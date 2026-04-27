@@ -6,6 +6,7 @@ import lombok.Data;
 public class PendingMessage {
     public static final int MSG_TYPE_TEXT = 0;
     public static final int MSG_TYPE_MEDIA = 7;
+    public static final int MSG_TYPE_MARKDOWN = 2;
     public static final int FILE_TYPE_IMAGE = 1;
     public static final int FILE_TYPE_VIDEO = 2;
 
@@ -19,6 +20,13 @@ public class PendingMessage {
         final PendingMessage message = new PendingMessage();
         message.content = content;
         message.msgType = MSG_TYPE_TEXT;
+        return message;
+    }
+
+    public static PendingMessage ofMarkdownRaw(String content) {
+        final PendingMessage message = new PendingMessage();
+        message.content = content;
+        message.msgType = MSG_TYPE_MARKDOWN;
         return message;
     }
 

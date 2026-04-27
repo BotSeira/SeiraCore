@@ -1,5 +1,6 @@
 package xyz.zcraft.platform;
 
+import com.google.gson.Gson;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.java_websocket.client.WebSocketClient;
@@ -11,16 +12,18 @@ import xyz.zcraft.data.*;
 import xyz.zcraft.util.ThreadHelper;
 
 import java.net.URI;
-import java.util.Arrays;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public abstract class AbstractCommandGatewayClient extends WebSocketClient implements PlatformGatewayClient {
+    public static final String BO_USAGE = "用法：/bo <个数> [玩家ID/@用户]";
+    public static final String NO_BIND_TIP = "你还没有绑定玩家ID，请先使用 /bind <玩家ID>";
+    public static final String RS_USAGE = "用法：/rs <个数> [玩家ID/@用户]";
+    public static final String M_USAGE = "用法：/m <铺面ID 或 快捷查询> [Mod]";
+    public static final String S_USAGE = "用法：/s <成绩ID 或 快捷查询>";
     private static final Logger LOG = LogManager.getLogger(AbstractCommandGatewayClient.class);
     private static final String PREFIX = "/";
     private static final String R_USAGE = "用法：/r <成绩ID 或 快捷查询>";
@@ -28,14 +31,11 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
     private static final ApiRequestStats API_REQUEST_STATS = new ApiRequestStats();
     private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo)(\\d+)$"); // bo25, rs1
     private static final Pattern SET_MACRO_PATTERN = Pattern.compile("^(\\d+)#(\\d+)$"); // 12345#1
+    private static final Pattern BEATMAP_MACRO_PATTERN = Pattern.compile("^m(\\d+)$"); // m12345
     private static final Pattern CQ_AT_PATTERN = Pattern.compile("^\\[CQ:at,qq=(\\d+)(?:,.*)?]$");
     private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
-    public static final String BO_USAGE = "用法：/bo <个数> [玩家ID/@用户]";
-    public static final String NO_BIND_TIP = "你还没有绑定玩家ID，请先使用 /bind <玩家ID>";
-    public static final String RS_USAGE = "用法：/rs <个数> [玩家ID/@用户]";
-    public static final String M_USAGE = "用法：/m <铺面ID 或 快捷查询> [Mod]";
-    public static final String S_USAGE = "用法：/s <成绩ID 或 快捷查询>";
     private final PlatformMessageSender messageSender;
+    private final VideoRenderRecord videoRenderRecord = new VideoRenderRecord();
 
     protected AbstractCommandGatewayClient(URI serverUri, PlatformMessageSender messageSender) {
         super(serverUri);
@@ -149,7 +149,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                     }
 
-                    return queueApiRequest("s", () -> PendingMessage.ofImageBase64(APIHelper.getScore(target)));
+                    return queueApiRequest("bo", () -> PendingMessage.ofImageBase64(APIHelper.getScore(target)));
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString(BO_USAGE));
                 }
@@ -190,7 +190,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                     }
 
-                    return queueApiRequest("s", () -> PendingMessage.ofImageBase64(APIHelper.getScore(target)));
+                    return queueApiRequest("rs", () -> PendingMessage.ofImageBase64(APIHelper.getScore(target)));
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString(RS_USAGE));
                 }
@@ -244,10 +244,14 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 if (target.isError()) {
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
-                return queueReplayTask("r", () -> APIHelper.createReplayRenderTask(target));
+                return queueReplayTask("r", () -> {
+                    final APIHelper.ReplayTaskInfo replayRenderTask = APIHelper.createReplayRenderTask(target);
+                    videoRenderRecord.updateRenderTask(senderUserId, replayRenderTask.taskId());
+                    return replayRenderTask;
+                });
             }
             case "rsc" -> {
-                if (args.length < 1 || args.length > 2) {
+                if (args.length < 1 || args.length > 3) {
                     return RouteDecision.sync(PendingMessage.ofString(RSC_USAGE));
                 }
 
@@ -255,12 +259,17 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                     return RouteDecision.sync(PendingMessage.ofString("/rsc 仅支持群聊使用。"));
                 }
 
-                ShortcutTarget target = parseTarget(args[0], platform, senderUserId);
+                TargetResolution targetResolution = resolveTargetWithOptionalMention(args, platform, senderUserId);
+                if (args.length - targetResolution.consumedArgs() > 1) {
+                    return RouteDecision.sync(PendingMessage.ofString(RSC_USAGE));
+                }
+                ShortcutTarget target = targetResolution.target();
                 if (target.isError()) {
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
 
-                String extraUidArg = args.length == 2 ? args[1] : null;
+                String extraUidArg =
+                        (args.length - targetResolution.consumedArgs() == 1) ? args[targetResolution.consumedArgs()] : null;
                 UidListResolution uidListResolution = resolveRscUidList(platform, groupId, extraUidArg);
                 if (uidListResolution.errorMessage() != null) {
                     return RouteDecision.sync(PendingMessage.ofString(uidListResolution.errorMessage()));
@@ -268,13 +277,21 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 String[] uidArray = uidListResolution.uids();
 
                 if (target.isMacro()) {
-                    return queueReplayTask("rsc", () -> APIHelper.createReplayShowcaseTask(target, uidArray));
+                    return queueReplayTask("rsc", () -> {
+                        final APIHelper.ReplayTaskInfo replayShowcaseTask = APIHelper.createReplayShowcaseTask(target, uidArray);
+                        videoRenderRecord.updateRenderTask(senderUserId, replayShowcaseTask.taskId());
+                        return replayShowcaseTask;
+                    });
                 }
 
                 if (target.explicitId() == null) {
                     return RouteDecision.sync(PendingMessage.ofString(RSC_USAGE));
                 }
-                return queueReplayTask("rsc", () -> APIHelper.createShowcaseRenderTaskByBeatmap(target.explicitId(), uidArray));
+                return queueReplayTask("rsc", () -> {
+                    final APIHelper.ReplayTaskInfo showcaseRenderTaskByBeatmap = APIHelper.createShowcaseRenderTaskByBeatmap(target.explicitId(), uidArray);
+                    videoRenderRecord.updateRenderTask(senderUserId, showcaseRenderTaskByBeatmap.taskId());
+                    return showcaseRenderTaskByBeatmap;
+                });
             }
             case "ms" -> {
                 if (args.length < 1 || args.length > 2) {
@@ -290,7 +307,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
 
-                return queueApiRequest("s", () -> PendingMessage.ofImageBase64(APIHelper.getBeatmapSet(target)));
+                return queueApiRequest("ms", () -> PendingMessage.ofImageBase64(APIHelper.getBeatmapSet(target)));
             }
             case "sms" -> {
                 if (args.length == 0) {
@@ -366,11 +383,17 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 return RouteDecision.sync(PendingMessage.ofString(APIHelper.getServerStatus()));
             }
             case "rstat" -> {
-                if (args.length != 1) {
-                    return RouteDecision.sync(PendingMessage.ofString("用法：/rstat <任务ID>"));
+                if (args.length == 1) {
+                    return RouteDecision.sync(PendingMessage.ofString(APIHelper.getRenderStat(args[0])));
+                } else if (args.length == 0) {
+                    if (videoRenderRecord.hasRenderTask(senderUserId)) {
+                        return RouteDecision.sync(PendingMessage.ofString(APIHelper.getRenderStat(videoRenderRecord.getRenderTask(senderUserId))));
+                    } else {
+                        return RouteDecision.sync(PendingMessage.ofString("未找到渲染请求"));
+                    }
+                } else {
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/rstat [任务ID]"));
                 }
-
-                return queueApiRequest("rstat", () -> PendingMessage.ofString(APIHelper.getRenderStat(args[0])));
             }
             case "help" -> {
                 return RouteDecision.sync(PendingMessage.ofString("""
@@ -383,14 +406,14 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                         /ms <铺面集ID> - 获取铺面集图谱
                         /r <成绩ID或快捷查询> - 生成成绩回放视频
                         /rsc <铺面ID或快捷查询> [+用户ID列表] - 生成同屏回放视频
+                        /rstat [任务ID] - 查询渲染进度
                         /sms <关键字> - 搜索铺面集
                         /c <铺面ID> [玩家ID列表] - 获取指定铺面排行榜
                         /lb [铺面ID] - /c 的别名（省略参数时走绑定用户）
                         /daily - 获取每日挑战
                         /mp - 获取多人房间列表
                         /status - 获取服务器状态
-                        /help - 显示此帮助信息
-                        """));
+                        /help - 显示此帮助信息"""));
             }
             default -> {
                 return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
@@ -413,7 +436,9 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                 return new ShortcutTarget(null, null, null, null, "铺面集索引无效。例如: 12345#2");
             }
 
-            return new ShortcutTarget(setId, null, "ms", index, null);
+            Integer uid = resolveBoundUid(platform, senderUserId);
+
+            return new ShortcutTarget(setId, uid, "ms", index, null);
         }
 
         Matcher userMatcher = USER_MACRO_PATTERN.matcher(arg.trim());
@@ -434,6 +459,13 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
             }
 
             return new ShortcutTarget(null, uid, type, index, null);
+        }
+
+        Matcher beatmapMatcher = BEATMAP_MACRO_PATTERN.matcher(arg.trim());
+        if (beatmapMatcher.matches()) {
+            Long mapId = parsePositiveLong(beatmapMatcher.group(1));
+            Integer uid = resolveBoundUid(platform, senderUserId);
+            return new ShortcutTarget(mapId, uid, "m", null, null);
         }
 
         Long id = parsePositiveLong(arg);
@@ -541,7 +573,7 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
 
     private RouteDecision queueReplayTask(String requestType, ReplayTaskCreator creator) {
         AtomicReference<APIHelper.ReplayTaskInfo> taskInfoRef = new AtomicReference<>();
-        AtomicReference<APIHelper.ReplayRenderResult> replayResultRef = new AtomicReference<>();
+
         return queueApiRequestUntilSubmit(
                 requestType,
                 () -> {
@@ -567,15 +599,14 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                     }
 
                     APIHelper.ReplayRenderResult result = APIHelper.waitReplayVideo(taskInfo.taskId());
-                    replayResultRef.set(result);
-                    return PendingMessage.ofVideoUrl(result.videoUrl());
-                },
-                () -> {
-                    APIHelper.ReplayRenderResult result = replayResultRef.get();
-                    if (result != null && result.taskId() != null && !result.taskId().isBlank()) {
-                        APIHelper.cleanupReplayVideo(result.taskId());
+
+                    if (result != null) {
+                        return PendingMessage.ofVideoUrl(result.videoUrl());
+                    } else {
+                        return PendingMessage.ofString("回放视频生成失败，请稍后重试。");
                     }
-                }
+                },
+                () -> {}
         );
     }
 
@@ -674,10 +705,15 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
 
     private void sendOutboundMessage(String targetId, String messageId, boolean groupMessage, PendingMessage pendingMsg, AtomicInteger messageSeqCounter) {
         Message message = new Message();
-        message.setContent(pendingMsg.getContent());
         message.setMsgType(pendingMsg.getMsgType());
         message.setMsgId(messageId);
         message.setMsgSeq(messageSeqCounter.getAndIncrement());
+
+        if (pendingMsg.getMsgType() == PendingMessage.MSG_TYPE_MARKDOWN) {
+            message.setMarkdown(new Gson().toJsonTree(Map.of("content", pendingMsg.getContent())).getAsJsonObject());
+        } else {
+            message.setContent(pendingMsg.getContent());
+        }
 
         if (pendingMsg.getFileUrl() != null) {
             LOG.info("Uploading media for {}", messageId);
@@ -686,20 +722,24 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
                     : messageSender.uploadPrivateMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl());
             if (fileInfo == null) {
                 LOG.error("Failed to upload media for message {}", messageId);
-                return;
+                message.setContent("媒体文件上传失败");
+                message.setMsgType(0);
+            } else {
+                LOG.info("Media uploaded for message {}", messageId);
+                message.setMedia(fileInfo);
             }
-            LOG.info("Media uploaded for message {}", messageId);
-            message.setMedia(fileInfo);
         } else if (pendingMsg.getFileBase64() != null) {
             FileInfo fileInfo = groupMessage
                     ? messageSender.uploadGroupMediaBase64(targetId, pendingMsg.getFileType(), pendingMsg.getFileBase64())
                     : messageSender.uploadPrivateMediaBase64(targetId, pendingMsg.getFileType(), pendingMsg.getFileBase64());
             if (fileInfo == null) {
                 LOG.error("Failed to upload base64 media for message {}", messageId);
-                return;
+                message.setContent("媒体文件上传失败");
+                message.setMsgType(0);
+            } else {
+                LOG.info("Base64 media uploaded for message {}", messageId);
+                message.setMedia(fileInfo);
             }
-            LOG.info("Base64 media uploaded for message {}", messageId);
-            message.setMedia(fileInfo);
         }
 
         if (groupMessage) {
@@ -754,7 +794,8 @@ public abstract class AbstractCommandGatewayClient extends WebSocketClient imple
         void execute();
     }
 
-    private record ApiTask(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer, boolean completeStatsAfterExecutor) {
+    private record ApiTask(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor,
+                           ApiTaskFinalizer finalizer, boolean completeStatsAfterExecutor) {
     }
 
     private record TargetResolution(ShortcutTarget target, int consumedArgs) {

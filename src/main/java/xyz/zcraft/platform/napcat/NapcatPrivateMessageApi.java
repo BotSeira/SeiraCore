@@ -154,22 +154,20 @@ public class NapcatPrivateMessageApi implements PlatformPrivateMessageApi {
 
     private String normalizeEndpoint(String endpoint) {
         if (endpoint == null || endpoint.isBlank()) {
-            throw new IllegalStateException("Missing required env: SEIRA_NAPCAT_HTTP_ENDPOINT");
+            throw new IllegalStateException("Missing required configuration");
         }
 
         URI uri = URI.create(endpoint.trim());
         String scheme = uri.getScheme();
         if (scheme == null || scheme.isBlank()) {
-            throw new IllegalStateException("Invalid SEIRA_NAPCAT_HTTP_ENDPOINT: missing URL scheme");
+            throw new IllegalStateException("Invalid configuration: missing URL scheme");
         }
 
         String normalizedScheme = scheme;
         if ("ws".equalsIgnoreCase(scheme)) {
             normalizedScheme = "http";
-            LOG.warn("SEIRA_NAPCAT_HTTP_ENDPOINT uses ws://, auto-converting to http://: {}", endpoint);
         } else if ("wss".equalsIgnoreCase(scheme)) {
             normalizedScheme = "https";
-            LOG.warn("SEIRA_NAPCAT_HTTP_ENDPOINT uses wss://, auto-converting to https://: {}", endpoint);
         }
 
         String normalizedPath = normalizeEndpointPath(uri.getPath());
@@ -182,7 +180,6 @@ public class NapcatPrivateMessageApi implements PlatformPrivateMessageApi {
         String lower = rawPath.toLowerCase();
 
         if ("/ws".equals(lower) || "/websocket".equals(lower)) {
-            LOG.warn("SEIRA_NAPCAT_HTTP_ENDPOINT path {} looks like a websocket route; auto-removing the path.", rawPath);
             return "";
         }
 

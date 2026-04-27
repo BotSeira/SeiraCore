@@ -11,7 +11,7 @@ public final class BotPlatformAdapters {
     public static BotPlatformAdapter create(AppConfig config) {
         return switch (config.seira().platform().toLowerCase()) {
             case "napcat" -> new NapcatPlatformAdapter(config);
-            case "qq" -> new QqPlatformAdapter();
+            case "qq" -> new QqPlatformAdapter(config);
             default -> throw new IllegalStateException("Unsupported platform: " + config.seira().platform());
         };
     }

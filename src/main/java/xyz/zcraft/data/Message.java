@@ -1,5 +1,6 @@
 package xyz.zcraft.data;
 
+import com.google.gson.JsonObject;
 import com.google.gson.annotations.SerializedName;
 import lombok.Data;
 
@@ -10,9 +11,9 @@ public class Message {
     @SerializedName("msg_type")
     private int msgType;
 
-    private Object markdown;
+    private JsonObject markdown;
 
-    private Object keyboard;
+    private JsonObject keyboard;
 
     private Object ark;
 

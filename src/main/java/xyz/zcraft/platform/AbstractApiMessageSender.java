@@ -34,6 +34,7 @@ public abstract class AbstractApiMessageSender implements PlatformMessageSender 
     @Override
     public FileInfo uploadPrivateMedia(String userId, int fileType, String url) {
         try {
+            log.info("Uploading private media for user {}, fileType {}, url {}", userId, fileType, url);
             return api.uploadPrivateMedia(userId, fileType, url);
         } catch (RuntimeException e) {
             log.error("Failed to upload private media {}", userId, e);

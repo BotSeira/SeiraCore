@@ -1,6 +1,5 @@
 package xyz.zcraft.config;
 
 public record OstellaConfig(
-        String endpoint,
-        String publicUrl
+        String endpoint
 ) {}

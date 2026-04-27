@@ -22,7 +22,6 @@ import java.util.Objects;
 
 public class APIHelper {
     private static final String ENDPOINT;
-    private static final String PUBLIC_URL;
     private static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(Duration.ofMinutes(5)).build();
     private static final Gson GSON = new Gson();
     private static final int REPLAY_POLL_INTERVAL_MS = 5000;
@@ -30,7 +29,6 @@ public class APIHelper {
 
     static {
         ENDPOINT = Seira.getConfig().ostella().endpoint();
-        PUBLIC_URL = Seira.getConfig().ostella().publicUrl();
     }
 
     public static String getBoN(int n, int uid) {
@@ -264,7 +262,14 @@ public class APIHelper {
         try {
             String query;
             if (target.isMacro()) {
-                query = "/s?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+                query = switch (target.macroType()) {
+                    case "bo", "rs" ->
+                            "/s?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+                    case "m" -> "/s?m=" + target.explicitId() + "&u=" + target.boundUid();
+                    case "ms" ->
+                            "/s?ms=" + target.explicitId() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+                    case null, default -> throw new IllegalArgumentException("Invalid macro type");
+                };
             } else {
                 query = "/s?s=" + target.explicitId();
             }
@@ -362,39 +367,9 @@ public class APIHelper {
     public static ReplayRenderResult waitReplayVideo(String taskId) {
         try {
             waitReplayDone(taskId);
-            String videoUrl = "";
-            if(PUBLIC_URL != null && !PUBLIC_URL.isBlank()) {
-                videoUrl += PUBLIC_URL;
-            } else {
-                videoUrl += ENDPOINT;
-            }
-            videoUrl += "/replay/video/" + taskId;
-
-            return new ReplayRenderResult(videoUrl, taskId);
-        } catch (RuntimeException ex) {
-            try {
-                cleanupReplayVideo(taskId);
-            } catch (RuntimeException ignored) {
-            }
-            throw ex;
-        }
-    }
-
-    public static void cleanupReplayVideo(String taskId) {
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/replay/video/" + taskId))
-                    .DELETE()
-                    .build();
-            HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-            if (codeNotOk(response.statusCode())) {
-                throw parseHttpError(response.body(), response.statusCode(), "清理回放视频失败");
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Replay cleanup interrupted", e);
+            return new ReplayRenderResult(ENDPOINT + "/replay/video/" + taskId + "/replay.mp4", taskId);
+        } catch (RuntimeException _) {
+            return null;
         }
     }
 
@@ -438,9 +413,18 @@ public class APIHelper {
     }
 
     private static String buildReplayTaskMessage(JsonObject data) {
+        StringBuilder sb = new StringBuilder();
+        if (data.has("beatmap") && data.get("beatmap").isJsonObject()) {
+            JsonObject beatmap = data.getAsJsonObject("beatmap");
+            sb.append("铺面信息: \n");
+            sb.append(beatmap.get("artist").getAsString()).append(" - ").append(beatmap.get("title").getAsString()).append("\n");
+            sb.append(beatmap.get("star").getAsString()).append(beatmap.get("version").getAsString()).append("\n");
+        }
+
         if (data.has("scores") && data.get("scores").isJsonArray()) {
-            StringBuilder sb = new StringBuilder();
             JsonArray scores = data.getAsJsonArray("scores");
+            sb.append("共%d个成绩:".formatted(scores.size()));
+
             for (JsonElement element : scores) {
                 if (!element.isJsonObject()) {
                     continue;
@@ -454,39 +438,6 @@ public class APIHelper {
                 }
                 sb.append(line);
             }
-            return sb.isEmpty() ? null : sb.toString();
-        }
-
-        JsonObject score = data.has("score") && data.get("score").isJsonObject()
-                ? data.getAsJsonObject("score")
-                : null;
-        if (score == null) {
-            return null;
-        }
-
-        String title = getScoreField(score, "title");
-        String artist = getScoreField(score, "artist");
-        String version = getScoreField(score, "version");
-        String star = getScoreField(score, "star");
-
-        StringBuilder sb = new StringBuilder();
-        if (title != null || artist != null || version != null || star != null) {
-            sb.append(orDash(title))
-                    .append(" - ")
-                    .append(orDash(artist))
-                    .append(" [")
-                    .append(orDash(version))
-                    .append(" ")
-                    .append(orDash(star))
-                    .append("]");
-        }
-
-        String scoreLine = buildScoreLine(score);
-        if (scoreLine != null) {
-            if (!sb.isEmpty()) {
-                sb.append("\n");
-            }
-            sb.append(scoreLine);
         }
 
         return sb.isEmpty() ? null : sb.toString();
@@ -502,7 +453,7 @@ public class APIHelper {
             return null;
         }
 
-        return orDash(username) + " - " + orDash(rank) + " - " + orDash(accuracy) + " - " + orDash(pp);
+        return "%s / %s / %s / %s".formatted(username, rank, accuracy, pp);
     }
 
     private static String getScoreField(JsonObject score, String field) {
@@ -514,10 +465,6 @@ public class APIHelper {
         } catch (Exception ignored) {
             return null;
         }
-    }
-
-    private static String orDash(String value) {
-        return value == null || value.isBlank() ? "-" : value;
     }
 
     private static void waitReplayDone(String taskId) {
@@ -667,7 +614,7 @@ public class APIHelper {
             final JsonObject data = r.getData().getAsJsonObject();
 
             StringBuilder sb = new StringBuilder();
-            sb.append("任务ID: ").append(jobId).append("\n");
+            sb.append("任务ID: ").append(jobId, 0, 8).append("\n");
 
             final JsonElement jsonElement = data.get("status");
             final String status = jsonElement != null ? jsonElement.getAsString() : null;
@@ -694,6 +641,8 @@ public class APIHelper {
     }
 
     public static String getServerStatus() {
+        boolean oStella = false;
+        boolean osu = false;
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/status"))
@@ -701,35 +650,34 @@ public class APIHelper {
                     .build();
 
             final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            final Response response = GSON.fromJson(send.body(), Response.class);
+            if (send.statusCode() == 200
+                    && send.body() != null
+                    && response != null
+                    && response.isSuccess()) {
+                        oStella = true;
 
+                        if(response.getData() != null && response.getData().isJsonObject()) {
+                            JsonObject data = response.getData().getAsJsonObject();
+                            if (data.has("osu-api") && !data.get("osu-api").isJsonNull()) {
+                                osu = data.get("osu-api").getAsBoolean();
+                            }
+                        }
+                    }
+        } catch (Exception _) {
+        }
 
             StringBuilder sb = new StringBuilder();
             sb.append("服务器状态: \n");
             sb.append("消息网关: ✅ 正常\n");
-            sb.append("oStella API: ");
+            sb.append("oStella API: ").append(oStella ? "✅ 正常" : "❌ 无法访问").append("\n");
 
-            final Response response = GSON.fromJson(send.body(), Response.class);
-
-            if(send.statusCode() != 200
-                    || send.body() == null
-                    || response == null
-                    || !response.isSuccess()) {
-                sb.append("❌ 无法访问\n");
-            } else {
-                sb.append("✅ 正常\n");
-
-                if(response.getData() != null && response.getData().isJsonObject()) {
-                    JsonObject data = response.getData().getAsJsonObject();
-                    if (data.has("osu-api") && !data.get("osu-api").isJsonNull()) {
-                        sb.append("osu!API: ").append(data.get("osu-api").getAsBoolean() ? "✅ 正常" : "❌ 无法访问").append("\n");
-                    }
-                }
+            if(oStella) {
+                sb.append("osu! API: ").append(osu ? "✅ 正常" : "❌ 无法访问").append("\n");
             }
 
             return sb.toString().trim();
-        } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+
     }
 
     public record ReplayRenderResult(String videoUrl, String taskId) {

@@ -10,7 +10,7 @@ import java.util.function.Supplier;
 public class MessageSender extends AbstractApiMessageSender {
     private static final Logger LOG = LogManager.getLogger(MessageSender.class);
 
-    public MessageSender(Supplier<AccessToken> tokenSupplier) {
-        super(new QqPrivateMessageApi(tokenSupplier), LOG);
+    public MessageSender(Supplier<AccessToken> tokenSupplier, CosUploadService cosUploadService) {
+        super(new QqPrivateMessageApi(tokenSupplier, cosUploadService), LOG);
     }
 }

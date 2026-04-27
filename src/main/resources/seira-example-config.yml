@@ -17,6 +17,14 @@ platforms:
     # 事件订阅，33554432 是消息相关权限的总和，不建议更改
     # 具体权限可以参考 https://bot.q.qq.com/wiki/develop/api-v2/dev-prepare/interface-framework/event-emit.html
     intents: 33554432
+    # 腾讯云 COS（可选，用于中转上传回放视频，不配置则直接使用原始 URL 上传）
+    cos:
+      secretId: ""
+      secretKey: ""
+      region: ""
+      bucket: ""
+      baseUrl: "" # 可选：自定义访问域名；留空将使用 https://<bucket>.cos.<region>.myqcloud.com
+      keyPrefix: "seira" # 可选：对象前缀，默认 seira
   # --- Napcat 适配器 ---
   napcat:
     wsEndpoint: "ws://127.0.0.1:3001"

@@ -38,6 +38,8 @@ public class GatewayWebSocketClient extends AbstractCommandGatewayClient {
         super(serverUri, messageSender);
         this.config = config;
         this.tokenSupplier = tokenSupplier;
+        LOG.info("QQ Gateway WebSocket Client created");
+        LOG.info(config.platforms().qq().cos().isConfigured() ? "Using COS for media storage" : "COS not configured");
     }
 
     @Override

@@ -1,4 +1,4 @@
-package xyz.zcraft.util;
+package xyz.zcraft.platform.qq;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
@@ -7,6 +7,7 @@ import com.google.gson.JsonParser;
 import xyz.zcraft.config.AppConfig;
 import xyz.zcraft.data.FileInfo;
 import xyz.zcraft.data.Message;
+import xyz.zcraft.util.AccessToken;
 
 import java.io.IOException;
 import java.net.URI;
@@ -65,7 +66,7 @@ public class NetworkHelper {
         try {
             final var request = newRequestBuilder(accessToken)
                     .uri(URI.create(ENDPOINT + "/v2/users/" + openId + "/messages"))
-                    .POST(HttpRequest.BodyPublishers.ofString(new Gson().toJson(message)))
+                    .POST(HttpRequest.BodyPublishers.ofString(buildMessageJson(message)))
                     .build();
 
             final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
@@ -75,6 +76,15 @@ public class NetworkHelper {
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public static String buildMessageJson(Message message) {
+        final JsonObject asJsonObject = new Gson().toJsonTree(message).getAsJsonObject();
+//        asJsonObject.add("message_reference", new Gson().toJsonTree(Map.of(
+//                "message_id", message.getMsgId(),
+//                "ignore_get_message_error", true
+//        )));
+        return asJsonObject.toString();
     }
 
     public static FileInfo uploadPrivateMedia(AccessToken accessToken, String openId, int fileType, String url) {
