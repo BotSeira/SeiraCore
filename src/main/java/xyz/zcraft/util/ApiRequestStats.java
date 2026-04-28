@@ -1,4 +1,4 @@
-package xyz.zcraft.platform;
+package xyz.zcraft.util;
 
 import java.util.ArrayDeque;
 import java.util.Deque;

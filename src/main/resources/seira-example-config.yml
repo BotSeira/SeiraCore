@@ -1,32 +1,24 @@
-# === 主程序配置 ===
+# === 主程序 配置 ===
 seira:
-  platform: qq # 使用的适配器，目前支持 "qq" 和 "napcat"
   sqlitePath: "./data/seira.db" # SQLite数据库路径，若不存在会自动创建
 
 # === oStella 配置 ===
 ostella:
   endpoint: "http://localhost:8721" # oStella API 的地址，由 Seira 访问，默认为本地运行的 oStella 实例
-  publicUrl: "" # 可选，从外网访问 oStella API 的地址，用于 qq 适配器的视频媒体上传
 
-# === 适配器设置 ===
-platforms:
-  # --- QQ 官方机器人 适配器 ---
-  qq:
-    appId: ""
-    appSecret: ""
-    # 事件订阅，33554432 是消息相关权限的总和，不建议更改
-    # 具体权限可以参考 https://bot.q.qq.com/wiki/develop/api-v2/dev-prepare/interface-framework/event-emit.html
-    intents: 33554432
-    # 腾讯云 COS（可选，用于中转上传回放视频，不配置则直接使用原始 URL 上传）
-    cos:
-      secretId: ""
-      secretKey: ""
-      region: ""
-      bucket: ""
-      baseUrl: "" # 可选：自定义访问域名；留空将使用 https://<bucket>.cos.<region>.myqcloud.com
-      keyPrefix: "seira" # 可选：对象前缀，默认 seira
-  # --- Napcat 适配器 ---
-  napcat:
-    wsEndpoint: "ws://127.0.0.1:3001"
-    httpEndpoint: "http://127.0.0.1:3000"
-    token: ""
+# === QQ机器人 配置 ===
+qq:
+  appId: ""
+  appSecret: ""
+  # 事件订阅，33554432 是消息相关权限的总和，不建议更改
+  # 具体权限可以参考 https://bot.q.qq.com/wiki/develop/api-v2/dev-prepare/interface-framework/event-emit.html
+  intents: 33554432
+
+# === 腾讯云COS 配置 ===
+cos:
+  secretId: ""
+  secretKey: ""
+  region: ""
+  bucket: ""
+  baseUrl: "" # 可选：自定义访问域名；留空将使用 https://<bucket>.cos.<region>.myqcloud.com
+  keyPrefix: "seira" # 可选：对象前缀，默认 seira

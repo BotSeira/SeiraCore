@@ -1,4 +1,4 @@
-package xyz.zcraft.platform.qq;
+package xyz.zcraft.bot;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
@@ -6,10 +6,9 @@ import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import xyz.zcraft.config.AppConfig;
-import xyz.zcraft.platform.AbstractCommandGatewayClient;
-import xyz.zcraft.platform.PlatformMessageSender;
 import xyz.zcraft.util.AccessToken;
 import xyz.zcraft.util.ThreadHelper;
 
@@ -20,26 +19,27 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
-public class GatewayWebSocketClient extends AbstractCommandGatewayClient {
-    private static final Logger LOG = LogManager.getLogger(GatewayWebSocketClient.class);
+public class WSClient extends WebSocketClient {
+    private static final Logger LOG = LogManager.getLogger(WSClient.class);
     private final Gson gson = new Gson();
     private final AppConfig config;
     private final Supplier<AccessToken> tokenSupplier;
     private final ScheduledExecutorService heartbeatExecutor = Executors.newSingleThreadScheduledExecutor();
     private final AtomicLong sequence = new AtomicLong(-1);
     private volatile boolean heartbeatAcked = true;
+    private final CommandRouter router;
 
-    public GatewayWebSocketClient(
+    public WSClient(
             URI serverUri,
             AppConfig config,
             Supplier<AccessToken> tokenSupplier,
-            PlatformMessageSender messageSender
+            MessageSender messageSender
     ) {
-        super(serverUri, messageSender);
+        super(serverUri);
         this.config = config;
         this.tokenSupplier = tokenSupplier;
+        this.router = new CommandRouter(messageSender);
         LOG.info("QQ Gateway WebSocket Client created");
-        LOG.info(config.platforms().qq().cos().isConfigured() ? "Using COS for media storage" : "COS not configured");
     }
 
     @Override
@@ -89,6 +89,8 @@ public class GatewayWebSocketClient extends AbstractCommandGatewayClient {
 
         if ("C2C_MESSAGE_CREATE".equals(eventType)) {
             onC2CMsg(payload);
+        } else if ("GROUP_AT_MESSAGE_CREATE".equals(eventType)) {
+            onGroupMsg(payload);
         }
     }
 
@@ -97,13 +99,22 @@ public class GatewayWebSocketClient extends AbstractCommandGatewayClient {
         String content = data.get("content").getAsString();
         String msgId = data.get("id").getAsString();
         String openId = data.get("author").getAsJsonObject().get("user_openid").getAsString();
-        onPrivateMessageReceived(openId, msgId, content);
+        router.onPrivateMessageReceived(openId, msgId, content);
+    }
+
+    private void onGroupMsg(JsonObject payload) {
+        JsonObject data = payload.get("d").getAsJsonObject();
+        String content = data.get("content").getAsString();
+        String msgId = data.get("id").getAsString();
+        String openId = data.get("author").getAsJsonObject().get("member_openid").getAsString();
+        String groupId = data.get("group_openid").getAsString();
+        router.onGroupMessageReceived(groupId, openId, msgId, content);
     }
 
     private void sendIdentify() {
         JsonObject data = new JsonObject();
         data.addProperty("token", "QQBot " + tokenSupplier.get().token());
-        data.addProperty("intents", config.platforms().qq().intents());
+        data.addProperty("intents", config.qq().intents());
 
         JsonObject payload = new JsonObject();
         payload.addProperty("op", 2);

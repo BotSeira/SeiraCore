@@ -1,10 +1,9 @@
-package xyz.zcraft.platform.qq;
+package xyz.zcraft.bot;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import xyz.zcraft.config.AppConfig;
 import xyz.zcraft.data.FileInfo;
 import xyz.zcraft.data.Message;
 import xyz.zcraft.util.AccessToken;
@@ -16,7 +15,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
-public class NetworkHelper {
+public class QQApi {
     private static final String ENDPOINT = "https://api.sgroup.qq.com";
     private static final HttpClient CLIENT = HttpClient.newBuilder().build();
     private static final Gson gson = new Gson();
@@ -38,11 +37,11 @@ public class NetworkHelper {
         }
     }
 
-    public static AccessToken getAccessToken(AppConfig config) {
+    public static AccessToken getAccessToken(String appId, String appSecret) {
         try {
             JsonObject payload = new JsonObject();
-            payload.addProperty("appId", config.platforms().qq().appId());
-            payload.addProperty("clientSecret", config.platforms().qq().appSecret());
+            payload.addProperty("appId", appId);
+            payload.addProperty("clientSecret", appSecret);
 
             HttpRequest request = HttpRequest.newBuilder()
                     .header("Content-Type", "application/json")
@@ -78,6 +77,22 @@ public class NetworkHelper {
         }
     }
 
+    public static void sendGroupMessage(AccessToken accessToken, String groupId, Message message) {
+        try {
+            final var request = newRequestBuilder(accessToken)
+                    .uri(URI.create(ENDPOINT + "/v2/groups/" + groupId + "/messages"))
+                    .POST(HttpRequest.BodyPublishers.ofString(buildMessageJson(message)))
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            if (send.statusCode() != 200) {
+                throw new RuntimeException("Failed to send group message to " + groupId + " " + send.body());
+            }
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public static String buildMessageJson(Message message) {
         final JsonObject asJsonObject = new Gson().toJsonTree(message).getAsJsonObject();
 //        asJsonObject.add("message_reference", new Gson().toJsonTree(Map.of(
@@ -106,6 +121,25 @@ public class NetworkHelper {
         }
     }
 
+    public static FileInfo uploadGroupMedia(AccessToken accessToken, String openId, int fileType, String url) {
+        try {
+            JsonObject payload = new JsonObject();
+            payload.addProperty("file_type", fileType);
+            payload.addProperty("url", url);
+            payload.addProperty("srv_send_msg", false);
+
+            final var request = newRequestBuilder(accessToken)
+                    .uri(URI.create(ENDPOINT + "/v2/groups/" + openId + "/files"))
+                    .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            return parseUploadedFileInfo(response, "upload private media");
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public static FileInfo uploadPrivateMediaBase64(AccessToken accessToken, String openId, int fileType, String base64) {
         try {
             JsonObject payload = new JsonObject();
@@ -115,6 +149,24 @@ public class NetworkHelper {
 
             final var request = newRequestBuilder(accessToken)
                     .uri(URI.create(ENDPOINT + "/v2/users/" + openId + "/files"))
+                    .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            return parseUploadedFileInfo(response, "upload private media(base64)");
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    public static FileInfo uploadGroupMediaBase64(AccessToken accessToken, String openId, int fileType, String base64) {
+        try {
+            JsonObject payload = new JsonObject();
+            payload.addProperty("file_type", fileType);
+            payload.addProperty("file_data", base64);
+            payload.addProperty("srv_send_msg", false);
+
+            final var request = newRequestBuilder(accessToken)
+                    .uri(URI.create(ENDPOINT + "/v2/groups/" + openId + "/files"))
                     .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
                     .build();
 

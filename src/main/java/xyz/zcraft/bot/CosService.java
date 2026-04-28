@@ -1,4 +1,4 @@
-package xyz.zcraft.platform.qq;
+package xyz.zcraft.bot;
 
 import com.qcloud.cos.COSClient;
 import com.qcloud.cos.ClientConfig;
@@ -22,14 +22,14 @@ import java.time.LocalDate;
 import java.util.Locale;
 import java.util.UUID;
 
-public class CosUploadService {
-    private static final Logger LOG = LogManager.getLogger(CosUploadService.class);
+public class CosService {
+    private static final Logger LOG = LogManager.getLogger(CosService.class);
     private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
 
     private final CosConfig config;
     private final COSClient client;
 
-    public CosUploadService(CosConfig config) {
+    public CosService(CosConfig config) {
         this.config = config;
         COSCredentials credentials = new BasicCOSCredentials(config.secretId(), config.secretKey());
         ClientConfig clientConfig = new ClientConfig(new Region(config.region()));
@@ -41,7 +41,7 @@ public class CosUploadService {
     public String uploadFromUrl(String sourceUrl, int fileType) {
         LOG.info("Processing file upload from url: " + sourceUrl);
         if (config == null || !config.isConfigured()) {
-            return sourceUrl;
+            throw new RuntimeException("COS is not configured");
         }
 
         DownloadedMedia media = downloadMedia(sourceUrl);
