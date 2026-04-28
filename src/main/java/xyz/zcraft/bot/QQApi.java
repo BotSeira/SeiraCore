@@ -4,6 +4,8 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import xyz.zcraft.data.FileInfo;
 import xyz.zcraft.data.Message;
 import xyz.zcraft.util.AccessToken;
@@ -19,6 +21,8 @@ public class QQApi {
     private static final String ENDPOINT = "https://api.sgroup.qq.com";
     private static final HttpClient CLIENT = HttpClient.newBuilder().build();
     private static final Gson gson = new Gson();
+    private static final Logger LOG = LogManager.getLogger(QQApi.class);
+
 
     public static String getWSSEndpoint(AccessToken accessToken) {
         try {
@@ -134,6 +138,12 @@ public class QQApi {
                     .build();
 
             final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                LOG.error("Failed to upload group media! Status code: {} body={}", response.statusCode(), response.body());
+                throw new RuntimeException("Failed to upload group media! Status code: " + response.statusCode());
+            }
+
             return parseUploadedFileInfo(response, "upload private media");
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
@@ -158,6 +168,7 @@ public class QQApi {
             throw new RuntimeException(e);
         }
     }
+
     public static FileInfo uploadGroupMediaBase64(AccessToken accessToken, String openId, int fileType, String base64) {
         try {
             JsonObject payload = new JsonObject();
