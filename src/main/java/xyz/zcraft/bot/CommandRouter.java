@@ -223,8 +223,8 @@ public class CommandRouter {
                     return queueImageRequest("m",
                             () -> APIHelper.getBeatmapResponse(target, mod),
                             response -> {
-                                String beatmapId = response != null && response.beatmapId() != null
-                                        ? response.beatmapId()
+                                String beatmapId = response != null && response.getBeatmapId() != null
+                                        ? response.getBeatmapId()
                                         : (target.explicitId() != null ? String.valueOf(target.explicitId()) : null);
                                 return markdownInfoMessage(buildBeatmapInfoText(beatmapId, mod, query), beatmapButtons(beatmapId));
                             });
@@ -248,7 +248,7 @@ public class CommandRouter {
 
                 return queueImageRequest("s",
                         () -> APIHelper.getScoreResponse(target),
-                        response -> markdownInfoMessage("成绩查询完成\n参数：" + query, sButtons(response.beatmapId())));
+                        response -> markdownInfoMessage("成绩查询完成\n参数：" + query, sButtons(response.getBeatmapId(), response.getScoreId())));
             }
             case "r" -> {
                 if (args.length < 1 || args.length > 2) {
@@ -352,7 +352,7 @@ public class CommandRouter {
                                 .toArray(String[]::new);
                         return queueImageRequest("lb",
                                 () -> APIHelper.getLeaderboardResponse(uidArray),
-                                response -> markdownInfoMessage("排行榜查询完成\n参数：" + (query.isBlank() ? "/lb" : query), lbButtons(response == null ? null : response.beatmapId())));
+                                response -> markdownInfoMessage("排行榜查询完成\n参数：" + (query.isBlank() ? "/lb" : query), lbButtons(response == null ? null : response.getBeatmapId())));
                     }
                     Integer uid = resolveBoundUid(senderUserId);
                     if (uid == null) {
@@ -360,7 +360,7 @@ public class CommandRouter {
                     }
                     return queueImageRequest("lb",
                             () -> APIHelper.getLeaderboardResponse(new String[]{String.valueOf(uid)}),
-                            response -> markdownInfoMessage("排行榜查询完成\n参数：" + (query.isBlank() ? "/lb" : query), lbButtons(response == null ? null : response.beatmapId())));
+                            response -> markdownInfoMessage("排行榜查询完成\n参数：" + (query.isBlank() ? "/lb" : query), lbButtons(response == null ? null : response.getBeatmapId())));
                 } else if (args.length == 1 || args.length == 2) {
                     TargetResolution targetResolution = resolveTargetWithOptionalMention(args, senderUserId);
                     ShortcutTarget target = targetResolution.target();
@@ -380,7 +380,7 @@ public class CommandRouter {
                                     .toArray(String[]::new);
                             return queueImageRequest("lbm",
                                     () -> APIHelper.getGroupLeaderboardResponse(target, uidArray),
-                                    response -> markdownInfoMessage("同屏排行榜查询完成\n参数：" + query, lbButtons(response.beatmapId())));
+                                    response -> markdownInfoMessage("同屏排行榜查询完成\n参数：" + query, lbButtons(response.getBeatmapId())));
                         }
                         Integer uid = resolveBoundUid(senderUserId);
                         if (uid == null) {
@@ -388,7 +388,7 @@ public class CommandRouter {
                         }
                         return queueImageRequest("lbm",
                                 () -> APIHelper.getGroupLeaderboardResponse(target, new String[]{String.valueOf(uid)}),
-                                response -> markdownInfoMessage("同屏排行榜查询完成\n参数：" + query, lbButtons(response.beatmapId())));
+                                response -> markdownInfoMessage("同屏排行榜查询完成\n参数：" + query, lbButtons(response.getBeatmapId())));
                     }
 
                     if (remainingArgs != 1) {
@@ -409,7 +409,7 @@ public class CommandRouter {
                     }
                     return queueImageRequest("lbm",
                             () -> APIHelper.getGroupLeaderboardResponse(target, uidArray),
-                            response -> markdownInfoMessage("同屏排行榜查询完成\n参数：" + query, lbButtons(response.beatmapId())));
+                            response -> markdownInfoMessage("同屏排行榜查询完成\n参数：" + query, lbButtons(response.getBeatmapId())));
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/lb <铺面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
                 }
@@ -722,7 +722,7 @@ public class CommandRouter {
                 () -> {
                     APIHelper.ImageResponse response = creator.create();
                     responseRef.set(response);
-                    return PendingMessage.ofImageBase64(response.base64());
+                    return PendingMessage.ofImageBase64(response.getBase64());
                 },
                 () -> postProcessor.execute(responseRef.get()),
                 () -> {
@@ -782,14 +782,19 @@ public class CommandRouter {
         );
     }
 
-    private List<List<Button>> sButtons(String beatmapId) {
+    private List<List<Button>> sButtons(String beatmapId, String scoreId) {
         if (beatmapId == null || beatmapId.isBlank()) {
             return null;
         }
 
         return Button.keyboard(
                 Button.row(
-                        Button.command(1, "查看铺面", "查看铺面", "/m " + beatmapId)
+                        Button.command(1, "查看铺面", "查看铺面", "/m " + beatmapId),
+                        Button.command(2, "查看铺面集", "查看铺面集", "/ms m" + beatmapId)
+                ),
+                Button.row(
+                        Button.command(1, "查询排行", "查询排行", "/lb " + beatmapId),
+                        Button.command(2, "渲染回放", "渲染回放", "/r " + scoreId)
                 )
         );
     }

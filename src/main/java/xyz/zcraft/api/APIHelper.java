@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import lombok.Data;
 import xyz.zcraft.Seira;
 import xyz.zcraft.data.SearchResultItem;
 import xyz.zcraft.data.ShortcutTarget;
@@ -16,12 +17,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.List;
-import java.util.LinkedList;
-import java.util.Objects;
+import java.util.*;
 
 public class APIHelper {
     private static final String ENDPOINT;
@@ -648,7 +644,7 @@ public class APIHelper {
             final JsonElement jsonElement = data.get("status");
             final String status = jsonElement != null ? jsonElement.getAsString() : null;
 
-            sb.append("状态: ").append(jsonElement != null ? switch (status){
+            sb.append("状态: ").append(jsonElement != null ? switch (status) {
                 case "done" -> "已完成";
                 case "failed" -> "失败";
                 case "timeout" -> "超时";
@@ -657,7 +653,7 @@ public class APIHelper {
                 default -> "未知";
             } : "未知").append("\n");
 
-            if(Objects.equals("rendering", status)) {
+            if (Objects.equals("rendering", status)) {
                 sb.append("进度: ").append(data.has("progress") && !data.get("progress").isJsonNull() ? data.get("progress").getAsString() : "未知").append("\n");
                 sb.append("速度: ").append(data.has("speed") && !data.get("speed").isJsonNull() ? data.get("speed").getAsString() : "未知").append("\n");
                 sb.append("预计时间: ").append(data.has("eta") && !data.get("eta").isJsonNull() ? data.get("eta").getAsString() : "未知").append("\n");
@@ -684,28 +680,28 @@ public class APIHelper {
                     && send.body() != null
                     && response != null
                     && response.isSuccess()) {
-                        oStella = true;
+                oStella = true;
 
-                        if(response.getData() != null && response.getData().isJsonObject()) {
-                            JsonObject data = response.getData().getAsJsonObject();
-                            if (data.has("osu-api") && !data.get("osu-api").isJsonNull()) {
-                                osu = data.get("osu-api").getAsBoolean();
-                            }
-                        }
+                if (response.getData() != null && response.getData().isJsonObject()) {
+                    JsonObject data = response.getData().getAsJsonObject();
+                    if (data.has("osu-api") && !data.get("osu-api").isJsonNull()) {
+                        osu = data.get("osu-api").getAsBoolean();
                     }
+                }
+            }
         } catch (Exception _) {
         }
 
-            StringBuilder sb = new StringBuilder();
-            sb.append("服务器状态: \n");
-            sb.append("消息网关: ✅ 正常\n");
-            sb.append("oStella API: ").append(oStella ? "✅ 正常" : "❌ 无法访问").append("\n");
+        StringBuilder sb = new StringBuilder();
+        sb.append("服务器状态: \n");
+        sb.append("消息网关: ✅ 正常\n");
+        sb.append("oStella API: ").append(oStella ? "✅ 正常" : "❌ 无法访问").append("\n");
 
-            if(oStella) {
-                sb.append("osu! API: ").append(osu ? "✅ 正常" : "❌ 无法访问").append("\n");
-            }
+        if (oStella) {
+            sb.append("osu! API: ").append(osu ? "✅ 正常" : "❌ 无法访问").append("\n");
+        }
 
-            return sb.toString().trim();
+        return sb.toString().trim();
 
     }
 
@@ -715,7 +711,18 @@ public class APIHelper {
     public record ReplayTaskInfo(String taskId, String status, Integer position, String message) {
     }
 
-    public record ImageResponse(String base64, String beatmapId, List<String> beatmapsetIds) {
+    @Data
+    public static final class ImageResponse {
+        private String base64;
+        private String beatmapId;
+        private String scoreId;
+        private List<String> beatmapsetIds;
+
+        public ImageResponse(String base64, String beatmapId, List<String> beatmapsetIds) {
+            this.base64 = base64;
+            this.beatmapId = beatmapId;
+            this.beatmapsetIds = beatmapsetIds;
+        }
     }
 
     public record TextResponse(String content, List<String> beatmapsetIds, int itemCount) {
