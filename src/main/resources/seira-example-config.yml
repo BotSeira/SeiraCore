@@ -1,6 +1,7 @@
 # === 主程序 配置 ===
 seira:
   sqlitePath: "./data/seira.db" # SQLite数据库路径，若不存在会自动创建
+  directUrl: "https://seira.zcraft.xyz/direct" # 用于消息卡片中跳转游戏的按钮
 
 # === oStella 配置 ===
 ostella:
