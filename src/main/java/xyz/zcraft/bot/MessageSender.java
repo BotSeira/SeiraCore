@@ -4,6 +4,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.data.FileInfo;
 import xyz.zcraft.data.Message;
+import xyz.zcraft.util.CosService;
+import xyz.zcraft.util.TokenManager;
 
 public class MessageSender {
     private final Logger LOG = LogManager.getLogger(MessageSender.class);
@@ -34,9 +36,7 @@ public class MessageSender {
     public FileInfo uploadPrivateMedia(String userId, int fileType, String url) {
         try {
             LOG.info("Uploading private media for user {}, fileType {}, url {}", userId, fileType, url);
-            if(cos != null) {
-                url = cos.uploadFromUrl(url, fileType);
-            }
+            url = cos.uploadFromUrl(url, fileType);
             return QQApi.uploadPrivateMedia(tokenManager.getToken(), userId, fileType, url);
         } catch (RuntimeException e) {
             LOG.error("Failed to upload private media {}", userId, e);
@@ -47,9 +47,7 @@ public class MessageSender {
     public FileInfo uploadGroupMedia(String groupId, int fileType, String url) {
         try {
             LOG.info("Uploading group media for group {}, fileType {}, url {}", groupId, fileType, url);
-            if(cos != null) {
-                url = cos.uploadFromUrl(url, fileType);
-            }
+            url = cos.uploadFromUrl(url, fileType);
             return QQApi.uploadGroupMedia(tokenManager.getToken(), groupId, fileType, url);
         } catch (RuntimeException e) {
             LOG.error("Failed to upload group media {}", groupId, e);

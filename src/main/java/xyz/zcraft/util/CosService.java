@@ -1,4 +1,4 @@
-package xyz.zcraft.bot;
+package xyz.zcraft.util;
 
 import com.qcloud.cos.COSClient;
 import com.qcloud.cos.ClientConfig;
@@ -40,9 +40,6 @@ public class CosService {
 
     public String uploadFromUrl(String sourceUrl, int fileType) {
         LOG.info("Processing file upload from url: " + sourceUrl);
-        if (config == null || !config.isConfigured()) {
-            throw new RuntimeException("COS is not configured");
-        }
 
         DownloadedMedia media = downloadMedia(sourceUrl);
         String objectKey = buildObjectKey(fileType, sourceUrl, media.contentType());

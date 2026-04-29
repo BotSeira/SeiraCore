@@ -8,15 +8,5 @@ public record CosConfig(
         String baseUrl,
         String keyPrefix
 ) {
-    public boolean isConfigured() {
-        return notBlank(secretId)
-                && notBlank(secretKey)
-                && notBlank(region)
-                && notBlank(bucket);
-    }
-
-    private static boolean notBlank(String value) {
-        return value != null && !value.isBlank();
-    }
 }
 

@@ -4,7 +4,9 @@ import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.config.AppConfig;
+import xyz.zcraft.util.CosService;
 import xyz.zcraft.util.ThreadHelper;
+import xyz.zcraft.util.TokenManager;
 
 import java.net.URI;
 
@@ -23,13 +25,8 @@ public class QQBot {
         LOG.info("Getting access token");
         this.tokenManager = new TokenManager(config.qq().appId(), config.qq().appSecret());
 
-        if(config.cos().isConfigured()) {
-            LOG.info("Initializing COS service");
-            this.cos = new CosService(config.cos());
-        } else {
-            LOG.info("COS service not configured");
-            this.cos = null;
-        }
+        LOG.info("Initializing COS service");
+        this.cos = new CosService(config.cos());
 
         this.sender = new MessageSender(tokenManager, cos);
 

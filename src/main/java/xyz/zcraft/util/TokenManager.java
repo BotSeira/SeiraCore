@@ -1,9 +1,9 @@
-package xyz.zcraft.bot;
+package xyz.zcraft.util;
 
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.util.AccessToken;
+import xyz.zcraft.bot.QQApi;
 
 import java.util.Timer;
 

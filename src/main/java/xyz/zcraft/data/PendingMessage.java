@@ -2,6 +2,8 @@ package xyz.zcraft.data;
 
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class PendingMessage {
     public static final int MSG_TYPE_TEXT = 0;
@@ -24,11 +26,13 @@ public class PendingMessage {
     }
 
     public static PendingMessage ofMarkdownRaw(String content) {
-        final PendingMessage message = new PendingMessage();
-        message.content = content;
-        message.msgType = MSG_TYPE_MARKDOWN;
-        return message;
+        return MDMessage.ofMarkdown(content, null);
     }
+
+    public static PendingMessage ofMarkdownRaw(String content, List<List<Button>> buttons) {
+        return MDMessage.ofMarkdown(content, buttons);
+    }
+
 
     public static PendingMessage ofImageBase64(String imageBase64) {
         final PendingMessage message = new PendingMessage();
@@ -43,14 +47,6 @@ public class PendingMessage {
         message.fileType = FILE_TYPE_VIDEO;
         message.msgType = MSG_TYPE_MEDIA;
         message.fileUrl = videoUrl;
-        return message;
-    }
-
-    public static PendingMessage ofVideoBase64(String videoBase64) {
-        final PendingMessage message = new PendingMessage();
-        message.fileType = FILE_TYPE_VIDEO;
-        message.msgType = MSG_TYPE_MEDIA;
-        message.fileBase64 = videoBase64;
         return message;
     }
 }

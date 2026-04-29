@@ -3,6 +3,7 @@ package xyz.zcraft.bot;
 import com.google.gson.Gson;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.Seira;
 import xyz.zcraft.api.APIHelper;
 import xyz.zcraft.api.ApiRequestException;
 import xyz.zcraft.binding.UserBindingStore;
@@ -127,7 +128,10 @@ public class CommandRouter {
                     if (uidResolution.uid() == null) {
                         return RouteDecision.sync(PendingMessage.ofString(BO_USAGE));
                     }
-                    return queueApiRequest("bo", () -> PendingMessage.ofImageBase64(APIHelper.getBoN(n, uidResolution.uid())));
+                    String infoQuery = query.isBlank() ? "bo1" : query;
+                    return queueImageRequest("bo",
+                            () -> APIHelper.getBoNResponse(n, uidResolution.uid()),
+                            response -> markdownInfoMessage("BoN 查询完成\n参数：" + infoQuery, boButtons()));
                 } else if (args.length == 1) {
                     Integer n = parsePositiveInt(args[0]);
                     if (n == null) {
@@ -137,14 +141,18 @@ public class CommandRouter {
                     if (uid == null) {
                         return RouteDecision.sync(PendingMessage.ofString(NO_BIND_TIP));
                     }
-                    return queueApiRequest("bo", () -> PendingMessage.ofImageBase64(APIHelper.getBoN(n, uid)));
+                    return queueImageRequest("bo",
+                            () -> APIHelper.getBoNResponse(n, uid),
+                            response -> markdownInfoMessage("BoN 查询完成\n参数：" + query, boButtons()));
                 } else if (args.length == 0) {
                     ShortcutTarget target = parseTarget("bo1", senderUserId);
                     if (target.isError()) {
                         return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                     }
 
-                    return queueApiRequest("bo", () -> PendingMessage.ofImageBase64(APIHelper.getScore(target)));
+                    return queueImageRequest("bo",
+                            () -> APIHelper.getScoreResponse(target),
+                            response -> markdownInfoMessage("BoN 查询完成\n参数：bo1", boButtons()));
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString(BO_USAGE));
                 }
@@ -168,7 +176,10 @@ public class CommandRouter {
                     if (uidResolution.uid() == null) {
                         return RouteDecision.sync(PendingMessage.ofString(RS_USAGE));
                     }
-                    return queueApiRequest("rs", () -> PendingMessage.ofImageBase64(APIHelper.getRecent(n, uidResolution.uid())));
+                    String infoQuery = query.isBlank() ? "rs1" : query;
+                    return queueImageRequest("rs",
+                            () -> APIHelper.getRecentResponse(n, uidResolution.uid()),
+                            response -> markdownInfoMessage("最近成绩查询完成\n参数：" + infoQuery, rsButtons()));
                 } else if (args.length == 1) {
                     Integer n = parsePositiveInt(args[0]);
                     if (n == null) {
@@ -178,14 +189,18 @@ public class CommandRouter {
                     if (uid == null) {
                         return RouteDecision.sync(PendingMessage.ofString(NO_BIND_TIP));
                     }
-                    return queueApiRequest("rs", () -> PendingMessage.ofImageBase64(APIHelper.getRecent(n, uid)));
+                    return queueImageRequest("rs",
+                            () -> APIHelper.getRecentResponse(n, uid),
+                            response -> markdownInfoMessage("最近成绩查询完成\n参数：" + query, rsButtons()));
                 } else if (args.length == 0) {
                     ShortcutTarget target = parseTarget("rs1", senderUserId);
                     if (target.isError()) {
                         return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                     }
 
-                    return queueApiRequest("rs", () -> PendingMessage.ofImageBase64(APIHelper.getScore(target)));
+                    return queueImageRequest("rs",
+                            () -> APIHelper.getScoreResponse(target),
+                            response -> markdownInfoMessage("最近成绩查询完成\n参数：rs1", rsButtons()));
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString(RS_USAGE));
                 }
@@ -205,7 +220,14 @@ public class CommandRouter {
                     String mod = args.length == targetResolution.consumedArgs() + 1
                             ? args[targetResolution.consumedArgs()]
                             : null;
-                    return queueApiRequest("m", () -> PendingMessage.ofImageBase64(APIHelper.getBeatmap(target, mod)));
+                    return queueImageRequest("m",
+                            () -> APIHelper.getBeatmapResponse(target, mod),
+                            response -> {
+                                String beatmapId = response != null && response.beatmapId() != null
+                                        ? response.beatmapId()
+                                        : (target.explicitId() != null ? String.valueOf(target.explicitId()) : null);
+                                return markdownInfoMessage(buildBeatmapInfoText(beatmapId, mod, query), beatmapButtons(beatmapId));
+                            });
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString(M_USAGE));
                 }
@@ -224,7 +246,9 @@ public class CommandRouter {
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
 
-                return queueApiRequest("s", () -> PendingMessage.ofImageBase64(APIHelper.getScore(target)));
+                return queueImageRequest("s",
+                        () -> APIHelper.getScoreResponse(target),
+                        response -> markdownInfoMessage("成绩查询完成\n参数：" + query, sButtons(response.beatmapId())));
             }
             case "r" -> {
                 if (args.length < 1 || args.length > 2) {
@@ -303,13 +327,18 @@ public class CommandRouter {
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
 
-                return queueApiRequest("ms", () -> PendingMessage.ofImageBase64(APIHelper.getBeatmapSet(target)));
+                return queueImageRequest("ms",
+                        () -> APIHelper.getBeatmapSetResponse(target),
+                        response -> markdownInfoMessage("铺面集查询完成\n参数：" + query, null));
             }
             case "sms" -> {
                 if (args.length == 0) {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/sms <搜索关键字>"));
                 }
-                return queueApiRequest("sms", () -> PendingMessage.ofString(APIHelper.searchBeatmapSet(query)));
+                return queueApiRequest("sms", () -> {
+                    APIHelper.TextResponse searchResponse = APIHelper.searchBeatmapSetResponse(query);
+                    return markdownInfoMessage(searchResponse.content(), searchButtons(searchResponse.beatmapsetIds(), searchResponse.itemCount()));
+                });
             }
             case "lb", "c" -> {
                 if (args.length == 0) {
@@ -321,13 +350,17 @@ public class CommandRouter {
                         String[] uidArray = groupBoundUids.stream()
                                 .map(String::valueOf)
                                 .toArray(String[]::new);
-                        return queueApiRequest("lb", () -> PendingMessage.ofImageBase64(APIHelper.getLeaderboard(uidArray)));
+                        return queueImageRequest("lb",
+                                () -> APIHelper.getLeaderboardResponse(uidArray),
+                                response -> markdownInfoMessage("排行榜查询完成\n参数：" + (query.isBlank() ? "/lb" : query), lbButtons(response == null ? null : response.beatmapId())));
                     }
                     Integer uid = resolveBoundUid(senderUserId);
                     if (uid == null) {
                         return RouteDecision.sync(PendingMessage.ofString(NO_BIND_TIP));
                     }
-                    return queueApiRequest("lb", () -> PendingMessage.ofImageBase64(APIHelper.getLeaderboard(new String[]{String.valueOf(uid)})));
+                    return queueImageRequest("lb",
+                            () -> APIHelper.getLeaderboardResponse(new String[]{String.valueOf(uid)}),
+                            response -> markdownInfoMessage("排行榜查询完成\n参数：" + (query.isBlank() ? "/lb" : query), lbButtons(response == null ? null : response.beatmapId())));
                 } else if (args.length == 1 || args.length == 2) {
                     TargetResolution targetResolution = resolveTargetWithOptionalMention(args, senderUserId);
                     ShortcutTarget target = targetResolution.target();
@@ -345,13 +378,17 @@ public class CommandRouter {
                             String[] uidArray = groupBoundUids.stream()
                                     .map(String::valueOf)
                                     .toArray(String[]::new);
-                            return queueApiRequest("lbm", () -> PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(target, uidArray)));
+                            return queueImageRequest("lbm",
+                                    () -> APIHelper.getGroupLeaderboardResponse(target, uidArray),
+                                    response -> markdownInfoMessage("同屏排行榜查询完成\n参数：" + query, lbButtons(response.beatmapId())));
                         }
                         Integer uid = resolveBoundUid(senderUserId);
                         if (uid == null) {
                             return RouteDecision.sync(PendingMessage.ofString(NO_BIND_TIP));
                         }
-                        return queueApiRequest("lbm", () -> PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(target, new String[]{String.valueOf(uid)})));
+                        return queueImageRequest("lbm",
+                                () -> APIHelper.getGroupLeaderboardResponse(target, new String[]{String.valueOf(uid)}),
+                                response -> markdownInfoMessage("同屏排行榜查询完成\n参数：" + query, lbButtons(response.beatmapId())));
                     }
 
                     if (remainingArgs != 1) {
@@ -370,7 +407,9 @@ public class CommandRouter {
                         }
                         uidArray[i] = String.valueOf(uid);
                     }
-                    return queueApiRequest("lbm", () -> PendingMessage.ofImageBase64(APIHelper.getGroupLeaderboard(target, uidArray)));
+                    return queueImageRequest("lbm",
+                            () -> APIHelper.getGroupLeaderboardResponse(target, uidArray),
+                            response -> markdownInfoMessage("同屏排行榜查询完成\n参数：" + query, lbButtons(response.beatmapId())));
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/lb <铺面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
                 }
@@ -412,6 +451,7 @@ public class CommandRouter {
                         /help - 显示此帮助信息"""));
             }
             case "test" -> {
+                messageSender.uploadGroupMedia(groupId, 2, "https://seirabot-1302810751.cos.ap-shanghai.myqcloud.com/seirabot/2026-04-29/39ca24529d654debb341c4541afbd692.mp4");
                 return RouteDecision.sync(PendingMessage.ofMarkdownRaw("""
                         # Markdown 测试
                         ## h2
@@ -603,7 +643,7 @@ public class CommandRouter {
                     if (taskInfo.message() != null) {
                         queuedText += "\n" + taskInfo.message();
                     }
-                    return PendingMessage.ofString(queuedText);
+                    return PendingMessage.ofMarkdownRaw(queuedText, replayProgressButtons(taskInfo.taskId()));
                 },
                 () -> {
                     APIHelper.ReplayTaskInfo taskInfo = taskInfoRef.get();
@@ -676,6 +716,135 @@ public class CommandRouter {
         }
     }
 
+    private RouteDecision queueImageRequest(String requestType, ImageResponseCreator creator, ImageResponsePostProcessor postProcessor) {
+        AtomicReference<APIHelper.ImageResponse> responseRef = new AtomicReference<>();
+        return queueApiRequest(requestType,
+                () -> {
+                    APIHelper.ImageResponse response = creator.create();
+                    responseRef.set(response);
+                    return PendingMessage.ofImageBase64(response.base64());
+                },
+                () -> postProcessor.execute(responseRef.get()),
+                () -> {
+                });
+    }
+
+    private PendingMessage markdownInfoMessage(String text, List<List<Button>> buttons) {
+        return PendingMessage.ofMarkdownRaw(text, buttons);
+    }
+
+    private String buildBeatmapInfoText(String beatmapId, String mod, String queryText) {
+        StringBuilder sb = new StringBuilder("铺面查询完成");
+        if (beatmapId != null && !beatmapId.isBlank()) {
+            sb.append("\n铺面ID：").append(beatmapId);
+        }
+        if (mod != null && !mod.isBlank()) {
+            sb.append("\nMod：").append(mod);
+        }
+        if (queryText != null && !queryText.isBlank()) {
+            sb.append("\n参数：").append(queryText);
+        }
+        return sb.toString();
+    }
+
+    private List<List<Button>> boButtons() {
+        return Button.keyboard(Button.row(
+                Button.command(1, "查询最好成绩", "查询最好成绩", "/s bo1"),
+                Button.command(2, "渲染最好成绩", "渲染最好成绩", "/r bo1")
+        ));
+    }
+
+    private List<List<Button>> rsButtons() {
+        return Button.keyboard(Button.row(
+                Button.command(1, "查询最近成绩", "查询最近成绩", "/s rs1"),
+                Button.command(2, "渲染最近成绩", "渲染最近成绩", "/r rs1")
+        ));
+    }
+
+    private List<List<Button>> beatmapButtons(String beatmapId) {
+        if (beatmapId == null || beatmapId.isBlank()) {
+            return null;
+        }
+
+        String directUrl = Seira.getConfig().seira().directUrl();
+        if (directUrl.endsWith("/")) {
+            directUrl = directUrl.substring(0, directUrl.length() - 1);
+        }
+
+        return Button.keyboard(
+                Button.row(
+                        Button.command(1, "查询排行榜", "查询排行榜", "/lb " + beatmapId),
+                        Button.openUrl(2, "在游戏中查看", "在游戏中查看", directUrl + "/b/" + beatmapId)
+                ),
+                Button.row(
+                        Button.command(3, "查询自己的分数", "查询自己的分数", "/s m" + beatmapId)
+                )
+        );
+    }
+
+    private List<List<Button>> sButtons(String beatmapId) {
+        if (beatmapId == null || beatmapId.isBlank()) {
+            return null;
+        }
+
+        return Button.keyboard(
+                Button.row(
+                        Button.command(1, "查看铺面", "查看铺面", "/m " + beatmapId)
+                )
+        );
+    }
+
+    private List<List<Button>> lbButtons(String beatmapId) {
+        if (beatmapId == null || beatmapId.isBlank()) {
+            return null;
+        }
+
+        return Button.keyboard(Button.row(
+                Button.command(1, "渲染同屏回放", "渲染同屏回放", "/rsc " + beatmapId)
+        ));
+    }
+
+    private List<List<Button>> replayProgressButtons(String jobId) {
+        if (jobId == null || jobId.isBlank()) {
+            return null;
+        }
+
+        return Button.keyboard(Button.row(
+                Button.command(1, "查询渲染进度", "查询渲染进度", "/rstat " + jobId)
+        ));
+    }
+
+    private List<List<Button>> searchButtons(List<String> beatmapsetIds, int itemCount) {
+        if (beatmapsetIds == null || beatmapsetIds.isEmpty() || itemCount <= 0) {
+            return null;
+        }
+
+        int count = Math.min(6, Math.min(itemCount, beatmapsetIds.size()));
+
+        List<List<Button>> rows = new ArrayList<>();
+        List<Button> currentRow = new ArrayList<>(3);
+        int buttonIndex = 0;
+        for (int i = 0; i < count; i++) {
+            String beatmapsetId = beatmapsetIds.get(i);
+            if (beatmapsetId == null || beatmapsetId.isBlank()) {
+                continue;
+            }
+
+            buttonIndex++;
+            currentRow.add(Button.command(buttonIndex, String.valueOf(buttonIndex), String.valueOf(buttonIndex), "/ms " + beatmapsetId));
+            if (currentRow.size() == 3) {
+                rows.add(List.copyOf(currentRow));
+                currentRow.clear();
+            }
+        }
+
+        if (!currentRow.isEmpty()) {
+            rows.add(List.copyOf(currentRow));
+        }
+
+        return rows.isEmpty() ? null : List.copyOf(rows);
+    }
+
     private String resolveErrorMessage(Exception exception) {
         Throwable cursor = exception;
         while (cursor != null) {
@@ -723,7 +892,13 @@ public class CommandRouter {
         message.setMsgId(messageId);
         message.setMsgSeq(messageSeqCounter.getAndIncrement());
 
-        if (pendingMsg.getMsgType() == PendingMessage.MSG_TYPE_MARKDOWN) {
+        if(pendingMsg instanceof MDMessage md) {
+            message.setMsgType(PendingMessage.MSG_TYPE_MARKDOWN);
+            message.setMarkdown(new Gson().toJsonTree(Map.of("content", md.getMarkdown())).getAsJsonObject());
+            if(md.hasKeyboard()) {
+                message.setKeyboard(md.getKeyboard());
+            }
+        } else if (pendingMsg.getMsgType() == PendingMessage.MSG_TYPE_MARKDOWN) {
             message.setMarkdown(new Gson().toJsonTree(Map.of("content", pendingMsg.getContent())).getAsJsonObject());
         } else {
             message.setContent(pendingMsg.getContent());
@@ -791,6 +966,16 @@ public class CommandRouter {
     @FunctionalInterface
     private interface ApiTaskExecutor {
         PendingMessage execute();
+    }
+
+    @FunctionalInterface
+    private interface ImageResponseCreator {
+        APIHelper.ImageResponse create();
+    }
+
+    @FunctionalInterface
+    private interface ImageResponsePostProcessor {
+        PendingMessage execute(APIHelper.ImageResponse response);
     }
 
     @FunctionalInterface

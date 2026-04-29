@@ -16,7 +16,10 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
+import java.util.List;
 import java.util.LinkedList;
 import java.util.Objects;
 
@@ -31,7 +34,8 @@ public class APIHelper {
         ENDPOINT = Seira.getConfig().ostella().endpoint();
     }
 
-    public static String getBoN(int n, int uid) {
+
+    public static ImageResponse getBoNResponse(int n, int uid) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/bo?" + "n=" + n + "&u=" + uid))
@@ -45,13 +49,13 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Base64.getEncoder().encodeToString(imageBytes);
+            return new ImageResponse(Base64.getEncoder().encodeToString(imageBytes), extractBeatmapId(send), Collections.emptyList());
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static String getGroupLeaderboard(ShortcutTarget target, String[] uids) {
+    public static ImageResponse getGroupLeaderboardResponse(ShortcutTarget target, String[] uids) {
         String uidsParam = String.join(",", uids);
         try {
             String query;
@@ -74,13 +78,13 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Base64.getEncoder().encodeToString(imageBytes);
+            return new ImageResponse(Base64.getEncoder().encodeToString(imageBytes), extractBeatmapId(send), Collections.emptyList());
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static String getLeaderboard(String[] uids) {
+    public static ImageResponse getLeaderboardResponse(String[] uids) {
         String uidsParam = String.join(",", uids);
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
@@ -95,7 +99,7 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Base64.getEncoder().encodeToString(imageBytes);
+            return new ImageResponse(Base64.getEncoder().encodeToString(imageBytes), extractBeatmapId(send), Collections.emptyList());
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -166,7 +170,7 @@ public class APIHelper {
         }
     }
 
-    public static String getRecent(int n, int uid) {
+    public static ImageResponse getRecentResponse(int n, int uid) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/rs?" + "n=" + n + "&u=" + uid))
@@ -181,13 +185,13 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Base64.getEncoder().encodeToString(imageBytes);
+            return new ImageResponse(Base64.getEncoder().encodeToString(imageBytes), extractBeatmapId(send), Collections.emptyList());
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static String getBeatmap(ShortcutTarget target, String mod) {
+    public static ImageResponse getBeatmapResponse(ShortcutTarget target, String mod) {
         try {
             final String query = getBeatmapQuery(target, mod);
 
@@ -204,7 +208,7 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Base64.getEncoder().encodeToString(imageBytes);
+            return new ImageResponse(Base64.getEncoder().encodeToString(imageBytes), extractBeatmapId(send), Collections.emptyList());
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -230,7 +234,7 @@ public class APIHelper {
         return query;
     }
 
-    public static String getBeatmapSet(ShortcutTarget target) {
+    public static ImageResponse getBeatmapSetResponse(ShortcutTarget target) {
         try {
             String query;
             if (target.isMacro()) {
@@ -252,13 +256,13 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Base64.getEncoder().encodeToString(imageBytes);
+            return new ImageResponse(Base64.getEncoder().encodeToString(imageBytes), extractBeatmapId(send), Collections.emptyList());
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static String getScore(ShortcutTarget target) {
+    public static ImageResponse getScoreResponse(ShortcutTarget target) {
         try {
             String query;
             if (target.isMacro()) {
@@ -287,13 +291,13 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Base64.getEncoder().encodeToString(imageBytes);
+            return new ImageResponse(Base64.getEncoder().encodeToString(imageBytes), extractBeatmapId(send), Collections.emptyList());
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static String searchBeatmapSet(String query) {
+    public static TextResponse searchBeatmapSetResponse(String query) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/sms?" + "q=" + URLEncoder.encode(query, StandardCharsets.UTF_8)))
@@ -326,7 +330,7 @@ public class APIHelper {
                         .append("\n");
             }
 
-            return sb.toString().trim();
+            return new TextResponse(sb.toString().trim(), extractBeatmapsetIds(send), items.size());
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -596,6 +600,31 @@ public class APIHelper {
         return payload.getData().getAsJsonObject();
     }
 
+    private static String extractBeatmapId(HttpResponse<?> response) {
+        return response.headers().firstValue("X-Beatmap-Id").orElse(null);
+    }
+
+    private static List<String> extractBeatmapsetIds(HttpResponse<?> response) {
+        return response.headers().firstValue("X-Beatmapset-Ids")
+                .map(APIHelper::parseCsvHeader)
+                .orElseGet(Collections::emptyList);
+    }
+
+    private static List<String> parseCsvHeader(String headerValue) {
+        if (headerValue == null || headerValue.isBlank()) {
+            return Collections.emptyList();
+        }
+
+        List<String> ids = new ArrayList<>();
+        for (String part : headerValue.split(",")) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) {
+                ids.add(trimmed);
+            }
+        }
+        return ids;
+    }
+
     public static String getRenderStat(String jobId) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -684,5 +713,11 @@ public class APIHelper {
     }
 
     public record ReplayTaskInfo(String taskId, String status, Integer position, String message) {
+    }
+
+    public record ImageResponse(String base64, String beatmapId, List<String> beatmapsetIds) {
+    }
+
+    public record TextResponse(String content, List<String> beatmapsetIds, int itemCount) {
     }
 }
