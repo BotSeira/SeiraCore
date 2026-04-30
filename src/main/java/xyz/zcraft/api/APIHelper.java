@@ -321,8 +321,8 @@ public class APIHelper {
             for (int i = 0; i < Math.min(items.size(), 10); i++) {
                 SearchResultItem item = items.get(i);
                 sb.append(i + 1).append(". ").append(item.beatmapsetId()).append(" - ").append(item.artist()).append(" - ").append(item.title())
-                        .append(" [").append(item.mapperName()).append("] ")
-                        .append(String.format("(%.2f★ ~ %.2f★)", item.minStar(), item.maxStar()).replace(".", "\u200B,"))
+                        .append(" <").append(item.mapperName()).append("> ")
+                        .append(String.format("[%.2f★ ~ %.2f★]", item.minStar(), item.maxStar()))
                         .append("\n");
             }
 
