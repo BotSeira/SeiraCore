@@ -147,20 +147,9 @@ final class CommandTaskCoordinator {
 
         if (pendingMsg.getFileUrl() != null) {
             LOG.info("Uploading media for {}", messageId);
-            FileInfo fileInfo = null;                                                                      
-            for(int i = 1; i <= 3; i++) {                                                                      
-                fileInfo = groupMessage                                                                                
-                    ? messageSender.uploadGroupMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl())                                                                                                 
-                    : messageSender.uploadPrivateMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl());                                                                                      
-                if (fileInfo == null) {                                                                            
-                    LOG.error("Upload failed ({}/3)", i);   
-                    try {
-                        Thread.sleep(1000);
-                    } catch (Exception _) {}
-                } else {                                                                                           
-                    break;                                                                                     
-                }                                                                                          
-            }
+            FileInfo fileInfo = groupMessage
+                    ? messageSender.uploadGroupMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl())
+                    : messageSender.uploadPrivateMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl()); 
             if (fileInfo == null) {
                 LOG.error("Failed to upload media for message {}", messageId);
                 message.setContent("媒体文件上传失败");
