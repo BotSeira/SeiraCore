@@ -39,8 +39,8 @@ public class MessageSender {
 
     public FileInfo uploadPrivateMedia(String userId, int fileType, String url, boolean uploadCos) {
         try {
-            LOG.info("Uploading private media for user {}, fileType {}, url {}", userId, fileType, url);
             if(uploadCos) url = cos.uploadFromUrl(url, fileType);
+            LOG.info("Uploading private media for user {}, fileType {}, url {}", userId, fileType, url);
             return QQApi.uploadPrivateMedia(tokenManager.getToken(), userId, fileType, url);
         } catch (RuntimeException e) {
             LOG.error("Failed to upload private media {}", userId, e);
@@ -54,8 +54,8 @@ public class MessageSender {
 
     public FileInfo uploadGroupMedia(String groupId, int fileType, String url, boolean uploadCos) {
         try {
-            LOG.info("Uploading group media for group {}, fileType {}, url {}", groupId, fileType, url);
             if(uploadCos) url = cos.uploadFromUrl(url, fileType);
+            LOG.info("Uploading group media for group {}, fileType {}, url {}", groupId, fileType, url);
             return QQApi.uploadGroupMedia(tokenManager.getToken(), groupId, fileType, url);
         } catch (RuntimeException e) {
             LOG.error("Failed to upload group media {}", groupId, e);
