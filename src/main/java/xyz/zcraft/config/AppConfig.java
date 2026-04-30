@@ -3,6 +3,7 @@ package xyz.zcraft.config;
 public record AppConfig(
         SeiraConfig seira,
         OstellaConfig ostella,
-        PlatformsConfig platforms
+        QqConfig qq,
+        CosConfig cos
 ) {}
 

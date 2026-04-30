@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import lombok.Data;
 import xyz.zcraft.Seira;
 import xyz.zcraft.data.SearchResultItem;
 import xyz.zcraft.data.ShortcutTarget;
@@ -16,9 +17,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Base64;
-import java.util.LinkedList;
-import java.util.Objects;
+import java.util.*;
 
 public class APIHelper {
     private static final String ENDPOINT;
@@ -31,7 +30,8 @@ public class APIHelper {
         ENDPOINT = Seira.getConfig().ostella().endpoint();
     }
 
-    public static String getBoN(int n, int uid) {
+
+    public static ImageResponse getBoNResponse(int n, int uid) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/bo?" + "n=" + n + "&u=" + uid))
@@ -45,13 +45,13 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Base64.getEncoder().encodeToString(imageBytes);
+            return new ImageResponse(Base64.getEncoder().encodeToString(imageBytes), extractBeatmapId(send), Collections.emptyList());
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static String getGroupLeaderboard(ShortcutTarget target, String[] uids) {
+    public static ImageResponse getGroupLeaderboardResponse(ShortcutTarget target, String[] uids) {
         String uidsParam = String.join(",", uids);
         try {
             String query;
@@ -74,13 +74,13 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Base64.getEncoder().encodeToString(imageBytes);
+            return new ImageResponse(Base64.getEncoder().encodeToString(imageBytes), extractBeatmapId(send), Collections.emptyList());
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static String getLeaderboard(String[] uids) {
+    public static ImageResponse getLeaderboardResponse(String[] uids) {
         String uidsParam = String.join(",", uids);
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
@@ -95,7 +95,7 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Base64.getEncoder().encodeToString(imageBytes);
+            return new ImageResponse(Base64.getEncoder().encodeToString(imageBytes), extractBeatmapId(send), Collections.emptyList());
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -166,7 +166,7 @@ public class APIHelper {
         }
     }
 
-    public static String getRecent(int n, int uid) {
+    public static ImageResponse getRecentResponse(int n, int uid) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/rs?" + "n=" + n + "&u=" + uid))
@@ -181,13 +181,13 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Base64.getEncoder().encodeToString(imageBytes);
+            return new ImageResponse(Base64.getEncoder().encodeToString(imageBytes), extractBeatmapId(send), Collections.emptyList());
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static String getBeatmap(ShortcutTarget target, String mod) {
+    public static ImageResponse getBeatmapResponse(ShortcutTarget target, String mod) {
         try {
             final String query = getBeatmapQuery(target, mod);
 
@@ -204,7 +204,7 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Base64.getEncoder().encodeToString(imageBytes);
+            return new ImageResponse(Base64.getEncoder().encodeToString(imageBytes), extractBeatmapId(send), Collections.emptyList());
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -230,7 +230,7 @@ public class APIHelper {
         return query;
     }
 
-    public static String getBeatmapSet(ShortcutTarget target) {
+    public static ImageResponse getBeatmapSetResponse(ShortcutTarget target) {
         try {
             String query;
             if (target.isMacro()) {
@@ -252,13 +252,13 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Base64.getEncoder().encodeToString(imageBytes);
+            return new ImageResponse(Base64.getEncoder().encodeToString(imageBytes), extractBeatmapId(send), Collections.emptyList());
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static String getScore(ShortcutTarget target) {
+    public static ImageResponse getScoreResponse(ShortcutTarget target) {
         try {
             String query;
             if (target.isMacro()) {
@@ -287,13 +287,16 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Base64.getEncoder().encodeToString(imageBytes);
+            var ret = new ImageResponse(Base64.getEncoder().encodeToString(imageBytes), extractBeatmapId(send), Collections.emptyList());
+            ret.setScoreId(extractScoreId(send));
+
+            return ret;
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static String searchBeatmapSet(String query) {
+    public static TextResponse searchBeatmapSetResponse(String query) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/sms?" + "q=" + URLEncoder.encode(query, StandardCharsets.UTF_8)))
@@ -321,12 +324,12 @@ public class APIHelper {
             for (int i = 0; i < Math.min(items.size(), 10); i++) {
                 SearchResultItem item = items.get(i);
                 sb.append(i + 1).append(". ").append(item.beatmapsetId()).append(" - ").append(item.artist()).append(" - ").append(item.title())
-                        .append(" [").append(item.mapperName()).append("] ")
-                        .append(String.format("(%.2f* - %.2f*)", item.minStar(), item.maxStar()))
+                        .append(" <").append(item.mapperName()).append("> ")
+                        .append(String.format("[%.2f★ ~ %.2f★]", item.minStar(), item.maxStar()))
                         .append("\n");
             }
 
-            return sb.toString().trim();
+            return new TextResponse(sb.toString().trim(), extractBeatmapsetIds(send), Math.min(items.size(), 10));
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -596,6 +599,35 @@ public class APIHelper {
         return payload.getData().getAsJsonObject();
     }
 
+    private static String extractBeatmapId(HttpResponse<?> response) {
+        return response.headers().firstValue("X-Beatmap-Id").orElse(null);
+    }
+
+    private static String extractScoreId(HttpResponse<?> response) {
+        return response.headers().firstValue("X-Score-Id").orElse(null);
+    }
+
+    private static List<String> extractBeatmapsetIds(HttpResponse<?> response) {
+        return response.headers().firstValue("X-Beatmapset-Ids")
+                .map(APIHelper::parseCsvHeader)
+                .orElseGet(Collections::emptyList);
+    }
+
+    private static List<String> parseCsvHeader(String headerValue) {
+        if (headerValue == null || headerValue.isBlank()) {
+            return Collections.emptyList();
+        }
+
+        List<String> ids = new ArrayList<>();
+        for (String part : headerValue.split(",")) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) {
+                ids.add(trimmed);
+            }
+        }
+        return ids;
+    }
+
     public static String getRenderStat(String jobId) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -619,7 +651,7 @@ public class APIHelper {
             final JsonElement jsonElement = data.get("status");
             final String status = jsonElement != null ? jsonElement.getAsString() : null;
 
-            sb.append("状态: ").append(jsonElement != null ? switch (status){
+            sb.append("状态: ").append(jsonElement != null ? switch (status) {
                 case "done" -> "已完成";
                 case "failed" -> "失败";
                 case "timeout" -> "超时";
@@ -628,7 +660,7 @@ public class APIHelper {
                 default -> "未知";
             } : "未知").append("\n");
 
-            if(Objects.equals("rendering", status)) {
+            if (Objects.equals("rendering", status)) {
                 sb.append("进度: ").append(data.has("progress") && !data.get("progress").isJsonNull() ? data.get("progress").getAsString() : "未知").append("\n");
                 sb.append("速度: ").append(data.has("speed") && !data.get("speed").isJsonNull() ? data.get("speed").getAsString() : "未知").append("\n");
                 sb.append("预计时间: ").append(data.has("eta") && !data.get("eta").isJsonNull() ? data.get("eta").getAsString() : "未知").append("\n");
@@ -655,28 +687,28 @@ public class APIHelper {
                     && send.body() != null
                     && response != null
                     && response.isSuccess()) {
-                        oStella = true;
+                oStella = true;
 
-                        if(response.getData() != null && response.getData().isJsonObject()) {
-                            JsonObject data = response.getData().getAsJsonObject();
-                            if (data.has("osu-api") && !data.get("osu-api").isJsonNull()) {
-                                osu = data.get("osu-api").getAsBoolean();
-                            }
-                        }
+                if (response.getData() != null && response.getData().isJsonObject()) {
+                    JsonObject data = response.getData().getAsJsonObject();
+                    if (data.has("osu-api") && !data.get("osu-api").isJsonNull()) {
+                        osu = data.get("osu-api").getAsBoolean();
                     }
+                }
+            }
         } catch (Exception _) {
         }
 
-            StringBuilder sb = new StringBuilder();
-            sb.append("服务器状态: \n");
-            sb.append("消息网关: ✅ 正常\n");
-            sb.append("oStella API: ").append(oStella ? "✅ 正常" : "❌ 无法访问").append("\n");
+        StringBuilder sb = new StringBuilder();
+        sb.append("服务器状态: \n");
+        sb.append("消息网关: ✅ 正常\n");
+        sb.append("oStella API: ").append(oStella ? "✅ 正常" : "❌ 无法访问").append("\n");
 
-            if(oStella) {
-                sb.append("osu! API: ").append(osu ? "✅ 正常" : "❌ 无法访问").append("\n");
-            }
+        if (oStella) {
+            sb.append("osu! API: ").append(osu ? "✅ 正常" : "❌ 无法访问").append("\n");
+        }
 
-            return sb.toString().trim();
+        return sb.toString().trim();
 
     }
 
@@ -684,5 +716,22 @@ public class APIHelper {
     }
 
     public record ReplayTaskInfo(String taskId, String status, Integer position, String message) {
+    }
+
+    @Data
+    public static final class ImageResponse {
+        private String base64;
+        private String beatmapId;
+        private String scoreId;
+        private List<String> beatmapsetIds;
+
+        public ImageResponse(String base64, String beatmapId, List<String> beatmapsetIds) {
+            this.base64 = base64;
+            this.beatmapId = beatmapId;
+            this.beatmapsetIds = beatmapsetIds;
+        }
+    }
+
+    public record TextResponse(String content, List<String> beatmapsetIds, int itemCount) {
     }
 }

@@ -42,36 +42,34 @@ public final class UserBindingStore {
         }
     }
 
-    public static void bind(String platform, String platformUserId, int osuUid) {
+    public static void bind(String openId, int osuUid) {
         ensureInitialized();
         long now = System.currentTimeMillis();
         String sql = """
-                INSERT INTO user_bindings(platform, platform_user_id, osu_uid, created_at, updated_at)
-                VALUES(?, ?, ?, ?, ?)
-                ON CONFLICT(platform, platform_user_id) DO UPDATE SET
+                INSERT INTO user_bindings(open_id, osu_uid, created_at, updated_at)
+                VALUES(?, ?, ?, ?)
+                ON CONFLICT(open_id) DO UPDATE SET
                     osu_uid = excluded.osu_uid,
                     updated_at = excluded.updated_at
                 """;
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
              PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, platform);
-            statement.setString(2, platformUserId);
-            statement.setInt(3, osuUid);
+            statement.setString(1, openId);
+            statement.setInt(2, osuUid);
+            statement.setLong(3, now);
             statement.setLong(4, now);
-            statement.setLong(5, now);
             statement.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to persist binding", e);
         }
     }
 
-    public static Integer findBoundUid(String platform, String platformUserId) {
+    public static Integer findBoundUid(String openId) {
         ensureInitialized();
-        String sql = "SELECT osu_uid FROM user_bindings WHERE platform = ? AND platform_user_id = ?";
+        String sql = "SELECT osu_uid FROM user_bindings WHERE open_id = ?";
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
              PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, platform);
-            statement.setString(2, platformUserId);
+            statement.setString(1, openId);
             try (ResultSet resultSet = statement.executeQuery()) {
                 if (resultSet.next()) {
                     return resultSet.getInt("osu_uid");
@@ -83,56 +81,52 @@ public final class UserBindingStore {
         return null;
     }
 
-    public static boolean unbind(String platform, String platformUserId) {
+    public static boolean unbind(String openId) {
         ensureInitialized();
-        String sql = "DELETE FROM user_bindings WHERE platform = ? AND platform_user_id = ?";
+        String sql = "DELETE FROM user_bindings WHERE open_id = ?";
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
              PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, platform);
-            statement.setString(2, platformUserId);
+            statement.setString(1, openId);
             return statement.executeUpdate() > 0;
         } catch (SQLException e) {
             throw new RuntimeException("Failed to delete binding", e);
         }
     }
 
-    public static void upsertGroupMember(String platform, String groupId, String platformUserId) {
+    public static void upsertGroupMember(String groupId, String openId) {
         ensureInitialized();
         long now = System.currentTimeMillis();
         String sql = """
-                INSERT INTO group_members(platform, group_id, platform_user_id, updated_at)
-                VALUES(?, ?, ?, ?)
-                ON CONFLICT(platform, group_id, platform_user_id) DO UPDATE SET
+                INSERT INTO group_members(group_id, open_id, updated_at)
+                VALUES(?, ?, ?)
+                ON CONFLICT(group_id, open_id) DO UPDATE SET
                     updated_at = excluded.updated_at
                 """;
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
              PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, platform);
-            statement.setString(2, groupId);
-            statement.setString(3, platformUserId);
-            statement.setLong(4, now);
+            statement.setString(1, groupId);
+            statement.setString(2, openId);
+            statement.setLong(3, now);
             statement.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to persist group member", e);
         }
     }
 
-    public static List<Integer> findBoundUidsByGroup(String platform, String groupId) {
+    public static List<Integer> findBoundUidsByGroup(String groupId) {
         ensureInitialized();
         String sql = """
                 SELECT DISTINCT ub.osu_uid
                 FROM group_members gm
                 JOIN user_bindings ub
-                  ON ub.platform = gm.platform
-                 AND ub.platform_user_id = gm.platform_user_id
-                WHERE gm.platform = ? AND gm.group_id = ?
+                 ON ub.open_id = gm.open_id
+                WHERE gm.group_id = ?
                 ORDER BY ub.osu_uid
                 """;
         List<Integer> uids = new ArrayList<>();
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
              PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, platform);
-            statement.setString(2, groupId);
+            statement.setString(1, groupId);
             try (ResultSet resultSet = statement.executeQuery()) {
                 while (resultSet.next()) {
                     uids.add(resultSet.getInt("osu_uid"));
@@ -147,21 +141,19 @@ public final class UserBindingStore {
     private static void createTablesIfNeeded() throws SQLException {
         String bindingSql = """
                 CREATE TABLE IF NOT EXISTS user_bindings (
-                    platform TEXT NOT NULL,
-                    platform_user_id TEXT NOT NULL,
+                    open_id TEXT NOT NULL,
                     osu_uid INTEGER NOT NULL,
                     created_at INTEGER NOT NULL,
                     updated_at INTEGER NOT NULL,
-                    PRIMARY KEY(platform, platform_user_id)
+                    PRIMARY KEY(open_id)
                 )
                 """;
         String groupMemberSql = """
                 CREATE TABLE IF NOT EXISTS group_members (
-                    platform TEXT NOT NULL,
                     group_id TEXT NOT NULL,
-                    platform_user_id TEXT NOT NULL,
+                    open_id TEXT NOT NULL,
                     updated_at INTEGER NOT NULL,
-                    PRIMARY KEY(platform, group_id, platform_user_id)
+                    PRIMARY KEY(group_id, open_id)
                 )
                 """;
         try (Connection connection = DriverManager.getConnection(jdbcUrl);

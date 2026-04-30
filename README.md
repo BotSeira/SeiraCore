@@ -5,6 +5,22 @@ Seira 是一个提供 osu! 成绩查询的 QQ 机器人。
 
 Seira 依赖 [oStella](https://github.com/ZayrexDev/oStella) 作为上游数据服务。
 
+## 现已上线！！
+
+在经过为时两周的审核后，Seira已经正式上线啦～
+
+扫描下面的二维码添加机器人↓
+
+<img width="100" alt="Image_1777528636326_363" src="https://github.com/user-attachments/assets/37ca0619-5ace-4168-8265-a47ac2422407" />
+
+## 注意事项
+
+Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会有维护的情况发生🥹
+
+如果使用过程中遇到了问题，或是有功能建议，欢迎Issue & PR 🥰
+
+另外，由于QQ机器人最近正在进行业务调整，部分功能（如指令列表和视频上传）可能会不稳定或暂时不可用
+
 ## Seira 能干什么？
 
 ### 绑定/解绑 osu 账号！
