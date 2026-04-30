@@ -3,6 +3,7 @@ package xyz.zcraft;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.core.config.Configurator;
 import xyz.zcraft.binding.UserBindingStore;
 import xyz.zcraft.bot.QQBot;
 import xyz.zcraft.config.AppConfig;
@@ -35,6 +36,11 @@ public class Seira {
             LOG.error("Invalid configuration! Please check your config.yml file.");
             System.exit(1);
             return;
+        }
+
+        if (config.seira().debugMode()) {
+            Configurator.setRootLevel(org.apache.logging.log4j.Level.DEBUG);
+            LOG.warn("Debug mode is enabled");
         }
 
         UserBindingStore.init(config.seira().sqlitePath());

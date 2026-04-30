@@ -99,11 +99,8 @@ public class QQApi {
 
     public static String buildMessageJson(Message message) {
         final JsonObject asJsonObject = new Gson().toJsonTree(message).getAsJsonObject();
-        LOG.info("Build body {}", asJsonObject.toString());
-//        asJsonObject.add("message_reference", new Gson().toJsonTree(Map.of(
-//                "message_id", message.getMsgId(),
-//                "ignore_get_message_error", true
-//        )));
+        LOG.debug("Build body {}", asJsonObject.toString());
+
         return asJsonObject.toString();
     }
 
@@ -120,6 +117,8 @@ public class QQApi {
                     .build();
 
             final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            LOG.debug("Upload private media response: status={}, body={}", response.statusCode(), response.body());
             return parseUploadedFileInfo(response, "upload private media");
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
@@ -144,6 +143,8 @@ public class QQApi {
                 LOG.error("Failed to upload group media! Status code: {} body={}", response.statusCode(), response.body());
                 throw new RuntimeException("Failed to upload group media! Status code: " + response.statusCode());
             }
+
+            LOG.debug("Upload group media status={}, body={}", response.statusCode(), response.body());
 
             return parseUploadedFileInfo(response, "upload private media");
         } catch (IOException | InterruptedException e) {

@@ -1,21 +1,19 @@
 package xyz.zcraft.bot;
 
-import com.google.gson.Gson;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.Seira;
 import xyz.zcraft.api.APIHelper;
-import xyz.zcraft.api.ApiRequestException;
 import xyz.zcraft.binding.UserBindingStore;
-import xyz.zcraft.data.*;
-import xyz.zcraft.util.ApiRequestStats;
+import xyz.zcraft.config.AppConfig;
+import xyz.zcraft.data.FileInfo;
+import xyz.zcraft.data.PendingMessage;
+import xyz.zcraft.data.ShortcutTarget;
+import xyz.zcraft.data.VideoRenderRecord;
 import xyz.zcraft.util.ThreadHelper;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class CommandRouter {
     public static final String BO_USAGE = "用法：/bo <个数> [玩家ID/@用户]";
@@ -27,17 +25,20 @@ public class CommandRouter {
     private static final String PREFIX = "/";
     private static final String R_USAGE = "用法：/r <成绩ID 或 快捷查询>";
     private static final String RSC_USAGE = "用法：/rsc <铺面ID或快捷查询> [+用户ID列表，逗号分隔]";
-    private static final ApiRequestStats API_REQUEST_STATS = new ApiRequestStats();
-    private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo)(\\d+)$"); // bo25, rs1
-    private static final Pattern SET_MACRO_PATTERN = Pattern.compile("^(\\d+)#(\\d+)$"); // 12345#1
-    private static final Pattern BEATMAP_MACRO_PATTERN = Pattern.compile("^m(\\d+)$"); // m12345
-    private static final Pattern CQ_AT_PATTERN = Pattern.compile("^\\[CQ:at,qq=(\\d+)(?:,.*)?]$");
-    private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
+
     private final MessageSender messageSender;
     private final VideoRenderRecord videoRenderRecord = new VideoRenderRecord();
+    private final AppConfig config;
+    private final CommandArgumentResolver argumentResolver;
+    private final CommandUiFactory uiFactory;
+    private final CommandTaskCoordinator taskCoordinator;
 
-    protected CommandRouter(MessageSender messageSender) {
+    protected CommandRouter(MessageSender messageSender, AppConfig config) {
         this.messageSender = messageSender;
+        this.config = config;
+        this.argumentResolver = new CommandArgumentResolver(RSC_USAGE);
+        this.uiFactory = new CommandUiFactory(config);
+        this.taskCoordinator = new CommandTaskCoordinator(messageSender);
     }
 
     protected void onPrivateMessageReceived(String userId, String messageId, String rawContent) {
@@ -61,14 +62,14 @@ public class CommandRouter {
                 return;
             }
 
-            sendOutboundMessage(targetId, messageId, groupMessage, routeDecision.initialMessage(), messageSeqCounter);
+            taskCoordinator.sendOutboundMessage(targetId, messageId, groupMessage, routeDecision.initialMessage(), messageSeqCounter);
 
             ApiTask apiTask = routeDecision.apiTask();
             if (apiTask != null) {
-                ThreadHelper.run(() -> processApiTask(targetId, messageId, groupMessage, apiTask, messageSeqCounter));
+                ThreadHelper.run(() -> taskCoordinator.processApiTask(targetId, messageId, groupMessage, apiTask, messageSeqCounter));
             }
         } catch (Exception e) {
-            sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString("处理指令时发生错误，请稍后再试。"), messageSeqCounter);
+            taskCoordinator.sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString("处理指令时发生错误，请稍后再试。"), messageSeqCounter);
             LOG.error("Failed to process inbound message {}", messageId, e);
         }
     }
@@ -96,7 +97,7 @@ public class CommandRouter {
                 if (args.length != 1) {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/bind <玩家ID>"));
                 }
-                Integer uid = parsePositiveInt(args[0]);
+                Integer uid = argumentResolver.parsePositiveInt(args[0]);
                 if (uid == null) {
                     return RouteDecision.sync(PendingMessage.ofString("玩家ID必须是正整数。用法：/bind <玩家ID>"));
                 }
@@ -117,11 +118,11 @@ public class CommandRouter {
             }
             case "bo", "top" -> {
                 if (args.length == 2) {
-                    Integer n = parsePositiveInt(args[0]);
+                    Integer n = argumentResolver.parsePositiveInt(args[0]);
                     if (n == null) {
                         return RouteDecision.sync(PendingMessage.ofString(BO_USAGE));
                     }
-                    UidResolution uidResolution = resolveUidArgument(args[1]);
+                    UidResolution uidResolution = argumentResolver.resolveUidArgument(args[1]);
                     if (uidResolution.errorMessage() != null) {
                         return RouteDecision.sync(PendingMessage.ofString(uidResolution.errorMessage()));
                     }
@@ -129,47 +130,46 @@ public class CommandRouter {
                         return RouteDecision.sync(PendingMessage.ofString(BO_USAGE));
                     }
                     String infoQuery = query.isBlank() ? "bo1" : query;
-                    return queueImageRequest("bo",
+                    return taskCoordinator.queueImageRequest("bo",
                             () -> APIHelper.getBoNResponse(n, uidResolution.uid()),
-                            response -> markdownInfoMessage("BoN 查询完成\n参数：" + infoQuery, boButtons()));
+                            response -> uiFactory.markdownInfoMessage("BoN 查询完成\n参数：" + infoQuery, uiFactory.boButtons()));
                 } else if (args.length == 1) {
-                    Integer n = parsePositiveInt(args[0]);
+                    Integer n = argumentResolver.parsePositiveInt(args[0]);
                     if (n == null) {
                         return RouteDecision.sync(PendingMessage.ofString(BO_USAGE));
                     }
-                    Integer uid = resolveBoundUid(senderUserId);
+                    Integer uid = argumentResolver.resolveBoundUid(senderUserId);
                     if (uid == null) {
                         return RouteDecision.sync(PendingMessage.ofString(NO_BIND_TIP));
                     }
-                    return queueImageRequest("bo",
+                    return taskCoordinator.queueImageRequest("bo",
                             () -> APIHelper.getBoNResponse(n, uid),
-                            response -> markdownInfoMessage("BoN 查询完成\n参数：" + query, boButtons()));
+                            response -> uiFactory.markdownInfoMessage("BoN 查询完成\n参数：" + query, uiFactory.boButtons()));
                 } else if (args.length == 0) {
-                    ShortcutTarget target = parseTarget("bo1", senderUserId);
+                    ShortcutTarget target = argumentResolver.parseTarget("bo1", senderUserId);
                     if (target.isError()) {
                         return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                     }
-
-                    return queueImageRequest("bo",
+                    return taskCoordinator.queueImageRequest("bo",
                             () -> APIHelper.getScoreResponse(target),
-                            response -> markdownInfoMessage("BoN 查询完成\n参数：bo1", boButtons()));
+                            response -> uiFactory.markdownInfoMessage("BoN 查询完成\n参数：bo1", uiFactory.boButtons()));
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString(BO_USAGE));
                 }
             }
             case "daily" -> {
-                return queueApiRequest("daily", () -> PendingMessage.ofString(APIHelper.getDaily()));
+                return taskCoordinator.queueApiRequest("daily", () -> PendingMessage.ofString(APIHelper.getDaily()));
             }
             case "mp" -> {
-                return queueApiRequest("mp", () -> PendingMessage.ofString(APIHelper.getMultiplayerRooms()));
+                return taskCoordinator.queueApiRequest("mp", () -> PendingMessage.ofString(APIHelper.getMultiplayerRooms()));
             }
             case "rs" -> {
                 if (args.length == 2) {
-                    Integer n = parsePositiveInt(args[0]);
+                    Integer n = argumentResolver.parsePositiveInt(args[0]);
                     if (n == null) {
                         return RouteDecision.sync(PendingMessage.ofString(RS_USAGE));
                     }
-                    UidResolution uidResolution = resolveUidArgument(args[1]);
+                    UidResolution uidResolution = argumentResolver.resolveUidArgument(args[1]);
                     if (uidResolution.errorMessage() != null) {
                         return RouteDecision.sync(PendingMessage.ofString(uidResolution.errorMessage()));
                     }
@@ -177,37 +177,36 @@ public class CommandRouter {
                         return RouteDecision.sync(PendingMessage.ofString(RS_USAGE));
                     }
                     String infoQuery = query.isBlank() ? "rs1" : query;
-                    return queueImageRequest("rs",
+                    return taskCoordinator.queueImageRequest("rs",
                             () -> APIHelper.getRecentResponse(n, uidResolution.uid()),
-                            response -> markdownInfoMessage("最近成绩查询完成\n参数：" + infoQuery, rsButtons()));
+                            response -> uiFactory.markdownInfoMessage("最近成绩查询完成\n参数：" + infoQuery, uiFactory.rsButtons()));
                 } else if (args.length == 1) {
-                    Integer n = parsePositiveInt(args[0]);
+                    Integer n = argumentResolver.parsePositiveInt(args[0]);
                     if (n == null) {
                         return RouteDecision.sync(PendingMessage.ofString(RS_USAGE));
                     }
-                    Integer uid = resolveBoundUid(senderUserId);
+                    Integer uid = argumentResolver.resolveBoundUid(senderUserId);
                     if (uid == null) {
                         return RouteDecision.sync(PendingMessage.ofString(NO_BIND_TIP));
                     }
-                    return queueImageRequest("rs",
+                    return taskCoordinator.queueImageRequest("rs",
                             () -> APIHelper.getRecentResponse(n, uid),
-                            response -> markdownInfoMessage("最近成绩查询完成\n参数：" + query, rsButtons()));
+                            response -> uiFactory.markdownInfoMessage("最近成绩查询完成\n参数：" + query, uiFactory.rsButtons()));
                 } else if (args.length == 0) {
-                    ShortcutTarget target = parseTarget("rs1", senderUserId);
+                    ShortcutTarget target = argumentResolver.parseTarget("rs1", senderUserId);
                     if (target.isError()) {
                         return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                     }
-
-                    return queueImageRequest("rs",
+                    return taskCoordinator.queueImageRequest("rs",
                             () -> APIHelper.getScoreResponse(target),
-                            response -> markdownInfoMessage("最近成绩查询完成\n参数：rs1", rsButtons()));
+                            response -> uiFactory.markdownInfoMessage("最近成绩查询完成\n参数：rs1", uiFactory.rsButtons()));
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString(RS_USAGE));
                 }
             }
             case "m" -> {
                 if (args.length >= 1) {
-                    TargetResolution targetResolution = resolveTargetWithOptionalMention(args, senderUserId);
+                    TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(args, senderUserId);
                     ShortcutTarget target = targetResolution.target();
                     if (target.isError()) {
                         return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
@@ -220,13 +219,16 @@ public class CommandRouter {
                     String mod = args.length == targetResolution.consumedArgs() + 1
                             ? args[targetResolution.consumedArgs()]
                             : null;
-                    return queueImageRequest("m",
+                    return taskCoordinator.queueImageRequest("m",
                             () -> APIHelper.getBeatmapResponse(target, mod),
                             response -> {
                                 String beatmapId = response != null && response.getBeatmapId() != null
                                         ? response.getBeatmapId()
                                         : (target.explicitId() != null ? String.valueOf(target.explicitId()) : null);
-                                return markdownInfoMessage(buildBeatmapInfoText(beatmapId, mod, query), beatmapButtons(beatmapId));
+                                return uiFactory.markdownInfoMessage(
+                                        uiFactory.buildBeatmapInfoText(beatmapId, mod, query),
+                                        uiFactory.beatmapButtons(beatmapId)
+                                );
                             });
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString(M_USAGE));
@@ -237,7 +239,7 @@ public class CommandRouter {
                     return RouteDecision.sync(PendingMessage.ofString(S_USAGE));
                 }
 
-                TargetResolution targetResolution = resolveTargetWithOptionalMention(args, senderUserId);
+                TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(args, senderUserId);
                 if (args.length != targetResolution.consumedArgs()) {
                     return RouteDecision.sync(PendingMessage.ofString(S_USAGE));
                 }
@@ -246,16 +248,19 @@ public class CommandRouter {
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
 
-                return queueImageRequest("s",
+                return taskCoordinator.queueImageRequest("s",
                         () -> APIHelper.getScoreResponse(target),
-                        response -> markdownInfoMessage("成绩查询完成\n参数：" + query, sButtons(response.getBeatmapId(), response.getScoreId())));
+                        response -> uiFactory.markdownInfoMessage(
+                                "成绩查询完成\n参数：" + query,
+                                uiFactory.sButtons(response == null ? null : response.getBeatmapId(), response == null ? null : response.getScoreId())
+                        ));
             }
             case "r" -> {
                 if (args.length < 1 || args.length > 2) {
                     return RouteDecision.sync(PendingMessage.ofString(R_USAGE));
                 }
 
-                TargetResolution targetResolution = resolveTargetWithOptionalMention(args, senderUserId);
+                TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(args, senderUserId);
                 if (args.length != targetResolution.consumedArgs()) {
                     return RouteDecision.sync(PendingMessage.ofString(R_USAGE));
                 }
@@ -263,11 +268,11 @@ public class CommandRouter {
                 if (target.isError()) {
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
-                return queueReplayTask("r", () -> {
-                    final APIHelper.ReplayTaskInfo replayRenderTask = APIHelper.createReplayRenderTask(target);
+                return taskCoordinator.queueReplayTask("r", () -> {
+                    APIHelper.ReplayTaskInfo replayRenderTask = APIHelper.createReplayRenderTask(target);
                     videoRenderRecord.updateRenderTask(senderUserId, replayRenderTask.taskId());
                     return replayRenderTask;
-                });
+                }, uiFactory::replayProgressButtons);
             }
             case "rsc" -> {
                 if (args.length < 1 || args.length > 3) {
@@ -278,7 +283,7 @@ public class CommandRouter {
                     return RouteDecision.sync(PendingMessage.ofString("/rsc 仅支持群聊使用。"));
                 }
 
-                TargetResolution targetResolution = resolveTargetWithOptionalMention(args, senderUserId);
+                TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(args, senderUserId);
                 if (args.length - targetResolution.consumedArgs() > 1) {
                     return RouteDecision.sync(PendingMessage.ofString(RSC_USAGE));
                 }
@@ -288,37 +293,38 @@ public class CommandRouter {
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
 
-                String extraUidArg =
-                        (args.length - targetResolution.consumedArgs() == 1) ? args[targetResolution.consumedArgs()] : null;
-                UidListResolution uidListResolution = resolveRscUidList(groupId, extraUidArg);
+                String extraUidArg = (args.length - targetResolution.consumedArgs() == 1)
+                        ? args[targetResolution.consumedArgs()]
+                        : null;
+                UidListResolution uidListResolution = argumentResolver.resolveRscUidList(groupId, extraUidArg);
                 if (uidListResolution.errorMessage() != null) {
                     return RouteDecision.sync(PendingMessage.ofString(uidListResolution.errorMessage()));
                 }
                 String[] uidArray = uidListResolution.uids();
 
                 if (target.isMacro()) {
-                    return queueReplayTask("rsc", () -> {
-                        final APIHelper.ReplayTaskInfo replayShowcaseTask = APIHelper.createReplayShowcaseTask(target, uidArray);
+                    return taskCoordinator.queueReplayTask("rsc", () -> {
+                        APIHelper.ReplayTaskInfo replayShowcaseTask = APIHelper.createReplayShowcaseTask(target, uidArray);
                         videoRenderRecord.updateRenderTask(senderUserId, replayShowcaseTask.taskId());
                         return replayShowcaseTask;
-                    });
+                    }, uiFactory::replayProgressButtons);
                 }
 
                 if (target.explicitId() == null) {
                     return RouteDecision.sync(PendingMessage.ofString(RSC_USAGE));
                 }
-                return queueReplayTask("rsc", () -> {
-                    final APIHelper.ReplayTaskInfo showcaseRenderTaskByBeatmap = APIHelper.createShowcaseRenderTaskByBeatmap(target.explicitId(), uidArray);
+                return taskCoordinator.queueReplayTask("rsc", () -> {
+                    APIHelper.ReplayTaskInfo showcaseRenderTaskByBeatmap = APIHelper.createShowcaseRenderTaskByBeatmap(target.explicitId(), uidArray);
                     videoRenderRecord.updateRenderTask(senderUserId, showcaseRenderTaskByBeatmap.taskId());
                     return showcaseRenderTaskByBeatmap;
-                });
+                }, uiFactory::replayProgressButtons);
             }
             case "ms" -> {
                 if (args.length < 1 || args.length > 2) {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/ms <铺面集ID 或 快捷查询>"));
                 }
 
-                TargetResolution targetResolution = resolveTargetWithOptionalMention(args, senderUserId);
+                TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(args, senderUserId);
                 if (args.length != targetResolution.consumedArgs()) {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/ms <铺面集ID 或 快捷查询>"));
                 }
@@ -327,17 +333,20 @@ public class CommandRouter {
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
 
-                return queueImageRequest("ms",
+                return taskCoordinator.queueImageRequest("ms",
                         () -> APIHelper.getBeatmapSetResponse(target),
-                        response -> markdownInfoMessage("铺面集查询完成\n参数：" + query, null));
+                        response -> uiFactory.markdownInfoMessage("铺面集查询完成\n参数：" + query, null));
             }
             case "sms" -> {
                 if (args.length == 0) {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/sms <搜索关键字>"));
                 }
-                return queueApiRequest("sms", () -> {
+                return taskCoordinator.queueApiRequest("sms", () -> {
                     APIHelper.TextResponse searchResponse = APIHelper.searchBeatmapSetResponse(query);
-                    return markdownInfoMessage(searchResponse.content(), searchButtons(searchResponse.beatmapsetIds(), searchResponse.itemCount()));
+                    return uiFactory.markdownInfoMessage(
+                            searchResponse.content(),
+                            uiFactory.searchButtons(searchResponse.beatmapsetIds(), searchResponse.itemCount())
+                    );
                 });
             }
             case "lb", "c" -> {
@@ -347,22 +356,26 @@ public class CommandRouter {
                         if (groupBoundUids.isEmpty()) {
                             return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>"));
                         }
-                        String[] uidArray = groupBoundUids.stream()
-                                .map(String::valueOf)
-                                .toArray(String[]::new);
-                        return queueImageRequest("lb",
+                        String[] uidArray = groupBoundUids.stream().map(String::valueOf).toArray(String[]::new);
+                        return taskCoordinator.queueImageRequest("lb",
                                 () -> APIHelper.getLeaderboardResponse(uidArray),
-                                response -> markdownInfoMessage("排行榜查询完成\n参数：" + (query.isBlank() ? "/lb" : query), lbButtons(response == null ? null : response.getBeatmapId())));
+                                response -> uiFactory.markdownInfoMessage(
+                                        "排行榜查询完成\n参数：" + (query.isBlank() ? "/lb" : query),
+                                        uiFactory.lbButtons(response == null ? null : response.getBeatmapId())
+                                ));
                     }
-                    Integer uid = resolveBoundUid(senderUserId);
+                    Integer uid = argumentResolver.resolveBoundUid(senderUserId);
                     if (uid == null) {
                         return RouteDecision.sync(PendingMessage.ofString(NO_BIND_TIP));
                     }
-                    return queueImageRequest("lb",
+                    return taskCoordinator.queueImageRequest("lb",
                             () -> APIHelper.getLeaderboardResponse(new String[]{String.valueOf(uid)}),
-                            response -> markdownInfoMessage("排行榜查询完成\n参数：" + (query.isBlank() ? "/lb" : query), lbButtons(response == null ? null : response.getBeatmapId())));
+                            response -> uiFactory.markdownInfoMessage(
+                                    "排行榜查询完成\n参数：" + (query.isBlank() ? "/lb" : query),
+                                    uiFactory.lbButtons(response == null ? null : response.getBeatmapId())
+                            ));
                 } else if (args.length == 1 || args.length == 2) {
-                    TargetResolution targetResolution = resolveTargetWithOptionalMention(args, senderUserId);
+                    TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(args, senderUserId);
                     ShortcutTarget target = targetResolution.target();
                     if (target.isError()) {
                         return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
@@ -375,20 +388,24 @@ public class CommandRouter {
                             if (groupBoundUids.isEmpty()) {
                                 return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>"));
                             }
-                            String[] uidArray = groupBoundUids.stream()
-                                    .map(String::valueOf)
-                                    .toArray(String[]::new);
-                            return queueImageRequest("lbm",
+                            String[] uidArray = groupBoundUids.stream().map(String::valueOf).toArray(String[]::new);
+                            return taskCoordinator.queueImageRequest("lbm",
                                     () -> APIHelper.getGroupLeaderboardResponse(target, uidArray),
-                                    response -> markdownInfoMessage("同屏排行榜查询完成\n参数：" + query, lbButtons(response.getBeatmapId())));
+                                    response -> uiFactory.markdownInfoMessage(
+                                            "同屏排行榜查询完成\n参数：" + query,
+                                            uiFactory.lbButtons(response == null ? null : response.getBeatmapId())
+                                    ));
                         }
-                        Integer uid = resolveBoundUid(senderUserId);
+                        Integer uid = argumentResolver.resolveBoundUid(senderUserId);
                         if (uid == null) {
                             return RouteDecision.sync(PendingMessage.ofString(NO_BIND_TIP));
                         }
-                        return queueImageRequest("lbm",
+                        return taskCoordinator.queueImageRequest("lbm",
                                 () -> APIHelper.getGroupLeaderboardResponse(target, new String[]{String.valueOf(uid)}),
-                                response -> markdownInfoMessage("同屏排行榜查询完成\n参数：" + query, lbButtons(response.getBeatmapId())));
+                                response -> uiFactory.markdownInfoMessage(
+                                        "同屏排行榜查询完成\n参数：" + query,
+                                        uiFactory.lbButtons(response == null ? null : response.getBeatmapId())
+                                ));
                     }
 
                     if (remainingArgs != 1) {
@@ -401,15 +418,18 @@ public class CommandRouter {
                     }
                     String[] uidArray = new String[uidTokens.length];
                     for (int i = 0; i < uidTokens.length; i++) {
-                        Integer uid = parsePositiveInt(uidTokens[i].trim());
+                        Integer uid = argumentResolver.parsePositiveInt(uidTokens[i].trim());
                         if (uid == null) {
                             return RouteDecision.sync(PendingMessage.ofString("玩家ID列表包含非法值。用法：/lb <铺面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
                         }
                         uidArray[i] = String.valueOf(uid);
                     }
-                    return queueImageRequest("lbm",
+                    return taskCoordinator.queueImageRequest("lbm",
                             () -> APIHelper.getGroupLeaderboardResponse(target, uidArray),
-                            response -> markdownInfoMessage("同屏排行榜查询完成\n参数：" + query, lbButtons(response.getBeatmapId())));
+                            response -> uiFactory.markdownInfoMessage(
+                                    "同屏排行榜查询完成\n参数：" + query,
+                                    uiFactory.lbButtons(response == null ? null : response.getBeatmapId())
+                            ));
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/lb <铺面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
                 }
@@ -423,9 +443,8 @@ public class CommandRouter {
                 } else if (args.length == 0) {
                     if (videoRenderRecord.hasRenderTask(senderUserId)) {
                         return RouteDecision.sync(PendingMessage.ofString(APIHelper.getRenderStat(videoRenderRecord.getRenderTask(senderUserId))));
-                    } else {
-                        return RouteDecision.sync(PendingMessage.ofString("未找到渲染请求"));
                     }
+                    return RouteDecision.sync(PendingMessage.ofString("未找到渲染请求"));
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/rstat [任务ID]"));
                 }
@@ -450,575 +469,33 @@ public class CommandRouter {
                         /status - 获取服务器状态
                         /help - 显示此帮助信息"""));
             }
-            case "test" -> {
-                messageSender.uploadGroupMedia(groupId, 2, "https://seirabot-1302810751.cos.ap-shanghai.myqcloud.com/seirabot/2026-04-29/39ca24529d654debb341c4541afbd692.mp4");
-                return RouteDecision.sync(PendingMessage.ofMarkdownRaw("""
-                        # Markdown 测试
-                        ## h2
-                        ***
-                        - 列表 1
-                        - 列表 2
-                        ***
-                        > 引用文本
-                        ***
-                        ```java
-                        IO.println("Hello World!");
-                        ```
-                        ***
-                        `行内代码`
-                        """));
+            case "debug.upload" -> {
+                if (!config.seira().debugMode()) {
+                    return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
+                }
+
+                if (args.length != 3) {
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/debug.upload <type> <cos> <url>"));
+                }
+
+                String typeStr = args[0];
+                String cosStr = args[1];
+                String urlStr = args[2];
+
+                FileInfo fileInfo;
+                if (groupId != null && !groupId.isBlank()) {
+                    fileInfo = messageSender.uploadGroupMedia(groupId, Integer.parseInt(typeStr), urlStr, "true".equals(cosStr));
+                } else {
+                    fileInfo = messageSender.uploadPrivateMedia(senderUserId, Integer.parseInt(typeStr), urlStr, "true".equals(cosStr));
+                }
+
+                return RouteDecision.sync(PendingMessage.ofString(fileInfo != null
+                        ? "上传成功，fileId: " + fileInfo
+                        : "上传失败，请检查日志获取详情"));
             }
             default -> {
                 return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
             }
         }
-
-    }
-
-    private ShortcutTarget parseTarget(String arg, String senderUserId) {
-        return parseTarget(arg, senderUserId, false);
-    }
-
-    private ShortcutTarget parseTarget(String arg, String senderUserId, boolean mentionedUser) {
-        Matcher setMatcher = SET_MACRO_PATTERN.matcher(arg.trim());
-        if (setMatcher.matches()) {
-            Long setId = parsePositiveLong(setMatcher.group(1));
-            Long index = parsePositiveLong(setMatcher.group(2));
-
-            if (setId == null || index == null || index < 1) {
-                return new ShortcutTarget(null, null, null, null, "铺面集索引无效。例如: 12345#2");
-            }
-
-            Integer uid = resolveBoundUid(senderUserId);
-
-            return new ShortcutTarget(setId, uid, "ms", index, null);
-        }
-
-        Matcher userMatcher = USER_MACRO_PATTERN.matcher(arg.trim());
-        if (userMatcher.matches()) {
-            String type = userMatcher.group(1).toLowerCase();
-            Long index = parsePositiveLong(userMatcher.group(2));
-
-            if (index == null || index < 1 || index > 100) {
-                return new ShortcutTarget(null, null, null, null, "快捷指令索引无效，请输入 1-100 之间的数字。例如: rs5");
-            }
-
-            Integer uid = resolveBoundUid(senderUserId);
-            if (uid == null) {
-                String errorMessage = mentionedUser
-                        ? "被@的用户还没有绑定玩家ID，无法使用快捷查询。"
-                        : "你还没有绑定玩家ID，无法使用快捷查询。请先使用 /bind <玩家ID>";
-                return new ShortcutTarget(null, null, null, null, errorMessage);
-            }
-
-            return new ShortcutTarget(null, uid, type, index, null);
-        }
-
-        Matcher beatmapMatcher = BEATMAP_MACRO_PATTERN.matcher(arg.trim());
-        if (beatmapMatcher.matches()) {
-            Long mapId = parsePositiveLong(beatmapMatcher.group(1));
-            Integer uid = resolveBoundUid(senderUserId);
-            return new ShortcutTarget(mapId, uid, "m", null, null);
-        }
-
-        Long id = parsePositiveLong(arg);
-        if (id == null) {
-            return new ShortcutTarget(null, null, null, null, "参数无效。请输入纯数字ID或快捷指令 (例如 rs1, 12345#2)。");
-        }
-
-        return new ShortcutTarget(id, null, null, null, null);
-    }
-
-    private TargetResolution resolveTargetWithOptionalMention(String[] args, String senderUserId) {
-        if (args.length >= 2 && isUserMacro(args[1])) {
-            String mentionedUserId = extractMentionedUserId(args[0]);
-            if (mentionedUserId != null) {
-                return new TargetResolution(parseTarget(args[1], mentionedUserId, true), 2);
-            }
-            if (looksLikeMention(args[0])) {
-                return new TargetResolution(new ShortcutTarget(null, null, null, null, "@用户格式无效，请使用@用户后再输入快捷查询（如 rs2）。"), 2);
-            }
-        }
-        return new TargetResolution(parseTarget(args[0], senderUserId), 1);
-    }
-
-    private boolean isUserMacro(String arg) {
-        return USER_MACRO_PATTERN.matcher(arg.trim()).matches();
-    }
-
-    private boolean looksLikeMention(String token) {
-        String trimmed = token == null ? "" : token.trim();
-        return trimmed.startsWith("@") || trimmed.startsWith("[CQ:at,");
-    }
-
-    private String extractMentionedUserId(String token) {
-        if (token == null) {
-            return null;
-        }
-
-        String trimmed = token.trim();
-        Matcher cqMatcher = CQ_AT_PATTERN.matcher(trimmed);
-        if (cqMatcher.matches()) {
-            return cqMatcher.group(1);
-        }
-
-        Matcher plainMatcher = PLAIN_AT_PATTERN.matcher(trimmed);
-        if (plainMatcher.matches()) {
-            return plainMatcher.group(1);
-        }
-
-        return null;
-    }
-
-    private UidResolution resolveUidArgument(String arg) {
-        Integer explicitUid = parsePositiveInt(arg);
-        if (explicitUid != null) {
-            return new UidResolution(explicitUid, null);
-        }
-
-        String mentionedUserId = extractMentionedUserId(arg);
-        if (mentionedUserId != null) {
-            Integer boundUid = resolveBoundUid(mentionedUserId);
-            if (boundUid == null) {
-                return new UidResolution(null, "被@的用户还没有绑定玩家ID，请先让对方使用 /bind <玩家ID>");
-            }
-            return new UidResolution(boundUid, null);
-        }
-
-        if (looksLikeMention(arg)) {
-            return new UidResolution(null, "@用户格式无效，请使用 @用户 后再输入指令。示例：/bo 5 @123456");
-        }
-
-        return new UidResolution(null, null);
-    }
-
-    private UidListResolution resolveRscUidList(String groupId, String extraUidArg) {
-        List<Integer> groupBoundUids = UserBindingStore.findBoundUidsByGroup(groupId);
-        if (groupBoundUids.isEmpty()) {
-            return new UidListResolution(null, "本群还没有已绑定的玩家，请先使用 /bind <玩家ID>");
-        }
-
-        Set<String> merged = new LinkedHashSet<>();
-        groupBoundUids.stream().map(String::valueOf).forEach(merged::add);
-
-        if (extraUidArg != null) {
-            String trimmed = extraUidArg.trim();
-            if (!trimmed.startsWith("+")) {
-                return new UidListResolution(null, "追加用户ID列表必须以 + 开头。" + RSC_USAGE);
-            }
-            String body = trimmed.substring(1).trim();
-            if (body.isEmpty()) {
-                return new UidListResolution(null, "追加用户ID列表不能为空。" + RSC_USAGE);
-            }
-
-            String[] extraTokens = body.split(",");
-            for (String token : extraTokens) {
-                Integer uid = parsePositiveInt(token.trim());
-                if (uid == null) {
-                    return new UidListResolution(null, "追加用户ID列表包含非法值。" + RSC_USAGE);
-                }
-                merged.add(String.valueOf(uid));
-            }
-        }
-
-        return new UidListResolution(merged.toArray(String[]::new), null);
-    }
-
-    private RouteDecision queueReplayTask(String requestType, ReplayTaskCreator creator) {
-        AtomicReference<APIHelper.ReplayTaskInfo> taskInfoRef = new AtomicReference<>();
-
-        return queueApiRequestUntilSubmit(
-                requestType,
-                () -> {
-                    APIHelper.ReplayTaskInfo taskInfo = creator.create();
-                    taskInfoRef.set(taskInfo);
-
-                    String queuedText = "生成请求已提交。";
-                    if (taskInfo.position() != null) {
-                        queuedText += "\n队列位置：" + taskInfo.position();
-                    }
-                    if (taskInfo.taskId() != null) {
-                        queuedText += "\n请求ID：" + taskInfo.taskId();
-                    }
-                    if (taskInfo.message() != null) {
-                        queuedText += "\n" + taskInfo.message();
-                    }
-                    return PendingMessage.ofMarkdownRaw(queuedText, replayProgressButtons(taskInfo.taskId()));
-                },
-                () -> {
-                    APIHelper.ReplayTaskInfo taskInfo = taskInfoRef.get();
-                    if (taskInfo == null || taskInfo.taskId() == null || taskInfo.taskId().isBlank()) {
-                        return PendingMessage.ofString("回放任务未返回有效请求ID，无法获取视频结果。请稍后重试。");
-                    }
-
-                    APIHelper.ReplayRenderResult result = APIHelper.waitReplayVideo(taskInfo.taskId());
-
-                    if (result != null) {
-                        return PendingMessage.ofVideoUrl(result.videoUrl());
-                    } else {
-                        return PendingMessage.ofString("回放视频生成失败，请稍后重试。");
-                    }
-                },
-                () -> {
-                }
-        );
-    }
-
-    private RouteDecision queueApiRequest(String requestType, ApiTaskExecutor executor) {
-        return queueApiRequest(requestType, executor, () -> null, () -> {
-        });
-    }
-
-    private RouteDecision queueApiRequest(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer) {
-        long estimatedSeconds = API_REQUEST_STATS.estimateAndEnqueue(requestType);
-        PendingMessage queuedNotice = PendingMessage.ofString("请求已加入队列，预计等待时间" + estimatedSeconds + "秒。");
-        return RouteDecision.async(queuedNotice, new ApiTask(requestType, executor, postProcessor, finalizer, false));
-    }
-
-    private RouteDecision queueApiRequestUntilSubmit(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer) {
-        long estimatedSeconds = API_REQUEST_STATS.estimateAndEnqueue(requestType);
-        PendingMessage queuedNotice = PendingMessage.ofString("请求已加入队列，预计等待时间" + estimatedSeconds + "秒。");
-        return RouteDecision.async(queuedNotice, new ApiTask(requestType, executor, postProcessor, finalizer, true));
-    }
-
-    private void processApiTask(String targetId, String messageId, boolean groupMessage, ApiTask apiTask, AtomicInteger messageSeqCounter) {
-        long startedAt = System.nanoTime();
-        boolean statsCompleted = false;
-        try {
-            PendingMessage response = apiTask.executor().execute();
-            if (response != null) {
-                sendOutboundMessage(targetId, messageId, groupMessage, response, messageSeqCounter);
-            }
-
-            if (apiTask.completeStatsAfterExecutor()) {
-                long elapsedMillis = Math.max(1L, (System.nanoTime() - startedAt) / 1_000_000L);
-                API_REQUEST_STATS.complete(apiTask.requestType(), elapsedMillis);
-                statsCompleted = true;
-            }
-
-            PendingMessage postResponse = apiTask.postProcessor().execute();
-            if (postResponse != null) {
-                sendOutboundMessage(targetId, messageId, groupMessage, postResponse, messageSeqCounter);
-            }
-        } catch (Exception e) {
-            sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString(resolveErrorMessage(e)), messageSeqCounter);
-            LOG.error("Failed to execute API task for message {}", messageId, e);
-        } finally {
-            try {
-                apiTask.finalizer().execute();
-            } catch (Exception e) {
-                LOG.warn("Failed to run finalizer for message {}", messageId, e);
-            }
-            if (!statsCompleted) {
-                long elapsedMillis = Math.max(1L, (System.nanoTime() - startedAt) / 1_000_000L);
-                API_REQUEST_STATS.complete(apiTask.requestType(), elapsedMillis);
-            }
-        }
-    }
-
-    private RouteDecision queueImageRequest(String requestType, ImageResponseCreator creator, ImageResponsePostProcessor postProcessor) {
-        AtomicReference<APIHelper.ImageResponse> responseRef = new AtomicReference<>();
-        return queueApiRequest(requestType,
-                () -> {
-                    APIHelper.ImageResponse response = creator.create();
-                    responseRef.set(response);
-                    return PendingMessage.ofImageBase64(response.getBase64());
-                },
-                () -> postProcessor.execute(responseRef.get()),
-                () -> {
-                });
-    }
-
-    private PendingMessage markdownInfoMessage(String text, List<List<Button>> buttons) {
-        return PendingMessage.ofMarkdownRaw(text, buttons);
-    }
-
-    private String buildBeatmapInfoText(String beatmapId, String mod, String queryText) {
-        StringBuilder sb = new StringBuilder("铺面查询完成");
-        if (beatmapId != null && !beatmapId.isBlank()) {
-            sb.append("\n铺面ID：").append(beatmapId);
-        }
-        if (mod != null && !mod.isBlank()) {
-            sb.append("\nMod：").append(mod);
-        }
-        if (queryText != null && !queryText.isBlank()) {
-            sb.append("\n参数：").append(queryText);
-        }
-        return sb.toString();
-    }
-
-    private List<List<Button>> boButtons() {
-        return Button.keyboard(Button.row(
-                Button.command(1, "查询最好成绩", "查询最好成绩", "/s bo1"),
-                Button.command(2, "渲染最好成绩", "渲染最好成绩", "/r bo1")
-        ));
-    }
-
-    private List<List<Button>> rsButtons() {
-        return Button.keyboard(Button.row(
-                Button.command(1, "查询最近成绩", "查询最近成绩", "/s rs1"),
-                Button.command(2, "渲染最近成绩", "渲染最近成绩", "/r rs1")
-        ));
-    }
-
-    private List<List<Button>> beatmapButtons(String beatmapId) {
-        if (beatmapId == null || beatmapId.isBlank()) {
-            return null;
-        }
-
-        String directUrl = Seira.getConfig().seira().directUrl();
-        if (directUrl.endsWith("/")) {
-            directUrl = directUrl.substring(0, directUrl.length() - 1);
-        }
-
-        return Button.keyboard(
-                Button.row(
-                        Button.command(1, "查询排行榜", "查询排行榜", "/lb " + beatmapId),
-                        Button.openUrl(2, "在游戏中查看", "在游戏中查看", directUrl + "/b/" + beatmapId)
-                ),
-                Button.row(
-                        Button.command(3, "查询自己的分数", "查询自己的分数", "/s m" + beatmapId)
-                )
-        );
-    }
-
-    private List<List<Button>> sButtons(String beatmapId, String scoreId) {
-        if (beatmapId == null || beatmapId.isBlank()) {
-            return null;
-        }
-
-        return Button.keyboard(
-                Button.row(
-                        Button.command(1, "查看铺面", "查看铺面", "/m " + beatmapId),
-                        Button.command(2, "查看铺面集", "查看铺面集", "/ms m" + beatmapId)
-                ),
-                Button.row(
-                        Button.command(1, "查询排行", "查询排行", "/lb " + beatmapId),
-                        Button.command(2, "渲染回放", "渲染回放", "/r " + scoreId)
-                )
-        );
-    }
-
-    private List<List<Button>> lbButtons(String beatmapId) {
-        if (beatmapId == null || beatmapId.isBlank()) {
-            return null;
-        }
-
-        return Button.keyboard(Button.row(
-                Button.command(1, "渲染同屏回放", "渲染同屏回放", "/rsc " + beatmapId)
-        ));
-    }
-
-    private List<List<Button>> replayProgressButtons(String jobId) {
-        if (jobId == null || jobId.isBlank()) {
-            return null;
-        }
-
-        return Button.keyboard(Button.row(
-                Button.command(1, "查询渲染进度", "查询渲染进度", "/rstat " + jobId)
-        ));
-    }
-
-    private List<List<Button>> searchButtons(List<String> beatmapsetIds, int itemCount) {
-        if (beatmapsetIds == null || beatmapsetIds.isEmpty() || itemCount <= 0) {
-            return null;
-        }
-
-        int count = Math.min(10, Math.min(itemCount, beatmapsetIds.size()));
-
-        List<List<Button>> rows = new ArrayList<>();
-        List<Button> currentRow = new ArrayList<>(5);
-        int buttonIndex = 0;
-        for (int i = 0; i < count; i++) {
-            String beatmapsetId = beatmapsetIds.get(i);
-            if (beatmapsetId == null || beatmapsetId.isBlank()) {
-                continue;
-            }
-
-            buttonIndex++;
-            currentRow.add(Button.command(buttonIndex, String.valueOf(buttonIndex), String.valueOf(buttonIndex), "/ms " + beatmapsetId));
-            if (currentRow.size() == 5) {
-                rows.add(List.copyOf(currentRow));
-                currentRow.clear();
-            }
-        }
-
-        if (!currentRow.isEmpty()) {
-            rows.add(List.copyOf(currentRow));
-        }
-
-        return rows.isEmpty() ? null : List.copyOf(rows);
-    }
-
-    private String resolveErrorMessage(Exception exception) {
-        Throwable cursor = exception;
-        while (cursor != null) {
-            if (cursor instanceof ApiRequestException apiRequestException) {
-                String mapped = mapErrorCodeMessage(apiRequestException.getErrorCode());
-                if (mapped != null) {
-                    return mapped;
-                }
-
-                String rawMessage = apiRequestException.getMessage();
-                if (rawMessage != null && !rawMessage.isBlank()) {
-                    return rawMessage;
-                }
-            }
-            cursor = cursor.getCause();
-        }
-        return "请求处理失败，请稍后再试。";
-    }
-
-    private String mapErrorCodeMessage(Integer code) {
-        ErrorCode errorCode = ErrorCode.fromCode(code);
-        if (errorCode == null) {
-            return null;
-        }
-
-        return switch (errorCode) {
-            case NO_BEATMAP_FOUND -> "未找到对应铺面，请检查输入后重试。";
-            case NO_BEATMAPSET_FOUND -> "未找到对应铺面集，请检查输入后重试。";
-            case NO_USER_FOUND -> "未找到对应玩家，请检查玩家ID后重试。";
-            case NO_SCORE_FOUND -> "未找到对应成绩，请检查输入后重试。";
-            case NO_ROOM_FOUND -> "当前没有可用的多人房间信息。";
-            case ILLEGAL_ARGUMENT -> "请求参数不合法，请检查指令参数格式。";
-            case BEATMAP_FETCH_FAILED -> "获取铺面数据失败，请稍后重试。";
-            case BEATMAPSET_FETCH_FAILED -> "获取铺面集数据失败，请稍后重试。";
-            case USER_FETCH_FAILED -> "获取玩家数据失败，请稍后重试。";
-            case SCORE_FETCH_FAILED -> "获取成绩数据失败，请稍后重试。";
-            case REPLAY_UNAVAILABLE -> "该成绩暂不支持回放渲染。";
-            case RENDER_QUEUE_FULL -> "回放渲染队列已满，请稍后再试。";
-        };
-    }
-
-    private void sendOutboundMessage(String targetId, String messageId, boolean groupMessage, PendingMessage pendingMsg, AtomicInteger messageSeqCounter) {
-        Message message = new Message();
-        message.setMsgType(pendingMsg.getMsgType());
-        message.setMsgId(messageId);
-        message.setMsgSeq(messageSeqCounter.getAndIncrement());
-
-        if(pendingMsg instanceof MDMessage md) {
-            message.setMsgType(PendingMessage.MSG_TYPE_MARKDOWN);
-            message.setMarkdown(new Gson().toJsonTree(Map.of("content", md.getMarkdown())).getAsJsonObject());
-            if(md.hasKeyboard()) {
-                message.setKeyboard(md.getKeyboard());
-            }
-        } else if (pendingMsg.getMsgType() == PendingMessage.MSG_TYPE_MARKDOWN) {
-            message.setMarkdown(new Gson().toJsonTree(Map.of("content", pendingMsg.getContent())).getAsJsonObject());
-        } else {
-            message.setContent(pendingMsg.getContent());
-        }
-
-        if (pendingMsg.getFileUrl() != null) {
-            LOG.info("Uploading media for {}", messageId);
-            FileInfo fileInfo = groupMessage
-                    ? messageSender.uploadGroupMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl())
-                    : messageSender.uploadPrivateMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl());
-            if (fileInfo == null) {
-                LOG.error("Failed to upload media for message {}", messageId);
-                message.setContent("媒体文件上传失败");
-                message.setMsgType(0);
-            } else {
-                LOG.info("Media uploaded for message {}", messageId);
-                message.setMedia(fileInfo);
-            }
-        } else if (pendingMsg.getFileBase64() != null) {
-            FileInfo fileInfo = groupMessage
-                    ? messageSender.uploadGroupMediaBase64(targetId, pendingMsg.getFileType(), pendingMsg.getFileBase64())
-                    : messageSender.uploadPrivateMediaBase64(targetId, pendingMsg.getFileType(), pendingMsg.getFileBase64());
-            if (fileInfo == null) {
-                LOG.error("Failed to upload base64 media for message {}", messageId);
-                message.setContent("媒体文件上传失败");
-                message.setMsgType(0);
-            } else {
-                LOG.info("Base64 media uploaded for message {}", messageId);
-                message.setMedia(fileInfo);
-            }
-        }
-
-        if (groupMessage) {
-            messageSender.sendGroupMessage(targetId, message);
-        } else {
-            messageSender.sendPrivateMessage(targetId, message);
-        }
-    }
-
-    private Integer resolveBoundUid(String senderUserId) {
-        if (senderUserId == null || senderUserId.isBlank()) {
-            return null;
-        }
-        return UserBindingStore.findBoundUid(senderUserId);
-    }
-
-    private Integer parsePositiveInt(String value) {
-        try {
-            int parsed = Integer.parseInt(value);
-            return parsed > 0 ? parsed : null;
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
-    }
-
-    private Long parsePositiveLong(String value) {
-        try {
-            long parsed = Long.parseLong(value);
-            return parsed > 0 ? parsed : null;
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
-    }
-
-    @FunctionalInterface
-    private interface ApiTaskExecutor {
-        PendingMessage execute();
-    }
-
-    @FunctionalInterface
-    private interface ImageResponseCreator {
-        APIHelper.ImageResponse create();
-    }
-
-    @FunctionalInterface
-    private interface ImageResponsePostProcessor {
-        PendingMessage execute(APIHelper.ImageResponse response);
-    }
-
-    @FunctionalInterface
-    private interface ReplayTaskCreator {
-        APIHelper.ReplayTaskInfo create();
-    }
-
-    @FunctionalInterface
-    private interface ApiTaskPostProcessor {
-        PendingMessage execute();
-    }
-
-    @FunctionalInterface
-    private interface ApiTaskFinalizer {
-        void execute();
-    }
-
-    private record ApiTask(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor,
-                           ApiTaskFinalizer finalizer, boolean completeStatsAfterExecutor) {
-    }
-
-    private record TargetResolution(ShortcutTarget target, int consumedArgs) {
-    }
-
-    private record UidResolution(Integer uid, String errorMessage) {
-    }
-
-    private record UidListResolution(String[] uids, String errorMessage) {
-    }
-
-    protected record RouteDecision(PendingMessage initialMessage, ApiTask apiTask) {
-        private static RouteDecision sync(PendingMessage message) {
-            return new RouteDecision(message, null);
-        }
-
-        private static RouteDecision async(PendingMessage message, ApiTask apiTask) {
-            return new RouteDecision(message, apiTask);
-        }
     }
 }
-

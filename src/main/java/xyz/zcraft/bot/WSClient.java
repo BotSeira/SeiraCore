@@ -38,7 +38,7 @@ public class WSClient extends WebSocketClient {
         super(serverUri);
         this.config = config;
         this.tokenSupplier = tokenSupplier;
-        this.router = new CommandRouter(messageSender);
+        this.router = new CommandRouter(messageSender, config);
         LOG.info("QQ Gateway WebSocket Client created");
     }
 
