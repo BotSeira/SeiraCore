@@ -824,10 +824,10 @@ public class CommandRouter {
             return null;
         }
 
-        int count = Math.min(6, Math.min(itemCount, beatmapsetIds.size()));
+        int count = Math.min(10, Math.min(itemCount, beatmapsetIds.size()));
 
         List<List<Button>> rows = new ArrayList<>();
-        List<Button> currentRow = new ArrayList<>(3);
+        List<Button> currentRow = new ArrayList<>(5);
         int buttonIndex = 0;
         for (int i = 0; i < count; i++) {
             String beatmapsetId = beatmapsetIds.get(i);
@@ -837,7 +837,7 @@ public class CommandRouter {
 
             buttonIndex++;
             currentRow.add(Button.command(buttonIndex, String.valueOf(buttonIndex), String.valueOf(buttonIndex), "/ms " + beatmapsetId));
-            if (currentRow.size() == 3) {
+            if (currentRow.size() == 5) {
                 rows.add(List.copyOf(currentRow));
                 currentRow.clear();
             }
