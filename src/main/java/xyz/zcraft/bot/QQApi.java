@@ -99,7 +99,7 @@ public class QQApi {
 
     public static String buildMessageJson(Message message) {
         final JsonObject asJsonObject = new Gson().toJsonTree(message).getAsJsonObject();
-        LOG.debug("Build body {}", asJsonObject.toString());
+        LOG.info("Build body {}", asJsonObject.toString());
 //        asJsonObject.add("message_reference", new Gson().toJsonTree(Map.of(
 //                "message_id", message.getMsgId(),
 //                "ignore_get_message_error", true
