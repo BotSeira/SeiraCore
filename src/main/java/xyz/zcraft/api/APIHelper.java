@@ -287,7 +287,10 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return new ImageResponse(Base64.getEncoder().encodeToString(imageBytes), extractBeatmapId(send), Collections.emptyList());
+            var ret = new ImageResponse(Base64.getEncoder().encodeToString(imageBytes), extractBeatmapId(send), Collections.emptyList());
+            ret.setScoreId(extractScoreId(send));
+
+            return ret;
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -598,6 +601,10 @@ public class APIHelper {
 
     private static String extractBeatmapId(HttpResponse<?> response) {
         return response.headers().firstValue("X-Beatmap-Id").orElse(null);
+    }
+
+    private static String extractScoreId(HttpResponse<?> response) {
+        return response.headers().firstValue("X-Score-Id").orElse(null);
     }
 
     private static List<String> extractBeatmapsetIds(HttpResponse<?> response) {
