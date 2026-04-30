@@ -326,7 +326,7 @@ public class APIHelper {
                         .append("\n");
             }
 
-            return new TextResponse(sb.toString().trim(), extractBeatmapsetIds(send), items.size());
+            return new TextResponse(sb.toString().trim(), extractBeatmapsetIds(send), Math.min(items.size(), 10));
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
