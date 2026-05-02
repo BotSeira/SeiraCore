@@ -214,7 +214,7 @@ public class APIHelper {
         String query = "/m?";
         if (target.isMacro()) {
             query += "&i=" + target.macroIndex();
-            if (target.boundUid() != null) {
+            if (target.macroType().equals("rs") || target.macroType().equals("bo")) {
                 query += "&of=" + target.macroType() + "&u=" + target.boundUid();
             } else if (target.macroType().equals("ms")) {
                 query += "&ms=" + target.explicitId();
