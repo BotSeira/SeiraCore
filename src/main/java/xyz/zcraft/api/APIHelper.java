@@ -46,7 +46,10 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return new ImageResponse(Base64.getEncoder().encodeToString(imageBytes), extractBeatmapId(send), Collections.emptyList());
+            return ImageResponse.builder()
+                                .base64(Base64.getEncoder().encodeToString(imageBytes))
+                                .beatmapId(extractBeatmapId(send))
+                                .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -75,7 +78,10 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return new ImageResponse(Base64.getEncoder().encodeToString(imageBytes), extractBeatmapId(send), Collections.emptyList());
+            return ImageResponse.builder()
+                                .base64(Base64.getEncoder().encodeToString(imageBytes))
+                                .beatmapId(extractBeatmapId(send))
+                                .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -96,7 +102,10 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return new ImageResponse(Base64.getEncoder().encodeToString(imageBytes), extractBeatmapId(send), Collections.emptyList());
+            return ImageResponse.builder()
+                                .base64(Base64.getEncoder().encodeToString(imageBytes))
+                                .beatmapId(extractBeatmapId(send))
+                                .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -182,7 +191,10 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return new ImageResponse(Base64.getEncoder().encodeToString(imageBytes), extractBeatmapId(send), Collections.emptyList());
+            return ImageResponse.builder()
+                                .base64(Base64.getEncoder().encodeToString(imageBytes))
+                                .beatmapId(extractBeatmapId(send))
+                                .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -205,7 +217,10 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return new ImageResponse(Base64.getEncoder().encodeToString(imageBytes), extractBeatmapId(send), Collections.emptyList());
+            return ImageResponse.builder()
+                                .base64(Base64.getEncoder().encodeToString(imageBytes))
+                                .beatmapId(extractBeatmapId(send))
+                                .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -253,7 +268,10 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return new ImageResponse(Base64.getEncoder().encodeToString(imageBytes), extractBeatmapId(send), Collections.emptyList());
+            return ImageResponse.builder()
+                                .base64(Base64.getEncoder().encodeToString(imageBytes))
+                                .beatmapId(extractBeatmapId(send))
+                                .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -288,10 +306,10 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            var ret = new ImageResponse(Base64.getEncoder().encodeToString(imageBytes), extractBeatmapId(send), Collections.emptyList());
-            ret.setScoreId(extractScoreId(send));
-
-            return ret;
+            return ImageResponse.builder()
+                                .base64(Base64.getEncoder().encodeToString(imageBytes))
+                                .beatmapId(extractBeatmapId(send))
+                                .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -726,12 +744,8 @@ public class APIHelper {
         private String beatmapId;
         private String scoreId;
         private List<String> beatmapsetIds;
-
-        public ImageResponse(String base64, String beatmapId, List<String> beatmapsetIds) {
-            this.base64 = base64;
-            this.beatmapId = beatmapId;
-            this.beatmapsetIds = beatmapsetIds;
-        }
+        private String beatmapsetId;
+        private List<String> beatmapIds;
     }
 
     public record TextResponse(String content, List<String> beatmapsetIds, int itemCount) {

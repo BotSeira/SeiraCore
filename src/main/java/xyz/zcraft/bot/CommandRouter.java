@@ -192,7 +192,7 @@ public class CommandRouter {
                     }
                     return taskCoordinator.queueImageRequest("rs",
                             () -> APIHelper.getRecentResponse(n, uid),
-                            response -> uiFactory.markdownInfoMessage("> 最近成绩查询完成\nID: " + id + "\n数量: " + n, uiFactory.rsButtons()));
+                            response -> uiFactory.markdownInfoMessage("> 最近成绩查询完成\nID: " + uid + "\n数量: " + n, uiFactory.rsButtons()));
                 } else if (args.length == 0) {
                     ShortcutTarget target = argumentResolver.parseTarget("rs1", senderUserId);
                     if (target.isError()) {
