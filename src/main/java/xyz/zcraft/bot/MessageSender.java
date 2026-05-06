@@ -47,12 +47,16 @@ public class MessageSender {
             return null;
         }
 
-        for (int i = 1; i <= 3; i++) {
+        for (int i = 1; i <= 10; i++) {
             try {
                 return QQApi.uploadPrivateMedia(tokenManager.getToken(), userId, fileType, url);
             } catch (RuntimeException e) {
-                LOG.error("Failed to upload private media ({}/3) {}", i, userId, e);         
+                LOG.error("Failed to upload private media ({}/10) {}", i, userId, e);         
             }
+
+            try {
+                Thread.sleep(i * 1000);
+            } catch (Exception e) {}
         }
 
         return null;
@@ -72,12 +76,16 @@ public class MessageSender {
             return null;
         }
 
-        for (int i = 1; i <= 3; i++) {
+        for (int i = 1; i <= 10; i++) {
             try {
                 return QQApi.uploadGroupMedia(tokenManager.getToken(), groupId, fileType, url);
             } catch (RuntimeException e) {
-                LOG.error("Failed to upload group media ({}/3) {}", i, groupId, e);         
+                LOG.error("Failed to upload group media ({}/10) {}", i, groupId, e);         
             }
+
+            try {
+                Thread.sleep(i * 1000);
+            } catch (Exception e) {}
         }
 
         return null;

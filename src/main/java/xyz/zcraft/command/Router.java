@@ -1,13 +1,19 @@
-package xyz.zcraft.bot;
+package xyz.zcraft.command;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.api.APIHelper;
+import xyz.zcraft.api.Response;
 import xyz.zcraft.binding.UserBindingStore;
+import xyz.zcraft.bot.MessageSender;
+import xyz.zcraft.command.resolution.ShortcutTarget;
+import xyz.zcraft.command.resolution.TargetResolution;
+import xyz.zcraft.command.resolution.UidListResolution;
+import xyz.zcraft.command.resolution.UidResolution;
 import xyz.zcraft.config.AppConfig;
+import xyz.zcraft.data.ApiTask;
 import xyz.zcraft.data.FileInfo;
 import xyz.zcraft.data.PendingMessage;
-import xyz.zcraft.data.ShortcutTarget;
 import xyz.zcraft.data.VideoRenderRecord;
 import xyz.zcraft.util.ThreadHelper;
 
@@ -15,13 +21,13 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class CommandRouter {
+public class Router {
     public static final String BO_USAGE = "用法：/bo <个数> [玩家ID/@用户]";
     public static final String NO_BIND_TIP = "你还没有绑定玩家ID，请先使用 /bind <玩家ID>";
     public static final String RS_USAGE = "用法：/rs <个数> [玩家ID/@用户]";
     public static final String M_USAGE = "用法：/m <铺面ID 或 快捷查询> [Mod]";
     public static final String S_USAGE = "用法：/s <成绩ID 或 快捷查询>";
-    private static final Logger LOG = LogManager.getLogger(CommandRouter.class);
+    private static final Logger LOG = LogManager.getLogger(Router.class);
     private static final String PREFIX = "/";
     private static final String R_USAGE = "用法：/r <成绩ID 或 快捷查询>";
     private static final String RSC_USAGE = "用法：/rsc <铺面ID或快捷查询> [+用户ID列表，逗号分隔]";
@@ -29,23 +35,23 @@ public class CommandRouter {
     private final MessageSender messageSender;
     private final VideoRenderRecord videoRenderRecord = new VideoRenderRecord();
     private final AppConfig config;
-    private final CommandArgumentResolver argumentResolver;
-    private final CommandUiFactory uiFactory;
-    private final CommandTaskCoordinator taskCoordinator;
+    private final Resolver argumentResolver;
+    private final ReplyFactory replyFactory;
+    private final TaskCoordinator taskCoordinator;
 
-    protected CommandRouter(MessageSender messageSender, AppConfig config) {
+    public Router(MessageSender messageSender, AppConfig config) {
         this.messageSender = messageSender;
         this.config = config;
-        this.argumentResolver = new CommandArgumentResolver(RSC_USAGE);
-        this.uiFactory = new CommandUiFactory(config);
-        this.taskCoordinator = new CommandTaskCoordinator(messageSender);
+        this.argumentResolver = new Resolver(RSC_USAGE);
+        this.replyFactory = new ReplyFactory(config);
+        this.taskCoordinator = new TaskCoordinator(messageSender);
     }
 
-    protected void onPrivateMessageReceived(String userId, String messageId, String rawContent) {
+    public void onPrivateMessageReceived(String userId, String messageId, String rawContent) {
         handleMessageReceived(userId, null, userId, messageId, rawContent, false);
     }
 
-    protected void onGroupMessageReceived(String groupId, String senderUserId, String messageId, String rawContent) {
+    public void onGroupMessageReceived(String groupId, String senderUserId, String messageId, String rawContent) {
         handleMessageReceived(groupId, groupId, senderUserId, messageId, rawContent, true);
     }
 
@@ -129,10 +135,13 @@ public class CommandRouter {
                     if (uidResolution.uid() == null) {
                         return RouteDecision.sync(PendingMessage.ofString(BO_USAGE));
                     }
-                    String infoQuery = query.isBlank() ? "bo1" : query;
-                    return taskCoordinator.queueImageRequest("bo",
-                            () -> APIHelper.getBoNResponse(n, uidResolution.uid()),
-                            response -> uiFactory.markdownInfoMessage("BoN 查询完成\n参数：" + infoQuery, uiFactory.boButtons()));
+                    var uid = uidResolution.uid();
+
+                    return taskCoordinator.queueImageRequest(
+                            "bo",
+                            () -> APIHelper.getBoNResponse(n, uid),
+                            replyFactory::boMessage
+                    );
                 } else if (args.length == 1) {
                     Integer n = argumentResolver.parsePositiveInt(args[0]);
                     if (n == null) {
@@ -142,17 +151,23 @@ public class CommandRouter {
                     if (uid == null) {
                         return RouteDecision.sync(PendingMessage.ofString(NO_BIND_TIP));
                     }
-                    return taskCoordinator.queueImageRequest("bo",
+
+                    return taskCoordinator.queueImageRequest(
+                            "bo",
                             () -> APIHelper.getBoNResponse(n, uid),
-                            response -> uiFactory.markdownInfoMessage("BoN 查询完成\n参数：" + query, uiFactory.boButtons()));
+                            replyFactory::boMessage
+                    );
                 } else if (args.length == 0) {
                     ShortcutTarget target = argumentResolver.parseTarget("bo1", senderUserId);
                     if (target.isError()) {
                         return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                     }
-                    return taskCoordinator.queueImageRequest("bo",
+
+                    return taskCoordinator.queueImageRequest(
+                            "bo",
                             () -> APIHelper.getScoreResponse(target),
-                            response -> uiFactory.markdownInfoMessage("BoN 查询完成\n参数：bo1", uiFactory.boButtons()));
+                            replyFactory::boMessage
+                    );
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString(BO_USAGE));
                 }
@@ -176,10 +191,12 @@ public class CommandRouter {
                     if (uidResolution.uid() == null) {
                         return RouteDecision.sync(PendingMessage.ofString(RS_USAGE));
                     }
-                    String infoQuery = query.isBlank() ? "rs1" : query;
-                    return taskCoordinator.queueImageRequest("rs",
+
+                    return taskCoordinator.queueImageRequest(
+                            "rs",
                             () -> APIHelper.getRecentResponse(n, uidResolution.uid()),
-                            response -> uiFactory.markdownInfoMessage("最近成绩查询完成\n参数：" + infoQuery, uiFactory.rsButtons()));
+                            replyFactory::rsMessage
+                    );
                 } else if (args.length == 1) {
                     Integer n = argumentResolver.parsePositiveInt(args[0]);
                     if (n == null) {
@@ -189,17 +206,23 @@ public class CommandRouter {
                     if (uid == null) {
                         return RouteDecision.sync(PendingMessage.ofString(NO_BIND_TIP));
                     }
-                    return taskCoordinator.queueImageRequest("rs",
+
+                    return taskCoordinator.queueImageRequest(
+                            "rs",
                             () -> APIHelper.getRecentResponse(n, uid),
-                            response -> uiFactory.markdownInfoMessage("最近成绩查询完成\n参数：" + query, uiFactory.rsButtons()));
+                            replyFactory::rsMessage
+                    );
                 } else if (args.length == 0) {
                     ShortcutTarget target = argumentResolver.parseTarget("rs1", senderUserId);
                     if (target.isError()) {
                         return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                     }
-                    return taskCoordinator.queueImageRequest("rs",
+
+                    return taskCoordinator.queueImageRequest(
+                            "rs",
                             () -> APIHelper.getScoreResponse(target),
-                            response -> uiFactory.markdownInfoMessage("最近成绩查询完成\n参数：rs1", uiFactory.rsButtons()));
+                            replyFactory::scoreMessage
+                    );
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString(RS_USAGE));
                 }
@@ -219,17 +242,12 @@ public class CommandRouter {
                     String mod = args.length == targetResolution.consumedArgs() + 1
                             ? args[targetResolution.consumedArgs()]
                             : null;
-                    return taskCoordinator.queueImageRequest("m",
+
+                    return taskCoordinator.queueImageRequest(
+                            "m",
                             () -> APIHelper.getBeatmapResponse(target, mod),
-                            response -> {
-                                String beatmapId = response != null && response.getBeatmapId() != null
-                                        ? response.getBeatmapId()
-                                        : (target.explicitId() != null ? String.valueOf(target.explicitId()) : null);
-                                return uiFactory.markdownInfoMessage(
-                                        uiFactory.buildBeatmapInfoText(beatmapId, mod, query),
-                                        uiFactory.beatmapButtons(beatmapId)
-                                );
-                            });
+                            replyFactory::beatmapMessage
+                    );
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString(M_USAGE));
                 }
@@ -248,12 +266,11 @@ public class CommandRouter {
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
 
-                return taskCoordinator.queueImageRequest("s",
+                return taskCoordinator.queueImageRequest(
+                        "s",
                         () -> APIHelper.getScoreResponse(target),
-                        response -> uiFactory.markdownInfoMessage(
-                                "成绩查询完成\n参数：" + query,
-                                uiFactory.sButtons(response == null ? null : response.getBeatmapId(), response == null ? null : response.getScoreId())
-                        ));
+                        replyFactory::scoreMessage
+                );
             }
             case "r" -> {
                 if (args.length < 1 || args.length > 2) {
@@ -268,11 +285,15 @@ public class CommandRouter {
                 if (target.isError()) {
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
-                return taskCoordinator.queueReplayTask("r", () -> {
-                    APIHelper.ReplayTaskInfo replayRenderTask = APIHelper.createReplayRenderTask(target);
-                    videoRenderRecord.updateRenderTask(senderUserId, replayRenderTask.taskId());
-                    return replayRenderTask;
-                }, uiFactory::replayProgressButtons);
+
+                return taskCoordinator.queueReplayTask(
+                        "r",
+                        () -> {
+                            APIHelper.ReplayTaskInfo replayRenderTask = APIHelper.createReplayRenderTask(target);
+                            videoRenderRecord.updateRenderTask(senderUserId, replayRenderTask.taskId());
+                            return replayRenderTask;
+                        },
+                        replyFactory::replayMessage);
             }
             case "rsc" -> {
                 if (args.length < 1 || args.length > 3) {
@@ -303,21 +324,28 @@ public class CommandRouter {
                 String[] uidArray = uidListResolution.uids();
 
                 if (target.isMacro()) {
-                    return taskCoordinator.queueReplayTask("rsc", () -> {
-                        APIHelper.ReplayTaskInfo replayShowcaseTask = APIHelper.createReplayShowcaseTask(target, uidArray);
-                        videoRenderRecord.updateRenderTask(senderUserId, replayShowcaseTask.taskId());
-                        return replayShowcaseTask;
-                    }, uiFactory::replayProgressButtons);
+                    return taskCoordinator.queueReplayTask(
+                            "rsc",
+                            () -> {
+                                APIHelper.ReplayTaskInfo replayShowcaseTask = APIHelper.createReplayShowcaseTask(target, uidArray);
+                                videoRenderRecord.updateRenderTask(senderUserId, replayShowcaseTask.taskId());
+                                return replayShowcaseTask;
+                            },
+                            replyFactory::replayMessage);
                 }
 
                 if (target.explicitId() == null) {
                     return RouteDecision.sync(PendingMessage.ofString(RSC_USAGE));
                 }
-                return taskCoordinator.queueReplayTask("rsc", () -> {
-                    APIHelper.ReplayTaskInfo showcaseRenderTaskByBeatmap = APIHelper.createShowcaseRenderTaskByBeatmap(target.explicitId(), uidArray);
-                    videoRenderRecord.updateRenderTask(senderUserId, showcaseRenderTaskByBeatmap.taskId());
-                    return showcaseRenderTaskByBeatmap;
-                }, uiFactory::replayProgressButtons);
+
+                return taskCoordinator.queueReplayTask(
+                        "rsc",
+                        () -> {
+                            APIHelper.ReplayTaskInfo showcaseRenderTaskByBeatmap = APIHelper.createShowcaseRenderTaskByBeatmap(target.explicitId(), uidArray);
+                            videoRenderRecord.updateRenderTask(senderUserId, showcaseRenderTaskByBeatmap.taskId());
+                            return showcaseRenderTaskByBeatmap;
+                        },
+                        replyFactory::replayMessage);
             }
             case "ms" -> {
                 if (args.length < 1 || args.length > 2) {
@@ -333,21 +361,22 @@ public class CommandRouter {
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
 
-                return taskCoordinator.queueImageRequest("ms",
-                        () -> APIHelper.getBeatmapSetResponse(target),
-                        response -> uiFactory.markdownInfoMessage("铺面集查询完成\n参数：" + query, null));
+                return taskCoordinator.queueImageRequest(
+                        "ms",
+                        () -> APIHelper.getBeatmapsetResponse(target),
+                        replyFactory::beatmapsetMessage
+                );
             }
             case "sms" -> {
                 if (args.length == 0) {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/sms <搜索关键字>"));
                 }
-                return taskCoordinator.queueApiRequest("sms", () -> {
-                    APIHelper.TextResponse searchResponse = APIHelper.searchBeatmapSetResponse(query);
-                    return uiFactory.markdownInfoMessage(
-                            searchResponse.content(),
-                            uiFactory.searchButtons(searchResponse.beatmapsetIds(), searchResponse.itemCount())
-                    );
-                });
+                return taskCoordinator.queueApiRequest(
+                        "sms",
+                        () -> {
+                            Response searchResponse = APIHelper.searchBeatmapSetResponse(query);
+                            return replyFactory.searchMessage(searchResponse);
+                        });
             }
             case "lb", "c" -> {
                 if (args.length == 0) {
@@ -357,23 +386,23 @@ public class CommandRouter {
                             return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>"));
                         }
                         String[] uidArray = groupBoundUids.stream().map(String::valueOf).toArray(String[]::new);
-                        return taskCoordinator.queueImageRequest("lb",
+
+                        return taskCoordinator.queueImageRequest(
+                                "lb",
                                 () -> APIHelper.getLeaderboardResponse(uidArray),
-                                response -> uiFactory.markdownInfoMessage(
-                                        "排行榜查询完成\n参数：" + (query.isBlank() ? "/lb" : query),
-                                        uiFactory.lbButtons(response == null ? null : response.getBeatmapId())
-                                ));
+                                replyFactory::lbMessage
+                        );
                     }
                     Integer uid = argumentResolver.resolveBoundUid(senderUserId);
                     if (uid == null) {
                         return RouteDecision.sync(PendingMessage.ofString(NO_BIND_TIP));
                     }
-                    return taskCoordinator.queueImageRequest("lb",
+
+                    return taskCoordinator.queueImageRequest(
+                            "lb",
                             () -> APIHelper.getLeaderboardResponse(new String[]{String.valueOf(uid)}),
-                            response -> uiFactory.markdownInfoMessage(
-                                    "排行榜查询完成\n参数：" + (query.isBlank() ? "/lb" : query),
-                                    uiFactory.lbButtons(response == null ? null : response.getBeatmapId())
-                            ));
+                            replyFactory::lbMessage
+                    );
                 } else if (args.length == 1 || args.length == 2) {
                     TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(args, senderUserId);
                     ShortcutTarget target = targetResolution.target();
@@ -389,23 +418,22 @@ public class CommandRouter {
                                 return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>"));
                             }
                             String[] uidArray = groupBoundUids.stream().map(String::valueOf).toArray(String[]::new);
-                            return taskCoordinator.queueImageRequest("lbm",
+                            return taskCoordinator.queueImageRequest(
+                                    "lbm",
                                     () -> APIHelper.getGroupLeaderboardResponse(target, uidArray),
-                                    response -> uiFactory.markdownInfoMessage(
-                                            "同屏排行榜查询完成\n参数：" + query,
-                                            uiFactory.lbButtons(response == null ? null : response.getBeatmapId())
-                                    ));
+                                    replyFactory::lbMessage
+                            );
                         }
                         Integer uid = argumentResolver.resolveBoundUid(senderUserId);
                         if (uid == null) {
                             return RouteDecision.sync(PendingMessage.ofString(NO_BIND_TIP));
                         }
-                        return taskCoordinator.queueImageRequest("lbm",
+
+                        return taskCoordinator.queueImageRequest(
+                                "lbm",
                                 () -> APIHelper.getGroupLeaderboardResponse(target, new String[]{String.valueOf(uid)}),
-                                response -> uiFactory.markdownInfoMessage(
-                                        "同屏排行榜查询完成\n参数：" + query,
-                                        uiFactory.lbButtons(response == null ? null : response.getBeatmapId())
-                                ));
+                                replyFactory::lbMessage
+                        );
                     }
 
                     if (remainingArgs != 1) {
@@ -424,12 +452,12 @@ public class CommandRouter {
                         }
                         uidArray[i] = String.valueOf(uid);
                     }
-                    return taskCoordinator.queueImageRequest("lbm",
+
+                    return taskCoordinator.queueImageRequest(
+                            "lbm",
                             () -> APIHelper.getGroupLeaderboardResponse(target, uidArray),
-                            response -> uiFactory.markdownInfoMessage(
-                                    "同屏排行榜查询完成\n参数：" + query,
-                                    uiFactory.lbButtons(response == null ? null : response.getBeatmapId())
-                            ));
+                            replyFactory::lbMessage
+                    );
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/lb <铺面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
                 }
@@ -439,10 +467,11 @@ public class CommandRouter {
             }
             case "rstat" -> {
                 if (args.length == 1) {
-                    return RouteDecision.sync(PendingMessage.ofString(APIHelper.getRenderStat(args[0])));
+                    return RouteDecision.sync(replyFactory.replayStatMessage(args[0], APIHelper.getRenderStat(args[0])));
                 } else if (args.length == 0) {
                     if (videoRenderRecord.hasRenderTask(senderUserId)) {
-                        return RouteDecision.sync(PendingMessage.ofString(APIHelper.getRenderStat(videoRenderRecord.getRenderTask(senderUserId))));
+                        final String jobId = videoRenderRecord.getRenderTask(senderUserId);
+                        return RouteDecision.sync(replyFactory.replayStatMessage(jobId, APIHelper.getRenderStat(jobId)));
                     }
                     return RouteDecision.sync(PendingMessage.ofString("未找到渲染请求"));
                 } else {
@@ -454,8 +483,8 @@ public class CommandRouter {
                         可用指令：
                         /bind <玩家ID> - 绑定你的玩家ID
                         /unbind - 解除你的玩家ID绑定
-                        /bo <个数> [玩家ID/@用户] - 获取BoN图谱
-                        /rs <个数> [玩家ID/@用户] - 获取最近成绩图谱
+                        /bo <个数> [玩家ID] - 获取BoN图谱
+                        /rs <个数> [玩家ID] - 获取最近成绩图谱
                         /m <铺面ID> - 获取铺面图谱
                         /ms <铺面集ID> - 获取铺面集图谱
                         /r <成绩ID或快捷查询> - 生成成绩回放视频

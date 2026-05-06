@@ -1,7 +1,10 @@
-package xyz.zcraft.bot;
+package xyz.zcraft.command;
 
 import xyz.zcraft.binding.UserBindingStore;
-import xyz.zcraft.data.ShortcutTarget;
+import xyz.zcraft.command.resolution.TargetResolution;
+import xyz.zcraft.command.resolution.UidListResolution;
+import xyz.zcraft.command.resolution.UidResolution;
+import xyz.zcraft.command.resolution.ShortcutTarget;
 
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -9,7 +12,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-final class CommandArgumentResolver {
+final class Resolver {
     private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo)(\\d+)$");
     private static final Pattern SET_MACRO_PATTERN = Pattern.compile("^(\\d+)#(\\d+)$");
     private static final Pattern BEATMAP_MACRO_PATTERN = Pattern.compile("^m(\\d+)$");
@@ -18,11 +21,11 @@ final class CommandArgumentResolver {
 
     private final String rscUsage;
 
-    CommandArgumentResolver(String rscUsage) {
+    Resolver(String rscUsage) {
         this.rscUsage = rscUsage;
     }
 
-    TargetResolution resolveTargetWithOptionalMention(String[] args, String senderUserId) {
+    public TargetResolution resolveTargetWithOptionalMention(String[] args, String senderUserId) {
         if (args.length >= 2 && isUserMacro(args[1])) {
             String mentionedUserId = extractMentionedUserId(args[0]);
             if (mentionedUserId != null) {
@@ -35,11 +38,11 @@ final class CommandArgumentResolver {
         return new TargetResolution(parseTarget(args[0], senderUserId), 1);
     }
 
-    ShortcutTarget parseTarget(String arg, String senderUserId) {
+    public ShortcutTarget parseTarget(String arg, String senderUserId) {
         return parseTarget(arg, senderUserId, false);
     }
 
-    UidResolution resolveUidArgument(String arg) {
+    public UidResolution resolveUidArgument(String arg) {
         Integer explicitUid = parsePositiveInt(arg);
         if (explicitUid != null) {
             return new UidResolution(explicitUid, null);
@@ -61,7 +64,7 @@ final class CommandArgumentResolver {
         return new UidResolution(null, null);
     }
 
-    UidListResolution resolveRscUidList(String groupId, String extraUidArg) {
+    public UidListResolution resolveRscUidList(String groupId, String extraUidArg) {
         List<Integer> groupBoundUids = UserBindingStore.findBoundUidsByGroup(groupId);
         if (groupBoundUids.isEmpty()) {
             return new UidListResolution(null, "本群还没有已绑定的玩家，请先使用 /bind <玩家ID>");
@@ -93,14 +96,14 @@ final class CommandArgumentResolver {
         return new UidListResolution(merged.toArray(String[]::new), null);
     }
 
-    Integer resolveBoundUid(String senderUserId) {
+    public Integer resolveBoundUid(String senderUserId) {
         if (senderUserId == null || senderUserId.isBlank()) {
             return null;
         }
         return UserBindingStore.findBoundUid(senderUserId);
     }
 
-    Integer parsePositiveInt(String value) {
+    public Integer parsePositiveInt(String value) {
         try {
             int parsed = Integer.parseInt(value);
             return parsed > 0 ? parsed : null;
@@ -109,7 +112,7 @@ final class CommandArgumentResolver {
         }
     }
 
-    private ShortcutTarget parseTarget(String arg, String senderUserId, boolean mentionedUser) {
+    public ShortcutTarget parseTarget(String arg, String senderUserId, boolean mentionedUser) {
         Matcher setMatcher = SET_MACRO_PATTERN.matcher(arg.trim());
         if (setMatcher.matches()) {
             Long setId = parsePositiveLong(setMatcher.group(1));

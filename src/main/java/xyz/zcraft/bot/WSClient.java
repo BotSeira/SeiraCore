@@ -8,6 +8,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
+import xyz.zcraft.command.Router;
 import xyz.zcraft.config.AppConfig;
 import xyz.zcraft.util.AccessToken;
 import xyz.zcraft.util.ThreadHelper;
@@ -27,7 +28,7 @@ public class WSClient extends WebSocketClient {
     private final ScheduledExecutorService heartbeatExecutor = Executors.newSingleThreadScheduledExecutor();
     private final AtomicLong sequence = new AtomicLong(-1);
     private volatile boolean heartbeatAcked = true;
-    private final CommandRouter router;
+    private final Router router;
 
     public WSClient(
             URI serverUri,
@@ -38,7 +39,7 @@ public class WSClient extends WebSocketClient {
         super(serverUri);
         this.config = config;
         this.tokenSupplier = tokenSupplier;
-        this.router = new CommandRouter(messageSender, config);
+        this.router = new Router(messageSender, config);
         LOG.info("QQ Gateway WebSocket Client created");
     }
 
