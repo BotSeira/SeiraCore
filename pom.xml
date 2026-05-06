@@ -6,7 +6,7 @@
 
     <groupId>xyz.zcraft</groupId>
     <artifactId>Seira</artifactId>
-    <version>1.2.0</version>
+    <version>1.2.1</version>
 
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
@@ -116,6 +116,7 @@
             <version>3.50.3.0</version>
         </dependency>
         <!-- Source: https://mvnrepository.com/artifact/com.qcloud/cos_api -->
+        <!--suppress VulnerableLibrariesLocal -->
         <dependency>
             <groupId>com.qcloud</groupId>
             <artifactId>cos_api</artifactId>

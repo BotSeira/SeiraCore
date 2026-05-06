@@ -176,18 +176,26 @@ final class TaskCoordinator {
     private String resolveErrorMessage(Exception exception) {
         Throwable cursor = exception;
         while (cursor != null) {
-            if (cursor instanceof ApiRequestException apiRequestException) {
-                String mapped = ApiRequestException.getDefaultMessage(apiRequestException.getErrorCode());
-                if (mapped != null) {
-                    return mapped;
-                }
+            switch (cursor) {
+                case ApiRequestException e -> {
+                    String mapped = ApiRequestException.getDefaultMessage(e.getErrorCode());
+                    if (mapped != null) {
+                        return mapped;
+                    }
 
-                String rawMessage = apiRequestException.getMessage();
-                if (rawMessage != null && !rawMessage.isBlank()) {
-                    return rawMessage;
+                    String rawMessage = e.getMessage();
+                    if (rawMessage != null && !rawMessage.isBlank()) {
+                        return rawMessage;
+                    }
                 }
-            } else if (cursor instanceof ClosedChannelException) {
-                return "oStella API 无法连接，请稍后再试。";
+                case ClosedChannelException _ -> {
+                    return "oStella API 无法连接，请稍后再试。";
+                }
+                case ResolutionException e -> {
+                    return e.getMessage();
+                }
+                default -> {
+                }
             }
             cursor = cursor.getCause();
         }

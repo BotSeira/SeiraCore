@@ -5,8 +5,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import xyz.zcraft.Seira;
+import xyz.zcraft.command.ResolutionException;
 import xyz.zcraft.command.resolution.ShortcutTarget;
-import xyz.zcraft.data.ErrorCode;
 import xyz.zcraft.data.SearchResultItem;
 
 import java.io.IOException;
@@ -254,7 +254,7 @@ public class APIHelper {
             }
 
             if (query == null) {
-                throw new ApiRequestException(ErrorCode.ILLEGAL_SHORTCUT);
+                throw new ResolutionException("快捷查询格式错误。");
             }
 
             HttpRequest localRequest = HttpRequest.newBuilder()
