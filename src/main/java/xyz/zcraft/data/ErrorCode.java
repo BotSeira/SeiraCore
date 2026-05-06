@@ -1,6 +1,5 @@
 package xyz.zcraft.data;
 
-import com.google.gson.JsonObject;
 import lombok.Getter;
 
 @Getter
@@ -12,26 +11,28 @@ public enum ErrorCode {
     NO_ROOM_FOUND(1005),
 
     ILLEGAL_ARGUMENT(2001),
+    ILLEGAL_SHORTCUT(2002),
 
+    FETCH_FAILED(3000),
     BEATMAP_FETCH_FAILED(3001),
     BEATMAPSET_FETCH_FAILED(3002),
     USER_FETCH_FAILED(3003),
     SCORE_FETCH_FAILED(3004),
+    ROOM_FETCH_FAILED(3005),
+    IMAGE_FETCH_FAILED(3006),
+    REPLAY_FETCH_FAILED(3007),
+    TOKEN_FETCH_FAILED(3008),
 
     REPLAY_UNAVAILABLE(4001),
 
-    RENDER_QUEUE_FULL(5001);
+    RENDER_QUEUE_FULL(5001),
+
+    ROSU_ERROR(6001);
 
     private final int code;
 
     ErrorCode(int i) {
         this.code = i;
-    }
-
-    public JsonObject toJson() {
-        final JsonObject jsonObject = new JsonObject();
-        jsonObject.addProperty("code", code);
-        return jsonObject;
     }
 
     public static ErrorCode fromCode(Integer code) {

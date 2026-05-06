@@ -1,31 +1,29 @@
-package xyz.zcraft.bot;
+package xyz.zcraft.command;
 
 import com.google.gson.Gson;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.api.APIHelper;
 import xyz.zcraft.api.ApiRequestException;
-import xyz.zcraft.data.Button;
-import xyz.zcraft.data.ErrorCode;
-import xyz.zcraft.data.FileInfo;
-import xyz.zcraft.data.MDMessage;
-import xyz.zcraft.data.Message;
-import xyz.zcraft.data.PendingMessage;
+import xyz.zcraft.api.Response;
+import xyz.zcraft.bot.MessageSender;
+import xyz.zcraft.command.iface.*;
+import xyz.zcraft.data.*;
 import xyz.zcraft.util.ApiRequestStats;
 
-import java.util.List;
+import java.nio.channels.ClosedChannelException;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
-final class CommandTaskCoordinator {
-    private static final Logger LOG = LogManager.getLogger(CommandTaskCoordinator.class);
+final class TaskCoordinator {
+    private static final Logger LOG = LogManager.getLogger(TaskCoordinator.class);
 
     private final MessageSender messageSender;
     private final ApiRequestStats apiRequestStats = new ApiRequestStats();
 
-    CommandTaskCoordinator(MessageSender messageSender) {
+    TaskCoordinator(MessageSender messageSender) {
         this.messageSender = messageSender;
     }
 
@@ -41,10 +39,10 @@ final class CommandTaskCoordinator {
     }
 
     RouteDecision queueImageRequest(String requestType, ImageResponseCreator creator, ImageResponsePostProcessor postProcessor) {
-        AtomicReference<APIHelper.ImageResponse> responseRef = new AtomicReference<>();
+        AtomicReference<Response> responseRef = new AtomicReference<>();
         return queueApiRequest(requestType,
                 () -> {
-                    APIHelper.ImageResponse response = creator.create();
+                    Response response = creator.create();
                     responseRef.set(response);
                     return PendingMessage.ofImageBase64(response.getBase64());
                 },
@@ -54,7 +52,7 @@ final class CommandTaskCoordinator {
         );
     }
 
-    RouteDecision queueReplayTask(String requestType, ReplayTaskCreator creator, Function<String, List<List<Button>>> replayButtonsFactory) {
+    RouteDecision queueReplayTask(String requestType, ReplayTaskCreator creator, Function<APIHelper.ReplayTaskInfo, PendingMessage> messageCreator) {
         AtomicReference<APIHelper.ReplayTaskInfo> taskInfoRef = new AtomicReference<>();
 
         return queueApiRequestUntilSubmit(
@@ -63,17 +61,7 @@ final class CommandTaskCoordinator {
                     APIHelper.ReplayTaskInfo taskInfo = creator.create();
                     taskInfoRef.set(taskInfo);
 
-                    String queuedText = "生成请求已提交。";
-                    if (taskInfo.position() != null) {
-                        queuedText += "\n队列位置：" + taskInfo.position();
-                    }
-                    if (taskInfo.taskId() != null) {
-                        queuedText += "\n请求ID：" + taskInfo.taskId();
-                    }
-                    if (taskInfo.message() != null) {
-                        queuedText += "\n" + taskInfo.message();
-                    }
-                    return PendingMessage.ofMarkdownRaw(queuedText, replayButtonsFactory.apply(taskInfo.taskId()));
+                    return messageCreator.apply(taskInfo);
                 },
                 () -> {
                     APIHelper.ReplayTaskInfo taskInfo = taskInfoRef.get();
@@ -189,7 +177,7 @@ final class CommandTaskCoordinator {
         Throwable cursor = exception;
         while (cursor != null) {
             if (cursor instanceof ApiRequestException apiRequestException) {
-                String mapped = mapErrorCodeMessage(apiRequestException.getErrorCode());
+                String mapped = ApiRequestException.getDefaultMessage(apiRequestException.getErrorCode());
                 if (mapped != null) {
                     return mapped;
                 }
@@ -198,33 +186,11 @@ final class CommandTaskCoordinator {
                 if (rawMessage != null && !rawMessage.isBlank()) {
                     return rawMessage;
                 }
+            } else if (cursor instanceof ClosedChannelException) {
+                return "oStella API 无法连接，请稍后再试。";
             }
             cursor = cursor.getCause();
         }
         return "请求处理失败，请稍后再试。";
     }
-
-    private String mapErrorCodeMessage(Integer code) {
-        ErrorCode errorCode = ErrorCode.fromCode(code);
-        if (errorCode == null) {
-            return null;
-        }
-
-        return switch (errorCode) {
-            case NO_BEATMAP_FOUND -> "未找到对应铺面，请检查输入后重试。";
-            case NO_BEATMAPSET_FOUND -> "未找到对应铺面集，请检查输入后重试。";
-            case NO_USER_FOUND -> "未找到对应玩家，请检查玩家ID后重试。";
-            case NO_SCORE_FOUND -> "未找到对应成绩，请检查输入后重试。";
-            case NO_ROOM_FOUND -> "当前没有可用的多人房间信息。";
-            case ILLEGAL_ARGUMENT -> "请求参数不合法，请检查指令参数格式。";
-            case BEATMAP_FETCH_FAILED -> "获取铺面数据失败，请稍后重试。";
-            case BEATMAPSET_FETCH_FAILED -> "获取铺面集数据失败，请稍后重试。";
-            case USER_FETCH_FAILED -> "获取玩家数据失败，请稍后重试。";
-            case SCORE_FETCH_FAILED -> "获取成绩数据失败，请稍后重试。";
-            case REPLAY_UNAVAILABLE -> "该成绩暂不支持回放渲染。";
-            case RENDER_QUEUE_FULL -> "回放渲染队列已满，请稍后再试。";
-        };
-    }
 }
-
-

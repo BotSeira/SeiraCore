@@ -1,4 +1,4 @@
-package xyz.zcraft.data;
+package xyz.zcraft.command.resolution;
 
 public record ShortcutTarget(
         Long explicitId,

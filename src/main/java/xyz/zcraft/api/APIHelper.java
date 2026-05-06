@@ -4,11 +4,10 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import lombok.Data;
-import lombok.Builder;
 import xyz.zcraft.Seira;
+import xyz.zcraft.command.resolution.ShortcutTarget;
+import xyz.zcraft.data.ErrorCode;
 import xyz.zcraft.data.SearchResultItem;
-import xyz.zcraft.data.ShortcutTarget;
 
 import java.io.IOException;
 import java.net.URI;
@@ -32,7 +31,7 @@ public class APIHelper {
     }
 
 
-    public static ImageResponse getBoNResponse(int n, int uid) {
+    public static Response getBoNResponse(int n, int uid) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/bo?" + "n=" + n + "&u=" + uid))
@@ -46,16 +45,15 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return ImageResponse.builder()
-                                .base64(Base64.getEncoder().encodeToString(imageBytes))
-                                .beatmapId(extractBeatmapId(send))
-                                .build();
+            return Response.fromHeaders(send.headers())
+                    .base64(Base64.getEncoder().encodeToString(imageBytes))
+                    .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static ImageResponse getGroupLeaderboardResponse(ShortcutTarget target, String[] uids) {
+    public static Response getGroupLeaderboardResponse(ShortcutTarget target, String[] uids) {
         String uidsParam = String.join(",", uids);
         try {
             String query;
@@ -78,16 +76,15 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return ImageResponse.builder()
-                                .base64(Base64.getEncoder().encodeToString(imageBytes))
-                                .beatmapId(extractBeatmapId(send))
-                                .build();
+            return Response.fromHeaders(send.headers())
+                    .base64(Base64.getEncoder().encodeToString(imageBytes))
+                    .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static ImageResponse getLeaderboardResponse(String[] uids) {
+    public static Response getLeaderboardResponse(String[] uids) {
         String uidsParam = String.join(",", uids);
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
@@ -102,10 +99,9 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return ImageResponse.builder()
-                                .base64(Base64.getEncoder().encodeToString(imageBytes))
-                                .beatmapId(extractBeatmapId(send))
-                                .build();
+            return Response.fromHeaders(send.headers())
+                    .base64(Base64.getEncoder().encodeToString(imageBytes))
+                    .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -124,7 +120,7 @@ public class APIHelper {
                 throw parseHttpError(send.body(), send.statusCode(), "获取每日挑战失败");
             }
 
-            final Response r = GSON.fromJson(send.body(), Response.class);
+            final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
             ensureApiSuccess(r, "获取每日挑战失败");
             final JsonObject data = r.getData().getAsJsonObject();
 
@@ -161,7 +157,7 @@ public class APIHelper {
                 throw parseHttpError(send.body(), send.statusCode(), "获取多人房间失败");
             }
 
-            final Response r = GSON.fromJson(send.body(), Response.class);
+            final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
             ensureApiSuccess(r, "获取多人房间失败");
             final JsonArray data = r.getData().getAsJsonArray();
 
@@ -176,7 +172,7 @@ public class APIHelper {
         }
     }
 
-    public static ImageResponse getRecentResponse(int n, int uid) {
+    public static Response getRecentResponse(int n, int uid) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/rs?" + "n=" + n + "&u=" + uid))
@@ -191,16 +187,15 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return ImageResponse.builder()
-                                .base64(Base64.getEncoder().encodeToString(imageBytes))
-                                .beatmapId(extractBeatmapId(send))
-                                .build();
+            return Response.fromHeaders(send.headers())
+                    .base64(Base64.getEncoder().encodeToString(imageBytes))
+                    .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static ImageResponse getBeatmapResponse(ShortcutTarget target, String mod) {
+    public static Response getBeatmapResponse(ShortcutTarget target, String mod) {
         try {
             final String query = getBeatmapQuery(target, mod);
 
@@ -217,10 +212,9 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return ImageResponse.builder()
-                                .base64(Base64.getEncoder().encodeToString(imageBytes))
-                                .beatmapId(extractBeatmapId(send))
-                                .build();
+            return Response.fromHeaders(send.headers())
+                    .base64(Base64.getEncoder().encodeToString(imageBytes))
+                    .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -246,13 +240,21 @@ public class APIHelper {
         return query;
     }
 
-    public static ImageResponse getBeatmapSetResponse(ShortcutTarget target) {
+    public static Response getBeatmapsetResponse(ShortcutTarget target) {
         try {
-            String query;
+            String query = null;
             if (target.isMacro()) {
-                query = "/ms?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+                if("m".equals(target.macroType())) {
+                    query = "/ms?m=" + target.explicitId();
+                } else if ("bo".equals(target.macroType()) || "rs".equals(target.macroType())) {
+                    query = "/ms?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+                }
             } else {
                 query = "/ms?ms=" + target.explicitId();
+            }
+
+            if (query == null) {
+                throw new ApiRequestException(ErrorCode.ILLEGAL_SHORTCUT);
             }
 
             HttpRequest localRequest = HttpRequest.newBuilder()
@@ -268,16 +270,15 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return ImageResponse.builder()
-                                .base64(Base64.getEncoder().encodeToString(imageBytes))
-                                .beatmapId(extractBeatmapId(send))
-                                .build();
+            return Response.fromHeaders(send.headers())
+                    .base64(Base64.getEncoder().encodeToString(imageBytes))
+                    .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static ImageResponse getScoreResponse(ShortcutTarget target) {
+    public static Response getScoreResponse(ShortcutTarget target) {
         try {
             String query;
             if (target.isMacro()) {
@@ -306,16 +307,15 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return ImageResponse.builder()
-                                .base64(Base64.getEncoder().encodeToString(imageBytes))
-                                .beatmapId(extractBeatmapId(send))
-                                .build();
+            return Response.fromHeaders(send.headers())
+                    .base64(Base64.getEncoder().encodeToString(imageBytes))
+                    .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static TextResponse searchBeatmapSetResponse(String query) {
+    public static Response searchBeatmapSetResponse(String query) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/sms?" + "q=" + URLEncoder.encode(query, StandardCharsets.UTF_8)))
@@ -328,9 +328,9 @@ public class APIHelper {
                 throw parseHttpError(send.body(), send.statusCode(), "搜索铺面集失败");
             }
 
-            final Response response = GSON.fromJson(send.body(), Response.class);
-            ensureApiSuccess(response, "搜索铺面集失败");
-            final JsonArray data = response.getData().getAsJsonArray();
+            final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
+            ensureApiSuccess(rawResponse, "搜索铺面集失败");
+            final JsonArray data = rawResponse.getData().getAsJsonArray();
 
             final LinkedList<SearchResultItem> items = new LinkedList<>();
 
@@ -348,7 +348,9 @@ public class APIHelper {
                         .append("\n");
             }
 
-            return new TextResponse(sb.toString().trim(), extractBeatmapsetIds(send), Math.min(items.size(), 10));
+            return Response.fromHeaders(send.headers())
+                    .content(sb.toString().trim())
+                    .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -406,7 +408,7 @@ public class APIHelper {
                     .GET()
                     .build();
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-            Response payload = GSON.fromJson(response.body(), Response.class);
+            RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
             if (codeNotOk(response.statusCode())) {
                 throw parseHttpError(response.body(), response.statusCode(), "回放渲染请求失败");
             }
@@ -516,7 +518,7 @@ public class APIHelper {
                     .GET()
                     .build();
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-            Response payload = GSON.fromJson(response.body(), Response.class);
+            RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
             if (codeNotOk(response.statusCode())) {
                 throw parseHttpError(response.body(), response.statusCode(), "查询回放渲染状态失败");
             }
@@ -544,7 +546,7 @@ public class APIHelper {
         return "/replay/render?s=" + target.explicitId();
     }
 
-    private static void ensureApiSuccess(Response payload, String fallbackMessage) {
+    private static void ensureApiSuccess(RawResponse payload, String fallbackMessage) {
         if (payload == null) {
             throw new RuntimeException(fallbackMessage);
         }
@@ -587,7 +589,7 @@ public class APIHelper {
         return parseHttpError(bodyAsText, statusCode, fallbackMessage);
     }
 
-    private static Integer extractErrorCode(Response payload) {
+    private static Integer extractErrorCode(RawResponse payload) {
         // Error code is returned as Response.data.code.
         if (payload.getData() != null && payload.getData().isJsonObject()) {
             JsonObject data = payload.getData().getAsJsonObject();
@@ -611,40 +613,11 @@ public class APIHelper {
         }
     }
 
-    private static JsonObject requireDataObject(Response payload, String message) {
+    private static JsonObject requireDataObject(RawResponse payload, String message) {
         if (payload.getData() == null || !payload.getData().isJsonObject()) {
             throw new RuntimeException(message);
         }
         return payload.getData().getAsJsonObject();
-    }
-
-    private static String extractBeatmapId(HttpResponse<?> response) {
-        return response.headers().firstValue("X-Beatmap-Id").orElse(null);
-    }
-
-    private static String extractScoreId(HttpResponse<?> response) {
-        return response.headers().firstValue("X-Score-Id").orElse(null);
-    }
-
-    private static List<String> extractBeatmapsetIds(HttpResponse<?> response) {
-        return response.headers().firstValue("X-Beatmapset-Ids")
-                .map(APIHelper::parseCsvHeader)
-                .orElseGet(Collections::emptyList);
-    }
-
-    private static List<String> parseCsvHeader(String headerValue) {
-        if (headerValue == null || headerValue.isBlank()) {
-            return Collections.emptyList();
-        }
-
-        List<String> ids = new ArrayList<>();
-        for (String part : headerValue.split(",")) {
-            String trimmed = part.trim();
-            if (!trimmed.isEmpty()) {
-                ids.add(trimmed);
-            }
-        }
-        return ids;
     }
 
     public static String getRenderStat(String jobId) {
@@ -660,12 +633,12 @@ public class APIHelper {
                 throw parseHttpError(send.body(), send.statusCode(), "获取渲染进度失败");
             }
 
-            final Response r = GSON.fromJson(send.body(), Response.class);
+            final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
             ensureApiSuccess(r, "获取渲染进度失败");
             final JsonObject data = r.getData().getAsJsonObject();
 
             StringBuilder sb = new StringBuilder();
-            sb.append("任务ID: ").append(jobId, 0, 8).append("\n");
+            sb.append("> 请求: ").append(jobId, 0, 8).append("\n");
 
             final JsonElement jsonElement = data.get("status");
             final String status = jsonElement != null ? jsonElement.getAsString() : null;
@@ -701,15 +674,15 @@ public class APIHelper {
                     .build();
 
             final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-            final Response response = GSON.fromJson(send.body(), Response.class);
+            final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
             if (send.statusCode() == 200
                     && send.body() != null
-                    && response != null
-                    && response.isSuccess()) {
+                    && rawResponse != null
+                    && rawResponse.isSuccess()) {
                 oStella = true;
 
-                if (response.getData() != null && response.getData().isJsonObject()) {
-                    JsonObject data = response.getData().getAsJsonObject();
+                if (rawResponse.getData() != null && rawResponse.getData().isJsonObject()) {
+                    JsonObject data = rawResponse.getData().getAsJsonObject();
                     if (data.has("osu-api") && !data.get("osu-api").isJsonNull()) {
                         osu = data.get("osu-api").getAsBoolean();
                     }
@@ -735,19 +708,5 @@ public class APIHelper {
     }
 
     public record ReplayTaskInfo(String taskId, String status, Integer position, String message) {
-    }
-
-    @Data
-    @Builder
-    public static final class ImageResponse {
-        private String base64;
-        private String beatmapId;
-        private String scoreId;
-        private List<String> beatmapsetIds;
-        private String beatmapsetId;
-        private List<String> beatmapIds;
-    }
-
-    public record TextResponse(String content, List<String> beatmapsetIds, int itemCount) {
     }
 }
