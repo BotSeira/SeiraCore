@@ -719,6 +719,7 @@ public class APIHelper {
     }
 
     @Data
+    @Builder
     public static final class ImageResponse {
         private String base64;
         private String beatmapId;

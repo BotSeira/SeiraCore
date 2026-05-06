@@ -129,10 +129,11 @@ public class CommandRouter {
                     if (uidResolution.uid() == null) {
                         return RouteDecision.sync(PendingMessage.ofString(BO_USAGE));
                     }
+                    var uid = uidResolution.uid();
                     String infoQuery = query.isBlank() ? "bo1" : query;
                     return taskCoordinator.queueImageRequest("bo",
-                            () -> APIHelper.getBoNResponse(n, uidResolution.uid()),
-                            response -> uiFactory.markdownInfoMessage("BoN 查询完成\n参数：" + infoQuery, uiFactory.boButtons()));
+                            () -> APIHelper.getBoNResponse(n, uid),
+                            response -> uiFactory.markdownInfoMessage("> BoN 查询完成\nID: " + uid + "\n数量: " + infoQuery, uiFactory.boButtons()));
                 } else if (args.length == 1) {
                     Integer n = argumentResolver.parsePositiveInt(args[0]);
                     if (n == null) {
@@ -144,7 +145,7 @@ public class CommandRouter {
                     }
                     return taskCoordinator.queueImageRequest("bo",
                             () -> APIHelper.getBoNResponse(n, uid),
-                            response -> uiFactory.markdownInfoMessage("BoN 查询完成\n参数：" + query, uiFactory.boButtons()));
+                            response -> uiFactory.markdownInfoMessage("> BoN 查询完成\nID: " + uid + "\n数量: " + query, uiFactory.boButtons()));
                 } else if (args.length == 0) {
                     ShortcutTarget target = argumentResolver.parseTarget("bo1", senderUserId);
                     if (target.isError()) {
@@ -152,7 +153,7 @@ public class CommandRouter {
                     }
                     return taskCoordinator.queueImageRequest("bo",
                             () -> APIHelper.getScoreResponse(target),
-                            response -> uiFactory.markdownInfoMessage("BoN 查询完成\n参数：bo1", uiFactory.boButtons()));
+                            response -> uiFactory.markdownInfoMessage("> 最好成绩查询完成", uiFactory.boButtons()));
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString(BO_USAGE));
                 }
@@ -179,7 +180,7 @@ public class CommandRouter {
                     String infoQuery = query.isBlank() ? "rs1" : query;
                     return taskCoordinator.queueImageRequest("rs",
                             () -> APIHelper.getRecentResponse(n, uidResolution.uid()),
-                            response -> uiFactory.markdownInfoMessage("最近成绩查询完成\n参数：" + infoQuery, uiFactory.rsButtons()));
+                            response -> uiFactory.markdownInfoMessage("> 最近成绩查询完成\nID: " + uidResolution.uid() + "\n数量: " + infoQuery, uiFactory.rsButtons()));
                 } else if (args.length == 1) {
                     Integer n = argumentResolver.parsePositiveInt(args[0]);
                     if (n == null) {
@@ -191,7 +192,7 @@ public class CommandRouter {
                     }
                     return taskCoordinator.queueImageRequest("rs",
                             () -> APIHelper.getRecentResponse(n, uid),
-                            response -> uiFactory.markdownInfoMessage("最近成绩查询完成\n参数：" + query, uiFactory.rsButtons()));
+                            response -> uiFactory.markdownInfoMessage("> 最近成绩查询完成\nID: " + id + "\n数量: " + n, uiFactory.rsButtons()));
                 } else if (args.length == 0) {
                     ShortcutTarget target = argumentResolver.parseTarget("rs1", senderUserId);
                     if (target.isError()) {
@@ -199,7 +200,7 @@ public class CommandRouter {
                     }
                     return taskCoordinator.queueImageRequest("rs",
                             () -> APIHelper.getScoreResponse(target),
-                            response -> uiFactory.markdownInfoMessage("最近成绩查询完成\n参数：rs1", uiFactory.rsButtons()));
+                            response -> uiFactory.markdownInfoMessage("> 最近成绩查询完成", uiFactory.rsButtons()));
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString(RS_USAGE));
                 }
@@ -251,8 +252,8 @@ public class CommandRouter {
                 return taskCoordinator.queueImageRequest("s",
                         () -> APIHelper.getScoreResponse(target),
                         response -> uiFactory.markdownInfoMessage(
-                                "成绩查询完成\n参数：" + query,
-                                uiFactory.sButtons(response == null ? null : response.getBeatmapId(), response == null ? null : response.getScoreId())
+                                "> 成绩查询完成\n铺面: " + response.getBeatmapId() + "\n成绩: " + response.getScoreId(),
+                                uiFactory.sButtons(response.getBeatmapId(), response.getScoreId())
                         ));
             }
             case "r" -> {
@@ -335,7 +336,7 @@ public class CommandRouter {
 
                 return taskCoordinator.queueImageRequest("ms",
                         () -> APIHelper.getBeatmapSetResponse(target),
-                        response -> uiFactory.markdownInfoMessage("铺面集查询完成\n参数：" + query, null));
+                        response -> uiFactory.markdownInfoMessage("> 铺面集查询完成\nID: " + response.getBeatmapsetId(), null));
             }
             case "sms" -> {
                 if (args.length == 0) {
