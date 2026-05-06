@@ -5,6 +5,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import lombok.Data;
+import lombok.Builder;
 import xyz.zcraft.Seira;
 import xyz.zcraft.data.SearchResultItem;
 import xyz.zcraft.data.ShortcutTarget;
