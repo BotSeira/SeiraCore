@@ -5,6 +5,7 @@ import xyz.zcraft.api.Response;
 import xyz.zcraft.config.AppConfig;
 import xyz.zcraft.data.Button;
 import xyz.zcraft.data.PendingMessage;
+import xyz.zcraft.data.SearchQuery;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,15 +48,15 @@ final class ReplyFactory {
 
     public PendingMessage lbMessage(Response response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 排行榜查询完成\n铺面: " + response.getBeatmapId(),
+                "> 排行榜查询完成" + (response.getBeatmapId() == null ? "" : "\n铺面: " + response.getBeatmapId()),
                 Buttons.lbButtons(response.getBeatmapId())
         );
     }
 
     public PendingMessage replayMessage(APIHelper.ReplayTaskInfo taskInfo) {
-        String queuedText = "生成请求已提交。";
+        String queuedText = "生成请求已提交。\n```text";
         if (taskInfo.position() != null) {
-            queuedText += "\n```text\n队列位置: " + taskInfo.position();
+            queuedText += "\n队列位置: " + taskInfo.position();
         }
         if (taskInfo.taskId() != null) {
             queuedText += "\n请求: " + taskInfo.taskId();
@@ -71,10 +72,10 @@ final class ReplyFactory {
         return PendingMessage.ofMarkdownRaw(renderStat, Buttons.replayProgressButtons(jobId));
     }
 
-    public PendingMessage searchMessage(Response response) {
+    public PendingMessage searchMessage(Response response, SearchQuery searchQuery) {
         return PendingMessage.ofMarkdownRaw(
                 response.getContent(),
-                Buttons.searchButtons(response.getBeatmapsetIds(), Math.min(response.getBeatmapsetIds().size(), 10))
+                Buttons.searchButtons(response, searchQuery)
         );
     }
 
@@ -92,12 +93,14 @@ final class ReplyFactory {
                     Button.command(2, "渲染最好成绩", "渲染最好成绩", "/r bo1")
             ));
         }
+
         static List<List<Button>> rsButtons() {
             return Button.keyboard(Button.row(
                     Button.command(1, "查询最近成绩", "查询最近成绩", "/s rs1"),
                     Button.command(2, "渲染最近成绩", "渲染最近成绩", "/r rs1")
             ));
         }
+
         static List<List<Button>> sButtons(String beatmapId, String scoreId) {
             if (beatmapId == null || beatmapId.isBlank()) {
                 return null;
@@ -114,6 +117,7 @@ final class ReplyFactory {
                     )
             );
         }
+
         static List<List<Button>> lbButtons(String beatmapId) {
             if (beatmapId == null || beatmapId.isBlank()) {
                 return null;
@@ -123,6 +127,7 @@ final class ReplyFactory {
                     Button.command(1, "渲染同屏回放", "渲染同屏回放", "/rsc " + beatmapId)
             ));
         }
+
         static List<List<Button>> replayProgressButtons(String jobId) {
             if (jobId == null || jobId.isBlank()) {
                 return null;
@@ -132,24 +137,24 @@ final class ReplyFactory {
                     Button.command(1, "查询渲染进度", "查询渲染进度", "/rstat " + jobId)
             ));
         }
-        static List<List<Button>> searchButtons(List<String> beatmapsetIds, int itemCount) {
-            if (beatmapsetIds == null || beatmapsetIds.isEmpty() || itemCount <= 0) {
+
+        static List<List<Button>> searchButtons(Response response, SearchQuery query) {
+            final List<String> ids = response.getBeatmapsetIds();
+            if (ids == null || ids.isEmpty()) {
                 return null;
             }
-
-            int count = Math.min(10, Math.min(itemCount, beatmapsetIds.size()));
 
             List<List<Button>> rows = new ArrayList<>();
             List<Button> currentRow = new ArrayList<>(5);
             int buttonIndex = 0;
-            for (int i = 0; i < count; i++) {
-                String beatmapsetId = beatmapsetIds.get(i);
+            for (int i = (query.page() - 1) * 10; i < Math.min(ids.size(), query.page() * 10); i++) {
+                String beatmapsetId = ids.get(i);
                 if (beatmapsetId == null || beatmapsetId.isBlank()) {
                     continue;
                 }
 
                 buttonIndex++;
-                currentRow.add(Button.command(buttonIndex, String.valueOf(buttonIndex), String.valueOf(buttonIndex), "/ms " + beatmapsetId));
+                currentRow.add(Button.command(buttonIndex, String.valueOf(i + 1), String.valueOf(i + 1), "/ms " + beatmapsetId));
                 if (currentRow.size() == 5) {
                     rows.add(List.copyOf(currentRow));
                     currentRow.clear();
@@ -160,8 +165,28 @@ final class ReplyFactory {
                 rows.add(List.copyOf(currentRow));
             }
 
-            return rows.isEmpty() ? null : List.copyOf(rows);
+            List<Button> navRow = new ArrayList<>(3);
+
+            if (query.page() > 1) {
+                navRow.add(Button.command(11, "上一页", "上一页", "/sms #" + (query.page() - 1) + " " + query.query()));
+            } else {
+                navRow.add(Button.command(11, false, "上一页", "上一页", ""));
+            }
+
+            final String label = query.page() + "/" + ((int) Math.ceil(response.getBeatmapsetIds().size() / 10.0));
+            navRow.add(Button.command(12, false, label, label, "/sms #" + query.page() + " " + query.query()));
+
+            if (query.page() * 10 < ids.size()) {
+                navRow.add(Button.command(13, "下一页", "下一页", "/sms #" + (query.page() + 1) + " " + query.query()));
+            } else {
+                navRow.add(Button.command(13, false, "下一页", "下一页", ""));
+            }
+
+            rows.add(List.copyOf(navRow));
+
+            return rows;
         }
+
         static List<List<Button>> beatmapButtons(String beatmapId, String directUrl) {
             if (beatmapId == null || beatmapId.isBlank()) {
                 return null;

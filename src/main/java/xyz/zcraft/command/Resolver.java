@@ -5,10 +5,13 @@ import xyz.zcraft.command.resolution.TargetResolution;
 import xyz.zcraft.command.resolution.UidListResolution;
 import xyz.zcraft.command.resolution.UidResolution;
 import xyz.zcraft.command.resolution.ShortcutTarget;
+import xyz.zcraft.data.SearchQuery;
 
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
+import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -18,11 +21,30 @@ final class Resolver {
     private static final Pattern BEATMAP_MACRO_PATTERN = Pattern.compile("^m(\\d+)$");
     private static final Pattern CQ_AT_PATTERN = Pattern.compile("^\\[CQ:at,qq=(\\d+)(?:,.*)?]$");
     private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
+    private static final Pattern SEARCH_PATTERN = Pattern.compile("^(?:#(\\d+) )?(.+)$");
 
     private final String rscUsage;
 
     Resolver(String rscUsage) {
         this.rscUsage = rscUsage;
+    }
+
+    public SearchQuery resolveSearchQuery(String arg) {
+        final Optional<MatchResult> first = SEARCH_PATTERN.matcher(arg.trim()).results().findFirst();
+        if (first.isPresent()) {
+            final MatchResult m = first.get();
+            String pagePart = m.group(1);
+            String queryPart = m.group(2);
+            if (pagePart != null) {
+                Integer page = parsePositiveInt(pagePart);
+                if (page != null) {
+                    return new SearchQuery(page, queryPart);
+                }
+            }
+            return new SearchQuery(1, queryPart);
+        }
+
+        return null;
     }
 
     public TargetResolution resolveTargetWithOptionalMention(String[] args, String senderUserId) {

@@ -17,13 +17,17 @@ public class Button {
     private Action action;
 
     public static Button command(int id, String label, String visited, String command) {
+        return command(id, true, label, visited, command);
+    }
+
+    public static Button command(int id, boolean enable, String label, String visited, String command) {
         Button button = new Button();
         button.id = String.valueOf(id);
 
         RenderData renderData = new RenderData();
         renderData.setLabel(label);
         renderData.setVisitedLabel(visited);
-        renderData.setStyle(1);
+        renderData.setStyle(enable ? 1 : 0);
 
         button.setRenderData(renderData);
 
@@ -33,7 +37,12 @@ public class Button {
         action.setEnter(true);
 
         Action.Permission permission = new Action.Permission();
-        permission.setType(2);
+        if (enable) {
+            permission.setType(2);
+        } else {
+            permission.setType(0);
+            permission.setSpecifyUserIds(List.of());
+        }
 
         action.setPermission(permission);
 
