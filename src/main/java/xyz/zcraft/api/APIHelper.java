@@ -127,20 +127,21 @@ public class APIHelper {
             ensureApiSuccess(r, "获取每日挑战失败");
             final JsonObject data = r.getData().getAsJsonObject();
 
+            final String mods = data.get("required_mods").getAsString();
             return String.format(
                     """
-                            ==== 今日挑战 ====
-                            %s
-                            曲名: %s
-                            难度: %.2f* %s
-                            参与人数: %d
-                            模组: %s""",
+                            ## 今日挑战
+                            > %s
+                            > 曲名: %s
+                            > 难度: %.2f* %s
+                            > 参与人数: %d
+                            > 模组: %s""",
                     data.get("name").getAsString(),
                     data.get("title").getAsString(),
                     data.get("difficulty_rating").getAsFloat(),
                     data.get("version").getAsString(),
                     data.get("participant_count").getAsInt(),
-                    data.get("required_mods").getAsString()
+                    mods == null || mods.isBlank() ? "NM" : mods
             );
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
@@ -164,7 +165,7 @@ public class APIHelper {
             ensureApiSuccess(r, "获取多人房间失败");
             final JsonArray data = r.getData().getAsJsonArray();
 
-            final StringBuilder sb = new StringBuilder("=== 进行中的多人游戏 ===\n");
+            final StringBuilder sb = new StringBuilder("## 进行中的多人游戏\n");
             for (JsonElement datum : data) {
                 sb.append(datum.getAsString()).append("\n");
             }

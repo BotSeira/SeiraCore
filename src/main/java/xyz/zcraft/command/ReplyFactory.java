@@ -19,7 +19,7 @@ final class ReplyFactory {
 
     public PendingMessage boMessage(Response response) {
         return PendingMessage.ofMarkdownRaw(
-                "> BoN 查询完成\n玩家: " + response.getUserId() + "\n数量: " + response.getScoreIds().size(),
+                "> b" + response.getScoreIds().size() + "查询完成\n玩家: " + response.getUserId(),
                 Buttons.boButtons()
         );
     }
@@ -33,7 +33,7 @@ final class ReplyFactory {
 
     public PendingMessage beatmapMessage(Response response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 铺面查询完成\nID: " + response.getBeatmapId(),
+                "> 铺面查询完成\n铺面: " + response.getBeatmapId(),
                 Buttons.beatmapButtons(response.getBeatmapId(), config.seira().directUrl())
         );
 
@@ -82,22 +82,22 @@ final class ReplyFactory {
     public PendingMessage beatmapsetMessage(Response response) {
         return PendingMessage.ofMarkdownRaw(
                 "> 铺面集查询完成\nID: " + response.getBeatmapsetId(),
-                null
+                Buttons.beatmapsetButtons(response.getBeatmapStars(), response.getBeatmapIds())
         );
     }
 
     private static final class Buttons {
         static List<List<Button>> boButtons() {
             return Button.keyboard(Button.row(
-                    Button.command(1, "查询最好成绩", "查询最好成绩", "/s bo1"),
-                    Button.command(2, "渲染最好成绩", "渲染最好成绩", "/r bo1")
+                    Button.command(1, "查询最好成绩", "/s bo1"),
+                    Button.command(2, "渲染最好成绩", "/r bo1")
             ));
         }
 
         static List<List<Button>> rsButtons() {
             return Button.keyboard(Button.row(
-                    Button.command(1, "查询最近成绩", "查询最近成绩", "/s rs1"),
-                    Button.command(2, "渲染最近成绩", "渲染最近成绩", "/r rs1")
+                    Button.command(1, "查询最近成绩", "/s rs1"),
+                    Button.command(2, "渲染最近成绩", "/r rs1")
             ));
         }
 
@@ -108,12 +108,12 @@ final class ReplyFactory {
 
             return Button.keyboard(
                     Button.row(
-                            Button.command(1, "查看铺面", "查看铺面", "/m " + beatmapId),
-                            Button.command(2, "查看铺面集", "查看铺面集", "/ms m" + beatmapId)
+                            Button.command(1, "查看铺面", "/m " + beatmapId),
+                            Button.command(2, "查看铺面集", "/ms m" + beatmapId)
                     ),
                     Button.row(
-                            Button.command(1, "查询排行", "查询排行", "/lb " + beatmapId),
-                            Button.command(2, "渲染回放", "渲染回放", "/r " + scoreId)
+                            Button.command(1, "查询排行", "/lb " + beatmapId),
+                            Button.command(2, "渲染回放", "/r " + scoreId)
                     )
             );
         }
@@ -124,7 +124,7 @@ final class ReplyFactory {
             }
 
             return Button.keyboard(Button.row(
-                    Button.command(1, "渲染同屏回放", "渲染同屏回放", "/rsc " + beatmapId)
+                    Button.command(1, "渲染同屏回放", "/rsc " + beatmapId)
             ));
         }
 
@@ -134,7 +134,7 @@ final class ReplyFactory {
             }
 
             return Button.keyboard(Button.row(
-                    Button.command(1, "查询渲染进度", "查询渲染进度", "/rstat " + jobId)
+                    Button.command(1, "查询渲染进度", "/rstat " + jobId)
             ));
         }
 
@@ -154,7 +154,7 @@ final class ReplyFactory {
                 }
 
                 buttonIndex++;
-                currentRow.add(Button.command(buttonIndex, String.valueOf(i + 1), String.valueOf(i + 1), "/ms " + beatmapsetId));
+                currentRow.add(Button.command(buttonIndex, String.valueOf(i + 1), "/ms " + beatmapsetId));
                 if (currentRow.size() == 5) {
                     rows.add(List.copyOf(currentRow));
                     currentRow.clear();
@@ -168,18 +168,18 @@ final class ReplyFactory {
             List<Button> navRow = new ArrayList<>(3);
 
             if (query.page() > 1) {
-                navRow.add(Button.command(11, "上一页", "上一页", "/sms #" + (query.page() - 1) + " " + query.query()));
+                navRow.add(Button.command(11, "上一页", "/sms #" + (query.page() - 1) + " " + query.query()));
             } else {
-                navRow.add(Button.command(11, false, "上一页", "上一页", ""));
+                navRow.add(Button.command(11, false, "上一页", ""));
             }
 
             final String label = query.page() + "/" + ((int) Math.ceil(response.getBeatmapsetIds().size() / 10.0));
-            navRow.add(Button.command(12, false, label, label, "/sms #" + query.page() + " " + query.query()));
+            navRow.add(Button.command(12, false, label, "/sms #" + query.page() + " " + query.query()));
 
             if (query.page() * 10 < ids.size()) {
-                navRow.add(Button.command(13, "下一页", "下一页", "/sms #" + (query.page() + 1) + " " + query.query()));
+                navRow.add(Button.command(13, "下一页", "/sms #" + (query.page() + 1) + " " + query.query()));
             } else {
-                navRow.add(Button.command(13, false, "下一页", "下一页", ""));
+                navRow.add(Button.command(13, false, "下一页", ""));
             }
 
             rows.add(List.copyOf(navRow));
@@ -198,11 +198,52 @@ final class ReplyFactory {
 
             return Button.keyboard(
                     Button.row(
-                            Button.command(1, "查询排行榜", "查询排行榜", "/lb " + beatmapId),
-                            Button.openUrl(2, "在游戏中查看", "在游戏中查看", directUrl + "/b/" + beatmapId)
+                            Button.command(1, "查询排行榜", "/lb " + beatmapId),
+                            Button.openUrl(2, "在游戏中查看", directUrl + "/b/" + beatmapId)
                     ),
-                    Button.row(Button.command(3, "查询自己的分数", "查询自己的分数", "/s m" + beatmapId))
+                    Button.row(Button.command(3, "查询自己的分数", "/s m" + beatmapId))
             );
+        }
+
+        public static List<List<Button>> beatmapsetButtons(List<String> stars, List<String> ids) {
+            if (ids == null || ids.isEmpty()) {
+                return null;
+            }
+
+            List<List<Button>> rows = new ArrayList<>();
+            List<Button> currentRow = new ArrayList<>(5);
+            int buttonIndex = 0;
+            for (int i = 0; i < ids.size(); i++) {
+                String beatmapId = ids.get(i);
+                if (beatmapId == null || beatmapId.isBlank()) {
+                    continue;
+                }
+
+                buttonIndex++;
+                currentRow.add(Button.command(buttonIndex, stars.get(i) + "★", "/m " + beatmapId));
+                if (currentRow.size() == 5) {
+                    rows.add(List.copyOf(currentRow));
+                    currentRow.clear();
+
+                    if (rows.size() >= 5) {
+                        break;
+                    }
+                }
+            }
+
+            if (!currentRow.isEmpty()) {
+                fillDummyButtons(currentRow);
+                rows.add(List.copyOf(currentRow));
+            }
+
+            return rows;
+        }
+
+        private static void fillDummyButtons(List<Button> buttons) {
+            final int c = 5 - buttons.size();
+            for (int i = 0; i < c; i++) {
+                buttons.add(Button.command(i + 100, false, "", ""));
+            }
         }
     }
 }

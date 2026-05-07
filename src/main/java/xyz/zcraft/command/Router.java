@@ -170,10 +170,10 @@ public class Router {
                 }
             }
             case "daily" -> {
-                return taskCoordinator.queueApiRequest("daily", () -> PendingMessage.ofString(APIHelper.getDaily()));
+                return taskCoordinator.queueApiRequest("daily", () -> PendingMessage.ofMarkdownRaw(APIHelper.getDaily()));
             }
             case "mp" -> {
-                return taskCoordinator.queueApiRequest("mp", () -> PendingMessage.ofString(APIHelper.getMultiplayerRooms()));
+                return taskCoordinator.queueApiRequest("mp", () -> PendingMessage.ofMarkdownRaw(APIHelper.getMultiplayerRooms()));
             }
             case "rs" -> {
                 if (args.length == 2) {
