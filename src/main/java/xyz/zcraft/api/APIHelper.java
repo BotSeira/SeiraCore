@@ -7,6 +7,7 @@ import com.google.gson.JsonObject;
 import xyz.zcraft.Seira;
 import xyz.zcraft.command.ResolutionException;
 import xyz.zcraft.command.resolution.ShortcutTarget;
+import xyz.zcraft.data.SearchQuery;
 import xyz.zcraft.data.SearchResultItem;
 
 import java.io.IOException;
@@ -17,7 +18,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.*;
+import java.util.Base64;
+import java.util.LinkedList;
+import java.util.Objects;
 
 public class APIHelper {
     private static final String ENDPOINT;
@@ -124,20 +127,21 @@ public class APIHelper {
             ensureApiSuccess(r, "获取每日挑战失败");
             final JsonObject data = r.getData().getAsJsonObject();
 
+            final String mods = data.get("required_mods").getAsString();
             return String.format(
                     """
-                            ==== 今日挑战 ====
-                            %s
-                            曲名: %s
-                            难度: %.2f* %s
-                            参与人数: %d
-                            模组: %s""",
+                            ## 今日挑战
+                            > %s
+                            > 曲名: %s
+                            > 难度: %.2f* %s
+                            > 参与人数: %d
+                            > 模组: %s""",
                     data.get("name").getAsString(),
                     data.get("title").getAsString(),
                     data.get("difficulty_rating").getAsFloat(),
                     data.get("version").getAsString(),
                     data.get("participant_count").getAsInt(),
-                    data.get("required_mods").getAsString()
+                    mods == null || mods.isBlank() ? "NM" : mods
             );
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
@@ -161,7 +165,7 @@ public class APIHelper {
             ensureApiSuccess(r, "获取多人房间失败");
             final JsonArray data = r.getData().getAsJsonArray();
 
-            final StringBuilder sb = new StringBuilder("=== 进行中的多人游戏 ===\n");
+            final StringBuilder sb = new StringBuilder("## 进行中的多人游戏\n");
             for (JsonElement datum : data) {
                 sb.append(datum.getAsString()).append("\n");
             }
@@ -244,7 +248,7 @@ public class APIHelper {
         try {
             String query = null;
             if (target.isMacro()) {
-                if("m".equals(target.macroType())) {
+                if ("m".equals(target.macroType())) {
                     query = "/ms?m=" + target.explicitId();
                 } else if ("bo".equals(target.macroType()) || "rs".equals(target.macroType())) {
                     query = "/ms?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
@@ -315,10 +319,10 @@ public class APIHelper {
         }
     }
 
-    public static Response searchBeatmapSetResponse(String query) {
+    public static Response searchBeatmapSetResponse(SearchQuery query) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/sms?" + "q=" + URLEncoder.encode(query, StandardCharsets.UTF_8)))
+                    .uri(URI.create(ENDPOINT + "/sms?" + "q=" + URLEncoder.encode(query.query(), StandardCharsets.UTF_8)))
                     .GET()
                     .build();
 
@@ -336,13 +340,19 @@ public class APIHelper {
 
             data.forEach(item -> items.add(GSON.fromJson(item, SearchResultItem.class)));
 
-            StringBuilder sb = new StringBuilder();
-            sb.append("\uD83D\uDD0D").append("搜索结果\n")
-                    .append("关键字：").append(query).append("\n");
+            if (items.size() < (query.page() - 1) * 10) {
+                return Response.fromHeaders(send.headers())
+                        .content("没有找到更多的搜索结果了哦~")
+                        .build();
+            }
 
-            for (int i = 0; i < Math.min(items.size(), 10); i++) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("\uD83D\uDD0D").append("搜索结果 - `").append(query.query()).append("`\n");
+
+            for (int i = (query.page() - 1) * 10; i < Math.min(items.size(), query.page() * 10); i++) {
                 SearchResultItem item = items.get(i);
-                sb.append(i + 1).append(". ").append(item.beatmapsetId()).append(" - ").append(item.artist()).append(" - ").append(item.title())
+                sb.append("> ");
+                sb.append(i + 1).append("# ").append(item.beatmapsetId()).append(" - ").append(item.artist()).append(" - ").append(item.title())
                         .append(" <").append(item.mapperName()).append("> ")
                         .append(String.format("[%.2f★ ~ %.2f★]", item.minStar(), item.maxStar()))
                         .append("\n");

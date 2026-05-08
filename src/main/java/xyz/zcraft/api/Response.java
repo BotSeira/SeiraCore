@@ -19,6 +19,7 @@ public final class Response {
 
     private String beatmapId;
     private List<String> beatmapIds;
+    private List<String> beatmapStars;
 
     private String beatmapsetId;
     private List<String> beatmapsetIds;
@@ -32,6 +33,7 @@ public final class Response {
                 .userIds(headers.firstValue("X-User-Ids").flatMap(Response::parseCsvHeader).orElse(null))
                 .beatmapId(headers.firstValue("X-Beatmap-Id").orElse(null))
                 .beatmapIds(headers.firstValue("X-Beatmap-Ids").flatMap(Response::parseCsvHeader).orElse(null))
+                .beatmapStars(headers.firstValue("X-Beatmap-Stars").flatMap(Response::parseCsvHeader).orElse(null))
                 .beatmapsetId(headers.firstValue("X-Beatmapset-Id").orElse(null))
                 .beatmapsetIds(headers.firstValue("X-Beatmapset-Ids").flatMap(Response::parseCsvHeader).orElse(null))
                 .scoreId(headers.firstValue("X-Score-Id").orElse(null))

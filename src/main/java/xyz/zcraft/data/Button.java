@@ -16,14 +16,18 @@ public class Button {
     private RenderData renderData;
     private Action action;
 
-    public static Button command(int id, String label, String visited, String command) {
+    public static Button command(int id, String label, String command) {
+        return command(id, true, label, command);
+    }
+
+    public static Button command(int id, boolean enable, String label, String command) {
         Button button = new Button();
         button.id = String.valueOf(id);
 
         RenderData renderData = new RenderData();
         renderData.setLabel(label);
-        renderData.setVisitedLabel(visited);
-        renderData.setStyle(1);
+        renderData.setVisitedLabel(label);
+        renderData.setStyle(enable ? 1 : 0);
 
         button.setRenderData(renderData);
 
@@ -33,7 +37,12 @@ public class Button {
         action.setEnter(true);
 
         Action.Permission permission = new Action.Permission();
-        permission.setType(2);
+        if (enable) {
+            permission.setType(2);
+        } else {
+            permission.setType(0);
+            permission.setSpecifyUserIds(List.of());
+        }
 
         action.setPermission(permission);
 
@@ -42,13 +51,13 @@ public class Button {
         return button;
     }
 
-    public static Button openUrl(int id, String label, String visited, String url) {
+    public static Button openUrl(int id, String label, String url) {
         Button button = new Button();
         button.id = String.valueOf(id);
 
         RenderData renderData = new RenderData();
         renderData.setLabel(label);
-        renderData.setVisitedLabel(visited);
+        renderData.setVisitedLabel(label);
         renderData.setStyle(1);
 
         button.setRenderData(renderData);
@@ -70,7 +79,7 @@ public class Button {
 
     public static List<Button> row(Button... buttons) {
         if (buttons == null || buttons.length == 0) {
-            return List.of(command(0, "_", "_", "/help"));
+            return List.of(command(0, "_", "/help"));
         }
         return List.of(buttons);
     }

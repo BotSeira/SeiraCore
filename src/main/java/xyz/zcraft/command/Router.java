@@ -11,10 +11,7 @@ import xyz.zcraft.command.resolution.TargetResolution;
 import xyz.zcraft.command.resolution.UidListResolution;
 import xyz.zcraft.command.resolution.UidResolution;
 import xyz.zcraft.config.AppConfig;
-import xyz.zcraft.data.ApiTask;
-import xyz.zcraft.data.FileInfo;
-import xyz.zcraft.data.PendingMessage;
-import xyz.zcraft.data.VideoRenderRecord;
+import xyz.zcraft.data.*;
 import xyz.zcraft.util.ThreadHelper;
 
 import java.util.Arrays;
@@ -173,10 +170,10 @@ public class Router {
                 }
             }
             case "daily" -> {
-                return taskCoordinator.queueApiRequest("daily", () -> PendingMessage.ofString(APIHelper.getDaily()));
+                return taskCoordinator.queueApiRequest("daily", () -> PendingMessage.ofMarkdownRaw(APIHelper.getDaily()));
             }
             case "mp" -> {
-                return taskCoordinator.queueApiRequest("mp", () -> PendingMessage.ofString(APIHelper.getMultiplayerRooms()));
+                return taskCoordinator.queueApiRequest("mp", () -> PendingMessage.ofMarkdownRaw(APIHelper.getMultiplayerRooms()));
             }
             case "rs" -> {
                 if (args.length == 2) {
@@ -368,14 +365,15 @@ public class Router {
                 );
             }
             case "sms" -> {
-                if (args.length == 0) {
-                    return RouteDecision.sync(PendingMessage.ofString("用法：/sms <搜索关键字>"));
+                final SearchQuery searchQuery = argumentResolver.resolveSearchQuery(query);
+                if (searchQuery == null) {
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/sms [#页数] <搜索关键字>"));
                 }
                 return taskCoordinator.queueApiRequest(
                         "sms",
                         () -> {
-                            Response searchResponse = APIHelper.searchBeatmapSetResponse(query);
-                            return replyFactory.searchMessage(searchResponse);
+                            Response searchResponse = APIHelper.searchBeatmapSetResponse(searchQuery);
+                            return replyFactory.searchMessage(searchResponse, searchQuery);
                         });
             }
             case "lb", "c" -> {
@@ -490,7 +488,7 @@ public class Router {
                         /r <成绩ID或快捷查询> - 生成成绩回放视频
                         /rsc <铺面ID或快捷查询> [+用户ID列表] - 生成同屏回放视频
                         /rstat [任务ID] - 查询渲染进度
-                        /sms <关键字> - 搜索铺面集
+                        /sms [#页数] <关键字> - 搜索铺面集
                         /c <铺面ID> [玩家ID列表] - 获取指定铺面排行榜
                         /lb [铺面ID] - /c 的别名（省略参数时走绑定用户）
                         /daily - 获取每日挑战
