@@ -127,7 +127,9 @@ public class APIHelper {
             ensureApiSuccess(r, "获取每日挑战失败");
             final JsonObject data = r.getData().getAsJsonObject();
 
-            final String mods = data.get("required_mods").getAsString();
+            String mods = null;
+            if (data.has("required_mods") && !data.get("required_mods").isJsonNull()) 
+                mods = data.get("required_mods").getAsString();
             return String.format(
                     """
                             ## 今日挑战
@@ -340,7 +342,7 @@ public class APIHelper {
 
             data.forEach(item -> items.add(GSON.fromJson(item, SearchResultItem.class)));
 
-            if (items.size() < (query.page() - 1) * 10) {
+            if (items.size() <= (query.page() - 1) * 10) {
                 return Response.fromHeaders(send.headers())
                         .content("没有找到更多的搜索结果了哦~")
                         .build();
