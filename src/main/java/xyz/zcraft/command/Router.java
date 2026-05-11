@@ -373,7 +373,7 @@ public class Router {
                         "sms",
                         () -> {
                             Response searchResponse = APIHelper.searchBeatmapSetResponse(searchQuery);
-                            return replyFactory.searchMessage(searchResponse, searchQuery);
+                            return replyFactory.searchMessage(searchResponse);
                         });
             }
             case "lb", "c" -> {
