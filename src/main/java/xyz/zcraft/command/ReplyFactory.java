@@ -5,7 +5,6 @@ import xyz.zcraft.api.Response;
 import xyz.zcraft.config.AppConfig;
 import xyz.zcraft.data.Button;
 import xyz.zcraft.data.PendingMessage;
-import xyz.zcraft.data.SearchQuery;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -72,10 +71,10 @@ final class ReplyFactory {
         return PendingMessage.ofMarkdownRaw(renderStat, Buttons.replayProgressButtons(jobId));
     }
 
-    public PendingMessage searchMessage(Response response, SearchQuery searchQuery) {
+    public PendingMessage searchMessage(Response response) {
         return PendingMessage.ofMarkdownRaw(
                 response.getContent(),
-                Buttons.searchButtons(response, searchQuery)
+                null
         );
     }
 
@@ -136,55 +135,6 @@ final class ReplyFactory {
             return Button.keyboard(Button.row(
                     Button.command(1, "查询渲染进度", "/rstat " + jobId)
             ));
-        }
-
-        static List<List<Button>> searchButtons(Response response, SearchQuery query) {
-            final List<String> ids = response.getBeatmapsetIds();
-            if (ids == null || ids.isEmpty()) {
-                return null;
-            }
-
-            List<List<Button>> rows = new ArrayList<>();
-            List<Button> currentRow = new ArrayList<>(5);
-            int buttonIndex = 0;
-            for (int i = (query.page() - 1) * 10; i < Math.min(ids.size(), query.page() * 10); i++) {
-                String beatmapsetId = ids.get(i);
-                if (beatmapsetId == null || beatmapsetId.isBlank()) {
-                    continue;
-                }
-
-                buttonIndex++;
-                currentRow.add(Button.command(buttonIndex, String.valueOf(i + 1), "/ms " + beatmapsetId));
-                if (currentRow.size() == 5) {
-                    rows.add(List.copyOf(currentRow));
-                    currentRow.clear();
-                }
-            }
-
-            if (!currentRow.isEmpty()) {
-                rows.add(List.copyOf(currentRow));
-            }
-
-            List<Button> navRow = new ArrayList<>(3);
-
-            if (query.page() > 1) {
-                navRow.add(Button.command(11, "上一页", "/sms #" + (query.page() - 1) + " " + query.query()));
-            } else {
-                navRow.add(Button.command(11, false, "上一页", ""));
-            }
-
-            final String label = query.page() + "/" + ((int) Math.ceil(response.getBeatmapsetIds().size() / 10.0));
-            navRow.add(Button.command(12, false, label, "/sms #" + query.page() + " " + query.query()));
-
-            if (query.page() * 10 < ids.size()) {
-                navRow.add(Button.command(13, "下一页", "/sms #" + (query.page() + 1) + " " + query.query()));
-            } else {
-                navRow.add(Button.command(13, false, "下一页", ""));
-            }
-
-            rows.add(List.copyOf(navRow));
-
-            return rows;
         }
 
         static List<List<Button>> beatmapButtons(String beatmapId, String directUrl) {
