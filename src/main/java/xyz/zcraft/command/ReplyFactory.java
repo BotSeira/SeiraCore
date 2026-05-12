@@ -86,6 +86,11 @@ final class ReplyFactory {
 
     private static final class Buttons {
         static List<List<Button>> searchButtons(Response response, SearchQuery query) {
+            final List<String> ids = response.getBeatmapsetIds();
+            if (ids == null || ids.isEmpty()) {
+                return null;
+            }
+            
             List<List<Button>> rows = new ArrayList<>();
 
             List<Button> navRow = new ArrayList<>(3);
