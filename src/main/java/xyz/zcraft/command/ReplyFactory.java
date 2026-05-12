@@ -71,10 +71,10 @@ final class ReplyFactory {
         return PendingMessage.ofMarkdownRaw(renderStat, Buttons.replayProgressButtons(jobId));
     }
 
-    public PendingMessage searchMessage(Response response) {
+    public PendingMessage searchMessage(Response response, SearchQuery searchQuery) {
         return PendingMessage.ofMarkdownRaw(
                 response.getContent(),
-                null
+                Buttons.searchButtons(response, searchQuery)
         );
     }
 
@@ -86,6 +86,31 @@ final class ReplyFactory {
     }
 
     private static final class Buttons {
+        static List<List<Button>> searchButtons(Response response, SearchQuery query) {
+            List<List<Button>> rows = new ArrayList<>();
+
+            List<Button> navRow = new ArrayList<>(3);
+
+            if (query.page() > 1) {
+                navRow.add(Button.command(11, "上一页", "/sms #" + (query.page() - 1) + " " + query.query()));
+            } else {
+                navRow.add(Button.command(11, false, "上一页", ""));
+            }
+
+            final String label = query.page() + "/" + ((int) Math.ceil(response.getBeatmapsetIds().size() / 10.0));
+            navRow.add(Button.command(12, false, label, "/sms #" + query.page() + " " + query.query()));
+
+            if (query.page() * 10 < ids.size()) {
+                navRow.add(Button.command(13, "下一页", "/sms #" + (query.page() + 1) + " " + query.query()));
+            } else {
+                navRow.add(Button.command(13, false, "下一页", ""));
+            }
+
+            rows.add(List.copyOf(navRow));
+
+            return rows;
+        }
+        
         static List<List<Button>> boButtons() {
             return Button.keyboard(Button.row(
                     Button.command(1, "查询最好成绩", "/s bo1"),
