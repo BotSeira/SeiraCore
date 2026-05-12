@@ -372,7 +372,7 @@ public class Router {
                 return taskCoordinator.queueApiRequest(
                         "sms",
                         () -> {
-                            Response searchResponse = APIHelper.searchBeatmapSetResponse(searchQuery);
+                            Response<List<SearchResultItem>> searchResponse = APIHelper.searchBeatmapSetResponse(searchQuery);
                             return replyFactory.searchMessage(searchResponse, searchQuery);
                         });
             }
@@ -519,6 +519,13 @@ public class Router {
                 return RouteDecision.sync(PendingMessage.ofString(fileInfo != null
                         ? "上传成功，fileId: " + fileInfo
                         : "上传失败，请检查日志获取详情"));
+            }
+            case "debug.test" -> {
+                if (!config.seira().debugMode()) {
+                    return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
+                }
+
+                return RouteDecision.sync(replyFactory.testMessage());
             }
             default -> {
                 return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));

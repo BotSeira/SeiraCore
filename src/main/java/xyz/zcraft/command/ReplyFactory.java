@@ -75,9 +75,10 @@ final class ReplyFactory {
     }
 
     public PendingMessage searchMessage(Response<List<SearchResultItem>> response, SearchQuery searchQuery) {
+        final int itemsPerPage = 10;
         return PendingMessage.ofMarkdownRaw(
-                Contents.searchContent(response, searchQuery),
-                Buttons.searchButtons(response, searchQuery)
+                Contents.searchContent(response, searchQuery, itemsPerPage),
+                Buttons.searchButtons(response, searchQuery, itemsPerPage)
         );
     }
 
@@ -85,6 +86,15 @@ final class ReplyFactory {
         return PendingMessage.ofMarkdownRaw(
                 "> 铺面集查询完成\nID: " + response.getBeatmapsetId(),
                 Buttons.beatmapsetButtons(response.getBeatmapStars(), response.getBeatmapIds())
+        );
+    }
+
+    public PendingMessage testMessage() {
+        return PendingMessage.ofMarkdownRaw(
+                """
+                        > 这是一个测试消息
+                        """,
+                null
         );
     }
 
@@ -111,25 +121,23 @@ final class ReplyFactory {
             return sb.toString().trim();
         }
 
-        static String searchContent(Response<List<SearchResultItem>> response, SearchQuery query) {
+        static String searchContent(Response<List<SearchResultItem>> response, SearchQuery query, int itemsPerPage) {
             final List<SearchResultItem> items = response.getContent();
 
-            if (items.size() <= (query.page() - 1) * 10) {
+            if (items.size() <= (query.page() - 1) * itemsPerPage) {
                 return "没有找到更多的搜索结果了哦~";
             }
 
             StringBuilder sb = new StringBuilder();
             sb.append("\uD83D\uDD0D").append("搜索结果 - `").append(query.query()).append("`\n");
 
-            for (int i = (query.page() - 1) * 10; i < Math.min(items.size(), query.page() * 10); i++) {
+            for (int i = (query.page() - 1) * itemsPerPage; i < Math.min(items.size(), query.page() * itemsPerPage); i++) {
                 SearchResultItem item = items.get(i);
                 sb.append("> ");
                 sb.append(i + 1).append("# ")
                         .append("<qqbot-cmd-input text=\"%s\" show=\"%d\" reference=\"false\" />".formatted("/ms " + item.beatmapsetId(), item.beatmapsetId()))
                         .append(" - ").append(item.artist()).append(" - ").append(item.title())
-                        .append(" <").append(item.mapperName()).append("> ")
-                        .append(String.format("[%.2f★ ~ %.2f★]", item.minStar(), item.maxStar()))
-                        .append("\n");
+                        .append(" <").append(item.mapperName()).append("> ").append(String.format("[%.2f★ ~ %.2f★]", item.minStar(), item.maxStar())).append("\n");
             }
 
             return sb.toString();
@@ -137,7 +145,7 @@ final class ReplyFactory {
     }
 
     private static final class Buttons {
-        static List<List<Button>> searchButtons(Response<List<SearchResultItem>> response, SearchQuery query) {
+        static List<List<Button>> searchButtons(Response<List<SearchResultItem>> response, SearchQuery query, int itemsPerPage) {
             final List<String> ids = response.getBeatmapsetIds();
             if (ids == null || ids.isEmpty()) {
                 return null;
@@ -148,18 +156,18 @@ final class ReplyFactory {
             List<Button> navRow = new ArrayList<>(3);
 
             if (query.page() > 1) {
-                navRow.add(Button.command(11, "上一页", "/sms #" + (query.page() - 1) + " " + query.query()));
+                navRow.add(Button.command(1, "上一页", "/sms #" + (query.page() - 1) + " " + query.query()));
             } else {
-                navRow.add(Button.command(11, false, "上一页", ""));
+                navRow.add(Button.command(1, false, "上一页", ""));
             }
 
-            final String label = query.page() + "/" + ((int) Math.ceil(response.getBeatmapsetIds().size() / 10.0));
-            navRow.add(Button.command(12, false, label, "/sms #" + query.page() + " " + query.query()));
+            final String label = query.page() + "/" + ((int) Math.ceil(response.getBeatmapsetIds().size() / (double) itemsPerPage));
+            navRow.add(Button.command(2, false, label, "/sms #" + query.page() + " " + query.query()));
 
-            if (query.page() * 10 < ids.size()) {
-                navRow.add(Button.command(13, "下一页", "/sms #" + (query.page() + 1) + " " + query.query()));
+            if (query.page() * itemsPerPage < ids.size()) {
+                navRow.add(Button.command(3, "下一页", "/sms #" + (query.page() + 1) + " " + query.query()));
             } else {
-                navRow.add(Button.command(13, false, "下一页", ""));
+                navRow.add(Button.command(3, false, "下一页", ""));
             }
 
             rows.add(List.copyOf(navRow));
