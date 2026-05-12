@@ -7,6 +7,7 @@ import com.google.gson.JsonObject;
 import xyz.zcraft.Seira;
 import xyz.zcraft.command.ResolutionException;
 import xyz.zcraft.command.resolution.ShortcutTarget;
+import xyz.zcraft.data.RenderStat;
 import xyz.zcraft.data.SearchQuery;
 import xyz.zcraft.data.SearchResultItem;
 
@@ -20,7 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.LinkedList;
-import java.util.Objects;
+import java.util.List;
 
 public class APIHelper {
     private static final String ENDPOINT;
@@ -34,7 +35,7 @@ public class APIHelper {
     }
 
 
-    public static Response getBoNResponse(int n, int uid) {
+    public static Response<Void> getBoNResponse(int n, int uid) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/bo?" + "n=" + n + "&u=" + uid))
@@ -48,7 +49,7 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Response.fromHeaders(send.headers())
+            return Response.<Void>fromHeaders(send.headers())
                     .base64(Base64.getEncoder().encodeToString(imageBytes))
                     .build();
         } catch (IOException | InterruptedException e) {
@@ -56,7 +57,7 @@ public class APIHelper {
         }
     }
 
-    public static Response getGroupLeaderboardResponse(ShortcutTarget target, String[] uids) {
+    public static Response<Void> getGroupLeaderboardResponse(ShortcutTarget target, String[] uids) {
         String uidsParam = String.join(",", uids);
         try {
             String query;
@@ -79,7 +80,7 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Response.fromHeaders(send.headers())
+            return Response.<Void>fromHeaders(send.headers())
                     .base64(Base64.getEncoder().encodeToString(imageBytes))
                     .build();
         } catch (IOException | InterruptedException e) {
@@ -87,7 +88,7 @@ public class APIHelper {
         }
     }
 
-    public static Response getLeaderboardResponse(String[] uids) {
+    public static Response<Void> getLeaderboardResponse(String[] uids) {
         String uidsParam = String.join(",", uids);
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
@@ -102,7 +103,7 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Response.fromHeaders(send.headers())
+            return Response.<Void>fromHeaders(send.headers())
                     .base64(Base64.getEncoder().encodeToString(imageBytes))
                     .build();
         } catch (IOException | InterruptedException e) {
@@ -178,7 +179,7 @@ public class APIHelper {
         }
     }
 
-    public static Response getRecentResponse(int n, int uid) {
+    public static Response<Void> getRecentResponse(int n, int uid) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/rs?" + "n=" + n + "&u=" + uid))
@@ -193,7 +194,7 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Response.fromHeaders(send.headers())
+            return Response.<Void>fromHeaders(send.headers())
                     .base64(Base64.getEncoder().encodeToString(imageBytes))
                     .build();
         } catch (IOException | InterruptedException e) {
@@ -201,7 +202,7 @@ public class APIHelper {
         }
     }
 
-    public static Response getBeatmapResponse(ShortcutTarget target, String mod) {
+    public static Response<Void> getBeatmapResponse(ShortcutTarget target, String mod) {
         try {
             final String query = getBeatmapQuery(target, mod);
 
@@ -218,7 +219,7 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Response.fromHeaders(send.headers())
+            return Response.<Void>fromHeaders(send.headers())
                     .base64(Base64.getEncoder().encodeToString(imageBytes))
                     .build();
         } catch (IOException | InterruptedException e) {
@@ -246,7 +247,7 @@ public class APIHelper {
         return query;
     }
 
-    public static Response getBeatmapsetResponse(ShortcutTarget target) {
+    public static Response<Void> getBeatmapsetResponse(ShortcutTarget target) {
         try {
             String query = null;
             if (target.isMacro()) {
@@ -276,7 +277,7 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Response.fromHeaders(send.headers())
+            return Response.<Void>fromHeaders(send.headers())
                     .base64(Base64.getEncoder().encodeToString(imageBytes))
                     .build();
         } catch (IOException | InterruptedException e) {
@@ -284,7 +285,7 @@ public class APIHelper {
         }
     }
 
-    public static Response getScoreResponse(ShortcutTarget target) {
+    public static Response<Void> getScoreResponse(ShortcutTarget target) {
         try {
             String query;
             if (target.isMacro()) {
@@ -313,7 +314,7 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Response.fromHeaders(send.headers())
+            return Response.<Void>fromHeaders(send.headers())
                     .base64(Base64.getEncoder().encodeToString(imageBytes))
                     .build();
         } catch (IOException | InterruptedException e) {
@@ -321,7 +322,7 @@ public class APIHelper {
         }
     }
 
-    public static Response searchBeatmapSetResponse(SearchQuery query) {
+    public static Response<List<SearchResultItem>> searchBeatmapSetResponse(SearchQuery query) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/sms?" + "q=" + URLEncoder.encode(query.query(), StandardCharsets.UTF_8)))
@@ -342,28 +343,8 @@ public class APIHelper {
 
             data.forEach(item -> items.add(GSON.fromJson(item, SearchResultItem.class)));
 
-            if (items.size() <= (query.page() - 1) * 10) {
-                return Response.fromHeaders(send.headers())
-                        .content("没有找到更多的搜索结果了哦~")
-                        .build();
-            }
-
-            StringBuilder sb = new StringBuilder();
-            sb.append("\uD83D\uDD0D").append("搜索结果 - `").append(query.query()).append("`\n");
-
-            for (int i = (query.page() - 1) * 10; i < Math.min(items.size(), query.page() * 10); i++) {
-                SearchResultItem item = items.get(i);
-                sb.append("> ");
-                sb.append(i + 1).append("# ")
-                        .append("<qqbot-cmd-input text=\"%s\" show=\"%d\" reference=\"false\" />".formatted("/ms " + item.beatmapsetId(), item.beatmapsetId()))
-                        .append(" - ").append(item.artist()).append(" - ").append(item.title())
-                        .append(" <").append(item.mapperName()).append("> ")
-                        .append(String.format("[%.2f★ ~ %.2f★]", item.minStar(), item.maxStar()))
-                        .append("\n");
-            }
-
-            return Response.fromHeaders(send.headers())
-                    .content(sb.toString().trim())
+            return Response.<List<SearchResultItem>>fromHeaders(send.headers())
+                    .content(items)
                     .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
@@ -634,7 +615,7 @@ public class APIHelper {
         return payload.getData().getAsJsonObject();
     }
 
-    public static String getRenderStat(String jobId) {
+    public static RenderStat getRenderStat(String jobId) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/replay/status/" + jobId))
@@ -651,28 +632,7 @@ public class APIHelper {
             ensureApiSuccess(r, "获取渲染进度失败");
             final JsonObject data = r.getData().getAsJsonObject();
 
-            StringBuilder sb = new StringBuilder();
-            sb.append("> 请求: ").append(jobId, 0, 8).append("\n");
-
-            final JsonElement jsonElement = data.get("status");
-            final String status = jsonElement != null ? jsonElement.getAsString() : null;
-
-            sb.append("状态: ").append(jsonElement != null ? switch (status) {
-                case "done" -> "已完成";
-                case "failed" -> "失败";
-                case "timeout" -> "超时";
-                case "queued" -> "排队中";
-                case "rendering" -> "渲染中";
-                default -> "未知";
-            } : "未知").append("\n");
-
-            if (Objects.equals("rendering", status)) {
-                sb.append("进度: ").append(data.has("progress") && !data.get("progress").isJsonNull() ? data.get("progress").getAsString() : "未知").append("\n");
-                sb.append("速度: ").append(data.has("speed") && !data.get("speed").isJsonNull() ? data.get("speed").getAsString() : "未知").append("\n");
-                sb.append("预计时间: ").append(data.has("eta") && !data.get("eta").isJsonNull() ? data.get("eta").getAsString() : "未知").append("\n");
-            }
-
-            return sb.toString().trim();
+            return GSON.fromJson(data, RenderStat.class);
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }

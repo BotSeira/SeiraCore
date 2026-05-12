@@ -7,6 +7,7 @@ import xyz.zcraft.data.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 final class ReplyFactory {
     private final AppConfig config;
@@ -15,21 +16,21 @@ final class ReplyFactory {
         this.config = config;
     }
 
-    public PendingMessage boMessage(Response response) {
+    public PendingMessage boMessage(Response<Void> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> b" + response.getScoreIds().size() + "查询完成\n玩家: " + response.getUserId(),
                 Buttons.boButtons()
         );
     }
 
-    public PendingMessage rsMessage(Response response) {
+    public PendingMessage rsMessage(Response<Void> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> 最近成绩查询完成\n玩家: " + response.getUserId() + "\n数量: " + response.getScoreIds().size(),
                 Buttons.rsButtons()
         );
     }
 
-    public PendingMessage beatmapMessage(Response response) {
+    public PendingMessage beatmapMessage(Response<Void> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> 铺面查询完成\n铺面: " + response.getBeatmapId(),
                 Buttons.beatmapButtons(response.getBeatmapId(), config.seira().directUrl())
@@ -37,14 +38,14 @@ final class ReplyFactory {
 
     }
 
-    public PendingMessage scoreMessage(Response response) {
+    public PendingMessage scoreMessage(Response<Void> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> 成绩查询完成\n铺面: " + response.getBeatmapId() + "\n成绩: " + response.getScoreId(),
                 Buttons.sButtons(response.getBeatmapId(), response.getScoreId())
         );
     }
 
-    public PendingMessage lbMessage(Response response) {
+    public PendingMessage lbMessage(Response<Void> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> 排行榜查询完成" + (response.getBeatmapId() == null ? "" : "\n铺面: " + response.getBeatmapId()),
                 Buttons.lbButtons(response.getBeatmapId())
@@ -66,31 +67,82 @@ final class ReplyFactory {
         return PendingMessage.ofMarkdownRaw(queuedText, Buttons.replayProgressButtons(taskInfo.taskId()));
     }
 
-    public PendingMessage replayStatMessage(String jobId, String renderStat) {
-        return PendingMessage.ofMarkdownRaw(renderStat, Buttons.replayProgressButtons(jobId));
+    public PendingMessage replayStatMessage(String jobId, RenderStat renderStat) {
+        return PendingMessage.ofMarkdownRaw(
+                Contents.replayStatContent(renderStat),
+                Buttons.replayProgressButtons(jobId)
+        );
     }
 
-    public PendingMessage searchMessage(Response response, SearchQuery searchQuery) {
+    public PendingMessage searchMessage(Response<List<SearchResultItem>> response, SearchQuery searchQuery) {
         return PendingMessage.ofMarkdownRaw(
-                response.getContent(),
+                Contents.searchContent(response, searchQuery),
                 Buttons.searchButtons(response, searchQuery)
         );
     }
 
-    public PendingMessage beatmapsetMessage(Response response) {
+    public PendingMessage beatmapsetMessage(Response<Void> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> 铺面集查询完成\nID: " + response.getBeatmapsetId(),
                 Buttons.beatmapsetButtons(response.getBeatmapStars(), response.getBeatmapIds())
         );
     }
 
+    private static final class Contents {
+        static String replayStatContent(RenderStat renderStat) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("> 请求: ").append(renderStat.getJobId(), 0, 8).append("\n");
+
+            sb.append("状态: ").append(switch (renderStat.getStatus()) {
+                case "done" -> "已完成";
+                case "failed" -> "失败";
+                case "timeout" -> "超时";
+                case "queued" -> "排队中";
+                case "rendering" -> "渲染中";
+                default -> "未知";
+            }).append("\n");
+
+            if (Objects.equals("rendering", renderStat.getStatus())) {
+                sb.append("进度: ").append(renderStat.getProgress() == null ? "未知" : renderStat.getProgress()).append("\n");
+                sb.append("速度: ").append(renderStat.getSpeed() == null ? "未知" : renderStat.getSpeed()).append("\n");
+                sb.append("预计时间: ").append(renderStat.getEta() == null ? "未知" : renderStat.getEta()).append("\n");
+            }
+
+            return sb.toString().trim();
+        }
+
+        static String searchContent(Response<List<SearchResultItem>> response, SearchQuery query) {
+            final List<SearchResultItem> items = response.getContent();
+
+            if (items.size() <= (query.page() - 1) * 10) {
+                return "没有找到更多的搜索结果了哦~";
+            }
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("\uD83D\uDD0D").append("搜索结果 - `").append(query.query()).append("`\n");
+
+            for (int i = (query.page() - 1) * 10; i < Math.min(items.size(), query.page() * 10); i++) {
+                SearchResultItem item = items.get(i);
+                sb.append("> ");
+                sb.append(i + 1).append("# ")
+                        .append("<qqbot-cmd-input text=\"%s\" show=\"%d\" reference=\"false\" />".formatted("/ms " + item.beatmapsetId(), item.beatmapsetId()))
+                        .append(" - ").append(item.artist()).append(" - ").append(item.title())
+                        .append(" <").append(item.mapperName()).append("> ")
+                        .append(String.format("[%.2f★ ~ %.2f★]", item.minStar(), item.maxStar()))
+                        .append("\n");
+            }
+
+            return sb.toString();
+        }
+    }
+
     private static final class Buttons {
-        static List<List<Button>> searchButtons(Response response, SearchQuery query) {
+        static List<List<Button>> searchButtons(Response<List<SearchResultItem>> response, SearchQuery query) {
             final List<String> ids = response.getBeatmapsetIds();
             if (ids == null || ids.isEmpty()) {
                 return null;
             }
-            
+
             List<List<Button>> rows = new ArrayList<>();
 
             List<Button> navRow = new ArrayList<>(3);
@@ -114,7 +166,7 @@ final class ReplyFactory {
 
             return rows;
         }
-        
+
         static List<List<Button>> boButtons() {
             return Button.keyboard(Button.row(
                     Button.command(1, "查询最好成绩", "/s bo1"),

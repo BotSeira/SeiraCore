@@ -9,8 +9,8 @@ import java.util.Optional;
 
 @Data
 @Builder
-public final class Response {
-    private String content;
+public class Response<T> {
+    private T content;
 
     private String base64;
 
@@ -27,8 +27,8 @@ public final class Response {
     private String scoreId;
     private List<String> scoreIds;
 
-    public static Response.ResponseBuilder fromHeaders(HttpHeaders headers) {
-        return Response.builder()
+    public static <T> Response.ResponseBuilder<T> fromHeaders(HttpHeaders headers) {
+        return Response.<T>builder()
                 .userId(headers.firstValue("X-User-Id").orElse(null))
                 .userIds(headers.firstValue("X-User-Ids").flatMap(Response::parseCsvHeader).orElse(null))
                 .beatmapId(headers.firstValue("X-Beatmap-Id").orElse(null))
