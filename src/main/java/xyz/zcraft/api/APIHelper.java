@@ -249,20 +249,7 @@ public class APIHelper {
 
     public static Response<Void> getBeatmapsetResponse(ShortcutTarget target) {
         try {
-            String query = null;
-            if (target.isMacro()) {
-                if ("m".equals(target.macroType())) {
-                    query = "/ms?m=" + target.explicitId();
-                } else if ("bo".equals(target.macroType()) || "rs".equals(target.macroType())) {
-                    query = "/ms?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
-                }
-            } else {
-                query = "/ms?ms=" + target.explicitId();
-            }
-
-            if (query == null) {
-                throw new ResolutionException("快捷查询格式错误。");
-            }
+            final String query = getBeatmapsetQuery(target);
 
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + query))
@@ -285,21 +272,27 @@ public class APIHelper {
         }
     }
 
+    private static String getBeatmapsetQuery(ShortcutTarget target) {
+        String query = null;
+        if (target.isMacro()) {
+            if ("m".equals(target.macroType())) {
+                query = "/ms?m=" + target.explicitId();
+            } else if ("bo".equals(target.macroType()) || "rs".equals(target.macroType())) {
+                query = "/ms?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+            }
+        } else {
+            query = "/ms?ms=" + target.explicitId();
+        }
+
+        if (query == null) {
+            throw new ResolutionException("快捷查询格式错误。");
+        }
+        return query;
+    }
+
     public static Response<Void> getScoreResponse(ShortcutTarget target) {
         try {
-            String query;
-            if (target.isMacro()) {
-                query = switch (target.macroType()) {
-                    case "bo", "rs" ->
-                            "/s?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
-                    case "m" -> "/s?m=" + target.explicitId() + "&u=" + target.boundUid();
-                    case "ms" ->
-                            "/s?ms=" + target.explicitId() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
-                    case null, default -> throw new IllegalArgumentException("Invalid macro type");
-                };
-            } else {
-                query = "/s?s=" + target.explicitId();
-            }
+            final String query = getScoreQuery(target);
 
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + query))
@@ -320,6 +313,23 @@ public class APIHelper {
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private static String getScoreQuery(ShortcutTarget target) {
+        String query;
+        if (target.isMacro()) {
+            query = switch (target.macroType()) {
+                case "bo", "rs" ->
+                        "/s?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+                case "m" -> "/s?m=" + target.explicitId() + "&u=" + target.boundUid();
+                case "ms" ->
+                        "/s?ms=" + target.explicitId() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+                case null, default -> throw new IllegalArgumentException("Invalid macro type");
+            };
+        } else {
+            query = "/s?s=" + target.explicitId();
+        }
+        return query;
     }
 
     public static Response<List<SearchResultItem>> searchBeatmapSetResponse(SearchQuery query) {

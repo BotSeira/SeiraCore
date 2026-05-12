@@ -137,5 +137,11 @@
             <version>2.25.4</version>
             <scope>compile</scope>
         </dependency>
+        <!--suppress VulnerableLibrariesLocal -->
+        <dependency>
+            <groupId>io.javalin</groupId>
+            <artifactId>javalin</artifactId>
+            <version>7.1.0</version>
+        </dependency>
     </dependencies>
 </project>

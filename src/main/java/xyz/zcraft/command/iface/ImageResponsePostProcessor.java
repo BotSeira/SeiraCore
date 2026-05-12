@@ -5,5 +5,5 @@ import xyz.zcraft.data.PendingMessage;
 
 @FunctionalInterface
 public interface ImageResponsePostProcessor {
-    PendingMessage execute(Response response);
+    PendingMessage execute(Response<?> response);
 }

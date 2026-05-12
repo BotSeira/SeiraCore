@@ -5,11 +5,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -64,6 +60,29 @@ public final class UserBindingStore {
         }
     }
 
+    public static void storeToken(String openId, String accessToken, String refreshToken, long expiresIn, long refreshedAt) {
+        ensureInitialized();
+        String sql = """
+                INSERT INTO token_store(open_id, access_token, refresh_token, expires_in, refreshed_at)
+                VALUES(?, ?, ?, ?, ?)
+                ON CONFLICT(open_id) DO UPDATE SET
+                    access_token = excluded.access_token,
+                    refresh_token = excluded.refresh_token,
+                    refreshed_at = excluded.refreshed_at
+                """;
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, openId);
+            statement.setString(2, accessToken);
+            statement.setString(3, refreshToken);
+            statement.setLong(4, expiresIn);
+            statement.setLong(5, refreshedAt);
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to store token", e);
+        }
+    }
+
     public static Integer findBoundUid(String openId) {
         ensureInitialized();
         String sql = "SELECT osu_uid FROM user_bindings WHERE open_id = ?";
@@ -83,11 +102,14 @@ public final class UserBindingStore {
 
     public static boolean unbind(String openId) {
         ensureInitialized();
-        String sql = "DELETE FROM user_bindings WHERE open_id = ?";
+        String bindingSql = "DELETE FROM user_bindings WHERE open_id = ?";
+        String tokenSql = "DELETE FROM token_store WHERE open_id = ?";
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, openId);
-            return statement.executeUpdate() > 0;
+             PreparedStatement bindingStatement = connection.prepareStatement(bindingSql);
+             PreparedStatement tokenStatement = connection.prepareStatement(tokenSql)) {
+            bindingStatement.setString(1, openId);
+            tokenStatement.setString(1, openId);
+            return bindingStatement.executeUpdate() > 0 && tokenStatement.executeUpdate() > 0;
         } catch (SQLException e) {
             throw new RuntimeException("Failed to delete binding", e);
         }
@@ -156,11 +178,23 @@ public final class UserBindingStore {
                     PRIMARY KEY(group_id, open_id)
                 )
                 """;
+        String tokenStoreSql = """
+                CREATE TABLE IF NOT EXISTS token_store (
+                    open_id TEXT NOT NULL,
+                    access_token INTEGER NOT NULL,
+                    refresh_token INTEGER NOT NULL,
+                    expires_in INTEGER NOT NULL,
+                    refreshed_at INTEGER NOT NULL,
+                    PRIMARY KEY(open_id)
+                )
+                """;
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
              PreparedStatement bindingStatement = connection.prepareStatement(bindingSql);
-             PreparedStatement memberStatement = connection.prepareStatement(groupMemberSql)) {
+             PreparedStatement memberStatement = connection.prepareStatement(groupMemberSql);
+             PreparedStatement tokenStatement = connection.prepareStatement(tokenStoreSql)) {
             bindingStatement.execute();
             memberStatement.execute();
+            tokenStatement.execute();
         }
     }
 

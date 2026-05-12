@@ -43,7 +43,7 @@ public class MessageSender {
         try {
             if(uploadCos) url = cos.uploadFromUrl(url, fileType);
         } catch (Exception e) {
-            LOG.error("Failed to upload file to COS");
+            LOG.error("Failed to upload private media to COS");
             return null;
         }
 
@@ -56,7 +56,7 @@ public class MessageSender {
 
             try {
                 Thread.sleep(i * 1000);
-            } catch (Exception e) {}
+            } catch (Exception _) {}
         }
 
         return null;
@@ -72,7 +72,7 @@ public class MessageSender {
         try {
             if(uploadCos) url = cos.uploadFromUrl(url, fileType);
         } catch (Exception e) {
-            LOG.error("Failed to upload file to COS");
+            LOG.error("Failed to upload group media to COS");
             return null;
         }
 
@@ -85,7 +85,7 @@ public class MessageSender {
 
             try {
                 Thread.sleep(i * 1000);
-            } catch (Exception e) {}
+            } catch (Exception _) {}
         }
 
         return null;

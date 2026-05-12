@@ -16,21 +16,21 @@ final class ReplyFactory {
         this.config = config;
     }
 
-    public PendingMessage boMessage(Response<Void> response) {
+    public PendingMessage boMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> b" + response.getScoreIds().size() + "查询完成\n玩家: " + response.getUserId(),
                 Buttons.boButtons()
         );
     }
 
-    public PendingMessage rsMessage(Response<Void> response) {
+    public PendingMessage rsMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> 最近成绩查询完成\n玩家: " + response.getUserId() + "\n数量: " + response.getScoreIds().size(),
                 Buttons.rsButtons()
         );
     }
 
-    public PendingMessage beatmapMessage(Response<Void> response) {
+    public PendingMessage beatmapMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> 铺面查询完成\n铺面: " + response.getBeatmapId(),
                 Buttons.beatmapButtons(response.getBeatmapId(), config.seira().directUrl())
@@ -38,14 +38,14 @@ final class ReplyFactory {
 
     }
 
-    public PendingMessage scoreMessage(Response<Void> response) {
+    public PendingMessage scoreMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> 成绩查询完成\n铺面: " + response.getBeatmapId() + "\n成绩: " + response.getScoreId(),
                 Buttons.sButtons(response.getBeatmapId(), response.getScoreId())
         );
     }
 
-    public PendingMessage lbMessage(Response<Void> response) {
+    public PendingMessage lbMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> 排行榜查询完成" + (response.getBeatmapId() == null ? "" : "\n铺面: " + response.getBeatmapId()),
                 Buttons.lbButtons(response.getBeatmapId())
@@ -82,7 +82,7 @@ final class ReplyFactory {
         );
     }
 
-    public PendingMessage beatmapsetMessage(Response<Void> response) {
+    public PendingMessage beatmapsetMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> 铺面集查询完成\nID: " + response.getBeatmapsetId(),
                 Buttons.beatmapsetButtons(response.getBeatmapStars(), response.getBeatmapIds())

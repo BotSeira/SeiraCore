@@ -39,10 +39,10 @@ final class TaskCoordinator {
     }
 
     RouteDecision queueImageRequest(String requestType, ImageResponseCreator creator, ImageResponsePostProcessor postProcessor) {
-        AtomicReference<Response> responseRef = new AtomicReference<>();
+        AtomicReference<Response<?>> responseRef = new AtomicReference<>();
         return queueApiRequest(requestType,
                 () -> {
-                    Response response = creator.create();
+                    Response<?> response = creator.create();
                     responseRef.set(response);
                     return PendingMessage.ofImageBase64(response.getBase64());
                 },
