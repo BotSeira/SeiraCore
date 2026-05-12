@@ -75,10 +75,10 @@ final class ReplyFactory {
     }
 
     public PendingMessage searchMessage(Response<List<SearchResultItem>> response, SearchQuery searchQuery) {
-        final int itemsPerPage = 10;
+        int SEARCH_ITEMS_PER_PAGE = 10;
         return PendingMessage.ofMarkdownRaw(
-                Contents.searchContent(response, searchQuery, itemsPerPage),
-                Buttons.searchButtons(response, searchQuery, itemsPerPage)
+                Contents.searchContent(response, searchQuery, SEARCH_ITEMS_PER_PAGE),
+                Buttons.searchButtons(response, searchQuery, SEARCH_ITEMS_PER_PAGE)
         );
     }
 
