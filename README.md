@@ -23,10 +23,6 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 
 ## Seira 能干什么？
 
-### 绑定/解绑 osu 账号！
-
-<img width="400" alt="image" src="https://github.com/user-attachments/assets/eccd7599-7476-424e-a53f-de1929a31963" />
-
 ### 查询最好成绩！
 
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/465d5ae1-e2b7-4295-ae79-5856bb9c2689" />

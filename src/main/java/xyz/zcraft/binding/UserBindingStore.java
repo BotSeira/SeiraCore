@@ -69,6 +69,7 @@ public final class UserBindingStore {
                 ON CONFLICT(open_id) DO UPDATE SET
                     access_token = excluded.access_token,
                     refresh_token = excluded.refresh_token,
+                    expires_in = excluded.expires_in,
                     refreshed_at = excluded.refreshed_at
                 """;
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
@@ -108,10 +109,25 @@ public final class UserBindingStore {
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
              PreparedStatement bindingStatement = connection.prepareStatement(bindingSql);
              PreparedStatement tokenStatement = connection.prepareStatement(tokenSql)) {
+            connection.setAutoCommit(false);
+
             bindingStatement.setString(1, openId);
             tokenStatement.setString(1, openId);
-            tokenStatement.executeUpdate();
-            return bindingStatement.executeUpdate() > 0;
+
+            try {
+                tokenStatement.executeUpdate();
+                boolean deleted = bindingStatement.executeUpdate() > 0;
+                connection.commit();
+                return deleted;
+            } catch (SQLException e) {
+                try {
+                    connection.rollback();
+                } catch (SQLException rollbackEx) {
+                    e.addSuppressed(rollbackEx);
+                }
+
+                throw e;
+            }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to delete binding", e);
         }

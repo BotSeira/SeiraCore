@@ -10,7 +10,7 @@ binding:
   listenPort: 8722 # 账号绑定回调监听端口
   listenPath: "/callback" # 账号绑定回调监听路径
   # 用于账号绑定的 Osu! API应用凭据
-  clientId: ""
+  clientId:
   clientSecret: ""
 
 # === oStella 配置 ===

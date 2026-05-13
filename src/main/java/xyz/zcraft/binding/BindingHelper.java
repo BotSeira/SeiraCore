@@ -9,6 +9,7 @@ import xyz.zcraft.config.BindingConfig;
 import xyz.zcraft.data.OsuToken;
 import xyz.zcraft.data.OsuUser;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -43,13 +44,13 @@ public class BindingHelper {
             return;
         }
 
-        if (!bindingTasks.containsKey(state)) {
+        final BindingTask bindingTask = bindingTasks.remove(state);
+
+        if (bindingTask == null) {
             LOG.warn("Invalid binding callback with no matching state");
             ctx.status(400).html(HtmlTemplates.getFailurePage("绑定请求无效或已过期"));
             return;
         }
-
-        final BindingTask bindingTask = bindingTasks.get(state);
 
         ctx.future(() -> CompletableFuture.supplyAsync(() ->
                         OsuAuthApi.getTokenFromCode(code, bindingConfig.clientId(), bindingConfig.clientSecret())
@@ -72,7 +73,7 @@ public class BindingHelper {
                 )
                 .exceptionally(e -> {
                     LOG.error("Error handling binding callback", e);
-                    ctx.status(500).html(HtmlTemplates.getFailurePage(e.getMessage()));
+                    ctx.status(500).html(HtmlTemplates.getFailurePage("发生了一个内部错误"));
                     return null;
                 })
                 .whenComplete((_, _) -> bindingTasks.remove(state)));
@@ -103,8 +104,8 @@ class HtmlTemplates {
 
     static {
         try {
-            SUCCESS_PAGE = new String(Objects.requireNonNull(HtmlTemplates.class.getResourceAsStream("/seira-bind-success.html")).readAllBytes());
-            FAILURE_PAGE = new String(Objects.requireNonNull(HtmlTemplates.class.getResourceAsStream("/seira-bind-fail.html")).readAllBytes());
+            SUCCESS_PAGE = new String(Objects.requireNonNull(HtmlTemplates.class.getResourceAsStream("/seira-bind-success.html")).readAllBytes(), StandardCharsets.UTF_8);
+            FAILURE_PAGE = new String(Objects.requireNonNull(HtmlTemplates.class.getResourceAsStream("/seira-bind-fail.html")).readAllBytes(), StandardCharsets.UTF_8);
         } catch (Exception e) {
             throw new RuntimeException("Failed to load HTML templates", e);
         }
