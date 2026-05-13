@@ -9,6 +9,7 @@ import xyz.zcraft.config.BindingConfig;
 import xyz.zcraft.data.OsuToken;
 import xyz.zcraft.data.OsuUser;
 
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -64,34 +65,15 @@ public class BindingHelper {
                     bindingTask.onFinish().accept(user, token);
                     return user;
                 })
-                .thenAccept(user -> ctx.html("""
-                        <!DOCTYPE html>
-                        <html lang="zh">
-                            <head>
-                                <meta charset="UTF-8">
-                                <title>绑定成功</title>
-                            </head>
-                            <body>
-                                <h1>成功绑定至玩家%s(%d)！</h1>
-                                <p>你可以关闭这个页面了。</p>
-                            </body>
-                        </html>
-                        """.formatted(user.username(), user.id())))
+                .thenAccept(user -> ctx.html(
+                        HtmlTemplates.SUCCESS_PAGE
+                                .replace("{{USER_NAME}}", user.username())
+                                .replace("{{USER_ID}}", String.valueOf(user.id()))
+                        )
+                )
                 .exceptionally(e -> {
                     LOG.error("Error handling binding callback", e);
-                    ctx.status(500).html("""
-                            <!DOCTYPE html>
-                            <html lang="zh">
-                                <head>
-                                    <meta charset="UTF-8">
-                                    <title>绑定失败</title>
-                                </head>
-                                <body>
-                                    <h1>绑定失败！</h1>
-                                    <p>发生了一个错误，请重试。</p>
-                                </body>
-                            </html>
-                            """);
+                    ctx.status(500).html(HtmlTemplates.FAILURE_PAGE);
                     return null;
                 })
                 .whenComplete((_, _) -> bindingTasks.remove(state)));
@@ -105,5 +87,19 @@ public class BindingHelper {
     }
 
     public record BindingTask(String taskId, String openId, String messageId, BiConsumer<OsuUser, OsuToken> onFinish) {
+    }
+
+    private static class HtmlTemplates {
+        public static final String SUCCESS_PAGE;
+        public static final String FAILURE_PAGE;
+
+        static {
+            try {
+                SUCCESS_PAGE = new String(Objects.requireNonNull(HtmlTemplates.class.getResourceAsStream("/seira-bind-success.html")).readAllBytes());
+                FAILURE_PAGE = new String(Objects.requireNonNull(HtmlTemplates.class.getResourceAsStream("/seira-bind-fail.html")).readAllBytes());
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to load HTML templates", e);
+            }
+        }
     }
 }

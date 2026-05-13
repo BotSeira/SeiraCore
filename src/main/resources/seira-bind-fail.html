@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>绑定失败 - Seira</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e1e2f, #2d2d44);
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .card {
+            background: #252536;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            border-top: 5px solid #ff4444; /* Error Red */
+            animation: popIn 0.5s ease-out;
+        }
+        .icon {
+            font-size: 64px;
+            margin-bottom: 15px;
+        }
+        h1 {
+            margin: 0 0 10px;
+            font-size: 26px;
+            color: #ff4444;
+            letter-spacing: 1px;
+        }
+        p {
+            margin: 0;
+            color: #b0b0c5;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+        .sub-text {
+            margin-top: 25px;
+            font-size: 13px;
+            opacity: 0.6;
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.9); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <div class="icon">💔</div>
+    <h1>绑定失败</h1>
+    <p>发生了一个未知的错误，导致授权未能完成。</p>
+    <p class="sub-text">请返回聊天输入绑定指令获取新的链接，然后重试一次吧。</p>
+</div>
+</body>
+</html>
