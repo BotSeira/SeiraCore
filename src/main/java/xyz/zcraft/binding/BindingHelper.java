@@ -39,13 +39,13 @@ public class BindingHelper {
 
         if (state == null || code == null) {
             LOG.warn("Received invalid binding callback with missing parameters");
-            ctx.status(400).html(HtmlTemplates.FAILURE_PAGE.replace("{{ERROR_DETAIL}}", "回调URL无效，请重试"));
+            ctx.status(400).html(HtmlTemplates.getFailurePage("回调URL无效，请重试"));
             return;
         }
 
         if (!bindingTasks.containsKey(state)) {
             LOG.warn("Invalid binding callback with no matching state");
-            ctx.status(400).html(HtmlTemplates.FAILURE_PAGE.replace("{{ERROR_DETAIL}}", "绑定请求无效或已过期"));
+            ctx.status(400).html(HtmlTemplates.getFailurePage("绑定请求无效或已过期"));
             return;
         }
 
@@ -65,15 +65,11 @@ public class BindingHelper {
                     bindingTask.onFinish().accept(user, token);
                     return user;
                 })
-                .thenAccept(user -> ctx.html(
-                        HtmlTemplates.SUCCESS_PAGE
-                                .replace("{{USER_NAME}}", user.username())
-                                .replace("{{USER_ID}}", String.valueOf(user.id()))
-                        )
+                .thenAccept(user -> ctx.html(HtmlTemplates.getSuccessPage(user.username(), String.valueOf(user.id())))
                 )
                 .exceptionally(e -> {
                     LOG.error("Error handling binding callback", e);
-                    ctx.status(500).html(HtmlTemplates.FAILURE_PAGE.replace("{{ERROR_DETAIL}}", e.getMessage()));
+                    ctx.status(500).html(HtmlTemplates.getFailurePage(e.getMessage()));
                     return null;
                 })
                 .whenComplete((_, _) -> bindingTasks.remove(state)));
@@ -88,18 +84,26 @@ public class BindingHelper {
 
     public record BindingTask(String taskId, String openId, String messageId, BiConsumer<OsuUser, OsuToken> onFinish) {
     }
+}
 
-    private static class HtmlTemplates {
-        public static final String SUCCESS_PAGE;
-        public static final String FAILURE_PAGE;
+class HtmlTemplates {
+    private static final String SUCCESS_PAGE;
+    private static final String FAILURE_PAGE;
 
-        static {
-            try {
-                SUCCESS_PAGE = new String(Objects.requireNonNull(HtmlTemplates.class.getResourceAsStream("/seira-bind-success.html")).readAllBytes());
-                FAILURE_PAGE = new String(Objects.requireNonNull(HtmlTemplates.class.getResourceAsStream("/seira-bind-fail.html")).readAllBytes());
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to load HTML templates", e);
-            }
+    public static String getSuccessPage(String userName, String userId) {
+        return SUCCESS_PAGE.replace("{{USER_NAME}}", userName).replace("{{USER_ID}}", userId);
+    }
+
+    public static String getFailurePage(String reason) {
+        return FAILURE_PAGE.replace("{{REASON}}", reason);
+    }
+
+    static {
+        try {
+            SUCCESS_PAGE = new String(Objects.requireNonNull(HtmlTemplates.class.getResourceAsStream("/seira-bind-success.html")).readAllBytes());
+            FAILURE_PAGE = new String(Objects.requireNonNull(HtmlTemplates.class.getResourceAsStream("/seira-bind-fail.html")).readAllBytes());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to load HTML templates", e);
         }
     }
 }

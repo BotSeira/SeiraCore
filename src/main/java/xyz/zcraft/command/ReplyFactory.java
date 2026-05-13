@@ -96,7 +96,7 @@ final class ReplyFactory {
                 .formatted(config.clientId(), task.taskId());
         return PendingMessage.ofMarkdownRaw(
                 (isC2C ? "" : "<qqbot-at-user id=\"%s\" /> ".formatted(task.openId())) + "点击下方按钮绑定账号,或者在浏览器打开以下链接: \n```\n%s\n```".formatted(url),
-                Buttons.bindButtons(task.openId(), url)
+                Buttons.bindButtons(task.openId(), url, !isC2C)
         );
     }
 
@@ -156,10 +156,10 @@ final class ReplyFactory {
     }
 
     private static final class Buttons {
-        static List<List<Button>> bindButtons(String userId, String url) {
-            return Button.keyboard(Button.row(
-                    Button.openUrl(1, "登录", url).permit(userId)
-            ));
+        static List<List<Button>> bindButtons(String userId, String url, boolean restrict) {
+            final Button button = Button.openUrl(1, "登录", url);
+            if (restrict) button.permit(userId);
+            return Button.keyboard(Button.row(button));
         }
 
         static List<List<Button>> searchButtons(Response<List<SearchResultItem>> response, SearchQuery query, int itemsPerPage) {
