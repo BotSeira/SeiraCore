@@ -94,8 +94,8 @@ class HtmlTemplates {
         return SUCCESS_PAGE.replace("{{USER_NAME}}", userName).replace("{{USER_ID}}", userId);
     }
 
-    public static String getFailurePage(String reason) {
-        return FAILURE_PAGE.replace("{{REASON}}", reason);
+    public static String getFailurePage(String detail) {
+        return FAILURE_PAGE.replace("{{ERROR_DETAIL}}", detail);
     }
 
     static {
