@@ -9,6 +9,16 @@
         <Console name="CONSOLE">
             <PatternLayout pattern="${CONSOLE_PATTERN}"/>
         </Console>
+        <RollingFile name="JAVALIN_FILE" fileName="${LOG_DIR}/javalin-server.log"
+                     filePattern="${LOG_DIR}/javalin-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="${FILE_PATTERN}"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="10 MB"/>
+                <OnStartupTriggeringPolicy/>
+            </Policies>
+            <DefaultRolloverStrategy max="5" compressionLevel="9" fileIndex="nomax"/>
+        </RollingFile>
         <RollingFile name="FILE" fileName="${LOG_DIR}/latest.log"
                      filePattern="${LOG_DIR}/%d{yyyy-MM-dd}-%i.log.gz">
             <PatternLayout pattern="${FILE_PATTERN}"/>
@@ -21,6 +31,14 @@
         </RollingFile>
     </Appenders>
     <Loggers>
+        <Logger name="io.javalin" level="INFO" additivity="false">
+            <AppenderRef ref="JAVALIN_FILE"/>
+        </Logger>
+
+        <Logger name="org.eclipse.jetty" level="INFO" additivity="false">
+            <AppenderRef ref="JAVALIN_FILE"/>
+        </Logger>
+
         <Root level="INFO">
             <AppenderRef ref="CONSOLE"/>
             <AppenderRef ref="FILE"/>

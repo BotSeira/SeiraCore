@@ -2,13 +2,14 @@ package xyz.zcraft.command;
 
 import xyz.zcraft.api.APIHelper;
 import xyz.zcraft.api.Response;
+import xyz.zcraft.binding.BindingHelper;
 import xyz.zcraft.config.AppConfig;
-import xyz.zcraft.data.Button;
-import xyz.zcraft.data.PendingMessage;
-import xyz.zcraft.data.SearchQuery;
+import xyz.zcraft.config.BindingConfig;
+import xyz.zcraft.data.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 final class ReplyFactory {
     private final AppConfig config;
@@ -17,21 +18,21 @@ final class ReplyFactory {
         this.config = config;
     }
 
-    public PendingMessage boMessage(Response response) {
+    public PendingMessage boMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> b" + response.getScoreIds().size() + "查询完成\n玩家: " + response.getUserId(),
                 Buttons.boButtons()
         );
     }
 
-    public PendingMessage rsMessage(Response response) {
+    public PendingMessage rsMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> 最近成绩查询完成\n玩家: " + response.getUserId() + "\n数量: " + response.getScoreIds().size(),
                 Buttons.rsButtons()
         );
     }
 
-    public PendingMessage beatmapMessage(Response response) {
+    public PendingMessage beatmapMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> 铺面查询完成\n铺面: " + response.getBeatmapId(),
                 Buttons.beatmapButtons(response.getBeatmapId(), config.seira().directUrl())
@@ -39,14 +40,14 @@ final class ReplyFactory {
 
     }
 
-    public PendingMessage scoreMessage(Response response) {
+    public PendingMessage scoreMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> 成绩查询完成\n铺面: " + response.getBeatmapId() + "\n成绩: " + response.getScoreId(),
                 Buttons.sButtons(response.getBeatmapId(), response.getScoreId())
         );
     }
 
-    public PendingMessage lbMessage(Response response) {
+    public PendingMessage lbMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> 排行榜查询完成" + (response.getBeatmapId() == null ? "" : "\n铺面: " + response.getBeatmapId()),
                 Buttons.lbButtons(response.getBeatmapId())
@@ -68,25 +69,129 @@ final class ReplyFactory {
         return PendingMessage.ofMarkdownRaw(queuedText, Buttons.replayProgressButtons(taskInfo.taskId()));
     }
 
-    public PendingMessage replayStatMessage(String jobId, String renderStat) {
-        return PendingMessage.ofMarkdownRaw(renderStat, Buttons.replayProgressButtons(jobId));
-    }
-
-    public PendingMessage searchMessage(Response response, SearchQuery searchQuery) {
+    public PendingMessage replayStatMessage(String jobId, RenderStat renderStat) {
         return PendingMessage.ofMarkdownRaw(
-                response.getContent(),
-                Buttons.searchButtons(response, searchQuery)
+                Contents.replayStatContent(renderStat),
+                Buttons.replayProgressButtons(jobId)
         );
     }
 
-    public PendingMessage beatmapsetMessage(Response response) {
+    public PendingMessage searchMessage(Response<List<SearchResultItem>> response, SearchQuery searchQuery) {
+        int SEARCH_ITEMS_PER_PAGE = 10;
+        return PendingMessage.ofMarkdownRaw(
+                Contents.searchContent(response, searchQuery, SEARCH_ITEMS_PER_PAGE),
+                Buttons.searchButtons(response, searchQuery, SEARCH_ITEMS_PER_PAGE)
+        );
+    }
+
+    public PendingMessage beatmapsetMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> 铺面集查询完成\nID: " + response.getBeatmapsetId(),
                 Buttons.beatmapsetButtons(response.getBeatmapStars(), response.getBeatmapIds())
         );
     }
 
+    public PendingMessage bindMessage(BindingConfig config, BindingHelper.BindingTask task, boolean isC2C) {
+        final String url = "https://osu.ppy.sh/oauth/authorize?client_id=%d&response_type=code&scope=public+identify+friends.read&state=%s"
+                .formatted(config.clientId(), task.taskId());
+        return PendingMessage.ofMarkdownRaw(
+                (isC2C ? "" : "<qqbot-at-user id=\"%s\" /> ".formatted(task.openId())) + "点击下方按钮绑定账号,或者在浏览器打开以下链接: \n```\n%s\n```".formatted(url),
+                Buttons.bindButtons(task.openId(), url, !isC2C)
+        );
+    }
+
+    public PendingMessage testMessage() {
+        return PendingMessage.ofMarkdownRaw(
+                """
+                        > 这是一个测试消息
+                        """,
+                null
+        );
+    }
+
+    private static final class Contents {
+        static String replayStatContent(RenderStat renderStat) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("> 请求: ").append(renderStat.getJobId(), 0, 8).append("\n");
+
+            sb.append("状态: ").append(switch (renderStat.getStatus()) {
+                case "done" -> "已完成";
+                case "failed" -> "失败";
+                case "timeout" -> "超时";
+                case "queued" -> "排队中";
+                case "rendering" -> "渲染中";
+                default -> "未知";
+            }).append("\n");
+
+            if (Objects.equals("rendering", renderStat.getStatus())) {
+                sb.append("进度: ").append(renderStat.getProgress() == null ? "未知" : renderStat.getProgress()).append("\n");
+                sb.append("速度: ").append(renderStat.getSpeed() == null ? "未知" : renderStat.getSpeed()).append("\n");
+                sb.append("预计时间: ").append(renderStat.getEta() == null ? "未知" : renderStat.getEta()).append("\n");
+            }
+
+            return sb.toString().trim();
+        }
+
+        static String searchContent(Response<List<SearchResultItem>> response, SearchQuery query, int itemsPerPage) {
+            final List<SearchResultItem> items = response.getContent();
+
+            if (items.size() <= (query.page() - 1) * itemsPerPage) {
+                return "没有找到更多的搜索结果了哦~";
+            }
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("\uD83D\uDD0D").append("搜索结果 - `").append(query.query()).append("`\n");
+
+            for (int i = (query.page() - 1) * itemsPerPage; i < Math.min(items.size(), query.page() * itemsPerPage); i++) {
+                SearchResultItem item = items.get(i);
+                sb.append("> ");
+                sb.append(i + 1).append("# ")
+                        .append("<qqbot-cmd-input text=\"%s\" show=\"%d\" reference=\"false\" />".formatted("/ms " + item.beatmapsetId(), item.beatmapsetId()))
+                        .append(" - ").append(item.artist()).append(" - ").append(item.title())
+                        .append(" <").append(item.mapperName()).append("> ").append(String.format("[%.2f★ ~ %.2f★]", item.minStar(), item.maxStar())).append("\n");
+            }
+
+            return sb.toString();
+        }
+    }
+
     private static final class Buttons {
+        static List<List<Button>> bindButtons(String userId, String url, boolean restrict) {
+            final Button button = Button.openUrl(1, "登录", url);
+            if (restrict) button.permit(userId);
+            return Button.keyboard(Button.row(button));
+        }
+
+        static List<List<Button>> searchButtons(Response<List<SearchResultItem>> response, SearchQuery query, int itemsPerPage) {
+            final List<String> ids = response.getBeatmapsetIds();
+            if (ids == null || ids.isEmpty()) {
+                return null;
+            }
+
+            List<List<Button>> rows = new ArrayList<>();
+
+            List<Button> navRow = new ArrayList<>(3);
+
+            if (query.page() > 1) {
+                navRow.add(Button.command(1, "上一页", "/sms #" + (query.page() - 1) + " " + query.query()));
+            } else {
+                navRow.add(Button.command(1, false, "上一页", ""));
+            }
+
+            final String label = query.page() + "/" + ((int) Math.ceil(response.getBeatmapsetIds().size() / (double) itemsPerPage));
+            navRow.add(Button.command(2, false, label, "/sms #" + query.page() + " " + query.query()));
+
+            if (query.page() * itemsPerPage < ids.size()) {
+                navRow.add(Button.command(3, "下一页", "/sms #" + (query.page() + 1) + " " + query.query()));
+            } else {
+                navRow.add(Button.command(3, false, "下一页", ""));
+            }
+
+            rows.add(List.copyOf(navRow));
+
+            return rows;
+        }
+
         static List<List<Button>> boButtons() {
             return Button.keyboard(Button.row(
                     Button.command(1, "查询最好成绩", "/s bo1"),
@@ -136,55 +241,6 @@ final class ReplyFactory {
             return Button.keyboard(Button.row(
                     Button.command(1, "查询渲染进度", "/rstat " + jobId)
             ));
-        }
-
-        static List<List<Button>> searchButtons(Response response, SearchQuery query) {
-            final List<String> ids = response.getBeatmapsetIds();
-            if (ids == null || ids.isEmpty()) {
-                return null;
-            }
-
-            List<List<Button>> rows = new ArrayList<>();
-            List<Button> currentRow = new ArrayList<>(5);
-            int buttonIndex = 0;
-            for (int i = (query.page() - 1) * 10; i < Math.min(ids.size(), query.page() * 10); i++) {
-                String beatmapsetId = ids.get(i);
-                if (beatmapsetId == null || beatmapsetId.isBlank()) {
-                    continue;
-                }
-
-                buttonIndex++;
-                currentRow.add(Button.command(buttonIndex, String.valueOf(i + 1), "/ms " + beatmapsetId));
-                if (currentRow.size() == 5) {
-                    rows.add(List.copyOf(currentRow));
-                    currentRow.clear();
-                }
-            }
-
-            if (!currentRow.isEmpty()) {
-                rows.add(List.copyOf(currentRow));
-            }
-
-            List<Button> navRow = new ArrayList<>(3);
-
-            if (query.page() > 1) {
-                navRow.add(Button.command(11, "上一页", "/sms #" + (query.page() - 1) + " " + query.query()));
-            } else {
-                navRow.add(Button.command(11, false, "上一页", ""));
-            }
-
-            final String label = query.page() + "/" + ((int) Math.ceil(response.getBeatmapsetIds().size() / 10.0));
-            navRow.add(Button.command(12, false, label, "/sms #" + query.page() + " " + query.query()));
-
-            if (query.page() * 10 < ids.size()) {
-                navRow.add(Button.command(13, "下一页", "/sms #" + (query.page() + 1) + " " + query.query()));
-            } else {
-                navRow.add(Button.command(13, false, "下一页", ""));
-            }
-
-            rows.add(List.copyOf(navRow));
-
-            return rows;
         }
 
         static List<List<Button>> beatmapButtons(String beatmapId, String directUrl) {

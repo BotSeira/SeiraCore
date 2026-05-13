@@ -6,6 +6,7 @@ public record SearchResultItem(
         String title,
         String mapperName,
         double minStar,
-        double maxStar
+        double maxStar,
+        String coverUrl
 ) {
 }

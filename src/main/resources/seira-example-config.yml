@@ -1,8 +1,17 @@
 # === 主程序 配置 ===
 seira:
   sqlitePath: "./data/seira.db" # SQLite数据库路径，若不存在会自动创建
-  directUrl: "https://seira.zcraft.xyz/direct" # 用于消息卡片中跳转游戏的按钮
+  directUrl: "https://example.com/direct" # 用于消息卡片中跳转游戏的按钮
   debugMode: false # 启用调试功能与日志输出
+
+# === 用户绑定配置 ===
+binding:
+  requireLogin: true # 设置为 true 以使绑定用户在绑定账号时需要登录，未启用登录绑定会导致某些功能不可用
+  listenPort: 8722 # 账号绑定回调监听端口
+  listenPath: "/callback" # 账号绑定回调监听路径
+  # 用于账号绑定的 Osu! API应用凭据
+  clientId: ""
+  clientSecret: ""
 
 # === oStella 配置 ===
 ostella:
@@ -12,9 +21,6 @@ ostella:
 qq:
   appId: ""
   appSecret: ""
-  # 事件订阅，33554432 是消息相关权限的总和，不建议更改
-  # 具体权限可以参考 https://bot.q.qq.com/wiki/develop/api-v2/dev-prepare/interface-framework/event-emit.html
-  intents: 33554432
 
 # === 腾讯云COS 配置 ===
 cos:

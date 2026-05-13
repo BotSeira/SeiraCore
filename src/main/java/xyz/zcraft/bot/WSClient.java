@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
+import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.java_websocket.client.WebSocketClient;
@@ -23,6 +24,7 @@ import java.util.function.Supplier;
 public class WSClient extends WebSocketClient {
     private static final Logger LOG = LogManager.getLogger(WSClient.class);
     private final Gson gson = new Gson();
+    @Getter
     private final AppConfig config;
     private final Supplier<AccessToken> tokenSupplier;
     private final ScheduledExecutorService heartbeatExecutor = Executors.newSingleThreadScheduledExecutor();
@@ -115,7 +117,7 @@ public class WSClient extends WebSocketClient {
     private void sendIdentify() {
         JsonObject data = new JsonObject();
         data.addProperty("token", "QQBot " + tokenSupplier.get().token());
-        data.addProperty("intents", config.qq().intents());
+        data.addProperty("intents", 33554432);
 
         JsonObject payload = new JsonObject();
         payload.addProperty("op", 2);
