@@ -112,7 +112,7 @@ final class ReplyFactory {
     private static final class Contents {
         static String replayStatContent(RenderStat renderStat) {
             StringBuilder sb = new StringBuilder();
-            sb.append("> 请求: ").append(renderStat.getJobId(), 0, 8).append("\n");
+            sb.append("> 请求: ").append(renderStat.getId(), 0, 8).append("\n");
 
             sb.append("状态: ").append(switch (renderStat.getStatus()) {
                 case "done" -> "已完成";
