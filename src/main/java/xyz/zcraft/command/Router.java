@@ -4,6 +4,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.api.APIHelper;
 import xyz.zcraft.api.Response;
+import xyz.zcraft.binding.BindingHelper;
 import xyz.zcraft.binding.UserBindingStore;
 import xyz.zcraft.bot.MessageSender;
 import xyz.zcraft.command.resolution.ShortcutTarget;
@@ -60,7 +61,7 @@ public class Router {
                 UserBindingStore.upsertGroupMember(groupId, userId);
             }
 
-            RouteDecision routeDecision = route(rawContent, userId, groupId);
+            RouteDecision routeDecision = route(rawContent, userId, groupId, messageId);
             if (routeDecision == null) {
                 return;
             }
@@ -77,7 +78,7 @@ public class Router {
         }
     }
 
-    protected RouteDecision route(String rawContent, String senderUserId, String groupId) {
+    protected RouteDecision route(String rawContent, String senderUserId, String groupId, String messageId) {
         if (rawContent == null || !rawContent.trim().startsWith(PREFIX)) {
             return null;
         }
@@ -97,15 +98,29 @@ public class Router {
                 if (senderUserId == null || senderUserId.isBlank()) {
                     return RouteDecision.sync(PendingMessage.ofString("无法识别你的用户ID，暂时无法绑定。请稍后重试。"));
                 }
-                if (args.length != 1) {
-                    return RouteDecision.sync(PendingMessage.ofString("用法：/bind <玩家ID>"));
+
+                if (UserBindingStore.findBoundUid(senderUserId) != null) {
+                    return RouteDecision.sync(PendingMessage.ofString("你已经绑定了玩家ID，如果要更换绑定请先使用 /unbind 解绑当前玩家ID。"));
                 }
-                Integer uid = argumentResolver.parsePositiveInt(args[0]);
-                if (uid == null) {
-                    return RouteDecision.sync(PendingMessage.ofString("玩家ID必须是正整数。用法：/bind <玩家ID>"));
+
+                if (config.binding().requireLogin()) {
+                    final var bindingTask = BindingHelper.createBindingTask(senderUserId, messageId, (user, token) -> {
+                        UserBindingStore.bind(senderUserId, user.id());
+                        UserBindingStore.storeToken(senderUserId, token);
+                    });
+                    return RouteDecision.sync(replyFactory.bindMessage(config.binding(), bindingTask));
+                } else {
+                    if (args.length != 1) {
+                        return RouteDecision.sync(PendingMessage.ofString("用法：/bind <玩家ID>"));
+                    }
+                    Integer uid = argumentResolver.parsePositiveInt(args[0]);
+                    if (uid == null) {
+                        return RouteDecision.sync(PendingMessage.ofString("玩家ID必须是正整数。用法：/bind <玩家ID>"));
+                    }
+
+                    UserBindingStore.bind(senderUserId, uid);
+                    return RouteDecision.sync(PendingMessage.ofString("绑定成功，已绑定到玩家ID: " + uid));
                 }
-                UserBindingStore.bind(senderUserId, uid);
-                return RouteDecision.sync(PendingMessage.ofString("绑定成功，已绑定到玩家ID: " + uid));
             }
             case "unbind" -> {
                 if (senderUserId == null || senderUserId.isBlank()) {

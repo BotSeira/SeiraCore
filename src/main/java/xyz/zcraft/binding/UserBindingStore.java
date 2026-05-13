@@ -2,6 +2,7 @@ package xyz.zcraft.binding;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.data.OsuToken;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -60,7 +61,7 @@ public final class UserBindingStore {
         }
     }
 
-    public static void storeToken(String openId, String accessToken, String refreshToken, long expiresIn, long refreshedAt) {
+    public static void storeToken(String openId, OsuToken token) {
         ensureInitialized();
         String sql = """
                 INSERT INTO token_store(open_id, access_token, refresh_token, expires_in, refreshed_at)
@@ -73,10 +74,10 @@ public final class UserBindingStore {
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, openId);
-            statement.setString(2, accessToken);
-            statement.setString(3, refreshToken);
-            statement.setLong(4, expiresIn);
-            statement.setLong(5, refreshedAt);
+            statement.setString(2, token.accessToken());
+            statement.setString(3, token.refreshToken());
+            statement.setLong(4, token.expiresIn());
+            statement.setLong(5, token.refreshedAt());
             statement.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to store token", e);

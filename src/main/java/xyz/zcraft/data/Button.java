@@ -89,6 +89,14 @@ public class Button {
         return List.of(rows);
     }
 
+    public Button permit(String userId) {
+        Action.Permission permission = new Action.Permission();
+        permission.setType(0);
+        permission.setSpecifyUserIds(List.of(userId));
+        this.getAction().setPermission(permission);
+        return this;
+    }
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor

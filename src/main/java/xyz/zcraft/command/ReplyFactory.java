@@ -2,7 +2,9 @@ package xyz.zcraft.command;
 
 import xyz.zcraft.api.APIHelper;
 import xyz.zcraft.api.Response;
+import xyz.zcraft.binding.BindingHelper;
 import xyz.zcraft.config.AppConfig;
+import xyz.zcraft.config.BindingConfig;
 import xyz.zcraft.data.*;
 
 import java.util.ArrayList;
@@ -89,6 +91,13 @@ final class ReplyFactory {
         );
     }
 
+    public PendingMessage bindMessage(BindingConfig config, BindingHelper.BindingTask task) {
+        return PendingMessage.ofMarkdownRaw(
+                "<qqbot-at-user id=\"%s\" /> 点击下方按钮绑定账号：".formatted(task.openId()),
+                Buttons.bindButtons(config, task.openId(), task.taskId())
+        );
+    }
+
     public PendingMessage testMessage() {
         return PendingMessage.ofMarkdownRaw(
                 """
@@ -145,6 +154,15 @@ final class ReplyFactory {
     }
 
     private static final class Buttons {
+        static List<List<Button>> bindButtons(BindingConfig config, String userId, String state) {
+            return Button.keyboard(Button.row(
+                    Button.openUrl(1, "登录",
+                            "https://osu.ppy.sh/oauth/authorize?client_id=%d&response_type=code&scope=public+identify+friends.read&state=%s"
+                                    .formatted(config.clientId(), state)
+                    ).permit(userId)
+            ));
+        }
+
         static List<List<Button>> searchButtons(Response<List<SearchResultItem>> response, SearchQuery query, int itemsPerPage) {
             final List<String> ids = response.getBeatmapsetIds();
             if (ids == null || ids.isEmpty()) {
