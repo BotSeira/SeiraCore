@@ -108,7 +108,7 @@ public class Router {
                         UserBindingStore.bind(senderUserId, user.id());
                         UserBindingStore.storeToken(senderUserId, token);
                     });
-                    return RouteDecision.sync(replyFactory.bindMessage(config.binding(), bindingTask));
+                    return RouteDecision.sync(replyFactory.bindMessage(config.binding(), bindingTask, groupId == null || groupId.isBlank()));
                 } else {
                     if (args.length != 1) {
                         return RouteDecision.sync(PendingMessage.ofString("用法：/bind <玩家ID>"));

@@ -91,10 +91,12 @@ final class ReplyFactory {
         );
     }
 
-    public PendingMessage bindMessage(BindingConfig config, BindingHelper.BindingTask task) {
+    public PendingMessage bindMessage(BindingConfig config, BindingHelper.BindingTask task, boolean isC2C) {
+        final String url = "https://osu.ppy.sh/oauth/authorize?client_id=%d&response_type=code&scope=public+identify+friends.read&state=%s"
+                .formatted(config.clientId(), task.taskId());
         return PendingMessage.ofMarkdownRaw(
-                "<qqbot-at-user id=\"%s\" /> 点击下方按钮绑定账号：".formatted(task.openId()),
-                Buttons.bindButtons(config, task.openId(), task.taskId())
+                (isC2C ? "" : "<qqbot-at-user id=\"%s\" /> ".formatted(task.openId())) + "点击下方按钮绑定账号,或者在浏览器打开以下链接: \n```\n%s\n```".formatted(url),
+                Buttons.bindButtons(task.openId(), url)
         );
     }
 
@@ -154,12 +156,9 @@ final class ReplyFactory {
     }
 
     private static final class Buttons {
-        static List<List<Button>> bindButtons(BindingConfig config, String userId, String state) {
+        static List<List<Button>> bindButtons(String userId, String url) {
             return Button.keyboard(Button.row(
-                    Button.openUrl(1, "登录",
-                            "https://osu.ppy.sh/oauth/authorize?client_id=%d&response_type=code&scope=public+identify+friends.read&state=%s"
-                                    .formatted(config.clientId(), state)
-                    ).permit(userId)
+                    Button.openUrl(1, "登录", url).permit(userId)
             ));
         }
 
