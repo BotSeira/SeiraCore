@@ -63,6 +63,9 @@ public class BindingHelper {
                     if (user == null) throw new RuntimeException("Failed to get user from token");
 
                     bindingTask.onFinish().accept(user, token);
+
+                    LOG.info("Binding successful for user {} (id {})", user.username(), user.id());
+
                     return user;
                 })
                 .thenAccept(user -> ctx.html(HtmlTemplates.getSuccessPage(user.username(), String.valueOf(user.id())))
