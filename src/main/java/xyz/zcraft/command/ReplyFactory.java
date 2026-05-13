@@ -71,7 +71,7 @@ final class ReplyFactory {
 
     public PendingMessage replayStatMessage(String jobId, RenderStat renderStat) {
         return PendingMessage.ofMarkdownRaw(
-                Contents.replayStatContent(renderStat),
+                Contents.replayStatContent(renderStat, jobId),
                 Buttons.replayProgressButtons(jobId)
         );
     }
@@ -110,9 +110,9 @@ final class ReplyFactory {
     }
 
     private static final class Contents {
-        static String replayStatContent(RenderStat renderStat) {
+        static String replayStatContent(RenderStat renderStat, String jobId) {
             StringBuilder sb = new StringBuilder();
-            sb.append("> 请求: ").append(renderStat.getId(), 0, 8).append("\n");
+            sb.append("> 请求: ").append(jobId, 0, 8).append("\n");
 
             sb.append("状态: ").append(switch (renderStat.getStatus()) {
                 case "done" -> "已完成";
