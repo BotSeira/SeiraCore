@@ -17,7 +17,7 @@ public class ApiRequestStats {
                     ? DEFAULT_COST_MILLIS
                     : (long) entry.samples.stream().mapToLong(Long::longValue).average().orElse(DEFAULT_COST_MILLIS);
             entry.pendingCount++;
-            long expectedMillis = avgMillis * Math.max(entry.pendingCount, WINDOW_SIZE);
+            long expectedMillis = avgMillis * Math.min(entry.pendingCount, WINDOW_SIZE);
             return Math.max(1L, (expectedMillis + 999L) / 1000L);
         }
     }
