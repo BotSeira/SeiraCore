@@ -110,7 +110,8 @@ public final class UserBindingStore {
              PreparedStatement tokenStatement = connection.prepareStatement(tokenSql)) {
             bindingStatement.setString(1, openId);
             tokenStatement.setString(1, openId);
-            return bindingStatement.executeUpdate() > 0 && tokenStatement.executeUpdate() > 0;
+            tokenStatement.executeUpdate();
+            return bindingStatement.executeUpdate() > 0;
         } catch (SQLException e) {
             throw new RuntimeException("Failed to delete binding", e);
         }
@@ -182,8 +183,8 @@ public final class UserBindingStore {
         String tokenStoreSql = """
                 CREATE TABLE IF NOT EXISTS token_store (
                     open_id TEXT NOT NULL,
-                    access_token INTEGER NOT NULL,
-                    refresh_token INTEGER NOT NULL,
+                    access_token TEXT NOT NULL,
+                    refresh_token TEXT NOT NULL,
                     expires_in INTEGER NOT NULL,
                     refreshed_at INTEGER NOT NULL,
                     PRIMARY KEY(open_id)
