@@ -10,6 +10,7 @@ import xyz.zcraft.data.OsuToken;
 import xyz.zcraft.data.OsuUser;
 
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 
@@ -24,7 +25,7 @@ public class BindingHelper {
         }
 
         final Javalin javalin = Javalin.create(config -> config.routes
-                .get("/", ctx -> handleCallback(ctx, bindingConfig)));
+                .get(bindingConfig.listenPath(), ctx -> handleCallback(ctx, bindingConfig)));
 
         javalin.start(bindingConfig.listenPort());
 
@@ -43,47 +44,57 @@ public class BindingHelper {
 
         if (!bindingTasks.containsKey(state)) {
             LOG.warn("Invalid binding callback with no matching state");
-            ctx.status(400).result("Missing required parameters");
+            ctx.status(400).result("Invalid or expired state");
             return;
         }
 
         final BindingTask bindingTask = bindingTasks.get(state);
 
-        final OsuToken token = OsuAuthApi.getTokenFromCode(code, bindingConfig.clientId(), bindingConfig.clientSecret());
-        final OsuUser user = OsuAuthApi.getUserFromToken(token);
+        ctx.future(() -> CompletableFuture.supplyAsync(() ->
+                        OsuAuthApi.getTokenFromCode(code, bindingConfig.clientId(), bindingConfig.clientSecret())
+                )
+                .thenApply(token -> {
+                    if (token == null) throw new RuntimeException("Failed to get token from code");
+                    return token;
+                })
+                .thenApplyAsync(token -> {
+                    var user = OsuAuthApi.getUserFromToken(token);
+                    if (user == null) throw new RuntimeException("Failed to get user from token");
 
-        if (token == null || user == null) {
-            ctx.status(400).html("""
-                    <!DOCTYPE html>
-                    <html lang="zh">
-                        <head>
-                            <meta charset="UTF-8">
-                            <title>绑定失败</title>
-                        </head>
-                        <body>
-                            <h1>绑定失败！</h1>
-                            <p>无法获取 osu! 令牌，请重试。</p>
-                        </body>
-                    """);
-
-            bindingTasks.remove(state);
-        } else {
-            ctx.html("""
-                    <!DOCTYPE html>
-                    <html lang="zh">
-                        <head>
-                            <meta charset="UTF-8">
-                            <title>绑定成功</title>
-                        </head>
-                        <body>
-                            <h1>成功绑定至玩家%s(%d)！</h1>
-                            <p>你可以关闭这个页面了。</p>
-                        </body>
-                    </html>
-                    """.formatted(user.username(), user.id()));
-
-            bindingTask.onFinish().accept(user, token);
-        }
+                    bindingTask.onFinish().accept(user, token);
+                    return user;
+                })
+                .thenAccept(user -> ctx.html("""
+                        <!DOCTYPE html>
+                        <html lang="zh">
+                            <head>
+                                <meta charset="UTF-8">
+                                <title>绑定成功</title>
+                            </head>
+                            <body>
+                                <h1>成功绑定至玩家%s(%d)！</h1>
+                                <p>你可以关闭这个页面了。</p>
+                            </body>
+                        </html>
+                        """.formatted(user.username(), user.id())))
+                .exceptionally(e -> {
+                    LOG.error("Error handling binding callback", e);
+                    ctx.status(500).html("""
+                            <!DOCTYPE html>
+                            <html lang="zh">
+                                <head>
+                                    <meta charset="UTF-8">
+                                    <title>绑定失败</title>
+                                </head>
+                                <body>
+                                    <h1>绑定失败！</h1>
+                                    <p>发生了一个错误，请重试。</p>
+                                </body>
+                            </html>
+                            """);
+                    return null;
+                })
+                .whenComplete((_, _) -> bindingTasks.remove(state)));
     }
 
     public static BindingTask createBindingTask(String openId, String messageId, BiConsumer<OsuUser, OsuToken> onFinish) {
