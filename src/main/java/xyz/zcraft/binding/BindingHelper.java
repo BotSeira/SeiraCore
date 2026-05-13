@@ -39,13 +39,13 @@ public class BindingHelper {
 
         if (state == null || code == null) {
             LOG.warn("Received invalid binding callback with missing parameters");
-            ctx.status(400).result("Missing required parameters");
+            ctx.status(400).html(HtmlTemplates.FAILURE_PAGE.replace("{{ERROR_DETAIL}}", "回调URL无效，请重试"));
             return;
         }
 
         if (!bindingTasks.containsKey(state)) {
             LOG.warn("Invalid binding callback with no matching state");
-            ctx.status(400).result("Invalid or expired state");
+            ctx.status(400).html(HtmlTemplates.FAILURE_PAGE.replace("{{ERROR_DETAIL}}", "绑定请求无效或已过期"));
             return;
         }
 
@@ -73,7 +73,7 @@ public class BindingHelper {
                 )
                 .exceptionally(e -> {
                     LOG.error("Error handling binding callback", e);
-                    ctx.status(500).html(HtmlTemplates.FAILURE_PAGE);
+                    ctx.status(500).html(HtmlTemplates.FAILURE_PAGE.replace("{{ERROR_DETAIL}}", e.getMessage()));
                     return null;
                 })
                 .whenComplete((_, _) -> bindingTasks.remove(state)));

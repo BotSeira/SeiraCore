@@ -48,6 +48,11 @@
             font-size: 13px;
             opacity: 0.6;
         }
+        .error-text {
+            margin-top: 5px;
+            font-size: 13px;
+            opacity: 0.6;
+        }
         @keyframes popIn {
             0% { transform: scale(0.9); opacity: 0; }
             100% { transform: scale(1); opacity: 1; }
@@ -58,7 +63,8 @@
 <div class="card">
     <div class="icon">💔</div>
     <h1>绑定失败</h1>
-    <p>发生了一个未知的错误，导致授权未能完成。</p>
+    <p>发生了一个错误，导致授权未能完成。</p>
+    <p class="error-text">{{ERROR_DETAIL}}</p>
     <p class="sub-text">请返回聊天输入绑定指令获取新的链接，然后重试一次吧。</p>
 </div>
 </body>
