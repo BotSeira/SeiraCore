@@ -109,6 +109,28 @@ final class ReplyFactory {
         );
     }
 
+    public PendingMessage inspectMessage(String senderUserId, boolean isAdmin, String groupId, String messageId) {
+        return PendingMessage.ofMarkdownRaw(
+                """
+                        用户ID%s:
+                        ```text
+                        %s
+                        ```
+                        
+                        群组ID:
+                        ```text
+                        %s
+                        ```
+                        
+                        消息ID:
+                        ```text
+                        %s
+                        ```
+                        """.formatted(isAdmin ? "(管理员)" : "", senderUserId, groupId, messageId),
+                null
+        );
+    }
+
     private static final class Contents {
         static String replayStatContent(RenderStat renderStat, String jobId) {
             StringBuilder sb = new StringBuilder();

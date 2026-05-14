@@ -504,6 +504,9 @@ public class Router {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/rstat [任务ID]"));
                 }
             }
+            case "inspect" -> {
+                return RouteDecision.sync(replyFactory.inspectMessage(senderUserId, isAdmin(senderUserId), groupId, messageId));
+            }
             case "help" -> {
                 return RouteDecision.sync(PendingMessage.ofString("""
                         可用指令：
@@ -527,6 +530,10 @@ public class Router {
             case "debug.upload" -> {
                 if (!config.seira().debugMode()) {
                     return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
+                }
+
+                if (!isAdmin(senderUserId)) {
+                    return RouteDecision.sync(PendingMessage.ofString("你没有权限使用此指令。"));
                 }
 
                 if (args.length != 3) {
@@ -553,11 +560,23 @@ public class Router {
                     return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
                 }
 
+                if (!isAdmin(senderUserId)) {
+                    return RouteDecision.sync(PendingMessage.ofString("你没有权限使用此指令。"));
+                }
+
                 return RouteDecision.sync(replyFactory.testMessage());
             }
             default -> {
                 return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
             }
         }
+    }
+
+    private boolean isAdmin(String openId) {
+        final List<String> adminIds = config.seira().adminIds();
+        if (adminIds == null || adminIds.isEmpty()) {
+            return false;
+        }
+        return adminIds.contains(openId);
     }
 }

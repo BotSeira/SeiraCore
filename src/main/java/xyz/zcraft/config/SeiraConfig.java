@@ -3,5 +3,6 @@ package xyz.zcraft.config;
 public record SeiraConfig(
         String sqlitePath,
         String directUrl,
-        boolean debugMode
+        boolean debugMode,
+        java.util.List<String> adminIds
 ) {}

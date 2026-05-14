@@ -3,6 +3,7 @@ seira:
   sqlitePath: "./data/seira.db" # SQLite数据库路径，若不存在会自动创建
   directUrl: "https://example.com/direct" # 用于消息卡片中跳转游戏的按钮
   debugMode: false # 启用调试功能与日志输出
+  adminIds: [] # 管理员用户ID列表，逗号分隔
 
 # === 用户绑定配置 ===
 binding:

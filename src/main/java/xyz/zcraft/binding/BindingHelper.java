@@ -69,7 +69,7 @@ public class BindingHelper {
 
                     return user;
                 })
-                .thenAccept(user -> ctx.html(HtmlTemplates.getSuccessPage(user.username(), String.valueOf(user.id())))
+                .thenAccept(user -> ctx.status(200).html(HtmlTemplates.getSuccessPage(user.username(), String.valueOf(user.id())))
                 )
                 .exceptionally(e -> {
                     LOG.error("Error handling binding callback", e);
