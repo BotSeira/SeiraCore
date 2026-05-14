@@ -40,7 +40,7 @@ public class Router {
     public Router(MessageSender messageSender, AppConfig config) {
         this.messageSender = messageSender;
         this.config = config;
-        this.argumentResolver = new Resolver(RSC_USAGE);
+        this.argumentResolver = new Resolver();
         this.replyFactory = new ReplyFactory(config);
         this.taskCoordinator = new TaskCoordinator(messageSender);
     }

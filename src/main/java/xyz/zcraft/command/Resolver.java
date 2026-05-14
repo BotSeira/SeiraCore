@@ -23,12 +23,6 @@ final class Resolver {
     private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
     private static final Pattern SEARCH_PATTERN = Pattern.compile("^(?:#(\\d+) )?(.+)$");
 
-    private final String rscUsage;
-
-    Resolver(String rscUsage) {
-        this.rscUsage = rscUsage;
-    }
-
     public SearchQuery resolveSearchQuery(String arg) {
         final Optional<MatchResult> first = SEARCH_PATTERN.matcher(arg.trim()).results().findFirst();
         if (first.isPresent()) {
@@ -98,18 +92,18 @@ final class Resolver {
         if (extraUidArg != null) {
             String trimmed = extraUidArg.trim();
             if (!trimmed.startsWith("+")) {
-                return new UidListResolution(null, "追加用户ID列表必须以 + 开头。" + rscUsage);
+                return new UidListResolution(null, "追加用户ID列表必须以 + 开头。");
             }
             String body = trimmed.substring(1).trim();
             if (body.isEmpty()) {
-                return new UidListResolution(null, "追加用户ID列表不能为空。" + rscUsage);
+                return new UidListResolution(null, "追加用户ID列表不能为空。");
             }
 
             String[] extraTokens = body.split(",");
             for (String token : extraTokens) {
                 Integer uid = parsePositiveInt(token.trim());
                 if (uid == null) {
-                    return new UidListResolution(null, "追加用户ID列表包含非法值。" + rscUsage);
+                    return new UidListResolution(null, "追加用户ID列表包含非法值。");
                 }
                 merged.add(String.valueOf(uid));
             }
