@@ -104,6 +104,9 @@ public class Router {
                 }
 
                 if (config.binding().requireLogin()) {
+                    if (args.length != 0) {
+                        return RouteDecision.sync(PendingMessage.ofString("用法：/bind"));
+                    }
                     final var bindingTask = BindingHelper.createBindingTask(senderUserId, messageId, (user, token) -> {
                         UserBindingStore.bind(senderUserId, user.id());
                         UserBindingStore.storeToken(senderUserId, token);
@@ -133,6 +136,16 @@ public class Router {
                 return RouteDecision.sync(PendingMessage.ofString(removed
                         ? "解绑成功。"
                         : "你当前还没有绑定玩家ID，无需解绑。"));
+            }
+            case "clearhistory" -> {
+                if (senderUserId == null || senderUserId.isBlank()) {
+                    return RouteDecision.sync(PendingMessage.ofString("无法识别你的用户ID，清除历史。请稍后重试。"));
+                }
+                if (args.length != 0) {
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/clearhistory"));
+                }
+                int removed = UserBindingStore.clearGroupMember(senderUserId);
+                return RouteDecision.sync(PendingMessage.ofString("清除了 " + removed + " 条群聊记录。"));
             }
             case "bo", "top" -> {
                 if (args.length == 2) {
@@ -496,6 +509,7 @@ public class Router {
                         可用指令：
                         /bind <玩家ID> - 绑定你的玩家ID
                         /unbind - 解除你的玩家ID绑定
+                        /clearhistory - 清除你在群聊中的记录
                         /bo <个数> [玩家ID] - 获取BoN图谱
                         /rs <个数> [玩家ID] - 获取最近成绩图谱
                         /m <铺面ID> - 获取铺面图谱
@@ -504,8 +518,7 @@ public class Router {
                         /rsc <铺面ID或快捷查询> [+用户ID列表] - 生成同屏回放视频
                         /rstat [任务ID] - 查询渲染进度
                         /sms [#页数] <关键字> - 搜索铺面集
-                        /c <铺面ID> [玩家ID列表] - 获取指定铺面排行榜
-                        /lb [铺面ID] - /c 的别名（省略参数时走绑定用户）
+                        /lb <铺面ID> [玩家ID列表] - 获取指定铺面排行榜
                         /daily - 获取每日挑战
                         /mp - 获取多人房间列表
                         /status - 获取服务器状态

@@ -153,6 +153,18 @@ public final class UserBindingStore {
         }
     }
 
+    public static int clearGroupMember(String openId) {
+        ensureInitialized();
+        String sql = "DELETE FROM group_members WHERE open_id = ?";
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, openId);
+            return statement.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to clear group member", e);
+        }
+    }
+
     public static List<Integer> findBoundUidsByGroup(String groupId) {
         ensureInitialized();
         String sql = """
