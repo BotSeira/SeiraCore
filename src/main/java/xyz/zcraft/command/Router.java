@@ -20,16 +20,9 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Router {
-    public static final String BO_USAGE = "用法：/bo <个数> [玩家ID/@用户]";
-    public static final String NO_BIND_TIP = "你还没有绑定玩家ID，请先使用 /bind <玩家ID>";
-    public static final String RS_USAGE = "用法：/rs <个数> [玩家ID/@用户]";
-    public static final String M_USAGE = "用法：/m <铺面ID 或 快捷查询> [Mod]";
-    public static final String S_USAGE = "用法：/s <成绩ID 或 快捷查询>";
     private static final Logger LOG = LogManager.getLogger(Router.class);
-    private static final String PREFIX = "/";
-    private static final String R_USAGE = "用法：/r <成绩ID 或 快捷查询>";
-    private static final String RSC_USAGE = "用法：/rsc <铺面ID或快捷查询> [+用户ID列表，逗号分隔]";
 
+    private static final String PREFIX = "/";
     private final MessageSender messageSender;
     private final VideoRenderRecord videoRenderRecord = new VideoRenderRecord();
     private final AppConfig config;
@@ -151,14 +144,14 @@ public class Router {
                 if (args.length == 2) {
                     Integer n = argumentResolver.parsePositiveInt(args[0]);
                     if (n == null) {
-                        return RouteDecision.sync(PendingMessage.ofString(BO_USAGE));
+                        return RouteDecision.sync(PendingMessage.ofString(Usages.BO_USAGE));
                     }
                     UidResolution uidResolution = argumentResolver.resolveUidArgument(args[1]);
                     if (uidResolution.errorMessage() != null) {
                         return RouteDecision.sync(PendingMessage.ofString(uidResolution.errorMessage()));
                     }
                     if (uidResolution.uid() == null) {
-                        return RouteDecision.sync(PendingMessage.ofString(BO_USAGE));
+                        return RouteDecision.sync(PendingMessage.ofString(Usages.BO_USAGE));
                     }
                     var uid = uidResolution.uid();
 
@@ -170,11 +163,11 @@ public class Router {
                 } else if (args.length == 1) {
                     Integer n = argumentResolver.parsePositiveInt(args[0]);
                     if (n == null) {
-                        return RouteDecision.sync(PendingMessage.ofString(BO_USAGE));
+                        return RouteDecision.sync(PendingMessage.ofString(Usages.BO_USAGE));
                     }
                     Integer uid = argumentResolver.resolveBoundUid(senderUserId);
                     if (uid == null) {
-                        return RouteDecision.sync(PendingMessage.ofString(NO_BIND_TIP));
+                        return RouteDecision.sync(PendingMessage.ofString(Usages.NO_BIND_TIP));
                     }
 
                     return taskCoordinator.queueImageRequest(
@@ -194,7 +187,7 @@ public class Router {
                             replyFactory::boMessage
                     );
                 } else {
-                    return RouteDecision.sync(PendingMessage.ofString(BO_USAGE));
+                    return RouteDecision.sync(PendingMessage.ofString(Usages.BO_USAGE));
                 }
             }
             case "daily" -> {
@@ -207,14 +200,14 @@ public class Router {
                 if (args.length == 2) {
                     Integer n = argumentResolver.parsePositiveInt(args[0]);
                     if (n == null) {
-                        return RouteDecision.sync(PendingMessage.ofString(RS_USAGE));
+                        return RouteDecision.sync(PendingMessage.ofString(Usages.RS_USAGE));
                     }
                     UidResolution uidResolution = argumentResolver.resolveUidArgument(args[1]);
                     if (uidResolution.errorMessage() != null) {
                         return RouteDecision.sync(PendingMessage.ofString(uidResolution.errorMessage()));
                     }
                     if (uidResolution.uid() == null) {
-                        return RouteDecision.sync(PendingMessage.ofString(RS_USAGE));
+                        return RouteDecision.sync(PendingMessage.ofString(Usages.RS_USAGE));
                     }
 
                     return taskCoordinator.queueImageRequest(
@@ -225,11 +218,11 @@ public class Router {
                 } else if (args.length == 1) {
                     Integer n = argumentResolver.parsePositiveInt(args[0]);
                     if (n == null) {
-                        return RouteDecision.sync(PendingMessage.ofString(RS_USAGE));
+                        return RouteDecision.sync(PendingMessage.ofString(Usages.RS_USAGE));
                     }
                     Integer uid = argumentResolver.resolveBoundUid(senderUserId);
                     if (uid == null) {
-                        return RouteDecision.sync(PendingMessage.ofString(NO_BIND_TIP));
+                        return RouteDecision.sync(PendingMessage.ofString(Usages.NO_BIND_TIP));
                     }
 
                     return taskCoordinator.queueImageRequest(
@@ -249,7 +242,7 @@ public class Router {
                             replyFactory::scoreMessage
                     );
                 } else {
-                    return RouteDecision.sync(PendingMessage.ofString(RS_USAGE));
+                    return RouteDecision.sync(PendingMessage.ofString(Usages.RS_USAGE));
                 }
             }
             case "m" -> {
@@ -261,7 +254,7 @@ public class Router {
                     }
 
                     if (args.length > targetResolution.consumedArgs() + 1) {
-                        return RouteDecision.sync(PendingMessage.ofString(M_USAGE));
+                        return RouteDecision.sync(PendingMessage.ofString(Usages.M_USAGE));
                     }
 
                     String mod = args.length == targetResolution.consumedArgs() + 1
@@ -274,17 +267,17 @@ public class Router {
                             replyFactory::beatmapMessage
                     );
                 } else {
-                    return RouteDecision.sync(PendingMessage.ofString(M_USAGE));
+                    return RouteDecision.sync(PendingMessage.ofString(Usages.M_USAGE));
                 }
             }
             case "s" -> {
                 if (args.length < 1 || args.length > 2) {
-                    return RouteDecision.sync(PendingMessage.ofString(S_USAGE));
+                    return RouteDecision.sync(PendingMessage.ofString(Usages.S_USAGE));
                 }
 
                 TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(args, senderUserId);
                 if (args.length != targetResolution.consumedArgs()) {
-                    return RouteDecision.sync(PendingMessage.ofString(S_USAGE));
+                    return RouteDecision.sync(PendingMessage.ofString(Usages.S_USAGE));
                 }
                 ShortcutTarget target = targetResolution.target();
                 if (target.isError()) {
@@ -299,12 +292,12 @@ public class Router {
             }
             case "r" -> {
                 if (args.length < 1 || args.length > 2) {
-                    return RouteDecision.sync(PendingMessage.ofString(R_USAGE));
+                    return RouteDecision.sync(PendingMessage.ofString(Usages.R_USAGE));
                 }
 
                 TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(args, senderUserId);
                 if (args.length != targetResolution.consumedArgs()) {
-                    return RouteDecision.sync(PendingMessage.ofString(R_USAGE));
+                    return RouteDecision.sync(PendingMessage.ofString(Usages.R_USAGE));
                 }
                 ShortcutTarget target = targetResolution.target();
                 if (target.isError()) {
@@ -322,7 +315,7 @@ public class Router {
             }
             case "rsc" -> {
                 if (args.length < 1 || args.length > 3) {
-                    return RouteDecision.sync(PendingMessage.ofString(RSC_USAGE));
+                    return RouteDecision.sync(PendingMessage.ofString(Usages.RSC_USAGE));
                 }
 
                 if (groupId == null || groupId.isBlank()) {
@@ -331,7 +324,7 @@ public class Router {
 
                 TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(args, senderUserId);
                 if (args.length - targetResolution.consumedArgs() > 1) {
-                    return RouteDecision.sync(PendingMessage.ofString(RSC_USAGE));
+                    return RouteDecision.sync(PendingMessage.ofString(Usages.RSC_USAGE));
                 }
 
                 ShortcutTarget target = targetResolution.target();
@@ -360,7 +353,7 @@ public class Router {
                 }
 
                 if (target.explicitId() == null) {
-                    return RouteDecision.sync(PendingMessage.ofString(RSC_USAGE));
+                    return RouteDecision.sync(PendingMessage.ofString(Usages.RSC_USAGE));
                 }
 
                 return taskCoordinator.queueReplayTask(
@@ -421,7 +414,7 @@ public class Router {
                     }
                     Integer uid = argumentResolver.resolveBoundUid(senderUserId);
                     if (uid == null) {
-                        return RouteDecision.sync(PendingMessage.ofString(NO_BIND_TIP));
+                        return RouteDecision.sync(PendingMessage.ofString(Usages.NO_BIND_TIP));
                     }
 
                     return taskCoordinator.queueImageRequest(
@@ -452,7 +445,7 @@ public class Router {
                         }
                         Integer uid = argumentResolver.resolveBoundUid(senderUserId);
                         if (uid == null) {
-                            return RouteDecision.sync(PendingMessage.ofString(NO_BIND_TIP));
+                            return RouteDecision.sync(PendingMessage.ofString(Usages.NO_BIND_TIP));
                         }
 
                         return taskCoordinator.queueImageRequest(
@@ -578,5 +571,15 @@ public class Router {
             return false;
         }
         return adminIds.contains(openId);
+    }
+
+    private static final class Usages {
+        public static final String BO_USAGE = "用法：/bo <个数> [玩家ID/@用户]";
+        public static final String NO_BIND_TIP = "你还没有绑定玩家ID，请先使用 /bind <玩家ID>";
+        public static final String RS_USAGE = "用法：/rs <个数> [玩家ID/@用户]";
+        public static final String M_USAGE = "用法：/m <铺面ID 或 快捷查询> [Mod]";
+        public static final String S_USAGE = "用法：/s <成绩ID 或 快捷查询>";
+        private static final String R_USAGE = "用法：/r <成绩ID 或 快捷查询>";
+        private static final String RSC_USAGE = "用法：/rsc <铺面ID或快捷查询> [+用户ID列表，逗号分隔]";
     }
 }

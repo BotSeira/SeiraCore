@@ -1,10 +1,10 @@
 package xyz.zcraft.command;
 
 import xyz.zcraft.binding.UserBindingStore;
+import xyz.zcraft.command.resolution.ShortcutTarget;
 import xyz.zcraft.command.resolution.TargetResolution;
 import xyz.zcraft.command.resolution.UidListResolution;
 import xyz.zcraft.command.resolution.UidResolution;
-import xyz.zcraft.command.resolution.ShortcutTarget;
 import xyz.zcraft.data.SearchQuery;
 
 import java.util.LinkedHashSet;
@@ -16,15 +16,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 final class Resolver {
-    private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo)(\\d+)$");
-    private static final Pattern SET_MACRO_PATTERN = Pattern.compile("^(\\d+)#(\\d+)$");
-    private static final Pattern BEATMAP_MACRO_PATTERN = Pattern.compile("^m(\\d+)$");
-    private static final Pattern CQ_AT_PATTERN = Pattern.compile("^\\[CQ:at,qq=(\\d+)(?:,.*)?]$");
-    private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
-    private static final Pattern SEARCH_PATTERN = Pattern.compile("^(?:#(\\d+) )?(.+)$");
-
     public SearchQuery resolveSearchQuery(String arg) {
-        final Optional<MatchResult> first = SEARCH_PATTERN.matcher(arg.trim()).results().findFirst();
+        final Optional<MatchResult> first = Patterns.SEARCH_PATTERN.matcher(arg.trim()).results().findFirst();
         if (first.isPresent()) {
             final MatchResult m = first.get();
             String pagePart = m.group(1);
@@ -129,7 +122,7 @@ final class Resolver {
     }
 
     public ShortcutTarget parseTarget(String arg, String senderUserId, boolean mentionedUser) {
-        Matcher setMatcher = SET_MACRO_PATTERN.matcher(arg.trim());
+        Matcher setMatcher = Patterns.SET_MACRO_PATTERN.matcher(arg.trim());
         if (setMatcher.matches()) {
             Long setId = parsePositiveLong(setMatcher.group(1));
             Long index = parsePositiveLong(setMatcher.group(2));
@@ -142,7 +135,7 @@ final class Resolver {
             return new ShortcutTarget(setId, uid, "ms", index, null);
         }
 
-        Matcher userMatcher = USER_MACRO_PATTERN.matcher(arg.trim());
+        Matcher userMatcher = Patterns.USER_MACRO_PATTERN.matcher(arg.trim());
         if (userMatcher.matches()) {
             String type = userMatcher.group(1).toLowerCase();
             Long index = parsePositiveLong(userMatcher.group(2));
@@ -162,7 +155,7 @@ final class Resolver {
             return new ShortcutTarget(null, uid, type, index, null);
         }
 
-        Matcher beatmapMatcher = BEATMAP_MACRO_PATTERN.matcher(arg.trim());
+        Matcher beatmapMatcher = Patterns.BEATMAP_MACRO_PATTERN.matcher(arg.trim());
         if (beatmapMatcher.matches()) {
             Long mapId = parsePositiveLong(beatmapMatcher.group(1));
             Integer uid = resolveBoundUid(senderUserId);
@@ -178,7 +171,7 @@ final class Resolver {
     }
 
     private boolean isUserMacro(String arg) {
-        return USER_MACRO_PATTERN.matcher(arg.trim()).matches();
+        return Patterns.USER_MACRO_PATTERN.matcher(arg.trim()).matches();
     }
 
     private boolean looksLikeMention(String token) {
@@ -192,12 +185,12 @@ final class Resolver {
         }
 
         String trimmed = token.trim();
-        Matcher cqMatcher = CQ_AT_PATTERN.matcher(trimmed);
+        Matcher cqMatcher = Patterns.CQ_AT_PATTERN.matcher(trimmed);
         if (cqMatcher.matches()) {
             return cqMatcher.group(1);
         }
 
-        Matcher plainMatcher = PLAIN_AT_PATTERN.matcher(trimmed);
+        Matcher plainMatcher = Patterns.PLAIN_AT_PATTERN.matcher(trimmed);
         if (plainMatcher.matches()) {
             return plainMatcher.group(1);
         }
@@ -212,6 +205,15 @@ final class Resolver {
         } catch (NumberFormatException ignored) {
             return null;
         }
+    }
+
+    private static final class Patterns {
+        private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo)(\\d+)$");
+        private static final Pattern SET_MACRO_PATTERN = Pattern.compile("^(\\d+)#(\\d+)$");
+        private static final Pattern BEATMAP_MACRO_PATTERN = Pattern.compile("^m(\\d+)$");
+        private static final Pattern CQ_AT_PATTERN = Pattern.compile("^\\[CQ:at,qq=(\\d+)(?:,.*)?]$");
+        private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
+        private static final Pattern SEARCH_PATTERN = Pattern.compile("^(?:#(\\d+) )?(.+)$");
     }
 }
 
