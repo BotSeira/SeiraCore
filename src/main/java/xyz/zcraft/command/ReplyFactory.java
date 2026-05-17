@@ -18,23 +18,35 @@ final class ReplyFactory {
         this.config = config;
     }
 
+    private static String cmd(String command, String text) {
+        return "<qqbot-cmd-input text=\"%s\" show=\"%s\" reference=\"false\" />".formatted(command, text);
+    }
+
+    private static String at(String id) {
+        return "<qqbot-at-user id=\"%s\" /> ".formatted(id);
+    }
+
     public PendingMessage boMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> b" + response.getScoreIds().size() + "查询完成\n玩家: " + response.getUserId(),
+                "> b" + response.getScoreIds().size() + "查询完成\n" +
+                        "玩家: " + response.getUserId(),
                 Buttons.boButtons()
         );
     }
 
     public PendingMessage rsMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 最近成绩查询完成\n玩家: " + response.getUserId() + "\n数量: " + response.getScoreIds().size(),
+                "> 最近成绩查询完成\n" +
+                        "玩家: " + response.getUserId() + "\n数量: " + response.getScoreIds().size(),
                 Buttons.rsButtons()
         );
     }
 
     public PendingMessage beatmapMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 铺面查询完成\n铺面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()),
+                "> 铺面查询完成\n" +
+                        "铺面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
+                        "铺面集: " + cmd("/ms m" + response.getBeatmapId(), response.getBeatmapsetId()),
                 Buttons.beatmapButtons(response.getBeatmapId(), config.seira().directUrl())
         );
 
@@ -42,7 +54,9 @@ final class ReplyFactory {
 
     public PendingMessage scoreMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 成绩查询完成\n铺面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n成绩: " + cmd("/s " + response.getScoreId(), response.getScoreId()),
+                "> 成绩查询完成\n" +
+                        "铺面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
+                        "成绩: " + cmd("/s " + response.getScoreId(), response.getScoreId()),
                 Buttons.sButtons(response.getBeatmapId(), response.getScoreId())
         );
     }
@@ -86,8 +100,8 @@ final class ReplyFactory {
 
     public PendingMessage beatmapsetMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 铺面集查询完成\nID: " + cmd("/ms " + response.getBeatmapsetId(), response.getBeatmapsetId()),
-                Buttons.beatmapsetButtons(response.getBeatmapStars(), response.getBeatmapIds())
+                Contents.beatmapsetContent(response),
+                null
         );
     }
 
@@ -129,14 +143,6 @@ final class ReplyFactory {
                         """.formatted(isAdmin ? "(管理员)" : "", senderUserId, groupId, messageId),
                 null
         );
-    }
-
-    private static String cmd(String command, String text) {
-        return "<qqbot-cmd-input text=\"%s\" show=\"%s\" reference=\"false\" />".formatted(command, text);
-    }
-
-    private static String at(String id) {
-        return "<qqbot-at-user id=\"%s\" /> ".formatted(id);
     }
 
     private static final class Contents {
@@ -182,6 +188,17 @@ final class ReplyFactory {
             }
 
             return sb.toString();
+        }
+
+        static String beatmapsetContent(Response<?> response) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("> 铺面集查询完成").append("\n");
+            sb.append("> 铺面集: ").append(cmd("/ms " + response.getBeatmapsetId(), response.getBeatmapsetId())).append("\n");
+            sb.append("> ");
+            for (int i = 0; i < response.getBeatmapStars().size(); i++) {
+                sb.append(cmd("/m " + response.getBeatmapIds().get(i), response.getBeatmapStars().get(i) + "★")).append(" ");
+            }
+            return sb.toString().trim();
         }
     }
 
@@ -289,40 +306,6 @@ final class ReplyFactory {
                     ),
                     Button.row(Button.command(3, "查询自己的分数", "/s m" + beatmapId))
             );
-        }
-
-        public static List<List<Button>> beatmapsetButtons(List<String> stars, List<String> ids) {
-            if (ids == null || ids.isEmpty()) {
-                return null;
-            }
-
-            List<List<Button>> rows = new ArrayList<>();
-            List<Button> currentRow = new ArrayList<>(5);
-            int buttonIndex = 0;
-            for (int i = 0; i < ids.size(); i++) {
-                String beatmapId = ids.get(i);
-                if (beatmapId == null || beatmapId.isBlank()) {
-                    continue;
-                }
-
-                buttonIndex++;
-                currentRow.add(Button.command(buttonIndex, stars.get(i) + "★", "/m " + beatmapId));
-                if (currentRow.size() == 5) {
-                    rows.add(List.copyOf(currentRow));
-                    currentRow.clear();
-
-                    if (rows.size() >= 5) {
-                        break;
-                    }
-                }
-            }
-
-            if (!currentRow.isEmpty()) {
-                fillDummyButtons(currentRow);
-                rows.add(List.copyOf(currentRow));
-            }
-
-            return rows;
         }
 
         private static void fillDummyButtons(List<Button> buttons) {
