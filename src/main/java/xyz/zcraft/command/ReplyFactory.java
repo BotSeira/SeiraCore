@@ -42,7 +42,7 @@ final class ReplyFactory {
 
     public PendingMessage scoreMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 成绩查询完成\n铺面: " + response.getBeatmapId() + "\n成绩: " + cmd("/s " + response.getScoreId(), response.getScoreId()),
+                "> 成绩查询完成\n铺面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n成绩: " + cmd("/s " + response.getScoreId(), response.getScoreId()),
                 Buttons.sButtons(response.getBeatmapId(), response.getScoreId())
         );
     }
