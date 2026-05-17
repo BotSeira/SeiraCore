@@ -34,7 +34,7 @@ final class ReplyFactory {
 
     public PendingMessage beatmapMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 铺面查询完成\n铺面: " + response.getBeatmapId(),
+                "> 铺面查询完成\n铺面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()),
                 Buttons.beatmapButtons(response.getBeatmapId(), config.seira().directUrl())
         );
 
@@ -42,14 +42,14 @@ final class ReplyFactory {
 
     public PendingMessage scoreMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 成绩查询完成\n铺面: " + response.getBeatmapId() + "\n成绩: " + response.getScoreId(),
+                "> 成绩查询完成\n铺面: " + response.getBeatmapId() + "\n成绩: " + cmd("/s " + response.getScoreId(), response.getScoreId()),
                 Buttons.sButtons(response.getBeatmapId(), response.getScoreId())
         );
     }
 
     public PendingMessage lbMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 排行榜查询完成" + (response.getBeatmapId() == null ? "" : "\n铺面: " + response.getBeatmapId()),
+                "> 排行榜查询完成" + (response.getBeatmapId() == null ? "" : "\n铺面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId())),
                 Buttons.lbButtons(response.getBeatmapId())
         );
     }
@@ -86,7 +86,7 @@ final class ReplyFactory {
 
     public PendingMessage beatmapsetMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 铺面集查询完成\nID: " + response.getBeatmapsetId(),
+                "> 铺面集查询完成\nID: " + cmd("/ms " + response.getBeatmapsetId(), response.getBeatmapsetId()),
                 Buttons.beatmapsetButtons(response.getBeatmapStars(), response.getBeatmapIds())
         );
     }
@@ -95,7 +95,7 @@ final class ReplyFactory {
         final String url = "https://osu.ppy.sh/oauth/authorize?client_id=%d&response_type=code&scope=public+identify+friends.read&state=%s"
                 .formatted(config.clientId(), task.taskId());
         return PendingMessage.ofMarkdownRaw(
-                (isC2C ? "" : "<qqbot-at-user id=\"%s\" /> ".formatted(task.openId())) + "点击下方按钮绑定账号,或者在浏览器打开以下链接: \n```\n%s\n```".formatted(url),
+                (isC2C ? "" : at(task.openId())) + "点击下方按钮绑定账号,或者在浏览器打开以下链接: \n```\n%s\n```".formatted(url),
                 Buttons.bindButtons(task.openId(), url, !isC2C)
         );
     }
@@ -129,6 +129,14 @@ final class ReplyFactory {
                         """.formatted(isAdmin ? "(管理员)" : "", senderUserId, groupId, messageId),
                 null
         );
+    }
+
+    private static String cmd(String command, String text) {
+        return "<qqbot-cmd-input text=\"%s\" show=\"%s\" reference=\"false\" />".formatted(command, text);
+    }
+
+    private static String at(String id) {
+        return "<qqbot-at-user id=\"%s\" /> ".formatted(id);
     }
 
     private static final class Contents {
@@ -168,7 +176,7 @@ final class ReplyFactory {
                 SearchResultItem item = items.get(i);
                 sb.append("> ");
                 sb.append(i + 1).append("# ")
-                        .append("<qqbot-cmd-input text=\"%s\" show=\"%d\" reference=\"false\" />".formatted("/ms " + item.beatmapsetId(), item.beatmapsetId()))
+                        .append(cmd("/ms " + item.beatmapsetId(), String.valueOf(item.beatmapsetId())))
                         .append(" - ").append(item.artist()).append(" - ").append(item.title())
                         .append(" <").append(item.mapperName()).append("> ").append(String.format("[%.2f★ ~ %.2f★]", item.minStar(), item.maxStar())).append("\n");
             }

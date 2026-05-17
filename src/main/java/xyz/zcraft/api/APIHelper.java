@@ -38,7 +38,7 @@ public class APIHelper {
     public static Response<Void> getBoNResponse(int n, int uid) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/bo?" + "n=" + n + "&u=" + uid))
+                    .uri(URI.create(ENDPOINT + "/bestof?" + "n=" + n + "&u=" + uid))
                     .GET()
                     .build();
             final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
@@ -62,7 +62,7 @@ public class APIHelper {
         try {
             String query;
             if (target.isMacro()) {
-                query = "/pk?of=" + target.macroType() + "&i=" + target.macroIndex() + "&us=" + target.boundUid() + "&u=" + uidsParam;
+                query = "/mapleadboard?of=" + target.macroType() + "&i=" + target.macroIndex() + "&us=" + target.boundUid() + "&u=" + uidsParam;
             } else {
                 query = "/pk?m=" + target.explicitId() + "&u=" + uidsParam;
             }
@@ -92,7 +92,7 @@ public class APIHelper {
         String uidsParam = String.join(",", uids);
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/lb?" + "u=" + uidsParam))
+                    .uri(URI.create(ENDPOINT + "/leaderboard?" + "u=" + uidsParam))
                     .GET()
                     .build();
             final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
@@ -182,7 +182,7 @@ public class APIHelper {
     public static Response<Void> getRecentResponse(int n, int uid) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/rs?" + "n=" + n + "&u=" + uid))
+                    .uri(URI.create(ENDPOINT + "/recent?" + "n=" + n + "&u=" + uid))
                     .GET()
                     .build();
 
@@ -228,7 +228,7 @@ public class APIHelper {
     }
 
     private static String getBeatmapQuery(ShortcutTarget target, String mod) {
-        String query = "/m?";
+        String query = "/beatmap?";
         if (target.isMacro()) {
             query += "&i=" + target.macroIndex();
             if (target.macroType().equals("rs") || target.macroType().equals("bo")) {
@@ -276,12 +276,12 @@ public class APIHelper {
         String query = null;
         if (target.isMacro()) {
             if ("m".equals(target.macroType())) {
-                query = "/ms?m=" + target.explicitId();
+                query = "/beatmapset?m=" + target.explicitId();
             } else if ("bo".equals(target.macroType()) || "rs".equals(target.macroType())) {
-                query = "/ms?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+                query = "/beatmapset?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
             }
         } else {
-            query = "/ms?ms=" + target.explicitId();
+            query = "/beatmapset?ms=" + target.explicitId();
         }
 
         if (query == null) {
@@ -320,14 +320,14 @@ public class APIHelper {
         if (target.isMacro()) {
             query = switch (target.macroType()) {
                 case "bo", "rs" ->
-                        "/s?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
-                case "m" -> "/s?m=" + target.explicitId() + "&u=" + target.boundUid();
+                        "/score?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+                case "m" -> "/score?m=" + target.explicitId() + "&u=" + target.boundUid();
                 case "ms" ->
-                        "/s?ms=" + target.explicitId() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+                        "/score?ms=" + target.explicitId() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
                 case null, default -> throw new IllegalArgumentException("Invalid macro type");
             };
         } else {
-            query = "/s?s=" + target.explicitId();
+            query = "/score?s=" + target.explicitId();
         }
         return query;
     }
@@ -335,7 +335,7 @@ public class APIHelper {
     public static Response<List<SearchResultItem>> searchBeatmapSetResponse(SearchQuery query) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/sms?" + "q=" + URLEncoder.encode(query.query(), StandardCharsets.UTF_8)))
+                    .uri(URI.create(ENDPOINT + "/searchms?" + "q=" + URLEncoder.encode(query.query(), StandardCharsets.UTF_8)))
                     .GET()
                     .build();
 
