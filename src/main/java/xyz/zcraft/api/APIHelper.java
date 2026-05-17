@@ -62,9 +62,9 @@ public class APIHelper {
         try {
             String query;
             if (target.isMacro()) {
-                query = "/mapleadboard?of=" + target.macroType() + "&i=" + target.macroIndex() + "&us=" + target.boundUid() + "&u=" + uidsParam;
+                query = "/maplb?of=" + target.macroType() + "&i=" + target.macroIndex() + "&us=" + target.boundUid() + "&u=" + uidsParam;
             } else {
-                query = "/mapleadboard?m=" + target.explicitId() + "&u=" + uidsParam;
+                query = "/maplb?m=" + target.explicitId() + "&u=" + uidsParam;
             }
 
             HttpRequest localRequest = HttpRequest.newBuilder()
