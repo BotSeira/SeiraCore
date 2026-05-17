@@ -64,7 +64,7 @@ public class APIHelper {
             if (target.isMacro()) {
                 query = "/mapleadboard?of=" + target.macroType() + "&i=" + target.macroIndex() + "&us=" + target.boundUid() + "&u=" + uidsParam;
             } else {
-                query = "/pk?m=" + target.explicitId() + "&u=" + uidsParam;
+                query = "/mapleadboard?m=" + target.explicitId() + "&u=" + uidsParam;
             }
 
             HttpRequest localRequest = HttpRequest.newBuilder()
@@ -237,7 +237,7 @@ public class APIHelper {
                 query += "&ms=" + target.explicitId();
             }
         } else {
-            query = "/m?m=" + target.explicitId();
+            query = "/beatmap?m=" + target.explicitId();
         }
 
         if (mod != null) {
