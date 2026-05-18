@@ -187,13 +187,13 @@ public final class UserDataStore {
                 PreparedStatement statement = connection.prepareStatement(sql);
                 statement.setInt(1, selfId);
                 statement.setInt(2, i);
-                return statement.executeUpdate() > 0;
+                statement.executeUpdate();
             }
+
+            return true;
         } catch (SQLException e) {
             throw new RuntimeException("Failed to store token", e);
         }
-
-        return false;
     }
 
     public static boolean unbind(String openId) {
