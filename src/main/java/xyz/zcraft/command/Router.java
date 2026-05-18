@@ -138,7 +138,7 @@ public class Router {
             }
             case "clearhistory" -> {
                 if (senderUserId == null || senderUserId.isBlank()) {
-                    return RouteDecision.sync(PendingMessage.ofString("无法识别你的用户ID，清除历史。请稍后重试。"));
+                    return RouteDecision.sync(PendingMessage.ofString("无法识别你的用户ID，无法清除历史记录。请稍后重试。"));
                 }
                 if (args.length != 0) {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/clearhistory"));
