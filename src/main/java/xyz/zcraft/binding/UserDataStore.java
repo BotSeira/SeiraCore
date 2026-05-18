@@ -175,7 +175,7 @@ public final class UserDataStore {
         }
     }
 
-    public static boolean storeFollowed(int selfId, List<Integer> followed) {
+    public static boolean storeFollowed(int selfId, int followed) {
         ensureInitialized();
         String sql = """
                 INSERT INTO user_follows(self, followed)
@@ -183,14 +183,10 @@ public final class UserDataStore {
                 ON CONFLICT(self, followed) DO NOTHING
                 """;
         try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
-            for (Integer i : followed) {
-                PreparedStatement statement = connection.prepareStatement(sql);
-                statement.setInt(1, selfId);
-                statement.setInt(2, i);
-                statement.executeUpdate();
-            }
-
-            return true;
+            PreparedStatement statement = connection.prepareStatement(sql);
+            statement.setInt(1, selfId);
+            statement.setInt(2, followed);
+            return statement.executeUpdate() > 0;
         } catch (SQLException e) {
             throw new RuntimeException("Failed to store token", e);
         }

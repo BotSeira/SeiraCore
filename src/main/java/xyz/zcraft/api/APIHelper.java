@@ -1,17 +1,10 @@
 package xyz.zcraft.api;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import kotlin.Pair;
+import com.google.gson.*;
 import xyz.zcraft.Seira;
 import xyz.zcraft.command.ResolutionException;
 import xyz.zcraft.command.resolution.ShortcutTarget;
-import xyz.zcraft.data.Base64Bytes;
-import xyz.zcraft.data.RenderStat;
-import xyz.zcraft.data.SearchQuery;
-import xyz.zcraft.data.SearchResultItem;
+import xyz.zcraft.data.*;
 
 import java.io.IOException;
 import java.net.URI;
@@ -35,7 +28,7 @@ public class APIHelper {
         ENDPOINT = Seira.getConfig().ostella().endpoint();
     }
 
-    public static Response<List<Pair<Integer, String>>> getFollowed(String accessToken) {
+    public static Response<List<FriendEntry>> getFollowed(String accessToken) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/friends"))
@@ -53,13 +46,13 @@ public class APIHelper {
             ensureApiSuccess(r, "获取多人房间失败");
             final JsonArray data = r.getData().getAsJsonArray();
 
-            LinkedList<Pair<Integer, String>> followed = new  LinkedList<>();
+            LinkedList<FriendEntry> followed = new LinkedList<>();
 
             for (JsonElement datum : data) {
-                followed.add(new Pair<>(datum.getAsJsonObject().get("id").getAsInt(), datum.getAsJsonObject().get("username").getAsString()));
+                followed.add(GSON.fromJson(datum, FriendEntry.class));
             }
 
-            return Response.<List<Pair<Integer, String>>>fromHeaders(send.headers())
+            return Response.<List<FriendEntry>>fromHeaders(send.headers())
                     .content(followed)
                     .build();
         } catch (IOException | InterruptedException e) {

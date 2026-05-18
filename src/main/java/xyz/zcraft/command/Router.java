@@ -17,7 +17,9 @@ import xyz.zcraft.data.*;
 import xyz.zcraft.util.OsuAuthHelper;
 import xyz.zcraft.util.ThreadHelper;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Router {
@@ -302,15 +304,20 @@ public class Router {
                 }
 
                 return taskCoordinator.queueApiRequest("f", () -> {
-                    final Response<List<Pair<Integer, String>>> response = APIHelper.getFollowed(token.accessToken());
-                    final List<Pair<Integer, String>> content = response.getContent();
+                    final Response<List<FriendEntry>> response = APIHelper.getFollowed(token.accessToken());
+                    final List<FriendEntry> content = response.getContent();
 
-                    final List<Integer> followed = content.stream().map(Pair::getFirst).toList();
+                    final List<Integer> followed = content.stream().map(FriendEntry::id).toList();
 
-                    UserDataStore.storeFollowed(uid, followed);
+                    for (FriendEntry friendEntry : content) {
+                        UserDataStore.storeFollowed(uid, friendEntry.id());
+                        if (friendEntry.mutual()) {
+                            UserDataStore.storeFollowed(friendEntry.id(), uid);
+                        }
+                    }
 
-                    for (Pair<Integer, String> info : content) {
-                        UserDataStore.storeUserInfo(info.getFirst(), info.getSecond());
+                    for (FriendEntry info : content) {
+                        UserDataStore.storeUserInfo(info.id(), info.username());
                     }
 
                     final List<Integer> follower = UserDataStore.findFollower(uid);
@@ -320,7 +327,7 @@ public class Router {
                     final List<Pair<Integer, String>> onlyFollower = new LinkedList<>();
 
                     for (Integer i : followed) {
-                        if(follower.contains(i)) {
+                        if (follower.contains(i)) {
                             mutual.add(new Pair<>(i, UserDataStore.findUsername(i)));
                         } else {
                             onlyFollowed.add(new Pair<>(i, UserDataStore.findUsername(i)));
@@ -328,7 +335,7 @@ public class Router {
                     }
 
                     for (Integer i : follower) {
-                        if(!followed.contains(i)) {
+                        if (!followed.contains(i)) {
                             onlyFollower.add(new Pair<>(i, UserDataStore.findUsername(i)));
                         }
                     }
