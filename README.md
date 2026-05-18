@@ -85,7 +85,7 @@ mvn -U clean compile exec:java
 | `/rs`           | `/rs [n] [uid/@user]`                   | 最近n个成绩图，无参时获取最近一个成绩详情 |
 | `/m`            | `/m <id/rsN/boN> [Mod]`                 | 获取指定铺面信息              |
 | `/s`            | `/s <id/rsN/boN>`                       | 获取指定成绩图               |
-| `/r`            | `/r <id/rsN/boNp>`                      | 生成并发送指定成绩回放视频         |
+| `/r`            | `/r <id/rsN/boN>`                       | 生成并发送指定成绩回放视频         |
 | `/rsc`          | `/rsc <id/rsN/boN> [+<uid1>,<uid2>...]` | 生成并发送指定成员的成绩同屏回放视频    |
 | `/rstat`        | `/rstat [id]`                           | 获取视频生成进度              |
 | `/ms`           | `/ms <id/rsN/boN>`                      | 获取指定铺面集信息             |
