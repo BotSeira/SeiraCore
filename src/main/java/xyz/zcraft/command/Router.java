@@ -16,6 +16,7 @@ import xyz.zcraft.config.AppConfig;
 import xyz.zcraft.data.*;
 import xyz.zcraft.util.OsuAuthHelper;
 import xyz.zcraft.util.ThreadHelper;
+import xyz.zcraft.util.TimeDurationParser;
 
 import java.util.Arrays;
 import java.util.LinkedList;
@@ -395,23 +396,35 @@ public class Router {
                 );
             }
             case "r" -> {
-                if (args.length < 1 || args.length > 2) {
+                if (args.length < 1 || args.length > 3) {
                     return RouteDecision.sync(PendingMessage.ofString(Usages.R_USAGE));
                 }
 
                 TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(args, senderUserId);
-                if (args.length != targetResolution.consumedArgs()) {
+                if (args.length - targetResolution.consumedArgs() > 1) {
                     return RouteDecision.sync(PendingMessage.ofString(Usages.R_USAGE));
                 }
+
                 ShortcutTarget target = targetResolution.target();
                 if (target.isError()) {
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
 
+                TimeDurationParser.TimeRange range = null;
+
+                if (args.length == 2) {
+                    try {
+                        range = TimeDurationParser.parseRange(args[1]);
+                    } catch (IllegalArgumentException e) {
+                        return RouteDecision.sync(PendingMessage.ofString("无法解析时间范围"));
+                    }
+                }
+
+                TimeDurationParser.TimeRange finalRange = range;
                 return taskCoordinator.queueReplayTask(
                         "r",
                         () -> {
-                            APIHelper.ReplayTaskInfo replayRenderTask = APIHelper.createReplayRenderTask(target);
+                            APIHelper.ReplayTaskInfo replayRenderTask = APIHelper.createReplayRenderTask(target, finalRange);
                             videoRenderRecord.updateRenderTask(senderUserId, replayRenderTask.taskId());
                             return replayRenderTask;
                         },
@@ -427,7 +440,7 @@ public class Router {
                 }
 
                 TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(args, senderUserId);
-                if (args.length - targetResolution.consumedArgs() > 1) {
+                if (args.length - targetResolution.consumedArgs() > 2) {
                     return RouteDecision.sync(PendingMessage.ofString(Usages.RSC_USAGE));
                 }
 
@@ -436,22 +449,34 @@ public class Router {
                     return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
                 }
 
-                String extraUidArg = (args.length - targetResolution.consumedArgs() == 1)
-                        ? args[targetResolution.consumedArgs()]
-                        : null;
+                String extraUidArg = null;
+                TimeDurationParser.TimeRange range = null;
+
+                for (int i = args.length - targetResolution.consumedArgs() - 1; i < args.length; i++) {
+                    if (args[i].startsWith("+")) {
+                        extraUidArg = args[i];
+                    } else if(TimeDurationParser.isTimeRange(args[i])) {
+                        range = TimeDurationParser.parseRange(args[i]);
+                    } else {
+                        return RouteDecision.sync(PendingMessage.ofString(Usages.RSC_USAGE));
+                    }
+                }
+
                 UidListResolution uidListResolution = argumentResolver.resolveRscUidList(groupId, extraUidArg);
                 if (uidListResolution.errorMessage() != null) {
                     return RouteDecision.sync(PendingMessage.ofString(uidListResolution.errorMessage()));
                 }
                 String[] uidArray = uidListResolution.uids();
 
+                TimeDurationParser.TimeRange finalRange = range;
+
                 if (target.isMacro()) {
                     return taskCoordinator.queueReplayTask(
                             "rsc",
                             () -> {
-                                APIHelper.ReplayTaskInfo replayShowcaseTask = APIHelper.createReplayShowcaseTask(target, uidArray);
-                                videoRenderRecord.updateRenderTask(senderUserId, replayShowcaseTask.taskId());
-                                return replayShowcaseTask;
+                                var task = APIHelper.createReplayShowcaseTask(target, uidArray, finalRange);
+                                videoRenderRecord.updateRenderTask(senderUserId, task.taskId());
+                                return task;
                             },
                             replyFactory::replayMessage);
                 }
@@ -463,9 +488,9 @@ public class Router {
                 return taskCoordinator.queueReplayTask(
                         "rsc",
                         () -> {
-                            APIHelper.ReplayTaskInfo showcaseRenderTaskByBeatmap = APIHelper.createShowcaseRenderTaskByBeatmap(target.explicitId(), uidArray);
-                            videoRenderRecord.updateRenderTask(senderUserId, showcaseRenderTaskByBeatmap.taskId());
-                            return showcaseRenderTaskByBeatmap;
+                            var task = APIHelper.createShowcaseRenderTaskByBeatmap(target.explicitId(), uidArray, finalRange);
+                            videoRenderRecord.updateRenderTask(senderUserId, task.taskId());
+                            return task;
                         },
                         replyFactory::replayMessage);
             }

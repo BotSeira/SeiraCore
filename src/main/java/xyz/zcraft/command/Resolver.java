@@ -35,15 +35,16 @@ final class Resolver {
     }
 
     public TargetResolution resolveTargetWithOptionalMention(String[] args, String senderUserId) {
-        if (args.length >= 2 && isUserMacro(args[1])) {
-            String mentionedUserId = extractMentionedUserId(args[0]);
-            if (mentionedUserId != null) {
-                return new TargetResolution(parseTarget(args[1], mentionedUserId, true), 2);
-            }
-            if (looksLikeMention(args[0])) {
-                return new TargetResolution(new ShortcutTarget(null, null, null, null, "@用户格式无效，请使用@用户后再输入快捷查询（如 rs2）。"), 2);
-            }
-        }
+        // TODO 受限于qq，at暂时无法解析
+//        if (args.length >= 2 && isUserMacro(args[1]) && false) {
+//            String mentionedUserId = extractMentionedUserId(args[0]);
+//            if (mentionedUserId != null) {
+//                return new TargetResolution(parseTarget(args[1], mentionedUserId, true), 2);
+//            }
+//            if (looksLikeMention(args[0])) {
+//                return new TargetResolution(new ShortcutTarget(null, null, null, null, "@用户格式无效，请使用@用户后再输入快捷查询（如 rs2）。"), 2);
+//            }
+//        }
         return new TargetResolution(parseTarget(args[0], senderUserId), 1);
     }
 
