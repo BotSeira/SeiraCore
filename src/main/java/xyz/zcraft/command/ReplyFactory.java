@@ -376,7 +376,6 @@ final class ReplyFactory {
                     Button.row(
                             Button.openUrl(1, "Sayobot", "https://dl.sayobot.cn/beatmaps/download/" + beatmapsetId),
                             Button.openUrl(2, "Nekoha", "https://mirror.nekoha.moe/api4/download/" + beatmapsetId)
-
                     )
             );
         }
