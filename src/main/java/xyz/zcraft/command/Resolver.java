@@ -228,7 +228,7 @@ final class Resolver {
     }
 
     private static final class Patterns {
-        private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^((rs|bo)(\\d+)|mp)$");
+        private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(?:(rs|bo)(\\d+)|mp)$");
         private static final Pattern SET_MACRO_PATTERN = Pattern.compile("^(\\d+)#(\\d+)$");
         private static final Pattern BEATMAP_MACRO_PATTERN = Pattern.compile("^m(\\d+)$");
         private static final Pattern CQ_AT_PATTERN = Pattern.compile("^\\[CQ:at,qq=(\\d+)(?:,.*)?]$");

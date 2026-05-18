@@ -307,7 +307,7 @@ public class APIHelper {
 
     public static Response<Base64Bytes> getBeatmapsetResponse(ShortcutTarget target, String auth) {
         try {
-            final String query = getBeatmapsetQuery(target);
+            final String query = getBeatmapsetQuery(target, "beatmapset");
 
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + query))
@@ -331,18 +331,18 @@ public class APIHelper {
         }
     }
 
-    private static String getBeatmapsetQuery(ShortcutTarget target) {
+    private static String getBeatmapsetQuery(ShortcutTarget target, String prefix) {
         String query = null;
         if (target.isMacro()) {
             if ("m".equals(target.macroType())) {
-                query = "/beatmapset?m=" + target.explicitId();
+                query = "/" + prefix + "?m=" + target.explicitId();
             } else if ("bo".equals(target.macroType()) || "rs".equals(target.macroType())) {
-                query = "/beatmapset?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+                query = "/" + prefix + "?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
             } else if ("mp".equals(target.macroType())) {
-                query = "/beatmapset?of=mp";
+                query = "/" + prefix + "?of=mp";
             }
         } else {
-            query = "/beatmapset?ms=" + target.explicitId();
+            query = "/" + prefix + "?ms=" + target.explicitId();
         }
 
         if (query == null) {
@@ -747,6 +747,34 @@ public class APIHelper {
 
         return sb.toString().trim();
 
+    }
+
+    public static Response<?> lookupBeatmapset(ShortcutTarget target, String s) {
+        try {
+            final String query = getBeatmapsetQuery(target, "lookup/beatmapset");
+
+            HttpRequest localRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + query))
+                    .header("Authorization", "Bearer " + s)
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw parseHttpError(send.body(), send.statusCode(), "获取铺面集失败");
+            }
+
+            final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
+            ensureApiSuccess(rawResponse, "查找铺面集失败");
+            final JsonObject data = rawResponse.getData().getAsJsonObject();
+
+            return Response.<Void>fromHeaders(send.headers())
+                    .beatmapsetId(data.get("id").getAsString())
+                    .build();
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public record ReplayRenderResult(String videoUrl, String taskId) {

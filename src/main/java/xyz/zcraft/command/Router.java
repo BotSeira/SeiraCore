@@ -145,7 +145,7 @@ public class Router {
                 int removed = UserDataStore.clearGroupMember(senderUserId);
                 return RouteDecision.sync(PendingMessage.ofString("清除了 " + removed + " 条群聊记录。"));
             }
-            case "bo", "top" -> {
+            case "bo" -> {
                 if (args.length == 2) {
                     Integer n = argumentResolver.parsePositiveInt(args[0]);
                     if (n == null) {
@@ -343,6 +343,28 @@ public class Router {
                     return replyFactory.friendMessage(mutual, onlyFollowed, onlyFollower);
                 });
             }
+            case "dl" -> {
+                if (args.length < 1 || args.length > 2) {
+                    return RouteDecision.sync(PendingMessage.ofString(Usages.DL_USAGE));
+                }
+
+                TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(args, senderUserId);
+                if (args.length != targetResolution.consumedArgs()) {
+                    return RouteDecision.sync(PendingMessage.ofString(Usages.DL_USAGE));
+                }
+
+                ShortcutTarget target = targetResolution.target();
+                if (target.isError()) {
+                    return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+                }
+
+                return taskCoordinator.queueApiRequest(
+                        "dl",
+                        () -> replyFactory.dlMessage(APIHelper.lookupBeatmapset(
+                                target, authHelper.getTokenFor(senderUserId).accessToken())
+                        )
+                );
+            }
             case "s" -> {
                 if (args.length < 1 || args.length > 2) {
                     return RouteDecision.sync(PendingMessage.ofString(Usages.S_USAGE));
@@ -470,7 +492,7 @@ public class Router {
                             return replyFactory.searchMessage(searchResponse, searchQuery);
                         });
             }
-            case "lb", "c" -> {
+            case "lb" -> {
                 if (args.length == 0) {
                     if (groupId != null && !groupId.isBlank()) {
                         List<Integer> groupBoundUids = UserDataStore.findBoundUidsByGroup(groupId);
@@ -651,6 +673,7 @@ public class Router {
         public static final String NO_BIND_TIP = "你还没有绑定玩家ID，请先使用 /bind <玩家ID>";
         public static final String RS_USAGE = "用法：/rs <个数> [玩家ID/@用户]";
         public static final String M_USAGE = "用法：/m <铺面ID 或 快捷查询> [Mod]";
+        public static final String DL_USAGE = "用法：/dl <铺面集ID 或 快捷查询>";
         public static final String S_USAGE = "用法：/s <成绩ID 或 快捷查询>";
         private static final String R_USAGE = "用法：/r <成绩ID 或 快捷查询>";
         private static final String RSC_USAGE = "用法：/rsc <铺面ID或快捷查询> [+用户ID列表，逗号分隔]";

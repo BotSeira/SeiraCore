@@ -106,6 +106,14 @@ final class ReplyFactory {
         );
     }
 
+    public PendingMessage dlMessage(Response<?> response) {
+        return PendingMessage.ofMarkdownRaw(
+                "> 铺面集: " + response.getBeatmapsetId() + "\n" +
+                        "> 选择下载镜像: ",
+                Buttons.dlButton(response.getBeatmapsetId())
+        );
+    }
+
     public PendingMessage bindMessage(BindingConfig config, BindingHelper.BindingTask task, boolean isC2C) {
         final String url = "https://osu.ppy.sh/oauth/authorize?client_id=%d&response_type=code&scope=public+identify+friends.read&state=%s"
                 .formatted(config.clientId(), task.taskId());
@@ -216,7 +224,7 @@ final class ReplyFactory {
             return sb.toString().trim();
         }
 
-        public static String friendContent(List<Pair<Integer, String>> mutual,  List<Pair<Integer, String>> onlyFollowed, List<Pair<Integer, String>> onlyFollower) {
+        public static String friendContent(List<Pair<Integer, String>> mutual, List<Pair<Integer, String>> onlyFollowed, List<Pair<Integer, String>> onlyFollower) {
             StringBuilder sb = new StringBuilder();
             sb.append("> 双向好友↔ (").append(mutual.size()).append(")\n>");
             for (Pair<Integer, String> integerStringPair : mutual) {
@@ -354,6 +362,16 @@ final class ReplyFactory {
             for (int i = 0; i < c; i++) {
                 buttons.add(Button.command(i + 100, false, "", ""));
             }
+        }
+
+        public static List<List<Button>> dlButton(String beatmapsetId) {
+            return Button.keyboard(
+                    Button.row(
+                            Button.openUrl(1, "Sayobot", "https://dl.sayobot.cn/beatmaps/download/" + beatmapsetId),
+                            Button.openUrl(2, "Nekoha", "https://mirror.nekoha.moe/api4/download/" + beatmapsetId)
+
+                    )
+            );
         }
     }
 }
