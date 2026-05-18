@@ -29,8 +29,8 @@ final class ReplyFactory {
 
     public PendingMessage boMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> b" + response.getScoreIds().size() + "查询完成\n" +
-                        "玩家: " + response.getUserId(),
+                "> B" + response.getScoreIds().size() + "查询完成\n" +
+                        "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()),
                 Buttons.boButtons()
         );
     }
@@ -38,7 +38,8 @@ final class ReplyFactory {
     public PendingMessage rsMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> 最近成绩查询完成\n" +
-                        "玩家: " + response.getUserId() + "\n数量: " + response.getScoreIds().size(),
+                        "> 玩家: " + cmd("/u" + response.getUserId(), response.getUserId()) + "\n" +
+                        "> 数量: " + response.getScoreIds().size(),
                 Buttons.rsButtons()
         );
     }
@@ -56,15 +57,16 @@ final class ReplyFactory {
     public PendingMessage scoreMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> 成绩查询完成\n" +
-                        "铺面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
-                        "成绩: " + cmd("/s " + response.getScoreId(), response.getScoreId()),
+                        "> 铺面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
+                        "> 成绩: " + cmd("/s " + response.getScoreId(), response.getScoreId()),
                 Buttons.sButtons(response.getBeatmapId(), response.getScoreId())
         );
     }
 
     public PendingMessage lbMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 排行榜查询完成" + (response.getBeatmapId() == null ? "" : "\n铺面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId())),
+                "> 排行榜查询完成" +
+                        (response.getBeatmapId() == null ? "" : "\n铺面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId())),
                 Buttons.lbButtons(response.getBeatmapId())
         );
     }
@@ -75,7 +77,7 @@ final class ReplyFactory {
             queuedText += "\n队列位置: " + taskInfo.position();
         }
         if (taskInfo.taskId() != null) {
-            queuedText += "\n请求: " + taskInfo.taskId();
+            queuedText += "\n请求: " + cmd("/rstat " + taskInfo.taskId(), taskInfo.taskId().substring(0, 8));
         }
         if (taskInfo.message() != null) {
             queuedText += "\n" + taskInfo.message();
@@ -296,14 +298,14 @@ final class ReplyFactory {
         static List<List<Button>> boButtons() {
             return Button.keyboard(Button.row(
                     Button.command(1, "查询最好成绩", "/s bo1"),
-                    Button.command(2, "渲染最好成绩", "/r bo1")
+                    Button.command(2, "查询最近成绩", "/s rs1")
             ));
         }
 
         static List<List<Button>> rsButtons() {
             return Button.keyboard(Button.row(
-                    Button.command(1, "查询最近成绩", "/s rs1"),
-                    Button.command(2, "渲染最近成绩", "/r rs1")
+                    Button.command(1, "查询最好成绩", "/s bo1"),
+                    Button.command(2, "查询最近成绩", "/s rs1")
             ));
         }
 

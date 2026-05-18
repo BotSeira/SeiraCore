@@ -34,7 +34,7 @@ public class OsuAuthApi {
 
             final HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-            if(response.statusCode() != 200) {
+            if (response.statusCode() != 200) {
                 throw new Exception("Failed to get token from Osu API, response code: " + response.statusCode());
             }
 
@@ -68,7 +68,7 @@ public class OsuAuthApi {
 
             final HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-            if(response.statusCode() != 200) {
+            if (response.statusCode() != 200) {
                 throw new Exception("Failed to refresh token from Osu API, response code: " + response.statusCode());
             }
 
@@ -96,7 +96,7 @@ public class OsuAuthApi {
 
             final HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-            if(response.statusCode() != 200) {
+            if (response.statusCode() != 200) {
                 throw new Exception("Failed to get user info from Osu API, response code: " + response.statusCode());
             }
 

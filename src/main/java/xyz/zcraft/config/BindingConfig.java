@@ -6,4 +6,5 @@ public record BindingConfig(
         String listenPath,
         int clientId,
         String clientSecret
-) {}
+) {
+}

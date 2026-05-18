@@ -10,7 +10,6 @@ import xyz.zcraft.bot.MessageSender;
 import xyz.zcraft.command.iface.*;
 import xyz.zcraft.data.*;
 import xyz.zcraft.util.ApiRequestStats;
-import xyz.zcraft.data.Base64Bytes;
 
 import java.nio.channels.ClosedChannelException;
 import java.util.Map;
@@ -138,7 +137,7 @@ final class TaskCoordinator {
             LOG.info("Uploading media for {}", messageId);
             FileInfo fileInfo = groupMessage
                     ? messageSender.uploadGroupMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl())
-                    : messageSender.uploadPrivateMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl()); 
+                    : messageSender.uploadPrivateMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl());
             if (fileInfo == null) {
                 LOG.error("Failed to upload media for message {}", messageId);
                 message.setContent("媒体文件上传失败");

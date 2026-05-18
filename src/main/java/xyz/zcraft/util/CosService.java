@@ -47,7 +47,7 @@ public class CosService {
         LOG.info("Processing file upload from url: {}", sourceUrl);
 
         DownloadedMedia media = downloadMedia(sourceUrl);
-        if(objectKey == null) {
+        if (objectKey == null) {
             objectKey = buildObjectKey(fileType, sourceUrl, media.contentType());
         }
 

@@ -1,6 +1,9 @@
 package xyz.zcraft.api;
 
-import com.google.gson.*;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import xyz.zcraft.Seira;
 import xyz.zcraft.command.ResolutionException;
 import xyz.zcraft.command.resolution.ShortcutTarget;

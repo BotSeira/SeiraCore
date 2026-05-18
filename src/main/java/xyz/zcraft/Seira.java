@@ -20,7 +20,7 @@ public class Seira {
     static void main() {
         LOG.info("Loading config");
 
-        if(!ConfigLoader.configExists()) {
+        if (!ConfigLoader.configExists()) {
             LOG.warn("Config file does not exist, copying default config. Please check your config file.");
             try {
                 ConfigLoader.copyDefaultConfig();

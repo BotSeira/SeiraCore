@@ -593,7 +593,7 @@ public class Router {
                 if (args.length == 1) {
                     return route("/bo 8 " + args[0], senderUserId, groupId, messageId);
                 } else {
-                    return RouteDecision.sync(PendingMessage.ofString("用法：/u <玩家ID>") );
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/u <玩家ID>"));
                 }
             }
             case "rstat" -> {

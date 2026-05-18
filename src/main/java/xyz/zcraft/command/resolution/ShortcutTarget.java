@@ -7,6 +7,11 @@ public record ShortcutTarget(
         Long macroIndex,
         String errorMessage
 ) {
-    public boolean isMacro() { return macroType != null; }
-    public boolean isError() { return errorMessage != null; }
+    public boolean isMacro() {
+        return macroType != null;
+    }
+
+    public boolean isError() {
+        return errorMessage != null;
+    }
 }

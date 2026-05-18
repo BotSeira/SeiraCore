@@ -29,8 +29,8 @@ public class WSClient extends WebSocketClient {
     private final Supplier<AccessToken> tokenSupplier;
     private final ScheduledExecutorService heartbeatExecutor = Executors.newSingleThreadScheduledExecutor();
     private final AtomicLong sequence = new AtomicLong(-1);
-    private volatile boolean heartbeatAcked = true;
     private final Router router;
+    private volatile boolean heartbeatAcked = true;
 
     public WSClient(
             URI serverUri,

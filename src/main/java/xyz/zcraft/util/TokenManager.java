@@ -10,10 +10,10 @@ import java.util.Timer;
 public class TokenManager {
     private static final Logger LOG = LogManager.getLogger(TokenManager.class);
     private static final Timer timer = new Timer("access-token-renewal", true);
-    @Getter
-    private AccessToken token;
     private final String clientId;
     private final String clientSecret;
+    @Getter
+    private AccessToken token;
 
     public TokenManager(String clientId, String clientSecret) {
         this.clientId = clientId;

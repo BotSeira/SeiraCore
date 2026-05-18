@@ -5,4 +5,5 @@ public record SeiraConfig(
         String directUrl,
         boolean debugMode,
         java.util.List<String> adminIds
-) {}
+) {
+}

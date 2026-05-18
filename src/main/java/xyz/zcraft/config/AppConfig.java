@@ -6,5 +6,6 @@ public record AppConfig(
         BindingConfig binding,
         QqConfig qq,
         CosConfig cos
-) {}
+) {
+}
 

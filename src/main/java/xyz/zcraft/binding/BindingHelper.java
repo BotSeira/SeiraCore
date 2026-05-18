@@ -94,14 +94,6 @@ class HtmlTemplates {
     private static final String SUCCESS_PAGE;
     private static final String FAILURE_PAGE;
 
-    public static String getSuccessPage(String userName, String userId) {
-        return SUCCESS_PAGE.replace("{{USER_NAME}}", userName).replace("{{USER_ID}}", userId);
-    }
-
-    public static String getFailurePage(String detail) {
-        return FAILURE_PAGE.replace("{{ERROR_DETAIL}}", detail);
-    }
-
     static {
         try {
             SUCCESS_PAGE = new String(Objects.requireNonNull(HtmlTemplates.class.getResourceAsStream("/seira-bind-success.html")).readAllBytes(), StandardCharsets.UTF_8);
@@ -109,5 +101,13 @@ class HtmlTemplates {
         } catch (Exception e) {
             throw new RuntimeException("Failed to load HTML templates", e);
         }
+    }
+
+    public static String getSuccessPage(String userName, String userId) {
+        return SUCCESS_PAGE.replace("{{USER_NAME}}", userName).replace("{{USER_ID}}", userId);
+    }
+
+    public static String getFailurePage(String detail) {
+        return FAILURE_PAGE.replace("{{ERROR_DETAIL}}", detail);
     }
 }
