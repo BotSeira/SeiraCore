@@ -38,7 +38,7 @@ final class ReplyFactory {
     public PendingMessage rsMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> 最近成绩查询完成\n" +
-                        "> 玩家: " + cmd("/u" + response.getUserId(), response.getUserId()) + "\n" +
+                        "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()) + "\n" +
                         "> 数量: " + response.getScoreIds().size(),
                 Buttons.rsButtons()
         );
