@@ -349,7 +349,7 @@ public class Router {
                         }
                     }
 
-                    return replyFactory.friendMessage((groupId == null || groupId.isBlank()), followed.size(), mutual, onlyFollowed, onlyFollower);
+                    return replyFactory.friendMessage(!(groupId == null || groupId.isBlank()), followed.size(), mutual, onlyFollowed, onlyFollower);
                 });
             }
             case "dl" -> {
