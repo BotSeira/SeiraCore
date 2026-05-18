@@ -52,7 +52,7 @@ public class OsuAuthApi {
         }
     }
 
-    public static OsuToken refreshToken(OsuToken token, String clientId, String clientSecret) {
+    public static OsuToken refreshToken(OsuToken token, int clientId, String clientSecret) {
         try (final HttpClient client = HttpClient.newHttpClient()) {
             final JsonObject body = new JsonObject();
             body.addProperty("client_id", clientId);

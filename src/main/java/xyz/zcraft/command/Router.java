@@ -1,11 +1,12 @@
 package xyz.zcraft.command;
 
+import kotlin.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.api.APIHelper;
 import xyz.zcraft.api.Response;
 import xyz.zcraft.binding.BindingHelper;
-import xyz.zcraft.binding.UserBindingStore;
+import xyz.zcraft.binding.UserDataStore;
 import xyz.zcraft.bot.MessageSender;
 import xyz.zcraft.command.resolution.ShortcutTarget;
 import xyz.zcraft.command.resolution.TargetResolution;
@@ -13,10 +14,10 @@ import xyz.zcraft.command.resolution.UidListResolution;
 import xyz.zcraft.command.resolution.UidResolution;
 import xyz.zcraft.config.AppConfig;
 import xyz.zcraft.data.*;
+import xyz.zcraft.util.OsuAuthHelper;
 import xyz.zcraft.util.ThreadHelper;
 
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Router {
@@ -29,6 +30,7 @@ public class Router {
     private final Resolver argumentResolver;
     private final ReplyFactory replyFactory;
     private final TaskCoordinator taskCoordinator;
+    private final OsuAuthHelper authHelper;
 
     public Router(MessageSender messageSender, AppConfig config) {
         this.messageSender = messageSender;
@@ -36,6 +38,7 @@ public class Router {
         this.argumentResolver = new Resolver();
         this.replyFactory = new ReplyFactory(config);
         this.taskCoordinator = new TaskCoordinator(messageSender);
+        this.authHelper = new OsuAuthHelper(config.binding());
     }
 
     public void onPrivateMessageReceived(String userId, String messageId, String rawContent) {
@@ -51,7 +54,7 @@ public class Router {
         AtomicInteger messageSeqCounter = new AtomicInteger(1);
         try {
             if (groupMessage && groupId != null && !groupId.isBlank() && userId != null && !userId.isBlank()) {
-                UserBindingStore.upsertGroupMember(groupId, userId);
+                UserDataStore.upsertGroupMember(groupId, userId);
             }
 
             RouteDecision routeDecision = route(rawContent, userId, groupId, messageId);
@@ -92,7 +95,7 @@ public class Router {
                     return RouteDecision.sync(PendingMessage.ofString("无法识别你的用户ID，暂时无法绑定。请稍后重试。"));
                 }
 
-                if (UserBindingStore.findBoundUid(senderUserId) != null) {
+                if (UserDataStore.findBoundUid(senderUserId) != null) {
                     return RouteDecision.sync(PendingMessage.ofString("你已经绑定了玩家ID，如果要更换绑定请先使用 /unbind 解绑当前玩家ID。"));
                 }
 
@@ -101,8 +104,8 @@ public class Router {
                         return RouteDecision.sync(PendingMessage.ofString("用法：/bind"));
                     }
                     final var bindingTask = BindingHelper.createBindingTask(senderUserId, messageId, (user, token) -> {
-                        UserBindingStore.bind(senderUserId, user.id());
-                        UserBindingStore.storeToken(senderUserId, token);
+                        UserDataStore.bind(senderUserId, user.id());
+                        UserDataStore.storeToken(senderUserId, token);
                     });
                     return RouteDecision.sync(replyFactory.bindMessage(config.binding(), bindingTask, groupId == null || groupId.isBlank()));
                 } else {
@@ -114,7 +117,7 @@ public class Router {
                         return RouteDecision.sync(PendingMessage.ofString("玩家ID必须是正整数。用法：/bind <玩家ID>"));
                     }
 
-                    UserBindingStore.bind(senderUserId, uid);
+                    UserDataStore.bind(senderUserId, uid);
                     return RouteDecision.sync(PendingMessage.ofString("绑定成功，已绑定到玩家ID: " + uid));
                 }
             }
@@ -125,7 +128,7 @@ public class Router {
                 if (args.length != 0) {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/unbind"));
                 }
-                boolean removed = UserBindingStore.unbind(senderUserId);
+                boolean removed = UserDataStore.unbind(senderUserId);
                 return RouteDecision.sync(PendingMessage.ofString(removed
                         ? "解绑成功。"
                         : "你当前还没有绑定玩家ID，无需解绑。"));
@@ -137,7 +140,7 @@ public class Router {
                 if (args.length != 0) {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/clearhistory"));
                 }
-                int removed = UserBindingStore.clearGroupMember(senderUserId);
+                int removed = UserDataStore.clearGroupMember(senderUserId);
                 return RouteDecision.sync(PendingMessage.ofString("清除了 " + removed + " 条群聊记录。"));
             }
             case "bo", "top" -> {
@@ -194,7 +197,17 @@ public class Router {
                 return taskCoordinator.queueApiRequest("daily", () -> PendingMessage.ofMarkdownRaw(APIHelper.getDaily()));
             }
             case "mp" -> {
-                return taskCoordinator.queueApiRequest("mp", () -> PendingMessage.ofMarkdownRaw(APIHelper.getMultiplayerRooms()));
+                if (!config.binding().requireLogin()) {
+                    return RouteDecision.sync(PendingMessage.ofString("本指令未启用：需要进行用户登录鉴权。"));
+                }
+
+                OsuToken token = authHelper.getTokenFor(senderUserId);
+
+                if (token == null) {
+                    return RouteDecision.sync(PendingMessage.ofString("无法获取用户凭据。"));
+                }
+
+                return taskCoordinator.queueApiRequest("mp", () -> replyFactory.mpMessage(APIHelper.getMultiplayerRoom(token.accessToken())));
             }
             case "rs" -> {
                 if (args.length == 2) {
@@ -202,10 +215,12 @@ public class Router {
                     if (n == null) {
                         return RouteDecision.sync(PendingMessage.ofString(Usages.RS_USAGE));
                     }
+
                     UidResolution uidResolution = argumentResolver.resolveUidArgument(args[1]);
                     if (uidResolution.errorMessage() != null) {
                         return RouteDecision.sync(PendingMessage.ofString(uidResolution.errorMessage()));
                     }
+
                     if (uidResolution.uid() == null) {
                         return RouteDecision.sync(PendingMessage.ofString(Usages.RS_USAGE));
                     }
@@ -263,12 +278,63 @@ public class Router {
 
                     return taskCoordinator.queueImageRequest(
                             "m",
-                            () -> APIHelper.getBeatmapResponse(target, mod),
+                            () -> APIHelper.getBeatmapResponse(target, mod, authHelper.getTokenFor(senderUserId).accessToken()),
                             replyFactory::beatmapMessage
                     );
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString(Usages.M_USAGE));
                 }
+            }
+            case "f" -> {
+                if (!config.binding().requireLogin()) {
+                    return RouteDecision.sync(PendingMessage.ofString("本指令未启用：需要进行用户登录鉴权。"));
+                }
+
+                Integer uid = argumentResolver.resolveBoundUid(senderUserId);
+                if (uid == null) {
+                    return RouteDecision.sync(PendingMessage.ofString(Usages.NO_BIND_TIP));
+                }
+
+                OsuToken token = authHelper.getTokenFor(senderUserId);
+
+                if (token == null) {
+                    return RouteDecision.sync(PendingMessage.ofString("无法获取用户凭据。"));
+                }
+
+                return taskCoordinator.queueApiRequest("f", () -> {
+                    final Response<List<Pair<Integer, String>>> response = APIHelper.getFollowed(token.accessToken());
+                    final List<Pair<Integer, String>> content = response.getContent();
+
+                    final List<Integer> followed = content.stream().map(Pair::getFirst).toList();
+
+                    UserDataStore.storeFollowed(uid, followed);
+
+                    for (Pair<Integer, String> info : content) {
+                        UserDataStore.storeUserInfo(info.getFirst(), info.getSecond());
+                    }
+
+                    final List<Integer> follower = UserDataStore.findFollower(uid);
+
+                    final List<Pair<Integer, String>> mutual = new LinkedList<>();
+                    final List<Pair<Integer, String>> onlyFollowed = new LinkedList<>();
+                    final List<Pair<Integer, String>> onlyFollower = new LinkedList<>();
+
+                    for (Integer i : followed) {
+                        if(follower.contains(i)) {
+                            mutual.add(new Pair<>(i, UserDataStore.findUsername(i)));
+                        } else {
+                            onlyFollowed.add(new Pair<>(i, UserDataStore.findUsername(i)));
+                        }
+                    }
+
+                    for (Integer i : follower) {
+                        if(!followed.contains(i)) {
+                            onlyFollower.add(new Pair<>(i, UserDataStore.findUsername(i)));
+                        }
+                    }
+
+                    return replyFactory.friendMessage(mutual, onlyFollowed, onlyFollower);
+                });
             }
             case "s" -> {
                 if (args.length < 1 || args.length > 2) {
@@ -381,7 +447,7 @@ public class Router {
 
                 return taskCoordinator.queueImageRequest(
                         "ms",
-                        () -> APIHelper.getBeatmapsetResponse(target),
+                        () -> APIHelper.getBeatmapsetResponse(target, authHelper.getTokenFor(senderUserId).accessToken()),
                         replyFactory::beatmapsetMessage
                 );
             }
@@ -400,7 +466,7 @@ public class Router {
             case "lb", "c" -> {
                 if (args.length == 0) {
                     if (groupId != null && !groupId.isBlank()) {
-                        List<Integer> groupBoundUids = UserBindingStore.findBoundUidsByGroup(groupId);
+                        List<Integer> groupBoundUids = UserDataStore.findBoundUidsByGroup(groupId);
                         if (groupBoundUids.isEmpty()) {
                             return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>"));
                         }
@@ -432,7 +498,7 @@ public class Router {
                     int remainingArgs = args.length - targetResolution.consumedArgs();
                     if (remainingArgs == 0) {
                         if (groupId != null && !groupId.isBlank()) {
-                            List<Integer> groupBoundUids = UserBindingStore.findBoundUidsByGroup(groupId);
+                            List<Integer> groupBoundUids = UserDataStore.findBoundUidsByGroup(groupId);
                             if (groupBoundUids.isEmpty()) {
                                 return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>"));
                             }

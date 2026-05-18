@@ -1,6 +1,6 @@
 package xyz.zcraft.command;
 
-import xyz.zcraft.binding.UserBindingStore;
+import xyz.zcraft.binding.UserDataStore;
 import xyz.zcraft.command.resolution.ShortcutTarget;
 import xyz.zcraft.command.resolution.TargetResolution;
 import xyz.zcraft.command.resolution.UidListResolution;
@@ -74,7 +74,7 @@ final class Resolver {
     }
 
     public UidListResolution resolveRscUidList(String groupId, String extraUidArg) {
-        List<Integer> groupBoundUids = UserBindingStore.findBoundUidsByGroup(groupId);
+        List<Integer> groupBoundUids = UserDataStore.findBoundUidsByGroup(groupId);
         if (groupBoundUids.isEmpty()) {
             return new UidListResolution(null, "本群还没有已绑定的玩家，请先使用 /bind <玩家ID>");
         }
@@ -109,7 +109,7 @@ final class Resolver {
         if (senderUserId == null || senderUserId.isBlank()) {
             return null;
         }
-        return UserBindingStore.findBoundUid(senderUserId);
+        return UserDataStore.findBoundUid(senderUserId);
     }
 
     public Integer parsePositiveInt(String value) {
@@ -138,21 +138,41 @@ final class Resolver {
         Matcher userMatcher = Patterns.USER_MACRO_PATTERN.matcher(arg.trim());
         if (userMatcher.matches()) {
             String type = userMatcher.group(1).toLowerCase();
-            Long index = parsePositiveLong(userMatcher.group(2));
 
-            if (index == null || index < 1 || index > 100) {
-                return new ShortcutTarget(null, null, null, null, "快捷指令索引无效，请输入 1-100 之间的数字。例如: rs5");
+            switch (type) {
+                case "rs", "bo" -> {
+                    Long index = parsePositiveLong(userMatcher.group(2));
+
+                    if (index == null || index < 1 || index > 100) {
+                        return new ShortcutTarget(null, null, null, null, "快捷指令索引无效，请输入 1-100 之间的数字。例如: rs5");
+                    }
+
+                    Integer uid = resolveBoundUid(senderUserId);
+                    if (uid == null) {
+                        String errorMessage = mentionedUser
+                                ? "被@的用户还没有绑定玩家ID，无法使用快捷查询。"
+                                : "你还没有绑定玩家ID，无法使用快捷查询。请先使用 /bind <玩家ID>";
+                        return new ShortcutTarget(null, null, null, null, errorMessage);
+                    }
+
+                    return new ShortcutTarget(null, uid, type, index, null);
+                }
+                case "mp" -> {
+                    Integer uid = resolveBoundUid(senderUserId);
+                    if (uid == null) {
+                        String errorMessage = mentionedUser
+                                ? "被@的用户还没有绑定玩家ID，无法使用快捷查询。"
+                                : "你还没有绑定玩家ID，无法使用快捷查询。请先使用 /bind <玩家ID>";
+                        return new ShortcutTarget(null, null, null, null, errorMessage);
+                    }
+
+
+                    return new ShortcutTarget(null, uid, "mp", null, null);
+                }
+                default -> {
+                    return new ShortcutTarget(null, null, null, null, "未知的快捷查询");
+                }
             }
-
-            Integer uid = resolveBoundUid(senderUserId);
-            if (uid == null) {
-                String errorMessage = mentionedUser
-                        ? "被@的用户还没有绑定玩家ID，无法使用快捷查询。"
-                        : "你还没有绑定玩家ID，无法使用快捷查询。请先使用 /bind <玩家ID>";
-                return new ShortcutTarget(null, null, null, null, errorMessage);
-            }
-
-            return new ShortcutTarget(null, uid, type, index, null);
         }
 
         Matcher beatmapMatcher = Patterns.BEATMAP_MACRO_PATTERN.matcher(arg.trim());
@@ -208,7 +228,7 @@ final class Resolver {
     }
 
     private static final class Patterns {
-        private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo)(\\d+)$");
+        private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^((rs|bo)(\\d+)|mp)$");
         private static final Pattern SET_MACRO_PATTERN = Pattern.compile("^(\\d+)#(\\d+)$");
         private static final Pattern BEATMAP_MACRO_PATTERN = Pattern.compile("^m(\\d+)$");
         private static final Pattern CQ_AT_PATTERN = Pattern.compile("^\\[CQ:at,qq=(\\d+)(?:,.*)?]$");

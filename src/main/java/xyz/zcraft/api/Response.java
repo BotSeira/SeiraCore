@@ -12,8 +12,6 @@ import java.util.Optional;
 public class Response<T> {
     private T content;
 
-    private String base64;
-
     private String userId;
     private List<String> userIds;
 
@@ -27,6 +25,8 @@ public class Response<T> {
     private String scoreId;
     private List<String> scoreIds;
 
+    private String roomId;
+
     public static <T> Response.ResponseBuilder<T> fromHeaders(HttpHeaders headers) {
         return Response.<T>builder()
                 .userId(headers.firstValue("X-User-Id").orElse(null))
@@ -37,7 +37,8 @@ public class Response<T> {
                 .beatmapsetId(headers.firstValue("X-Beatmapset-Id").orElse(null))
                 .beatmapsetIds(headers.firstValue("X-Beatmapset-Ids").flatMap(Response::parseCsvHeader).orElse(null))
                 .scoreId(headers.firstValue("X-Score-Id").orElse(null))
-                .scoreIds(headers.firstValue("X-Score-Ids").flatMap(Response::parseCsvHeader).orElse(null));
+                .scoreIds(headers.firstValue("X-Score-Ids").flatMap(Response::parseCsvHeader).orElse(null))
+                .roomId(headers.firstValue("X-Room-Id").orElse(null));
     }
 
     private static Optional<List<String>> parseCsvHeader(String headerValue) {

@@ -1,5 +1,6 @@
 package xyz.zcraft.command;
 
+import kotlin.Pair;
 import xyz.zcraft.api.APIHelper;
 import xyz.zcraft.api.Response;
 import xyz.zcraft.binding.BindingHelper;
@@ -45,8 +46,8 @@ final class ReplyFactory {
     public PendingMessage beatmapMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> 铺面查询完成\n" +
-                        "铺面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
-                        "铺面集: " + cmd("/ms m" + response.getBeatmapId(), response.getBeatmapsetId()),
+                        "> 铺面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
+                        "> 铺面集: " + cmd("/ms m" + response.getBeatmapId(), response.getBeatmapsetId()),
                 Buttons.beatmapButtons(response.getBeatmapId(), config.seira().directUrl())
         );
 
@@ -114,6 +115,13 @@ final class ReplyFactory {
         );
     }
 
+    public PendingMessage mpMessage(Response<String> response) {
+        return PendingMessage.ofMarkdownRaw(
+                response.getContent(),
+                Buttons.mpButtons(response.getRoomId(), config.seira().directUrl())
+        );
+    }
+
     public PendingMessage testMessage() {
         return PendingMessage.ofMarkdownRaw(
                 """
@@ -141,6 +149,13 @@ final class ReplyFactory {
                         %s
                         ```
                         """.formatted(isAdmin ? "(管理员)" : "", senderUserId, groupId, messageId),
+                null
+        );
+    }
+
+    public PendingMessage friendMessage(List<Pair<Integer, String>> mutual, List<Pair<Integer, String>> onlyFollowed, List<Pair<Integer, String>> onlyFollower) {
+        return PendingMessage.ofMarkdownRaw(
+                Contents.friendContent(mutual, onlyFollowed, onlyFollower),
                 null
         );
     }
@@ -200,9 +215,35 @@ final class ReplyFactory {
             }
             return sb.toString().trim();
         }
+
+        public static String friendContent(List<Pair<Integer, String>> mutual,  List<Pair<Integer, String>> onlyFollowed, List<Pair<Integer, String>> onlyFollower) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("> 双向好友↔ (").append(mutual.size()).append(")\n>");
+            for (Pair<Integer, String> integerStringPair : mutual) {
+                sb.append(cmd("/u " + integerStringPair.getFirst(), integerStringPair.getSecond())).append(" ");
+            }
+
+            sb.append("\n> 仅关注→ (").append(onlyFollowed.size()).append(")\n>");
+            for (Pair<Integer, String> integerStringPair : onlyFollowed) {
+                sb.append(cmd("/u " + integerStringPair.getFirst(), integerStringPair.getSecond())).append(" ");
+            }
+
+            sb.append("\n> 仅粉丝← (").append(onlyFollower.size()).append(")\n>");
+            for (Pair<Integer, String> integerStringPair : onlyFollower) {
+                sb.append(cmd("/u " + integerStringPair.getFirst(), integerStringPair.getSecond())).append(" ");
+            }
+
+            return sb.toString().trim();
+        }
     }
 
     private static final class Buttons {
+        static List<List<Button>> mpButtons(String roomId, String directUrl) {
+            return Button.keyboard(Button.row(
+                    Button.openUrl(1, "在游戏中查看", directUrl + "/room/" + roomId)
+            ));
+        }
+
         static List<List<Button>> bindButtons(String userId, String url, boolean restrict) {
             final Button button = Button.openUrl(1, "登录", url);
             if (restrict) button.permit(userId);

@@ -5,7 +5,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.config.Configurator;
 import xyz.zcraft.binding.BindingHelper;
-import xyz.zcraft.binding.UserBindingStore;
+import xyz.zcraft.binding.UserDataStore;
 import xyz.zcraft.bot.QQBot;
 import xyz.zcraft.config.AppConfig;
 import xyz.zcraft.config.ConfigLoader;
@@ -44,7 +44,7 @@ public class Seira {
             LOG.warn("Debug mode is enabled");
         }
 
-        UserBindingStore.init(config.seira().sqlitePath());
+        UserDataStore.init(config.seira().sqlitePath());
         BindingHelper.init(config.binding());
 
         new QQBot(config);
