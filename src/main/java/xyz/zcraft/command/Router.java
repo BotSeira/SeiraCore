@@ -334,7 +334,7 @@ public class Router {
                     final List<Pair<Integer, String>> onlyFollower = new LinkedList<>();
 
                     for (Integer i : followed) {
-                        if(!filter.test(i)) continue;
+                        if (!filter.test(i)) continue;
                         if (follower.contains(i)) {
                             mutual.add(new Pair<>(i, UserDataStore.findUsername(i)));
                         } else {
@@ -343,7 +343,7 @@ public class Router {
                     }
 
                     for (Integer i : follower) {
-                        if(!filter.test(i)) continue;
+                        if (!filter.test(i)) continue;
                         if (!followed.contains(i)) {
                             onlyFollower.add(new Pair<>(i, UserDataStore.findUsername(i)));
                         }
@@ -587,6 +587,14 @@ public class Router {
             }
             case "status" -> {
                 return RouteDecision.sync(PendingMessage.ofString(APIHelper.getServerStatus()));
+            }
+            case "u" -> {
+                // TODO: 暂时使用bo8
+                if (args.length == 1) {
+                    return route("/bo 8 " + args[0], senderUserId, groupId, messageId);
+                } else {
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/u <玩家ID>") );
+                }
             }
             case "rstat" -> {
                 if (args.length == 1) {
