@@ -31,7 +31,7 @@ final class ReplyFactory {
         return PendingMessage.ofMarkdownRaw(
                 "> B" + response.getScoreIds().size() + "查询完成\n" +
                         "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()),
-                Buttons.boButtons()
+                Buttons.boButtons(config.seira().directUrl(), response.getUserId())
         );
     }
 
@@ -295,11 +295,16 @@ final class ReplyFactory {
             return rows;
         }
 
-        static List<List<Button>> boButtons() {
-            return Button.keyboard(Button.row(
-                    Button.command(1, "查询最好成绩", "/s bo1"),
-                    Button.command(2, "查询最近成绩", "/s rs1")
-            ));
+        static List<List<Button>> boButtons(String directUrl, String userId) {
+            return Button.keyboard(
+                    Button.row(
+                            Button.command(1, "查询最好成绩", "/s bo1"),
+                            Button.command(2, "查询最近成绩", "/s rs1")
+                    ),
+                    Button.row(
+                            Button.openUrl(3, "在游戏中查看", directUrl + "/u/" + userId)
+                    )
+            );
         }
 
         static List<List<Button>> rsButtons() {
