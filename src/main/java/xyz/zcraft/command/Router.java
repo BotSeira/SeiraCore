@@ -21,6 +21,7 @@ import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Predicate;
 
 public class Router {
     private static final Logger LOG = LogManager.getLogger(Router.class);
@@ -309,6 +310,12 @@ public class Router {
 
                     final List<Integer> followed = content.stream().map(FriendEntry::id).toList();
 
+                    final Predicate<Integer> filter = (
+                            groupId == null
+                                    ? (_) -> true
+                                    : (i) -> UserDataStore.findBoundUidsByGroup(groupId).contains(i)
+                    );
+
                     for (FriendEntry friendEntry : content) {
                         UserDataStore.storeFollowed(uid, friendEntry.id());
                         if (friendEntry.mutual()) {
@@ -327,6 +334,7 @@ public class Router {
                     final List<Pair<Integer, String>> onlyFollower = new LinkedList<>();
 
                     for (Integer i : followed) {
+                        if(!filter.test(i)) continue;
                         if (follower.contains(i)) {
                             mutual.add(new Pair<>(i, UserDataStore.findUsername(i)));
                         } else {
@@ -335,12 +343,13 @@ public class Router {
                     }
 
                     for (Integer i : follower) {
+                        if(!filter.test(i)) continue;
                         if (!followed.contains(i)) {
                             onlyFollower.add(new Pair<>(i, UserDataStore.findUsername(i)));
                         }
                     }
 
-                    return replyFactory.friendMessage(mutual, onlyFollowed, onlyFollower);
+                    return replyFactory.friendMessage(followed.size(), mutual, onlyFollowed, onlyFollower);
                 });
             }
             case "dl" -> {

@@ -157,22 +157,22 @@ final class Resolver {
 
                     return new ShortcutTarget(null, uid, type, index, null);
                 }
-                case "mp" -> {
-                    Integer uid = resolveBoundUid(senderUserId);
-                    if (uid == null) {
-                        String errorMessage = mentionedUser
-                                ? "被@的用户还没有绑定玩家ID，无法使用快捷查询。"
-                                : "你还没有绑定玩家ID，无法使用快捷查询。请先使用 /bind <玩家ID>";
-                        return new ShortcutTarget(null, null, null, null, errorMessage);
-                    }
-
-
-                    return new ShortcutTarget(null, uid, "mp", null, null);
-                }
                 default -> {
                     return new ShortcutTarget(null, null, null, null, "未知的快捷查询");
                 }
             }
+        }
+
+        if ("mp".equalsIgnoreCase(arg.trim())) {
+            Integer uid = resolveBoundUid(senderUserId);
+            if (uid == null) {
+                String errorMessage = mentionedUser
+                        ? "被@的用户还没有绑定玩家ID，无法使用快捷查询。"
+                        : "你还没有绑定玩家ID，无法使用快捷查询。请先使用 /bind <玩家ID>";
+                return new ShortcutTarget(null, null, null, null, errorMessage);
+            }
+
+            return new ShortcutTarget(null, uid, "mp", null, null);
         }
 
         Matcher beatmapMatcher = Patterns.BEATMAP_MACRO_PATTERN.matcher(arg.trim());
@@ -228,7 +228,7 @@ final class Resolver {
     }
 
     private static final class Patterns {
-        private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(?:(rs|bo)(\\d+)|mp)$");
+        private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo)(\\d+)$");
         private static final Pattern SET_MACRO_PATTERN = Pattern.compile("^(\\d+)#(\\d+)$");
         private static final Pattern BEATMAP_MACRO_PATTERN = Pattern.compile("^m(\\d+)$");
         private static final Pattern CQ_AT_PATTERN = Pattern.compile("^\\[CQ:at,qq=(\\d+)(?:,.*)?]$");

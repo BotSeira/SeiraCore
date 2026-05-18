@@ -161,9 +161,9 @@ final class ReplyFactory {
         );
     }
 
-    public PendingMessage friendMessage(List<Pair<Integer, String>> mutual, List<Pair<Integer, String>> onlyFollowed, List<Pair<Integer, String>> onlyFollower) {
+    public PendingMessage friendMessage(int followedCount, List<Pair<Integer, String>> mutual, List<Pair<Integer, String>> onlyFollowed, List<Pair<Integer, String>> onlyFollower) {
         return PendingMessage.ofMarkdownRaw(
-                Contents.friendContent(mutual, onlyFollowed, onlyFollower),
+                Contents.friendContent(followedCount, mutual, onlyFollowed, onlyFollower),
                 null
         );
     }
@@ -224,21 +224,22 @@ final class ReplyFactory {
             return sb.toString().trim();
         }
 
-        public static String friendContent(List<Pair<Integer, String>> mutual, List<Pair<Integer, String>> onlyFollowed, List<Pair<Integer, String>> onlyFollower) {
+        public static String friendContent(int followedCount, List<Pair<Integer, String>> mutual, List<Pair<Integer, String>> onlyFollowed, List<Pair<Integer, String>> onlyFollower) {
             StringBuilder sb = new StringBuilder();
-            sb.append("> 双向好友↔ (").append(mutual.size()).append(")\n>");
-            for (Pair<Integer, String> integerStringPair : mutual) {
-                sb.append(cmd("/u " + integerStringPair.getFirst(), integerStringPair.getSecond())).append(" ");
+            sb.append("\uD83D\uDC65").append("好友列表 - 共关注了 ").append(followedCount).append(" 位玩家\n");
+            sb.append("> 好友←→ (").append(mutual.size()).append(")\n>");
+            for (Pair<Integer, String> p : mutual) {
+                sb.append(cmd("/u " + p.getFirst(), "[" + p.getSecond() + "]")).append(" ");
             }
 
             sb.append("\n> 仅关注→ (").append(onlyFollowed.size()).append(")\n>");
-            for (Pair<Integer, String> integerStringPair : onlyFollowed) {
-                sb.append(cmd("/u " + integerStringPair.getFirst(), integerStringPair.getSecond())).append(" ");
+            for (Pair<Integer, String> p : onlyFollowed) {
+                sb.append(cmd("/u " + p.getFirst(), "[" + p.getSecond() + "]")).append(" ");
             }
 
             sb.append("\n> 仅粉丝← (").append(onlyFollower.size()).append(")\n>");
-            for (Pair<Integer, String> integerStringPair : onlyFollower) {
-                sb.append(cmd("/u " + integerStringPair.getFirst(), integerStringPair.getSecond())).append(" ");
+            for (Pair<Integer, String> p : onlyFollower) {
+                sb.append(cmd("/u " + p.getFirst(), "[" + p.getSecond() + "]")).append(" ");
             }
 
             return sb.toString().trim();
