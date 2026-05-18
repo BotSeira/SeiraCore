@@ -8,6 +8,7 @@ import xyz.zcraft.Seira;
 import xyz.zcraft.command.ResolutionException;
 import xyz.zcraft.command.resolution.ShortcutTarget;
 import xyz.zcraft.data.*;
+import xyz.zcraft.util.TimeDurationParser;
 
 import java.io.IOException;
 import java.net.URI;
@@ -425,11 +426,11 @@ public class APIHelper {
         }
     }
 
-    public static ReplayTaskInfo createReplayRenderTask(ShortcutTarget target) {
-        return createReplayTask(target);
+    public static ReplayTaskInfo createReplayRenderTask(ShortcutTarget target, TimeDurationParser.TimeRange timeRange) {
+        return createReplayTask(target, timeRange);
     }
 
-    public static ReplayTaskInfo createShowcaseRenderTaskByBeatmap(Long beatmapId, String[] uids) {
+    public static ReplayTaskInfo createShowcaseRenderTaskByBeatmap(Long beatmapId, String[] uids, TimeDurationParser.TimeRange timeRange) {
         if (beatmapId == null || beatmapId <= 0) {
             throw new RuntimeException("铺面ID无效。");
         }
@@ -438,10 +439,10 @@ public class APIHelper {
         }
 
         String uidsParam = String.join(",", uids);
-        return createReplayTask("/replay/showcase?m=" + beatmapId + "&u=" + uidsParam);
+        return createReplayTask("/replay/showcase?m=" + beatmapId + "&u=" + uidsParam + (timeRange != null ? timeRange.toQueryString() : ""));
     }
 
-    public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] groupUids) {
+    public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] groupUids, TimeDurationParser.TimeRange timeRange) {
         if (!target.isMacro() || target.boundUid() == null) {
             throw new RuntimeException("同屏回放仅支持玩家快捷查询（如 rs1/bo1）。");
         }
@@ -454,6 +455,11 @@ public class APIHelper {
                 + "&i=" + target.macroIndex()
                 + "&us=" + target.boundUid()
                 + "&u=" + groupUidsParam;
+
+        if(timeRange != null) {
+            query += timeRange.toQueryString();
+        }
+
         return createReplayTask(query);
     }
 
@@ -466,8 +472,8 @@ public class APIHelper {
         }
     }
 
-    private static ReplayTaskInfo createReplayTask(ShortcutTarget target) {
-        return createReplayTask(getReplayRenderQuery(target));
+    private static ReplayTaskInfo createReplayTask(ShortcutTarget target, TimeDurationParser.TimeRange timeRange) {
+        return createReplayTask(getReplayRenderQuery(target, timeRange));
     }
 
     private static ReplayTaskInfo createReplayTask(String query) {
@@ -605,14 +611,14 @@ public class APIHelper {
         }
     }
 
-    private static String getReplayRenderQuery(ShortcutTarget target) {
+    private static String getReplayRenderQuery(ShortcutTarget target, TimeDurationParser.TimeRange timeRange) {
         if (target.isMacro()) {
             if (target.boundUid() == null) {
                 throw new RuntimeException("回放仅支持玩家快捷查询（如 rs1/bo1）或成绩ID。");
             }
-            return "/replay/render?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+            return "/replay/render?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid() + (timeRange != null ? timeRange.toQueryString() : "");
         }
-        return "/replay/render?s=" + target.explicitId();
+        return "/replay/render?s=" + target.explicitId() + (timeRange != null ? timeRange.toQueryString() : "");
     }
 
     private static void ensureApiSuccess(RawResponse payload, String fallbackMessage) {

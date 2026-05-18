@@ -77,7 +77,7 @@ final class ReplyFactory {
             queuedText += "\n队列位置: " + taskInfo.position();
         }
         if (taskInfo.taskId() != null) {
-            queuedText += "\n请求: " + cmd("/rstat " + taskInfo.taskId(), taskInfo.taskId().substring(0, 8));
+            queuedText += "\n请求: " + taskInfo.taskId();
         }
         if (taskInfo.message() != null) {
             queuedText += "\n" + taskInfo.message();
