@@ -618,6 +618,7 @@ public class Router {
                         /bind <玩家ID> - 绑定你的玩家ID
                         /unbind - 解除你的玩家ID绑定
                         /clearhistory - 清除你在群聊中的记录
+                        /f - 获取好友列表
                         /bo <个数> [玩家ID] - 获取BoN图谱
                         /rs <个数> [玩家ID] - 获取最近成绩图谱
                         /m <铺面ID> - 获取铺面图谱
@@ -625,6 +626,7 @@ public class Router {
                         /r <成绩ID或快捷查询> - 生成成绩回放视频
                         /rsc <铺面ID或快捷查询> [+用户ID列表] - 生成同屏回放视频
                         /rstat [任务ID] - 查询渲染进度
+                        /dl <ID或快捷查询> - 获取镜像下载链接
                         /sms [#页数] <关键字> - 搜索铺面集
                         /lb <铺面ID> [玩家ID列表] - 获取指定铺面排行榜
                         /daily - 获取每日挑战
