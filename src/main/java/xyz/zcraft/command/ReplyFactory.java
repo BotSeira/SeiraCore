@@ -161,9 +161,9 @@ final class ReplyFactory {
         );
     }
 
-    public PendingMessage friendMessage(int followedCount, List<Pair<Integer, String>> mutual, List<Pair<Integer, String>> onlyFollowed, List<Pair<Integer, String>> onlyFollower) {
+    public PendingMessage friendMessage(boolean inGroup, int followedCount, List<Pair<Integer, String>> mutual, List<Pair<Integer, String>> onlyFollowed, List<Pair<Integer, String>> onlyFollower) {
         return PendingMessage.ofMarkdownRaw(
-                Contents.friendContent(followedCount, mutual, onlyFollowed, onlyFollower),
+                Contents.friendContent(inGroup, followedCount, mutual, onlyFollowed, onlyFollower),
                 null
         );
     }
@@ -224,9 +224,13 @@ final class ReplyFactory {
             return sb.toString().trim();
         }
 
-        public static String friendContent(int followedCount, List<Pair<Integer, String>> mutual, List<Pair<Integer, String>> onlyFollowed, List<Pair<Integer, String>> onlyFollower) {
+        public static String friendContent(boolean inGroup, int followedCount, List<Pair<Integer, String>> mutual, List<Pair<Integer, String>> onlyFollowed, List<Pair<Integer, String>> onlyFollower) {
             StringBuilder sb = new StringBuilder();
-            sb.append("\uD83D\uDC65").append("好友列表 - 共关注了 ").append(followedCount).append(" 位玩家\n");
+            if (inGroup) {
+                sb.append("\uD83D\uDC65").append("本群好友列表\n");
+            } else {
+                sb.append("\uD83D\uDC65").append("全部好友列表 - 共关注了 ").append(followedCount).append(" 位玩家\n");
+            }
             sb.append("> 好友←→ (").append(mutual.size()).append(")\n>");
             for (Pair<Integer, String> p : mutual) {
                 sb.append(cmd("/u " + p.getFirst(), "[" + p.getSecond() + "]")).append(" ");

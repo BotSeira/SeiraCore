@@ -311,7 +311,7 @@ public class Router {
                     final List<Integer> followed = content.stream().map(FriendEntry::id).toList();
 
                     final Predicate<Integer> filter = (
-                            groupId == null
+                            (groupId == null || groupId.isBlank())
                                     ? (_) -> true
                                     : (i) -> UserDataStore.findBoundUidsByGroup(groupId).contains(i)
                     );
@@ -349,7 +349,7 @@ public class Router {
                         }
                     }
 
-                    return replyFactory.friendMessage(followed.size(), mutual, onlyFollowed, onlyFollower);
+                    return replyFactory.friendMessage((groupId == null || groupId.isBlank()), followed.size(), mutual, onlyFollowed, onlyFollower);
                 });
             }
             case "dl" -> {
