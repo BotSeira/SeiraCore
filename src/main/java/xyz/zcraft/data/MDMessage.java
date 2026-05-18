@@ -11,9 +11,9 @@ import java.util.List;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class MDMessage extends PendingMessage {
+    private final static Gson GSON = new Gson();
     private String markdown;
     private List<List<Button>> buttons;
-    private final static Gson GSON = new Gson();
 
     public static MDMessage ofMarkdown(String markdown, List<List<Button>> buttons) {
         MDMessage message = new MDMessage();

@@ -9,6 +9,7 @@ import com.qcloud.cos.model.PutObjectRequest;
 import com.qcloud.cos.region.Region;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.config.CosConfig;
 import xyz.zcraft.data.PendingMessage;
 
@@ -39,11 +40,24 @@ public class CosService {
     }
 
     public String uploadFromUrl(String sourceUrl, int fileType) {
+        return uploadFromUrl(sourceUrl, fileType, null);
+    }
+
+    public String uploadFromUrl(String sourceUrl, int fileType, String objectKey) {
         LOG.info("Processing file upload from url: {}", sourceUrl);
 
         DownloadedMedia media = downloadMedia(sourceUrl);
-        String objectKey = buildObjectKey(fileType, sourceUrl, media.contentType());
+        if (objectKey == null) {
+            objectKey = buildObjectKey(fileType, sourceUrl, media.contentType());
+        }
 
+        final String s = doUpload(objectKey, media);
+        LOG.info("Uploaded media to COS. sourceUrl={}, cosUrl={}", sourceUrl, s);
+        return s;
+    }
+
+    @NotNull
+    private String doUpload(String objectKey, DownloadedMedia media) {
         ObjectMetadata metadata = new ObjectMetadata();
         metadata.setContentLength(media.content().length);
         if (media.contentType() != null && !media.contentType().isBlank()) {
@@ -58,9 +72,7 @@ public class CosService {
         );
         client.putObject(putObjectRequest);
 
-        String cosUrl = buildObjectUrl(objectKey);
-        LOG.info("Uploaded media to COS. sourceUrl={}, cosUrl={}", sourceUrl, cosUrl);
-        return cosUrl;
+        return buildObjectUrl(objectKey);
     }
 
     private DownloadedMedia downloadMedia(String sourceUrl) {

@@ -39,12 +39,12 @@ final class TaskCoordinator {
     }
 
     RouteDecision queueImageRequest(String requestType, ImageResponseCreator creator, ImageResponsePostProcessor postProcessor) {
-        AtomicReference<Response<?>> responseRef = new AtomicReference<>();
+        AtomicReference<Response<Base64Bytes>> responseRef = new AtomicReference<>();
         return queueApiRequest(requestType,
                 () -> {
-                    Response<?> response = creator.create();
+                    Response<Base64Bytes> response = creator.create();
                     responseRef.set(response);
-                    return PendingMessage.ofImageBase64(response.getBase64());
+                    return PendingMessage.ofImageBase64(response.getContent().toBase64());
                 },
                 () -> postProcessor.execute(responseRef.get()),
                 () -> {
@@ -137,7 +137,7 @@ final class TaskCoordinator {
             LOG.info("Uploading media for {}", messageId);
             FileInfo fileInfo = groupMessage
                     ? messageSender.uploadGroupMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl())
-                    : messageSender.uploadPrivateMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl()); 
+                    : messageSender.uploadPrivateMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl());
             if (fileInfo == null) {
                 LOG.error("Failed to upload media for message {}", messageId);
                 message.setContent("媒体文件上传失败");

@@ -26,6 +26,7 @@ public class ApiRequestException extends RuntimeException {
             case NO_ROOM_FOUND -> "当前没有可用的多人房间信息。";
 
             case ILLEGAL_ARGUMENT -> "请求参数不合法，请检查指令参数格式。";
+            case UNAUTHORIZED -> "缺少用户凭据，请重新绑定。";
 
             case BEATMAP_FETCH_FAILED -> "获取铺面数据失败，请稍后重试。";
             case BEATMAPSET_FETCH_FAILED -> "获取铺面集数据失败，请稍后重试。";

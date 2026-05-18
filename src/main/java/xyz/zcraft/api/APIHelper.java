@@ -7,9 +7,7 @@ import com.google.gson.JsonObject;
 import xyz.zcraft.Seira;
 import xyz.zcraft.command.ResolutionException;
 import xyz.zcraft.command.resolution.ShortcutTarget;
-import xyz.zcraft.data.RenderStat;
-import xyz.zcraft.data.SearchQuery;
-import xyz.zcraft.data.SearchResultItem;
+import xyz.zcraft.data.*;
 
 import java.io.IOException;
 import java.net.URI;
@@ -19,7 +17,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Base64;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -34,11 +31,42 @@ public class APIHelper {
         ENDPOINT = Seira.getConfig().ostella().endpoint();
     }
 
+    public static Response<List<FriendEntry>> getFollowed(String accessToken) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/friends"))
+                    .header("Authorization", "Bearer " + accessToken)
+                    .GET()
+                    .build();
 
-    public static Response<Void> getBoNResponse(int n, int uid) {
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw parseHttpError(send.body(), send.statusCode(), "获取多人房间失败");
+            }
+
+            final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
+            ensureApiSuccess(r, "获取多人房间失败");
+            final JsonArray data = r.getData().getAsJsonArray();
+
+            LinkedList<FriendEntry> followed = new LinkedList<>();
+
+            for (JsonElement datum : data) {
+                followed.add(GSON.fromJson(datum, FriendEntry.class));
+            }
+
+            return Response.<List<FriendEntry>>fromHeaders(send.headers())
+                    .content(followed)
+                    .build();
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static Response<Base64Bytes> getBoNResponse(int n, int uid) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/bo?" + "n=" + n + "&u=" + uid))
+                    .uri(URI.create(ENDPOINT + "/bestof?" + "n=" + n + "&u=" + uid))
                     .GET()
                     .build();
             final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
@@ -49,22 +77,22 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Response.<Void>fromHeaders(send.headers())
-                    .base64(Base64.getEncoder().encodeToString(imageBytes))
+            return Response.<Base64Bytes>fromHeaders(send.headers())
+                    .content(new Base64Bytes(imageBytes))
                     .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static Response<Void> getGroupLeaderboardResponse(ShortcutTarget target, String[] uids) {
+    public static Response<Base64Bytes> getGroupLeaderboardResponse(ShortcutTarget target, String[] uids) {
         String uidsParam = String.join(",", uids);
         try {
             String query;
             if (target.isMacro()) {
-                query = "/pk?of=" + target.macroType() + "&i=" + target.macroIndex() + "&us=" + target.boundUid() + "&u=" + uidsParam;
+                query = "/maplb?of=" + target.macroType() + "&i=" + target.macroIndex() + "&us=" + target.boundUid() + "&u=" + uidsParam;
             } else {
-                query = "/pk?m=" + target.explicitId() + "&u=" + uidsParam;
+                query = "/maplb?m=" + target.explicitId() + "&u=" + uidsParam;
             }
 
             HttpRequest localRequest = HttpRequest.newBuilder()
@@ -80,19 +108,19 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Response.<Void>fromHeaders(send.headers())
-                    .base64(Base64.getEncoder().encodeToString(imageBytes))
+            return Response.<Base64Bytes>fromHeaders(send.headers())
+                    .content(new Base64Bytes(imageBytes))
                     .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static Response<Void> getLeaderboardResponse(String[] uids) {
+    public static Response<Base64Bytes> getLeaderboardResponse(String[] uids) {
         String uidsParam = String.join(",", uids);
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/lb?" + "u=" + uidsParam))
+                    .uri(URI.create(ENDPOINT + "/leaderboard?" + "u=" + uidsParam))
                     .GET()
                     .build();
             final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
@@ -103,8 +131,8 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Response.<Void>fromHeaders(send.headers())
-                    .base64(Base64.getEncoder().encodeToString(imageBytes))
+            return Response.<Base64Bytes>fromHeaders(send.headers())
+                    .content(new Base64Bytes(imageBytes))
                     .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
@@ -129,7 +157,7 @@ public class APIHelper {
             final JsonObject data = r.getData().getAsJsonObject();
 
             String mods = null;
-            if (data.has("required_mods") && !data.get("required_mods").isJsonNull()) 
+            if (data.has("required_mods") && !data.get("required_mods").isJsonNull())
                 mods = data.get("required_mods").getAsString();
             return String.format(
                     """
@@ -151,10 +179,11 @@ public class APIHelper {
         }
     }
 
-    public static String getMultiplayerRooms() {
+    public static Response<String> getMultiplayerRoom(String accessToken) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/mp"))
+                    .header("Authorization", "Bearer " + accessToken)
                     .GET()
                     .build();
 
@@ -166,23 +195,49 @@ public class APIHelper {
 
             final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
             ensureApiSuccess(r, "获取多人房间失败");
-            final JsonArray data = r.getData().getAsJsonArray();
+            final JsonObject data = r.getData().getAsJsonObject();
 
-            final StringBuilder sb = new StringBuilder("## 进行中的多人游戏\n");
-            for (JsonElement datum : data) {
-                sb.append(datum.getAsString()).append("\n");
-            }
+            String str = "## 进行中的多人游戏\n" +
+                    "房间名: " + data.get("name") + "\n" +
+                    "人数: " + data.get("participant_count") + "\n" +
+                    "ID: " + data.get("id");
 
-            return sb.toString().trim();
+            return Response.<String>fromHeaders(send.headers())
+                    .content(str.trim())
+                    .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static Response<Void> getRecentResponse(int n, int uid) {
+    public static Response<Base64Bytes> getMultiplayerRoomItem(String accessToken) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/beatmap?of=mp"))
+                    .header("Authorization", "Bearer " + accessToken)
+                    .GET()
+                    .build();
+
+            final var send = CLIENT.send(request, HttpResponse.BodyHandlers.ofByteArray());
+
+            if (send.statusCode() != 200) {
+                throw parseHttpError(send.body(), send.statusCode(), "获取多人房间失败");
+            }
+
+            final byte[] imgBytes = send.body();
+
+            return Response.<Base64Bytes>fromHeaders(send.headers())
+                    .content(new Base64Bytes(imgBytes))
+                    .build();
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static Response<Base64Bytes> getRecentResponse(int n, int uid) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/rs?" + "n=" + n + "&u=" + uid))
+                    .uri(URI.create(ENDPOINT + "/recent?" + "n=" + n + "&u=" + uid))
                     .GET()
                     .build();
 
@@ -194,20 +249,21 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Response.<Void>fromHeaders(send.headers())
-                    .base64(Base64.getEncoder().encodeToString(imageBytes))
+            return Response.<Base64Bytes>fromHeaders(send.headers())
+                    .content(new Base64Bytes(imageBytes))
                     .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static Response<Void> getBeatmapResponse(ShortcutTarget target, String mod) {
+    public static Response<Base64Bytes> getBeatmapResponse(ShortcutTarget target, String mod, String auth) {
         try {
             final String query = getBeatmapQuery(target, mod);
 
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + query))
+                    .header("Authorization", "Bearer " + auth)
                     .GET()
                     .build();
 
@@ -219,8 +275,8 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Response.<Void>fromHeaders(send.headers())
-                    .base64(Base64.getEncoder().encodeToString(imageBytes))
+            return Response.<Base64Bytes>fromHeaders(send.headers())
+                    .content(new Base64Bytes(imageBytes))
                     .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
@@ -228,16 +284,21 @@ public class APIHelper {
     }
 
     private static String getBeatmapQuery(ShortcutTarget target, String mod) {
-        String query = "/m?";
+        String query = "/beatmap?";
         if (target.isMacro()) {
-            query += "&i=" + target.macroIndex();
-            if (target.macroType().equals("rs") || target.macroType().equals("bo")) {
-                query += "&of=" + target.macroType() + "&u=" + target.boundUid();
-            } else if (target.macroType().equals("ms")) {
-                query += "&ms=" + target.explicitId();
+            switch (target.macroType()) {
+                case "rs", "bo" -> {
+                    query += "&of=" + target.macroType() + "&u=" + target.boundUid();
+                    query += "&i=" + target.macroIndex();
+                }
+                case "ms" -> {
+                    query += "&ms=" + target.explicitId();
+                    query += "&i=" + target.macroIndex();
+                }
+                case "mp" -> query += "&of=mp";
             }
         } else {
-            query = "/m?m=" + target.explicitId();
+            query = "/beatmap?m=" + target.explicitId();
         }
 
         if (mod != null) {
@@ -247,12 +308,13 @@ public class APIHelper {
         return query;
     }
 
-    public static Response<Void> getBeatmapsetResponse(ShortcutTarget target) {
+    public static Response<Base64Bytes> getBeatmapsetResponse(ShortcutTarget target, String auth) {
         try {
-            final String query = getBeatmapsetQuery(target);
+            final String query = getBeatmapsetQuery(target, "beatmapset");
 
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + query))
+                    .header("Authorization", "Bearer " + auth)
                     .GET()
                     .build();
 
@@ -264,24 +326,26 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Response.<Void>fromHeaders(send.headers())
-                    .base64(Base64.getEncoder().encodeToString(imageBytes))
+            return Response.<Base64Bytes>fromHeaders(send.headers())
+                    .content(new Base64Bytes(imageBytes))
                     .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private static String getBeatmapsetQuery(ShortcutTarget target) {
+    private static String getBeatmapsetQuery(ShortcutTarget target, String prefix) {
         String query = null;
         if (target.isMacro()) {
             if ("m".equals(target.macroType())) {
-                query = "/ms?m=" + target.explicitId();
+                query = "/" + prefix + "?m=" + target.explicitId();
             } else if ("bo".equals(target.macroType()) || "rs".equals(target.macroType())) {
-                query = "/ms?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+                query = "/" + prefix + "?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+            } else if ("mp".equals(target.macroType())) {
+                query = "/" + prefix + "?of=mp";
             }
         } else {
-            query = "/ms?ms=" + target.explicitId();
+            query = "/" + prefix + "?ms=" + target.explicitId();
         }
 
         if (query == null) {
@@ -290,7 +354,7 @@ public class APIHelper {
         return query;
     }
 
-    public static Response<Void> getScoreResponse(ShortcutTarget target) {
+    public static Response<Base64Bytes> getScoreResponse(ShortcutTarget target) {
         try {
             final String query = getScoreQuery(target);
 
@@ -307,8 +371,8 @@ public class APIHelper {
 
             byte[] imageBytes = send.body();
 
-            return Response.<Void>fromHeaders(send.headers())
-                    .base64(Base64.getEncoder().encodeToString(imageBytes))
+            return Response.<Base64Bytes>fromHeaders(send.headers())
+                    .content(new Base64Bytes(imageBytes))
                     .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
@@ -320,14 +384,14 @@ public class APIHelper {
         if (target.isMacro()) {
             query = switch (target.macroType()) {
                 case "bo", "rs" ->
-                        "/s?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
-                case "m" -> "/s?m=" + target.explicitId() + "&u=" + target.boundUid();
+                        "/score?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+                case "m" -> "/score?m=" + target.explicitId() + "&u=" + target.boundUid();
                 case "ms" ->
-                        "/s?ms=" + target.explicitId() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+                        "/score?ms=" + target.explicitId() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
                 case null, default -> throw new IllegalArgumentException("Invalid macro type");
             };
         } else {
-            query = "/s?s=" + target.explicitId();
+            query = "/score?s=" + target.explicitId();
         }
         return query;
     }
@@ -335,7 +399,7 @@ public class APIHelper {
     public static Response<List<SearchResultItem>> searchBeatmapSetResponse(SearchQuery query) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/sms?" + "q=" + URLEncoder.encode(query.query(), StandardCharsets.UTF_8)))
+                    .uri(URI.create(ENDPOINT + "/searchms?" + "q=" + URLEncoder.encode(query.query(), StandardCharsets.UTF_8)))
                     .GET()
                     .build();
 
@@ -686,6 +750,34 @@ public class APIHelper {
 
         return sb.toString().trim();
 
+    }
+
+    public static Response<?> lookupBeatmapset(ShortcutTarget target, String s) {
+        try {
+            final String query = getBeatmapsetQuery(target, "lookup/beatmapset");
+
+            HttpRequest localRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + query))
+                    .header("Authorization", "Bearer " + s)
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw parseHttpError(send.body(), send.statusCode(), "获取铺面集失败");
+            }
+
+            final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
+            ensureApiSuccess(rawResponse, "查找铺面集失败");
+            final JsonObject data = rawResponse.getData().getAsJsonObject();
+
+            return Response.<Void>fromHeaders(send.headers())
+                    .beatmapsetId(data.get("id").getAsString())
+                    .build();
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public record ReplayRenderResult(String videoUrl, String taskId) {

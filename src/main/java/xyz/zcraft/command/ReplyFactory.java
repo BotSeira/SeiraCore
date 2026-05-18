@@ -1,5 +1,6 @@
 package xyz.zcraft.command;
 
+import kotlin.Pair;
 import xyz.zcraft.api.APIHelper;
 import xyz.zcraft.api.Response;
 import xyz.zcraft.binding.BindingHelper;
@@ -18,23 +19,36 @@ final class ReplyFactory {
         this.config = config;
     }
 
+    private static String cmd(String command, String text) {
+        return "<qqbot-cmd-input text=\"%s\" show=\"%s\" reference=\"false\" />".formatted(command, text);
+    }
+
+    private static String at(String id) {
+        return "<qqbot-at-user id=\"%s\" /> ".formatted(id);
+    }
+
     public PendingMessage boMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> b" + response.getScoreIds().size() + "查询完成\n玩家: " + response.getUserId(),
+                "> B" + response.getScoreIds().size() + "查询完成\n" +
+                        "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()),
                 Buttons.boButtons()
         );
     }
 
     public PendingMessage rsMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 最近成绩查询完成\n玩家: " + response.getUserId() + "\n数量: " + response.getScoreIds().size(),
+                "> 最近成绩查询完成\n" +
+                        "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()) + "\n" +
+                        "> 数量: " + response.getScoreIds().size(),
                 Buttons.rsButtons()
         );
     }
 
     public PendingMessage beatmapMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 铺面查询完成\n铺面: " + response.getBeatmapId(),
+                "> 铺面查询完成\n" +
+                        "> 铺面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
+                        "> 铺面集: " + cmd("/ms m" + response.getBeatmapId(), response.getBeatmapsetId()),
                 Buttons.beatmapButtons(response.getBeatmapId(), config.seira().directUrl())
         );
 
@@ -42,14 +56,17 @@ final class ReplyFactory {
 
     public PendingMessage scoreMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 成绩查询完成\n铺面: " + response.getBeatmapId() + "\n成绩: " + response.getScoreId(),
+                "> 成绩查询完成\n" +
+                        "> 铺面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
+                        "> 成绩: " + cmd("/s " + response.getScoreId(), response.getScoreId()),
                 Buttons.sButtons(response.getBeatmapId(), response.getScoreId())
         );
     }
 
     public PendingMessage lbMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 排行榜查询完成" + (response.getBeatmapId() == null ? "" : "\n铺面: " + response.getBeatmapId()),
+                "> 排行榜查询完成" +
+                        (response.getBeatmapId() == null ? "" : "\n铺面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId())),
                 Buttons.lbButtons(response.getBeatmapId())
         );
     }
@@ -60,7 +77,7 @@ final class ReplyFactory {
             queuedText += "\n队列位置: " + taskInfo.position();
         }
         if (taskInfo.taskId() != null) {
-            queuedText += "\n请求: " + taskInfo.taskId();
+            queuedText += "\n请求: " + cmd("/rstat " + taskInfo.taskId(), taskInfo.taskId().substring(0, 8));
         }
         if (taskInfo.message() != null) {
             queuedText += "\n" + taskInfo.message();
@@ -71,7 +88,7 @@ final class ReplyFactory {
 
     public PendingMessage replayStatMessage(String jobId, RenderStat renderStat) {
         return PendingMessage.ofMarkdownRaw(
-                Contents.replayStatContent(renderStat),
+                Contents.replayStatContent(renderStat, jobId),
                 Buttons.replayProgressButtons(jobId)
         );
     }
@@ -86,8 +103,16 @@ final class ReplyFactory {
 
     public PendingMessage beatmapsetMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 铺面集查询完成\nID: " + response.getBeatmapsetId(),
-                Buttons.beatmapsetButtons(response.getBeatmapStars(), response.getBeatmapIds())
+                Contents.beatmapsetContent(response),
+                null
+        );
+    }
+
+    public PendingMessage dlMessage(Response<?> response) {
+        return PendingMessage.ofMarkdownRaw(
+                "> 铺面集: " + response.getBeatmapsetId() + "\n" +
+                        "> 选择下载镜像: ",
+                Buttons.dlButton(response.getBeatmapsetId())
         );
     }
 
@@ -95,8 +120,15 @@ final class ReplyFactory {
         final String url = "https://osu.ppy.sh/oauth/authorize?client_id=%d&response_type=code&scope=public+identify+friends.read&state=%s"
                 .formatted(config.clientId(), task.taskId());
         return PendingMessage.ofMarkdownRaw(
-                (isC2C ? "" : "<qqbot-at-user id=\"%s\" /> ".formatted(task.openId())) + "点击下方按钮绑定账号,或者在浏览器打开以下链接: \n```\n%s\n```".formatted(url),
+                (isC2C ? "" : at(task.openId())) + "点击下方按钮绑定账号,或者在浏览器打开以下链接: \n```\n%s\n```".formatted(url),
                 Buttons.bindButtons(task.openId(), url, !isC2C)
+        );
+    }
+
+    public PendingMessage mpMessage(Response<String> response) {
+        return PendingMessage.ofMarkdownRaw(
+                response.getContent(),
+                Buttons.mpButtons(response.getRoomId(), config.seira().directUrl())
         );
     }
 
@@ -109,10 +141,39 @@ final class ReplyFactory {
         );
     }
 
+    public PendingMessage inspectMessage(String senderUserId, boolean isAdmin, String groupId, String messageId) {
+        return PendingMessage.ofMarkdownRaw(
+                """
+                        用户ID%s:
+                        ```text
+                        %s
+                        ```
+                        
+                        群组ID:
+                        ```text
+                        %s
+                        ```
+                        
+                        消息ID:
+                        ```text
+                        %s
+                        ```
+                        """.formatted(isAdmin ? "(管理员)" : "", senderUserId, groupId, messageId),
+                null
+        );
+    }
+
+    public PendingMessage friendMessage(boolean inGroup, int followedCount, List<Pair<Integer, String>> mutual, List<Pair<Integer, String>> onlyFollowed, List<Pair<Integer, String>> onlyFollower) {
+        return PendingMessage.ofMarkdownRaw(
+                Contents.friendContent(inGroup, followedCount, mutual, onlyFollowed, onlyFollower),
+                null
+        );
+    }
+
     private static final class Contents {
-        static String replayStatContent(RenderStat renderStat) {
+        static String replayStatContent(RenderStat renderStat, String jobId) {
             StringBuilder sb = new StringBuilder();
-            sb.append("> 请求: ").append(renderStat.getJobId(), 0, 8).append("\n");
+            sb.append("> 请求: ").append(jobId, 0, 8).append("\n");
 
             sb.append("状态: ").append(switch (renderStat.getStatus()) {
                 case "done" -> "已完成";
@@ -146,16 +207,58 @@ final class ReplyFactory {
                 SearchResultItem item = items.get(i);
                 sb.append("> ");
                 sb.append(i + 1).append("# ")
-                        .append("<qqbot-cmd-input text=\"%s\" show=\"%d\" reference=\"false\" />".formatted("/ms " + item.beatmapsetId(), item.beatmapsetId()))
+                        .append(cmd("/ms " + item.beatmapsetId(), String.valueOf(item.beatmapsetId())))
                         .append(" - ").append(item.artist()).append(" - ").append(item.title())
                         .append(" <").append(item.mapperName()).append("> ").append(String.format("[%.2f★ ~ %.2f★]", item.minStar(), item.maxStar())).append("\n");
             }
 
             return sb.toString();
         }
+
+        static String beatmapsetContent(Response<?> response) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("> 铺面集查询完成").append("\n");
+            sb.append("> 铺面集: ").append(cmd("/ms " + response.getBeatmapsetId(), response.getBeatmapsetId())).append("\n");
+            sb.append("> ");
+            for (int i = 0; i < response.getBeatmapStars().size(); i++) {
+                sb.append(cmd("/m " + response.getBeatmapIds().get(i), response.getBeatmapStars().get(i) + "★")).append(" ");
+            }
+            return sb.toString().trim();
+        }
+
+        public static String friendContent(boolean inGroup, int followedCount, List<Pair<Integer, String>> mutual, List<Pair<Integer, String>> onlyFollowed, List<Pair<Integer, String>> onlyFollower) {
+            StringBuilder sb = new StringBuilder();
+            if (inGroup) {
+                sb.append("\uD83D\uDC65").append("本群好友列表\n");
+            } else {
+                sb.append("\uD83D\uDC65").append("全部好友列表 - 共关注了 ").append(followedCount).append(" 位玩家\n");
+            }
+            sb.append("> 好友←→ (").append(mutual.size()).append(")\n>");
+            for (Pair<Integer, String> p : mutual) {
+                sb.append(cmd("/u " + p.getFirst(), "[" + p.getSecond() + "]")).append(" ");
+            }
+
+            sb.append("\n> 仅关注→ (").append(onlyFollowed.size()).append(")\n>");
+            for (Pair<Integer, String> p : onlyFollowed) {
+                sb.append(cmd("/u " + p.getFirst(), "[" + p.getSecond() + "]")).append(" ");
+            }
+
+            sb.append("\n> 仅粉丝← (").append(onlyFollower.size()).append(")\n>");
+            for (Pair<Integer, String> p : onlyFollower) {
+                sb.append(cmd("/u " + p.getFirst(), "[" + p.getSecond() + "]")).append(" ");
+            }
+
+            return sb.toString().trim();
+        }
     }
 
     private static final class Buttons {
+        static List<List<Button>> mpButtons(String roomId, String directUrl) {
+            return Button.keyboard(Button.row(
+                    Button.openUrl(1, "在游戏中查看", directUrl + "/room/" + roomId)
+            ));
+        }
+
         static List<List<Button>> bindButtons(String userId, String url, boolean restrict) {
             final Button button = Button.openUrl(1, "登录", url);
             if (restrict) button.permit(userId);
@@ -195,14 +298,14 @@ final class ReplyFactory {
         static List<List<Button>> boButtons() {
             return Button.keyboard(Button.row(
                     Button.command(1, "查询最好成绩", "/s bo1"),
-                    Button.command(2, "渲染最好成绩", "/r bo1")
+                    Button.command(2, "查询最近成绩", "/s rs1")
             ));
         }
 
         static List<List<Button>> rsButtons() {
             return Button.keyboard(Button.row(
-                    Button.command(1, "查询最近成绩", "/s rs1"),
-                    Button.command(2, "渲染最近成绩", "/r rs1")
+                    Button.command(1, "查询最好成绩", "/s bo1"),
+                    Button.command(2, "查询最近成绩", "/s rs1")
             ));
         }
 
@@ -261,45 +364,20 @@ final class ReplyFactory {
             );
         }
 
-        public static List<List<Button>> beatmapsetButtons(List<String> stars, List<String> ids) {
-            if (ids == null || ids.isEmpty()) {
-                return null;
-            }
-
-            List<List<Button>> rows = new ArrayList<>();
-            List<Button> currentRow = new ArrayList<>(5);
-            int buttonIndex = 0;
-            for (int i = 0; i < ids.size(); i++) {
-                String beatmapId = ids.get(i);
-                if (beatmapId == null || beatmapId.isBlank()) {
-                    continue;
-                }
-
-                buttonIndex++;
-                currentRow.add(Button.command(buttonIndex, stars.get(i) + "★", "/m " + beatmapId));
-                if (currentRow.size() == 5) {
-                    rows.add(List.copyOf(currentRow));
-                    currentRow.clear();
-
-                    if (rows.size() >= 5) {
-                        break;
-                    }
-                }
-            }
-
-            if (!currentRow.isEmpty()) {
-                fillDummyButtons(currentRow);
-                rows.add(List.copyOf(currentRow));
-            }
-
-            return rows;
-        }
-
         private static void fillDummyButtons(List<Button> buttons) {
             final int c = 5 - buttons.size();
             for (int i = 0; i < c; i++) {
                 buttons.add(Button.command(i + 100, false, "", ""));
             }
+        }
+
+        public static List<List<Button>> dlButton(String beatmapsetId) {
+            return Button.keyboard(
+                    Button.row(
+                            Button.openUrl(1, "Sayobot", "https://dl.sayobot.cn/beatmaps/download/" + beatmapsetId),
+                            Button.openUrl(2, "Nekoha", "https://mirror.nekoha.moe/api4/download/" + beatmapsetId)
+                    )
+            );
         }
     }
 }

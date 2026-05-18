@@ -1,10 +1,10 @@
 package xyz.zcraft.command;
 
-import xyz.zcraft.binding.UserBindingStore;
+import xyz.zcraft.binding.UserDataStore;
+import xyz.zcraft.command.resolution.ShortcutTarget;
 import xyz.zcraft.command.resolution.TargetResolution;
 import xyz.zcraft.command.resolution.UidListResolution;
 import xyz.zcraft.command.resolution.UidResolution;
-import xyz.zcraft.command.resolution.ShortcutTarget;
 import xyz.zcraft.data.SearchQuery;
 
 import java.util.LinkedHashSet;
@@ -16,21 +16,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 final class Resolver {
-    private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo)(\\d+)$");
-    private static final Pattern SET_MACRO_PATTERN = Pattern.compile("^(\\d+)#(\\d+)$");
-    private static final Pattern BEATMAP_MACRO_PATTERN = Pattern.compile("^m(\\d+)$");
-    private static final Pattern CQ_AT_PATTERN = Pattern.compile("^\\[CQ:at,qq=(\\d+)(?:,.*)?]$");
-    private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
-    private static final Pattern SEARCH_PATTERN = Pattern.compile("^(?:#(\\d+) )?(.+)$");
-
-    private final String rscUsage;
-
-    Resolver(String rscUsage) {
-        this.rscUsage = rscUsage;
-    }
-
     public SearchQuery resolveSearchQuery(String arg) {
-        final Optional<MatchResult> first = SEARCH_PATTERN.matcher(arg.trim()).results().findFirst();
+        final Optional<MatchResult> first = Patterns.SEARCH_PATTERN.matcher(arg.trim()).results().findFirst();
         if (first.isPresent()) {
             final MatchResult m = first.get();
             String pagePart = m.group(1);
@@ -87,7 +74,7 @@ final class Resolver {
     }
 
     public UidListResolution resolveRscUidList(String groupId, String extraUidArg) {
-        List<Integer> groupBoundUids = UserBindingStore.findBoundUidsByGroup(groupId);
+        List<Integer> groupBoundUids = UserDataStore.findBoundUidsByGroup(groupId);
         if (groupBoundUids.isEmpty()) {
             return new UidListResolution(null, "本群还没有已绑定的玩家，请先使用 /bind <玩家ID>");
         }
@@ -98,18 +85,18 @@ final class Resolver {
         if (extraUidArg != null) {
             String trimmed = extraUidArg.trim();
             if (!trimmed.startsWith("+")) {
-                return new UidListResolution(null, "追加用户ID列表必须以 + 开头。" + rscUsage);
+                return new UidListResolution(null, "追加用户ID列表必须以 + 开头。");
             }
             String body = trimmed.substring(1).trim();
             if (body.isEmpty()) {
-                return new UidListResolution(null, "追加用户ID列表不能为空。" + rscUsage);
+                return new UidListResolution(null, "追加用户ID列表不能为空。");
             }
 
             String[] extraTokens = body.split(",");
             for (String token : extraTokens) {
                 Integer uid = parsePositiveInt(token.trim());
                 if (uid == null) {
-                    return new UidListResolution(null, "追加用户ID列表包含非法值。" + rscUsage);
+                    return new UidListResolution(null, "追加用户ID列表包含非法值。");
                 }
                 merged.add(String.valueOf(uid));
             }
@@ -122,7 +109,7 @@ final class Resolver {
         if (senderUserId == null || senderUserId.isBlank()) {
             return null;
         }
-        return UserBindingStore.findBoundUid(senderUserId);
+        return UserDataStore.findBoundUid(senderUserId);
     }
 
     public Integer parsePositiveInt(String value) {
@@ -135,7 +122,7 @@ final class Resolver {
     }
 
     public ShortcutTarget parseTarget(String arg, String senderUserId, boolean mentionedUser) {
-        Matcher setMatcher = SET_MACRO_PATTERN.matcher(arg.trim());
+        Matcher setMatcher = Patterns.SET_MACRO_PATTERN.matcher(arg.trim());
         if (setMatcher.matches()) {
             Long setId = parsePositiveLong(setMatcher.group(1));
             Long index = parsePositiveLong(setMatcher.group(2));
@@ -148,15 +135,35 @@ final class Resolver {
             return new ShortcutTarget(setId, uid, "ms", index, null);
         }
 
-        Matcher userMatcher = USER_MACRO_PATTERN.matcher(arg.trim());
+        Matcher userMatcher = Patterns.USER_MACRO_PATTERN.matcher(arg.trim());
         if (userMatcher.matches()) {
             String type = userMatcher.group(1).toLowerCase();
-            Long index = parsePositiveLong(userMatcher.group(2));
 
-            if (index == null || index < 1 || index > 100) {
-                return new ShortcutTarget(null, null, null, null, "快捷指令索引无效，请输入 1-100 之间的数字。例如: rs5");
+            switch (type) {
+                case "rs", "bo" -> {
+                    Long index = parsePositiveLong(userMatcher.group(2));
+
+                    if (index == null || index < 1 || index > 100) {
+                        return new ShortcutTarget(null, null, null, null, "快捷指令索引无效，请输入 1-100 之间的数字。例如: rs5");
+                    }
+
+                    Integer uid = resolveBoundUid(senderUserId);
+                    if (uid == null) {
+                        String errorMessage = mentionedUser
+                                ? "被@的用户还没有绑定玩家ID，无法使用快捷查询。"
+                                : "你还没有绑定玩家ID，无法使用快捷查询。请先使用 /bind <玩家ID>";
+                        return new ShortcutTarget(null, null, null, null, errorMessage);
+                    }
+
+                    return new ShortcutTarget(null, uid, type, index, null);
+                }
+                default -> {
+                    return new ShortcutTarget(null, null, null, null, "未知的快捷查询");
+                }
             }
+        }
 
+        if ("mp".equalsIgnoreCase(arg.trim())) {
             Integer uid = resolveBoundUid(senderUserId);
             if (uid == null) {
                 String errorMessage = mentionedUser
@@ -165,10 +172,10 @@ final class Resolver {
                 return new ShortcutTarget(null, null, null, null, errorMessage);
             }
 
-            return new ShortcutTarget(null, uid, type, index, null);
+            return new ShortcutTarget(null, uid, "mp", null, null);
         }
 
-        Matcher beatmapMatcher = BEATMAP_MACRO_PATTERN.matcher(arg.trim());
+        Matcher beatmapMatcher = Patterns.BEATMAP_MACRO_PATTERN.matcher(arg.trim());
         if (beatmapMatcher.matches()) {
             Long mapId = parsePositiveLong(beatmapMatcher.group(1));
             Integer uid = resolveBoundUid(senderUserId);
@@ -184,7 +191,7 @@ final class Resolver {
     }
 
     private boolean isUserMacro(String arg) {
-        return USER_MACRO_PATTERN.matcher(arg.trim()).matches();
+        return Patterns.USER_MACRO_PATTERN.matcher(arg.trim()).matches();
     }
 
     private boolean looksLikeMention(String token) {
@@ -198,12 +205,12 @@ final class Resolver {
         }
 
         String trimmed = token.trim();
-        Matcher cqMatcher = CQ_AT_PATTERN.matcher(trimmed);
+        Matcher cqMatcher = Patterns.CQ_AT_PATTERN.matcher(trimmed);
         if (cqMatcher.matches()) {
             return cqMatcher.group(1);
         }
 
-        Matcher plainMatcher = PLAIN_AT_PATTERN.matcher(trimmed);
+        Matcher plainMatcher = Patterns.PLAIN_AT_PATTERN.matcher(trimmed);
         if (plainMatcher.matches()) {
             return plainMatcher.group(1);
         }
@@ -218,6 +225,15 @@ final class Resolver {
         } catch (NumberFormatException ignored) {
             return null;
         }
+    }
+
+    private static final class Patterns {
+        private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo)(\\d+)$");
+        private static final Pattern SET_MACRO_PATTERN = Pattern.compile("^(\\d+)#(\\d+)$");
+        private static final Pattern BEATMAP_MACRO_PATTERN = Pattern.compile("^m(\\d+)$");
+        private static final Pattern CQ_AT_PATTERN = Pattern.compile("^\\[CQ:at,qq=(\\d+)(?:,.*)?]$");
+        private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
+        private static final Pattern SEARCH_PATTERN = Pattern.compile("^(?:#(\\d+) )?(.+)$");
     }
 }
 

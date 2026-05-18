@@ -10,14 +10,11 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public final class UserBindingStore {
-    private static final Logger LOG = LogManager.getLogger(UserBindingStore.class);
+public final class UserDataStore {
+    private static final Logger LOG = LogManager.getLogger(UserDataStore.class);
     private static final Object INIT_LOCK = new Object();
 
     private static volatile String jdbcUrl;
-
-    private UserBindingStore() {
-    }
 
     public static void init(String sqlitePath) {
         synchronized (INIT_LOCK) {
@@ -61,7 +58,7 @@ public final class UserBindingStore {
         }
     }
 
-    public static void storeToken(String openId, OsuToken token) {
+    public static boolean storeToken(String openId, OsuToken token) {
         ensureInitialized();
         String sql = """
                 INSERT INTO token_store(open_id, access_token, refresh_token, expires_in, refreshed_at)
@@ -69,6 +66,7 @@ public final class UserBindingStore {
                 ON CONFLICT(open_id) DO UPDATE SET
                     access_token = excluded.access_token,
                     refresh_token = excluded.refresh_token,
+                    expires_in = excluded.expires_in,
                     refreshed_at = excluded.refreshed_at
                 """;
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
@@ -78,10 +76,45 @@ public final class UserBindingStore {
             statement.setString(3, token.refreshToken());
             statement.setLong(4, token.expiresIn());
             statement.setLong(5, token.refreshedAt());
-            statement.executeUpdate();
+            return statement.executeUpdate() > 0;
         } catch (SQLException e) {
             throw new RuntimeException("Failed to store token", e);
         }
+    }
+
+    public static boolean storeUserInfo(int uid, String username) {
+        ensureInitialized();
+        String sql = """
+                INSERT INTO user_info(uid, username)
+                VALUES(?, ?)
+                ON CONFLICT(uid) DO UPDATE SET
+                    username = excluded.username
+                """;
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, uid);
+            statement.setString(2, username);
+            return statement.executeUpdate() > 0;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to store user info", e);
+        }
+    }
+
+    public static String findUsername(int uid) {
+        ensureInitialized();
+        String sql = "SELECT username FROM user_info WHERE uid = ?";
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, uid);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return resultSet.getString("username");
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to query user info", e);
+        }
+        return null;
     }
 
     public static Integer findBoundUid(String openId) {
@@ -101,6 +134,64 @@ public final class UserBindingStore {
         return null;
     }
 
+    public static OsuToken findOsuToken(String openId) {
+        ensureInitialized();
+        String sql = "SELECT access_token, refresh_token, expires_in, refreshed_at FROM token_store WHERE open_id = ?";
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, openId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return new OsuToken(
+                            resultSet.getString("access_token"),
+                            resultSet.getString("refresh_token"),
+                            resultSet.getLong("expires_in"),
+                            resultSet.getLong("refreshed_at")
+                    );
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to query binding", e);
+        }
+        return null;
+    }
+
+    public static List<Integer> findFollower(int uid) {
+        ensureInitialized();
+        List<Integer> followers = new ArrayList<>();
+        String sql = "SELECT self FROM user_follows WHERE followed = ?";
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, uid);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    int followerId = resultSet.getInt("self");
+                    followers.add(followerId);
+                }
+            }
+            return followers;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to query binding", e);
+        }
+    }
+
+    public static boolean storeFollowed(int selfId, int followed) {
+        ensureInitialized();
+        String sql = """
+                INSERT INTO user_follows(self, followed)
+                VALUES(?, ?)
+                ON CONFLICT(self, followed) DO NOTHING
+                """;
+        try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
+            PreparedStatement statement = connection.prepareStatement(sql);
+            statement.setInt(1, selfId);
+            statement.setInt(2, followed);
+            return statement.executeUpdate() > 0;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to store token", e);
+        }
+    }
+
     public static boolean unbind(String openId) {
         ensureInitialized();
         String bindingSql = "DELETE FROM user_bindings WHERE open_id = ?";
@@ -108,10 +199,25 @@ public final class UserBindingStore {
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
              PreparedStatement bindingStatement = connection.prepareStatement(bindingSql);
              PreparedStatement tokenStatement = connection.prepareStatement(tokenSql)) {
+            connection.setAutoCommit(false);
+
             bindingStatement.setString(1, openId);
             tokenStatement.setString(1, openId);
-            tokenStatement.executeUpdate();
-            return bindingStatement.executeUpdate() > 0;
+
+            try {
+                tokenStatement.executeUpdate();
+                boolean deleted = bindingStatement.executeUpdate() > 0;
+                connection.commit();
+                return deleted;
+            } catch (SQLException e) {
+                try {
+                    connection.rollback();
+                } catch (SQLException rollbackEx) {
+                    e.addSuppressed(rollbackEx);
+                }
+
+                throw e;
+            }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to delete binding", e);
         }
@@ -134,6 +240,18 @@ public final class UserBindingStore {
             statement.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to persist group member", e);
+        }
+    }
+
+    public static int clearGroupMember(String openId) {
+        ensureInitialized();
+        String sql = "DELETE FROM group_members WHERE open_id = ?";
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, openId);
+            return statement.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to clear group member", e);
         }
     }
 
@@ -190,13 +308,35 @@ public final class UserBindingStore {
                     PRIMARY KEY(open_id)
                 )
                 """;
+        String followSql = """
+                CREATE TABLE IF NOT EXISTS user_follows (
+                    self INTEGER NOT NULL,
+                    followed INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                
+                    PRIMARY KEY(self, followed)
+                )
+                """;
+        String followIndexSql = """
+                CREATE INDEX IF NOT EXISTS idx_followed_id ON user_follows(followed)
+                """;
+        String userInfoSql = """
+                CREATE TABLE IF NOT EXISTS user_info (
+                    uid INTEGER NOT NULL,
+                    username INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                
+                    PRIMARY KEY(uid)
+                )
+                """;
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
-             PreparedStatement bindingStatement = connection.prepareStatement(bindingSql);
-             PreparedStatement memberStatement = connection.prepareStatement(groupMemberSql);
-             PreparedStatement tokenStatement = connection.prepareStatement(tokenStoreSql)) {
-            bindingStatement.execute();
-            memberStatement.execute();
-            tokenStatement.execute();
+             Statement statement = connection.createStatement()) {
+            statement.execute(bindingSql);
+            statement.execute(groupMemberSql);
+            statement.execute(tokenStoreSql);
+            statement.execute(followSql);
+            statement.execute(followIndexSql);
+            statement.execute(userInfoSql);
         }
     }
 
