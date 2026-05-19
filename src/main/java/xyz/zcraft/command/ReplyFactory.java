@@ -234,7 +234,7 @@ final class ReplyFactory {
             if (inGroup) {
                 sb.append("\uD83D\uDC65").append("本群好友列表");
             } else {
-                sb.append("\uD83D\uDC65").append("全部好友列表 - 共关注了 ").append(followedCount).append(" 位玩家");
+                sb.append("\uD83D\uDC65").append("全部好友列表 - 共 ").append(followedCount);
             }
 
             final long onlineCount = Stream.of(mutual, onlyFollowed, onlyFollower)
