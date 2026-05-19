@@ -153,9 +153,47 @@ public final class UserDataStore {
             statement.setLong(2, followed);
             statement.executeUpdate();
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to store token", e);
+            throw new RuntimeException("Failed to store follow", e);
         }
     }
+
+    public static void removeFollowed(long selfId, long followed) {
+        ensureInitialized();
+        String sql = """
+                DELETE FROM user_follows
+                WHERE self = ?
+                AND followed = ?;
+                """;
+        try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
+            PreparedStatement statement = connection.prepareStatement(sql);
+            statement.setLong(1, selfId);
+            statement.setLong(2, followed);
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to remove follow", e);
+        }
+    }
+
+    public static boolean haveFollowed(long selfId, long followed) {
+        ensureInitialized();
+        String sql = """
+                SELECT * FROM user_follows
+                WHERE self = ?
+                AND followed = ?;
+                """;
+        try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
+            PreparedStatement statement = connection.prepareStatement(sql);
+            statement.setLong(1, selfId);
+            statement.setLong(2, followed);
+
+            final ResultSet resultSet = statement.executeQuery();
+
+            return resultSet.next();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to lookup follow", e);
+        }
+    }
+
 
     public static boolean unbind(String openId) {
         ensureInitialized();

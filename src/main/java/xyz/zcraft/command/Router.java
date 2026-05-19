@@ -309,6 +309,7 @@ public class Router {
                 return taskCoordinator.queueApiRequest("f", () -> {
                     final Response<List<FriendEntry>> response = APIHelper.getFollowed(token.accessToken());
                     final List<FriendEntry> content = response.getContent();
+                    final List<Long> ids = content.stream().map(e -> e.user().id()).toList();
 
                     final Predicate<Long> filter = (
                             (groupId == null || groupId.isBlank())
@@ -316,10 +317,21 @@ public class Router {
                                     : (i) -> UserDataStore.findBoundUidsByGroup(groupId).contains(i)
                     );
 
+                    final List<Long> origFollower = UserDataStore.findFollower(uid);
+
+                    origFollower.stream()
+                            .filter(i -> !ids.contains(i))
+                            .forEach(i -> UserDataStore.removeFollowed(uid, i));
+
                     for (FriendEntry friendEntry : content) {
-                        UserDataStore.storeFollowed(uid, friendEntry.user().id());
+                        if (!UserDataStore.haveFollowed(uid, friendEntry.user().id())) {
+                            UserDataStore.storeFollowed(uid, friendEntry.user().id());
+                        }
+
                         if (friendEntry.mutual()) {
-                            UserDataStore.storeFollowed(friendEntry.user().id(), uid);
+                            if (!UserDataStore.haveFollowed(friendEntry.user().id(), uid)) {
+                                UserDataStore.storeFollowed(friendEntry.user().id(), uid);
+                            }
                         }
                     }
 
@@ -450,7 +462,7 @@ public class Router {
                 for (int i = args.length - targetResolution.consumedArgs() - 1; i < args.length; i++) {
                     if (args[i].startsWith("+")) {
                         extraUidArg = args[i];
-                    } else if(TimeDurationParser.isTimeRange(args[i])) {
+                    } else if (TimeDurationParser.isTimeRange(args[i])) {
                         range = TimeDurationParser.parseRange(args[i]);
                     } else {
                         return RouteDecision.sync(PendingMessage.ofString(Usages.RSC_USAGE));
