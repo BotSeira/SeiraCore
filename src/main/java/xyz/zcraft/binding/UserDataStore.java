@@ -82,41 +82,6 @@ public final class UserDataStore {
         }
     }
 
-    public static void storeUserInfo(long uid, String username) {
-        ensureInitialized();
-        String sql = """
-                INSERT INTO user_info(uid, username)
-                VALUES(?, ?)
-                ON CONFLICT(uid) DO UPDATE SET
-                    username = excluded.username
-                """;
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setLong(1, uid);
-            statement.setString(2, username);
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to store user info", e);
-        }
-    }
-
-    public static String findUsername(long uid) {
-        ensureInitialized();
-        String sql = "SELECT username FROM user_info WHERE uid = ?";
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setLong(1, uid);
-            try (ResultSet resultSet = statement.executeQuery()) {
-                if (resultSet.next()) {
-                    return resultSet.getString("username");
-                }
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to query user info", e);
-        }
-        return null;
-    }
-
     public static Long findBoundUid(String openId) {
         ensureInitialized();
         String sql = "SELECT osu_uid FROM user_bindings WHERE open_id = ?";
@@ -320,15 +285,6 @@ public final class UserDataStore {
         String followIndexSql = """
                 CREATE INDEX IF NOT EXISTS idx_followed_id ON user_follows(followed)
                 """;
-        String userInfoSql = """
-                CREATE TABLE IF NOT EXISTS user_info (
-                    uid BIGINT NOT NULL,
-                    username TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                
-                    PRIMARY KEY(uid)
-                )
-                """;
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
              Statement statement = connection.createStatement()) {
             statement.execute(bindingSql);
@@ -336,7 +292,6 @@ public final class UserDataStore {
             statement.execute(tokenStoreSql);
             statement.execute(followSql);
             statement.execute(followIndexSql);
-            statement.execute(userInfoSql);
         }
     }
 

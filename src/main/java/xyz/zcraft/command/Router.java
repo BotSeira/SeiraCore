@@ -323,10 +323,6 @@ public class Router {
                         }
                     }
 
-                    for (FriendEntry info : content) {
-                        UserDataStore.storeUserInfo(info.user().id(), info.user().username());
-                    }
-
                     final List<Long> follower = UserDataStore.findFollower(uid);
 
                     final List<OsuUser> mutual = new LinkedList<>();
