@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Router {
     private static final Logger LOG = LogManager.getLogger(Router.class);
@@ -79,6 +81,17 @@ public class Router {
         }
     }
 
+    private static final Pattern RS_QUERY = Pattern.compile("^rs(\\d+)$");
+
+    private String preProcess(String rawContent) {
+        Matcher matcher = RS_QUERY.matcher(rawContent);
+        if (matcher.matches()) {
+            return "/s rs" + matcher.group(1);
+        }
+
+        return rawContent;
+    }
+
     protected RouteDecision route(String rawContent, String senderUserId, String groupId, String messageId) {
         if (rawContent == null || !rawContent.trim().startsWith(PREFIX)) {
             return null;
@@ -88,6 +101,8 @@ public class Router {
         if (body.isEmpty()) {
             return RouteDecision.sync(PendingMessage.ofString("请输入指令。使用/help获取帮助。"));
         }
+
+        body = preProcess(body);
 
         String[] parts = body.split("\\s+");
         String command = parts[0].toLowerCase();
