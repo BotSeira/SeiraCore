@@ -1,16 +1,17 @@
 package xyz.zcraft.command;
 
-import kotlin.Pair;
 import xyz.zcraft.api.APIHelper;
 import xyz.zcraft.api.Response;
 import xyz.zcraft.binding.BindingHelper;
 import xyz.zcraft.config.AppConfig;
 import xyz.zcraft.config.BindingConfig;
 import xyz.zcraft.data.*;
+import xyz.zcraft.osu.model.User;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 final class ReplyFactory {
     private final AppConfig config;
@@ -31,7 +32,7 @@ final class ReplyFactory {
         return PendingMessage.ofMarkdownRaw(
                 "> B" + response.getScoreIds().size() + "查询完成\n" +
                         "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()),
-                Buttons.boButtons()
+                Buttons.boButtons(config.seira().directUrl(), response.getUserId())
         );
     }
 
@@ -163,7 +164,8 @@ final class ReplyFactory {
         );
     }
 
-    public PendingMessage friendMessage(boolean inGroup, int followedCount, List<Pair<Integer, String>> mutual, List<Pair<Integer, String>> onlyFollowed, List<Pair<Integer, String>> onlyFollower) {
+    public PendingMessage friendMessage(boolean inGroup, int followedCount,
+                                        List<User> mutual, List<User> onlyFollowed, List<User> onlyFollower) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.friendContent(inGroup, followedCount, mutual, onlyFollowed, onlyFollower),
                 null
@@ -226,29 +228,45 @@ final class ReplyFactory {
             return sb.toString().trim();
         }
 
-        public static String friendContent(boolean inGroup, int followedCount, List<Pair<Integer, String>> mutual, List<Pair<Integer, String>> onlyFollowed, List<Pair<Integer, String>> onlyFollower) {
+        public static String friendContent(boolean inGroup, int followedCount,
+                                           List<User> mutual, List<User> onlyFollowed, List<User> onlyFollower) {
             StringBuilder sb = new StringBuilder();
             if (inGroup) {
-                sb.append("\uD83D\uDC65").append("本群好友列表\n");
+                sb.append("\uD83D\uDC65").append("本群好友列表");
             } else {
-                sb.append("\uD83D\uDC65").append("全部好友列表 - 共关注了 ").append(followedCount).append(" 位玩家\n");
+                sb.append("\uD83D\uDC65").append("全部好友列表 - 共 ").append(followedCount);
             }
+
+            final long onlineCount = Stream.of(mutual, onlyFollowed, onlyFollower)
+                    .flatMap(List::stream)
+                    .distinct()
+                    .filter(User::isOnline)
+                    .count();
+
+            sb.append(" - ").append(onlineCount).append(" 在线").append("\n");
+
+            sb.append("\n");
+
             sb.append("> 好友←→ (").append(mutual.size()).append(")\n>");
-            for (Pair<Integer, String> p : mutual) {
-                sb.append(cmd("/u " + p.getFirst(), "[" + p.getSecond() + "]")).append(" ");
+            for (User p : mutual) {
+                sb.append(getFriendItem(p)).append(" ");
             }
 
             sb.append("\n> 仅关注→ (").append(onlyFollowed.size()).append(")\n>");
-            for (Pair<Integer, String> p : onlyFollowed) {
-                sb.append(cmd("/u " + p.getFirst(), "[" + p.getSecond() + "]")).append(" ");
+            for (User p : onlyFollowed) {
+                sb.append(getFriendItem(p)).append(" ");
             }
 
             sb.append("\n> 仅粉丝← (").append(onlyFollower.size()).append(")\n>");
-            for (Pair<Integer, String> p : onlyFollower) {
-                sb.append(cmd("/u " + p.getFirst(), "[" + p.getSecond() + "]")).append(" ");
+            for (User p : onlyFollower) {
+                sb.append(getFriendItem(p)).append(" ");
             }
 
             return sb.toString().trim();
+        }
+
+        private static String getFriendItem(User u) {
+            return cmd("/u " + u.getId(), "[" + (u.isOnline() ? "▶" : "") + u.getUsername() + "]");
         }
     }
 
@@ -295,11 +313,16 @@ final class ReplyFactory {
             return rows;
         }
 
-        static List<List<Button>> boButtons() {
-            return Button.keyboard(Button.row(
-                    Button.command(1, "查询最好成绩", "/s bo1"),
-                    Button.command(2, "查询最近成绩", "/s rs1")
-            ));
+        static List<List<Button>> boButtons(String directUrl, String userId) {
+            return Button.keyboard(
+                    Button.row(
+                            Button.command(1, "查询最好成绩", "/s bo1"),
+                            Button.command(2, "查询最近成绩", "/s rs1")
+                    ),
+                    Button.row(
+                            Button.openUrl(3, "在游戏中查看", directUrl + "/u/" + userId)
+                    )
+            );
         }
 
         static List<List<Button>> rsButtons() {

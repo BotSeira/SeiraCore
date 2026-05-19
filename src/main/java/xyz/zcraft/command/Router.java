@@ -1,6 +1,5 @@
 package xyz.zcraft.command;
 
-import kotlin.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.api.APIHelper;
@@ -14,6 +13,7 @@ import xyz.zcraft.command.resolution.UidListResolution;
 import xyz.zcraft.command.resolution.UidResolution;
 import xyz.zcraft.config.AppConfig;
 import xyz.zcraft.data.*;
+import xyz.zcraft.osu.model.User;
 import xyz.zcraft.util.OsuAuthHelper;
 import xyz.zcraft.util.ThreadHelper;
 import xyz.zcraft.util.TimeDurationParser;
@@ -21,8 +21,11 @@ import xyz.zcraft.util.TimeDurationParser;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Router {
     private static final Logger LOG = LogManager.getLogger(Router.class);
@@ -78,6 +81,17 @@ public class Router {
         }
     }
 
+    private static final Pattern RS_QUERY = Pattern.compile("^rs(\\d+)$");
+
+    private String preProcess(String rawContent) {
+        Matcher matcher = RS_QUERY.matcher(rawContent);
+        if (matcher.matches()) {
+            return "/s rs" + matcher.group(1);
+        }
+
+        return rawContent;
+    }
+
     protected RouteDecision route(String rawContent, String senderUserId, String groupId, String messageId) {
         if (rawContent == null || !rawContent.trim().startsWith(PREFIX)) {
             return null;
@@ -87,6 +101,8 @@ public class Router {
         if (body.isEmpty()) {
             return RouteDecision.sync(PendingMessage.ofString("请输入指令。使用/help获取帮助。"));
         }
+
+        body = preProcess(body);
 
         String[] parts = body.split("\\s+");
         String command = parts[0].toLowerCase();
@@ -108,7 +124,7 @@ public class Router {
                         return RouteDecision.sync(PendingMessage.ofString("用法：/bind"));
                     }
                     final var bindingTask = BindingHelper.createBindingTask(senderUserId, messageId, (user, token) -> {
-                        UserDataStore.bind(senderUserId, user.id());
+                        UserDataStore.bind(senderUserId, user.getId());
                         UserDataStore.storeToken(senderUserId, token);
                     });
                     return RouteDecision.sync(replyFactory.bindMessage(config.binding(), bindingTask, groupId == null || groupId.isBlank()));
@@ -172,7 +188,7 @@ public class Router {
                     if (n == null) {
                         return RouteDecision.sync(PendingMessage.ofString(Usages.BO_USAGE));
                     }
-                    Integer uid = argumentResolver.resolveBoundUid(senderUserId);
+                    Long uid = argumentResolver.resolveBoundUid(senderUserId);
                     if (uid == null) {
                         return RouteDecision.sync(PendingMessage.ofString(Usages.NO_BIND_TIP));
                     }
@@ -239,7 +255,7 @@ public class Router {
                     if (n == null) {
                         return RouteDecision.sync(PendingMessage.ofString(Usages.RS_USAGE));
                     }
-                    Integer uid = argumentResolver.resolveBoundUid(senderUserId);
+                    Long uid = argumentResolver.resolveBoundUid(senderUserId);
                     if (uid == null) {
                         return RouteDecision.sync(PendingMessage.ofString(Usages.NO_BIND_TIP));
                     }
@@ -294,7 +310,7 @@ public class Router {
                     return RouteDecision.sync(PendingMessage.ofString("本指令未启用：需要进行用户登录鉴权。"));
                 }
 
-                Integer uid = argumentResolver.resolveBoundUid(senderUserId);
+                Long uid = argumentResolver.resolveBoundUid(senderUserId);
                 if (uid == null) {
                     return RouteDecision.sync(PendingMessage.ofString(Usages.NO_BIND_TIP));
                 }
@@ -308,49 +324,55 @@ public class Router {
                 return taskCoordinator.queueApiRequest("f", () -> {
                     final Response<List<FriendEntry>> response = APIHelper.getFollowed(token.accessToken());
                     final List<FriendEntry> content = response.getContent();
+                    final List<Long> ids = content.stream().map(e -> e.user().getId()).toList();
 
-                    final List<Integer> followed = content.stream().map(FriendEntry::id).toList();
-
-                    final Predicate<Integer> filter = (
+                    final Predicate<Long> filter = (
                             (groupId == null || groupId.isBlank())
                                     ? (_) -> true
                                     : (i) -> UserDataStore.findBoundUidsByGroup(groupId).contains(i)
                     );
 
+                    final List<Long> origFollower = UserDataStore.findFollower(uid);
+
+                    origFollower.stream()
+                            .filter(i -> !ids.contains(i))
+                            .forEach(i -> UserDataStore.removeFollowed(uid, i));
+
                     for (FriendEntry friendEntry : content) {
-                        UserDataStore.storeFollowed(uid, friendEntry.id());
+                        if (!UserDataStore.haveFollowed(uid, friendEntry.user().getId())) {
+                            UserDataStore.storeFollowed(uid, friendEntry.user().getId());
+                        }
+
                         if (friendEntry.mutual()) {
-                            UserDataStore.storeFollowed(friendEntry.id(), uid);
+                            if (!UserDataStore.haveFollowed(friendEntry.user().getId(), uid)) {
+                                UserDataStore.storeFollowed(friendEntry.user().getId(), uid);
+                            }
                         }
                     }
 
-                    for (FriendEntry info : content) {
-                        UserDataStore.storeUserInfo(info.id(), info.username());
-                    }
+                    final List<Long> follower = UserDataStore.findFollower(uid);
 
-                    final List<Integer> follower = UserDataStore.findFollower(uid);
+                    final List<User> mutual = new LinkedList<>();
+                    final List<User> onlyFollowed = new LinkedList<>();
+                    final List<User> onlyFollower = new LinkedList<>();
 
-                    final List<Pair<Integer, String>> mutual = new LinkedList<>();
-                    final List<Pair<Integer, String>> onlyFollowed = new LinkedList<>();
-                    final List<Pair<Integer, String>> onlyFollower = new LinkedList<>();
-
-                    for (Integer i : followed) {
-                        if (!filter.test(i)) continue;
-                        if (follower.contains(i)) {
-                            mutual.add(new Pair<>(i, UserDataStore.findUsername(i)));
+                    for (FriendEntry e : content) {
+                        if (!filter.test(e.user().getId())) continue;
+                        if (follower.contains(e.user().getId())) {
+                            mutual.add(e.user());
                         } else {
-                            onlyFollowed.add(new Pair<>(i, UserDataStore.findUsername(i)));
+                            onlyFollowed.add(e.user());
                         }
                     }
 
-                    for (Integer i : follower) {
-                        if (!filter.test(i)) continue;
-                        if (!followed.contains(i)) {
-                            onlyFollower.add(new Pair<>(i, UserDataStore.findUsername(i)));
+                    for (FriendEntry e : content) {
+                        if (!filter.test(e.user().getId())) continue;
+                        if (content.stream().noneMatch(entry -> Objects.equals(entry.user().getId(), e.user().getId()))) {
+                            onlyFollower.add(e.user());
                         }
                     }
 
-                    return replyFactory.friendMessage(!(groupId == null || groupId.isBlank()), followed.size(), mutual, onlyFollowed, onlyFollower);
+                    return replyFactory.friendMessage(!(groupId == null || groupId.isBlank()), content.size(), mutual, onlyFollowed, onlyFollower);
                 });
             }
             case "dl" -> {
@@ -455,7 +477,7 @@ public class Router {
                 for (int i = args.length - targetResolution.consumedArgs() - 1; i < args.length; i++) {
                     if (args[i].startsWith("+")) {
                         extraUidArg = args[i];
-                    } else if(TimeDurationParser.isTimeRange(args[i])) {
+                    } else if (TimeDurationParser.isTimeRange(args[i])) {
                         range = TimeDurationParser.parseRange(args[i]);
                     } else {
                         return RouteDecision.sync(PendingMessage.ofString(Usages.RSC_USAGE));
@@ -529,7 +551,7 @@ public class Router {
             case "lb" -> {
                 if (args.length == 0) {
                     if (groupId != null && !groupId.isBlank()) {
-                        List<Integer> groupBoundUids = UserDataStore.findBoundUidsByGroup(groupId);
+                        List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(groupId);
                         if (groupBoundUids.isEmpty()) {
                             return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>"));
                         }
@@ -541,7 +563,7 @@ public class Router {
                                 replyFactory::lbMessage
                         );
                     }
-                    Integer uid = argumentResolver.resolveBoundUid(senderUserId);
+                    Long uid = argumentResolver.resolveBoundUid(senderUserId);
                     if (uid == null) {
                         return RouteDecision.sync(PendingMessage.ofString(Usages.NO_BIND_TIP));
                     }
@@ -561,7 +583,7 @@ public class Router {
                     int remainingArgs = args.length - targetResolution.consumedArgs();
                     if (remainingArgs == 0) {
                         if (groupId != null && !groupId.isBlank()) {
-                            List<Integer> groupBoundUids = UserDataStore.findBoundUidsByGroup(groupId);
+                            List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(groupId);
                             if (groupBoundUids.isEmpty()) {
                                 return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>"));
                             }
@@ -572,7 +594,7 @@ public class Router {
                                     replyFactory::lbMessage
                             );
                         }
-                        Integer uid = argumentResolver.resolveBoundUid(senderUserId);
+                        Long uid = argumentResolver.resolveBoundUid(senderUserId);
                         if (uid == null) {
                             return RouteDecision.sync(PendingMessage.ofString(Usages.NO_BIND_TIP));
                         }

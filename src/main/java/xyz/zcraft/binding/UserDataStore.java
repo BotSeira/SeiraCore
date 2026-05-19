@@ -36,7 +36,7 @@ public final class UserDataStore {
         }
     }
 
-    public static void bind(String openId, int osuUid) {
+    public static void bind(String openId, long osuUid) {
         ensureInitialized();
         long now = System.currentTimeMillis();
         String sql = """
@@ -49,7 +49,7 @@ public final class UserDataStore {
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, openId);
-            statement.setInt(2, osuUid);
+            statement.setLong(2, osuUid);
             statement.setLong(3, now);
             statement.setLong(4, now);
             statement.executeUpdate();
@@ -58,7 +58,7 @@ public final class UserDataStore {
         }
     }
 
-    public static boolean storeToken(String openId, OsuToken token) {
+    public static void storeToken(String openId, OsuToken token) {
         ensureInitialized();
         String sql = """
                 INSERT INTO token_store(open_id, access_token, refresh_token, expires_in, refreshed_at)
@@ -76,48 +76,13 @@ public final class UserDataStore {
             statement.setString(3, token.refreshToken());
             statement.setLong(4, token.expiresIn());
             statement.setLong(5, token.refreshedAt());
-            return statement.executeUpdate() > 0;
+            statement.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to store token", e);
         }
     }
 
-    public static boolean storeUserInfo(int uid, String username) {
-        ensureInitialized();
-        String sql = """
-                INSERT INTO user_info(uid, username)
-                VALUES(?, ?)
-                ON CONFLICT(uid) DO UPDATE SET
-                    username = excluded.username
-                """;
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setInt(1, uid);
-            statement.setString(2, username);
-            return statement.executeUpdate() > 0;
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to store user info", e);
-        }
-    }
-
-    public static String findUsername(int uid) {
-        ensureInitialized();
-        String sql = "SELECT username FROM user_info WHERE uid = ?";
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setInt(1, uid);
-            try (ResultSet resultSet = statement.executeQuery()) {
-                if (resultSet.next()) {
-                    return resultSet.getString("username");
-                }
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to query user info", e);
-        }
-        return null;
-    }
-
-    public static Integer findBoundUid(String openId) {
+    public static Long findBoundUid(String openId) {
         ensureInitialized();
         String sql = "SELECT osu_uid FROM user_bindings WHERE open_id = ?";
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
@@ -125,7 +90,7 @@ public final class UserDataStore {
             statement.setString(1, openId);
             try (ResultSet resultSet = statement.executeQuery()) {
                 if (resultSet.next()) {
-                    return resultSet.getInt("osu_uid");
+                    return resultSet.getLong("osu_uid");
                 }
             }
         } catch (SQLException e) {
@@ -156,16 +121,16 @@ public final class UserDataStore {
         return null;
     }
 
-    public static List<Integer> findFollower(int uid) {
+    public static List<Long> findFollower(long uid) {
         ensureInitialized();
-        List<Integer> followers = new ArrayList<>();
+        List<Long> followers = new ArrayList<>();
         String sql = "SELECT self FROM user_follows WHERE followed = ?";
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
              PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setInt(1, uid);
+            statement.setLong(1, uid);
             try (ResultSet resultSet = statement.executeQuery()) {
                 while (resultSet.next()) {
-                    int followerId = resultSet.getInt("self");
+                    long followerId = resultSet.getLong("self");
                     followers.add(followerId);
                 }
             }
@@ -175,7 +140,7 @@ public final class UserDataStore {
         }
     }
 
-    public static boolean storeFollowed(int selfId, int followed) {
+    public static void storeFollowed(long selfId, long followed) {
         ensureInitialized();
         String sql = """
                 INSERT INTO user_follows(self, followed)
@@ -184,13 +149,51 @@ public final class UserDataStore {
                 """;
         try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
             PreparedStatement statement = connection.prepareStatement(sql);
-            statement.setInt(1, selfId);
-            statement.setInt(2, followed);
-            return statement.executeUpdate() > 0;
+            statement.setLong(1, selfId);
+            statement.setLong(2, followed);
+            statement.executeUpdate();
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to store token", e);
+            throw new RuntimeException("Failed to store follow", e);
         }
     }
+
+    public static void removeFollowed(long selfId, long followed) {
+        ensureInitialized();
+        String sql = """
+                DELETE FROM user_follows
+                WHERE self = ?
+                AND followed = ?;
+                """;
+        try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
+            PreparedStatement statement = connection.prepareStatement(sql);
+            statement.setLong(1, selfId);
+            statement.setLong(2, followed);
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to remove follow", e);
+        }
+    }
+
+    public static boolean haveFollowed(long selfId, long followed) {
+        ensureInitialized();
+        String sql = """
+                SELECT * FROM user_follows
+                WHERE self = ?
+                AND followed = ?;
+                """;
+        try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
+            PreparedStatement statement = connection.prepareStatement(sql);
+            statement.setLong(1, selfId);
+            statement.setLong(2, followed);
+
+            final ResultSet resultSet = statement.executeQuery();
+
+            return resultSet.next();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to lookup follow", e);
+        }
+    }
+
 
     public static boolean unbind(String openId) {
         ensureInitialized();
@@ -255,7 +258,7 @@ public final class UserDataStore {
         }
     }
 
-    public static List<Integer> findBoundUidsByGroup(String groupId) {
+    public static List<Long> findBoundUidsByGroup(String groupId) {
         ensureInitialized();
         String sql = """
                 SELECT DISTINCT ub.osu_uid
@@ -265,13 +268,13 @@ public final class UserDataStore {
                 WHERE gm.group_id = ?
                 ORDER BY ub.osu_uid
                 """;
-        List<Integer> uids = new ArrayList<>();
+        List<Long> uids = new ArrayList<>();
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, groupId);
             try (ResultSet resultSet = statement.executeQuery()) {
                 while (resultSet.next()) {
-                    uids.add(resultSet.getInt("osu_uid"));
+                    uids.add(resultSet.getLong("osu_uid"));
                 }
             }
         } catch (SQLException e) {
@@ -284,9 +287,9 @@ public final class UserDataStore {
         String bindingSql = """
                 CREATE TABLE IF NOT EXISTS user_bindings (
                     open_id TEXT NOT NULL,
-                    osu_uid INTEGER NOT NULL,
-                    created_at INTEGER NOT NULL,
-                    updated_at INTEGER NOT NULL,
+                    osu_uid BIGINT NOT NULL,
+                    created_at BIGINT NOT NULL,
+                    updated_at BIGINT NOT NULL,
                     PRIMARY KEY(open_id)
                 )
                 """;
@@ -294,7 +297,7 @@ public final class UserDataStore {
                 CREATE TABLE IF NOT EXISTS group_members (
                     group_id TEXT NOT NULL,
                     open_id TEXT NOT NULL,
-                    updated_at INTEGER NOT NULL,
+                    updated_at BIGINT NOT NULL,
                     PRIMARY KEY(group_id, open_id)
                 )
                 """;
@@ -303,15 +306,15 @@ public final class UserDataStore {
                     open_id TEXT NOT NULL,
                     access_token TEXT NOT NULL,
                     refresh_token TEXT NOT NULL,
-                    expires_in INTEGER NOT NULL,
-                    refreshed_at INTEGER NOT NULL,
+                    expires_in BIGINT NOT NULL,
+                    refreshed_at BIGINT NOT NULL,
                     PRIMARY KEY(open_id)
                 )
                 """;
         String followSql = """
                 CREATE TABLE IF NOT EXISTS user_follows (
-                    self INTEGER NOT NULL,
-                    followed INTEGER NOT NULL,
+                    self BIGINT NOT NULL,
+                    followed BIGINT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 
                     PRIMARY KEY(self, followed)
@@ -320,15 +323,6 @@ public final class UserDataStore {
         String followIndexSql = """
                 CREATE INDEX IF NOT EXISTS idx_followed_id ON user_follows(followed)
                 """;
-        String userInfoSql = """
-                CREATE TABLE IF NOT EXISTS user_info (
-                    uid INTEGER NOT NULL,
-                    username INTEGER NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                
-                    PRIMARY KEY(uid)
-                )
-                """;
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
              Statement statement = connection.createStatement()) {
             statement.execute(bindingSql);
@@ -336,7 +330,6 @@ public final class UserDataStore {
             statement.execute(tokenStoreSql);
             statement.execute(followSql);
             statement.execute(followIndexSql);
-            statement.execute(userInfoSql);
         }
     }
 

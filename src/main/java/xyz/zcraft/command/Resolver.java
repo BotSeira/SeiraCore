@@ -53,14 +53,14 @@ final class Resolver {
     }
 
     public UidResolution resolveUidArgument(String arg) {
-        Integer explicitUid = parsePositiveInt(arg);
+        Long explicitUid = parsePositiveLong(arg);
         if (explicitUid != null) {
             return new UidResolution(explicitUid, null);
         }
 
         String mentionedUserId = extractMentionedUserId(arg);
         if (mentionedUserId != null) {
-            Integer boundUid = resolveBoundUid(mentionedUserId);
+            Long boundUid = resolveBoundUid(mentionedUserId);
             if (boundUid == null) {
                 return new UidResolution(null, "被@的用户还没有绑定玩家ID，请先让对方使用 /bind <玩家ID>");
             }
@@ -75,7 +75,7 @@ final class Resolver {
     }
 
     public UidListResolution resolveRscUidList(String groupId, String extraUidArg) {
-        List<Integer> groupBoundUids = UserDataStore.findBoundUidsByGroup(groupId);
+        List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(groupId);
         if (groupBoundUids.isEmpty()) {
             return new UidListResolution(null, "本群还没有已绑定的玩家，请先使用 /bind <玩家ID>");
         }
@@ -106,7 +106,7 @@ final class Resolver {
         return new UidListResolution(merged.toArray(String[]::new), null);
     }
 
-    public Integer resolveBoundUid(String senderUserId) {
+    public Long resolveBoundUid(String senderUserId) {
         if (senderUserId == null || senderUserId.isBlank()) {
             return null;
         }
@@ -132,7 +132,7 @@ final class Resolver {
                 return new ShortcutTarget(null, null, null, null, "铺面集索引无效。例如: 12345#2");
             }
 
-            Integer uid = resolveBoundUid(senderUserId);
+            Long uid = resolveBoundUid(senderUserId);
             return new ShortcutTarget(setId, uid, "ms", index, null);
         }
 
@@ -148,7 +148,7 @@ final class Resolver {
                         return new ShortcutTarget(null, null, null, null, "快捷指令索引无效，请输入 1-100 之间的数字。例如: rs5");
                     }
 
-                    Integer uid = resolveBoundUid(senderUserId);
+                    Long uid = resolveBoundUid(senderUserId);
                     if (uid == null) {
                         String errorMessage = mentionedUser
                                 ? "被@的用户还没有绑定玩家ID，无法使用快捷查询。"
@@ -165,7 +165,7 @@ final class Resolver {
         }
 
         if ("mp".equalsIgnoreCase(arg.trim())) {
-            Integer uid = resolveBoundUid(senderUserId);
+            Long uid = resolveBoundUid(senderUserId);
             if (uid == null) {
                 String errorMessage = mentionedUser
                         ? "被@的用户还没有绑定玩家ID，无法使用快捷查询。"
@@ -179,7 +179,7 @@ final class Resolver {
         Matcher beatmapMatcher = Patterns.BEATMAP_MACRO_PATTERN.matcher(arg.trim());
         if (beatmapMatcher.matches()) {
             Long mapId = parsePositiveLong(beatmapMatcher.group(1));
-            Integer uid = resolveBoundUid(senderUserId);
+            Long uid = resolveBoundUid(senderUserId);
             return new ShortcutTarget(mapId, uid, "m", null, null);
         }
 

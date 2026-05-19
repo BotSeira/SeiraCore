@@ -6,7 +6,7 @@ import com.google.gson.JsonParser;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.data.OsuToken;
-import xyz.zcraft.data.OsuUser;
+import xyz.zcraft.osu.model.User;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -86,7 +86,7 @@ public class OsuAuthApi {
         }
     }
 
-    public static OsuUser getUserFromToken(OsuToken token) {
+    public static User getUserFromToken(OsuToken token) {
         try (final HttpClient client = HttpClient.newHttpClient()) {
             final HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create("https://osu.ppy.sh/api/v2/me"))
@@ -101,7 +101,7 @@ public class OsuAuthApi {
             }
 
             final JsonObject responseJson = JsonParser.parseString(response.body()).getAsJsonObject();
-            return GSON.fromJson(responseJson, OsuUser.class);
+            return GSON.fromJson(responseJson, User.class);
         } catch (Exception ex) {
             LOG.error("Failed to get user info from Osu API", ex);
             return null;

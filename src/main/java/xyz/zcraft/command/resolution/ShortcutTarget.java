@@ -2,7 +2,7 @@ package xyz.zcraft.command.resolution;
 
 public record ShortcutTarget(
         Long explicitId,
-        Integer boundUid,
+        Long boundUid,
         String macroType,
         Long macroIndex,
         String errorMessage

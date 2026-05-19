@@ -64,7 +64,7 @@ public class APIHelper {
         }
     }
 
-    public static Response<Base64Bytes> getBoNResponse(int n, int uid) {
+    public static Response<Base64Bytes> getBoNResponse(int n, long uid) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/bestof?" + "n=" + n + "&u=" + uid))
@@ -235,7 +235,7 @@ public class APIHelper {
         }
     }
 
-    public static Response<Base64Bytes> getRecentResponse(int n, int uid) {
+    public static Response<Base64Bytes> getRecentResponse(int n, long uid) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/recent?" + "n=" + n + "&u=" + uid))
