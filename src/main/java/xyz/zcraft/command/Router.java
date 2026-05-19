@@ -1,6 +1,5 @@
 package xyz.zcraft.command;
 
-import kotlin.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.api.APIHelper;
@@ -14,6 +13,7 @@ import xyz.zcraft.command.resolution.UidListResolution;
 import xyz.zcraft.command.resolution.UidResolution;
 import xyz.zcraft.config.AppConfig;
 import xyz.zcraft.data.*;
+import xyz.zcraft.model.OsuUser;
 import xyz.zcraft.util.OsuAuthHelper;
 import xyz.zcraft.util.ThreadHelper;
 import xyz.zcraft.util.TimeDurationParser;
@@ -21,6 +21,7 @@ import xyz.zcraft.util.TimeDurationParser;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 
@@ -172,7 +173,7 @@ public class Router {
                     if (n == null) {
                         return RouteDecision.sync(PendingMessage.ofString(Usages.BO_USAGE));
                     }
-                    Integer uid = argumentResolver.resolveBoundUid(senderUserId);
+                    Long uid = argumentResolver.resolveBoundUid(senderUserId);
                     if (uid == null) {
                         return RouteDecision.sync(PendingMessage.ofString(Usages.NO_BIND_TIP));
                     }
@@ -239,7 +240,7 @@ public class Router {
                     if (n == null) {
                         return RouteDecision.sync(PendingMessage.ofString(Usages.RS_USAGE));
                     }
-                    Integer uid = argumentResolver.resolveBoundUid(senderUserId);
+                    Long uid = argumentResolver.resolveBoundUid(senderUserId);
                     if (uid == null) {
                         return RouteDecision.sync(PendingMessage.ofString(Usages.NO_BIND_TIP));
                     }
@@ -294,7 +295,7 @@ public class Router {
                     return RouteDecision.sync(PendingMessage.ofString("本指令未启用：需要进行用户登录鉴权。"));
                 }
 
-                Integer uid = argumentResolver.resolveBoundUid(senderUserId);
+                Long uid = argumentResolver.resolveBoundUid(senderUserId);
                 if (uid == null) {
                     return RouteDecision.sync(PendingMessage.ofString(Usages.NO_BIND_TIP));
                 }
@@ -309,48 +310,46 @@ public class Router {
                     final Response<List<FriendEntry>> response = APIHelper.getFollowed(token.accessToken());
                     final List<FriendEntry> content = response.getContent();
 
-                    final List<Integer> followed = content.stream().map(FriendEntry::id).toList();
-
-                    final Predicate<Integer> filter = (
+                    final Predicate<Long> filter = (
                             (groupId == null || groupId.isBlank())
                                     ? (_) -> true
                                     : (i) -> UserDataStore.findBoundUidsByGroup(groupId).contains(i)
                     );
 
                     for (FriendEntry friendEntry : content) {
-                        UserDataStore.storeFollowed(uid, friendEntry.id());
+                        UserDataStore.storeFollowed(uid, friendEntry.user().id());
                         if (friendEntry.mutual()) {
-                            UserDataStore.storeFollowed(friendEntry.id(), uid);
+                            UserDataStore.storeFollowed(friendEntry.user().id(), uid);
                         }
                     }
 
                     for (FriendEntry info : content) {
-                        UserDataStore.storeUserInfo(info.id(), info.username());
+                        UserDataStore.storeUserInfo(info.user().id(), info.user().username());
                     }
 
-                    final List<Integer> follower = UserDataStore.findFollower(uid);
+                    final List<Long> follower = UserDataStore.findFollower(uid);
 
-                    final List<Pair<Integer, String>> mutual = new LinkedList<>();
-                    final List<Pair<Integer, String>> onlyFollowed = new LinkedList<>();
-                    final List<Pair<Integer, String>> onlyFollower = new LinkedList<>();
+                    final List<OsuUser> mutual = new LinkedList<>();
+                    final List<OsuUser> onlyFollowed = new LinkedList<>();
+                    final List<OsuUser> onlyFollower = new LinkedList<>();
 
-                    for (Integer i : followed) {
-                        if (!filter.test(i)) continue;
-                        if (follower.contains(i)) {
-                            mutual.add(new Pair<>(i, UserDataStore.findUsername(i)));
+                    for (FriendEntry e : content) {
+                        if (!filter.test(e.user().id())) continue;
+                        if (follower.contains(e.user().id())) {
+                            mutual.add(e.user());
                         } else {
-                            onlyFollowed.add(new Pair<>(i, UserDataStore.findUsername(i)));
+                            onlyFollowed.add(e.user());
                         }
                     }
 
-                    for (Integer i : follower) {
-                        if (!filter.test(i)) continue;
-                        if (!followed.contains(i)) {
-                            onlyFollower.add(new Pair<>(i, UserDataStore.findUsername(i)));
+                    for (FriendEntry e : content) {
+                        if (!filter.test(e.user().id())) continue;
+                        if (content.stream().noneMatch(entry -> Objects.equals(entry.user().id(), e.user().id()))) {
+                            onlyFollower.add(e.user());
                         }
                     }
 
-                    return replyFactory.friendMessage(!(groupId == null || groupId.isBlank()), followed.size(), mutual, onlyFollowed, onlyFollower);
+                    return replyFactory.friendMessage(!(groupId == null || groupId.isBlank()), content.size(), mutual, onlyFollowed, onlyFollower);
                 });
             }
             case "dl" -> {
@@ -529,7 +528,7 @@ public class Router {
             case "lb" -> {
                 if (args.length == 0) {
                     if (groupId != null && !groupId.isBlank()) {
-                        List<Integer> groupBoundUids = UserDataStore.findBoundUidsByGroup(groupId);
+                        List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(groupId);
                         if (groupBoundUids.isEmpty()) {
                             return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>"));
                         }
@@ -541,7 +540,7 @@ public class Router {
                                 replyFactory::lbMessage
                         );
                     }
-                    Integer uid = argumentResolver.resolveBoundUid(senderUserId);
+                    Long uid = argumentResolver.resolveBoundUid(senderUserId);
                     if (uid == null) {
                         return RouteDecision.sync(PendingMessage.ofString(Usages.NO_BIND_TIP));
                     }
@@ -561,7 +560,7 @@ public class Router {
                     int remainingArgs = args.length - targetResolution.consumedArgs();
                     if (remainingArgs == 0) {
                         if (groupId != null && !groupId.isBlank()) {
-                            List<Integer> groupBoundUids = UserDataStore.findBoundUidsByGroup(groupId);
+                            List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(groupId);
                             if (groupBoundUids.isEmpty()) {
                                 return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>"));
                             }
@@ -572,7 +571,7 @@ public class Router {
                                     replyFactory::lbMessage
                             );
                         }
-                        Integer uid = argumentResolver.resolveBoundUid(senderUserId);
+                        Long uid = argumentResolver.resolveBoundUid(senderUserId);
                         if (uid == null) {
                             return RouteDecision.sync(PendingMessage.ofString(Usages.NO_BIND_TIP));
                         }
