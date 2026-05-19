@@ -7,8 +7,7 @@ import org.apache.logging.log4j.Logger;
 import xyz.zcraft.api.OsuAuthApi;
 import xyz.zcraft.config.BindingConfig;
 import xyz.zcraft.data.OsuToken;
-import xyz.zcraft.model.OsuUser;
-
+import xyz.zcraft.osu.model.User;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.UUID;
@@ -65,11 +64,11 @@ public class BindingHelper {
 
                     bindingTask.onFinish().accept(user, token);
 
-                    LOG.info("Binding successful for user {} (id {})", user.username(), user.id());
+                    LOG.info("Binding successful for user {} (id {})", user.getUsername(), user.getId());
 
                     return user;
                 })
-                .thenAccept(user -> ctx.status(200).html(HtmlTemplates.getSuccessPage(user.username(), String.valueOf(user.id())))
+                .thenAccept(user -> ctx.status(200).html(HtmlTemplates.getSuccessPage(user.getUsername(), String.valueOf(user.getId())))
                 )
                 .exceptionally(e -> {
                     LOG.error("Error handling binding callback", e);
@@ -79,14 +78,14 @@ public class BindingHelper {
                 .whenComplete((_, _) -> bindingTasks.remove(state)));
     }
 
-    public static BindingTask createBindingTask(String openId, String messageId, BiConsumer<OsuUser, OsuToken> onFinish) {
+    public static BindingTask createBindingTask(String openId, String messageId, BiConsumer<User, OsuToken> onFinish) {
         UUID taskId = UUID.randomUUID();
         final BindingTask task = new BindingTask(taskId.toString(), openId, messageId, onFinish);
         bindingTasks.put(taskId.toString(), task);
         return task;
     }
 
-    public record BindingTask(String taskId, String openId, String messageId, BiConsumer<OsuUser, OsuToken> onFinish) {
+    public record BindingTask(String taskId, String openId, String messageId, BiConsumer<User, OsuToken> onFinish) {
     }
 }
 

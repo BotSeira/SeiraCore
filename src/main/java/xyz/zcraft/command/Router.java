@@ -13,7 +13,7 @@ import xyz.zcraft.command.resolution.UidListResolution;
 import xyz.zcraft.command.resolution.UidResolution;
 import xyz.zcraft.config.AppConfig;
 import xyz.zcraft.data.*;
-import xyz.zcraft.model.OsuUser;
+import xyz.zcraft.osu.model.User;
 import xyz.zcraft.util.OsuAuthHelper;
 import xyz.zcraft.util.ThreadHelper;
 import xyz.zcraft.util.TimeDurationParser;
@@ -109,7 +109,7 @@ public class Router {
                         return RouteDecision.sync(PendingMessage.ofString("用法：/bind"));
                     }
                     final var bindingTask = BindingHelper.createBindingTask(senderUserId, messageId, (user, token) -> {
-                        UserDataStore.bind(senderUserId, user.id());
+                        UserDataStore.bind(senderUserId, user.getId());
                         UserDataStore.storeToken(senderUserId, token);
                     });
                     return RouteDecision.sync(replyFactory.bindMessage(config.binding(), bindingTask, groupId == null || groupId.isBlank()));
@@ -309,7 +309,7 @@ public class Router {
                 return taskCoordinator.queueApiRequest("f", () -> {
                     final Response<List<FriendEntry>> response = APIHelper.getFollowed(token.accessToken());
                     final List<FriendEntry> content = response.getContent();
-                    final List<Long> ids = content.stream().map(e -> e.user().id()).toList();
+                    final List<Long> ids = content.stream().map(e -> e.user().getId()).toList();
 
                     final Predicate<Long> filter = (
                             (groupId == null || groupId.isBlank())
@@ -324,26 +324,26 @@ public class Router {
                             .forEach(i -> UserDataStore.removeFollowed(uid, i));
 
                     for (FriendEntry friendEntry : content) {
-                        if (!UserDataStore.haveFollowed(uid, friendEntry.user().id())) {
-                            UserDataStore.storeFollowed(uid, friendEntry.user().id());
+                        if (!UserDataStore.haveFollowed(uid, friendEntry.user().getId())) {
+                            UserDataStore.storeFollowed(uid, friendEntry.user().getId());
                         }
 
                         if (friendEntry.mutual()) {
-                            if (!UserDataStore.haveFollowed(friendEntry.user().id(), uid)) {
-                                UserDataStore.storeFollowed(friendEntry.user().id(), uid);
+                            if (!UserDataStore.haveFollowed(friendEntry.user().getId(), uid)) {
+                                UserDataStore.storeFollowed(friendEntry.user().getId(), uid);
                             }
                         }
                     }
 
                     final List<Long> follower = UserDataStore.findFollower(uid);
 
-                    final List<OsuUser> mutual = new LinkedList<>();
-                    final List<OsuUser> onlyFollowed = new LinkedList<>();
-                    final List<OsuUser> onlyFollower = new LinkedList<>();
+                    final List<User> mutual = new LinkedList<>();
+                    final List<User> onlyFollowed = new LinkedList<>();
+                    final List<User> onlyFollower = new LinkedList<>();
 
                     for (FriendEntry e : content) {
-                        if (!filter.test(e.user().id())) continue;
-                        if (follower.contains(e.user().id())) {
+                        if (!filter.test(e.user().getId())) continue;
+                        if (follower.contains(e.user().getId())) {
                             mutual.add(e.user());
                         } else {
                             onlyFollowed.add(e.user());
@@ -351,8 +351,8 @@ public class Router {
                     }
 
                     for (FriendEntry e : content) {
-                        if (!filter.test(e.user().id())) continue;
-                        if (content.stream().noneMatch(entry -> Objects.equals(entry.user().id(), e.user().id()))) {
+                        if (!filter.test(e.user().getId())) continue;
+                        if (content.stream().noneMatch(entry -> Objects.equals(entry.user().getId(), e.user().getId()))) {
                             onlyFollower.add(e.user());
                         }
                     }

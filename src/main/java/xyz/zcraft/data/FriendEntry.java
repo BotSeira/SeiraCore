@@ -1,8 +1,8 @@
 package xyz.zcraft.data;
 
-import xyz.zcraft.model.OsuUser;
+import xyz.zcraft.osu.model.User;
 
 public record FriendEntry(
-        OsuUser user,
+        User user,
         boolean mutual) {
 }

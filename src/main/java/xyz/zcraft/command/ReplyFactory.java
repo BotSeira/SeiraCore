@@ -6,7 +6,7 @@ import xyz.zcraft.binding.BindingHelper;
 import xyz.zcraft.config.AppConfig;
 import xyz.zcraft.config.BindingConfig;
 import xyz.zcraft.data.*;
-import xyz.zcraft.model.OsuUser;
+import xyz.zcraft.osu.model.User;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -165,7 +165,7 @@ final class ReplyFactory {
     }
 
     public PendingMessage friendMessage(boolean inGroup, int followedCount,
-                                        List<OsuUser> mutual, List<OsuUser> onlyFollowed, List<OsuUser> onlyFollower) {
+                                        List<User> mutual, List<User> onlyFollowed, List<User> onlyFollower) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.friendContent(inGroup, followedCount, mutual, onlyFollowed, onlyFollower),
                 null
@@ -229,7 +229,7 @@ final class ReplyFactory {
         }
 
         public static String friendContent(boolean inGroup, int followedCount,
-                                           List<OsuUser> mutual, List<OsuUser> onlyFollowed, List<OsuUser> onlyFollower) {
+                                           List<User> mutual, List<User> onlyFollowed, List<User> onlyFollower) {
             StringBuilder sb = new StringBuilder();
             if (inGroup) {
                 sb.append("\uD83D\uDC65").append("本群好友列表");
@@ -240,7 +240,7 @@ final class ReplyFactory {
             final long onlineCount = Stream.of(mutual, onlyFollowed, onlyFollower)
                     .flatMap(List::stream)
                     .distinct()
-                    .filter(OsuUser::isOnline)
+                    .filter(User::isOnline)
                     .count();
 
             sb.append(" - ").append(onlineCount).append(" 在线").append("\n");
@@ -248,25 +248,25 @@ final class ReplyFactory {
             sb.append("\n");
 
             sb.append("> 好友←→ (").append(mutual.size()).append(")\n>");
-            for (OsuUser p : mutual) {
+            for (User p : mutual) {
                 sb.append(getFriendItem(p)).append(" ");
             }
 
             sb.append("\n> 仅关注→ (").append(onlyFollowed.size()).append(")\n>");
-            for (OsuUser p : onlyFollowed) {
+            for (User p : onlyFollowed) {
                 sb.append(getFriendItem(p)).append(" ");
             }
 
             sb.append("\n> 仅粉丝← (").append(onlyFollower.size()).append(")\n>");
-            for (OsuUser p : onlyFollower) {
+            for (User p : onlyFollower) {
                 sb.append(getFriendItem(p)).append(" ");
             }
 
             return sb.toString().trim();
         }
 
-        private static String getFriendItem(OsuUser u) {
-            return cmd("/u " + u.id(), "[" + (u.isOnline() ? "▶" : "") + u.username() + "]");
+        private static String getFriendItem(User u) {
+            return cmd("/u " + u.getId(), "[" + (u.isOnline() ? "▶" : "") + u.getUsername() + "]");
         }
     }
 

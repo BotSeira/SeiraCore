@@ -15,6 +15,13 @@
         <exec.mainClass>xyz.zcraft.Seira</exec.mainClass>
     </properties>
 
+    <repositories>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://www.jitpack.io</url>
+        </repository>
+    </repositories>
+
     <build>
         <resources>
             <resource>
@@ -72,6 +79,11 @@
     </build>
 
     <dependencies>
+        <dependency>
+            <groupId>com.github.ZayrexDev</groupId>
+            <artifactId>osuModel</artifactId>
+            <version>master-a7b13a170e-1</version>
+        </dependency>
         <!-- Source: https://mvnrepository.com/artifact/tools.jackson.core/jackson-databind -->
         <dependency>
             <groupId>tools.jackson.core</groupId>
