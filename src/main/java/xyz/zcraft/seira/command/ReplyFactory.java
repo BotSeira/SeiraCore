@@ -1,6 +1,7 @@
 package xyz.zcraft.seira.command;
 
 import org.jetbrains.annotations.NotNull;
+import xyz.zcraft.osu.model.Beatmap;
 import xyz.zcraft.osu.model.MultiplayerRoom;
 import xyz.zcraft.osu.model.User;
 import xyz.zcraft.seira.api.APIHelper;
@@ -276,8 +277,8 @@ final class ReplyFactory {
             String sb = "> 进行中的多人游戏" + "\n" +
                     "> 房间名: " + content.getName() + "\n" +
                     "> 人数: " + content.getParticipantCount() + "\n" +
-                    "> ID: " + content.getId() +
-                    "> 加入房间/下载铺面:" + content.getId();
+                    "> ID: " + content.getId() + "\n" +
+                    "> 加入房间/下载铺面";
             return sb.trim();
         }
     }
@@ -287,7 +288,8 @@ final class ReplyFactory {
             return Button.keyboard(
                     Button.row(Button.openUrl(1, "加入房间", directUrl + "/room/" + room.getId()))
                     , Optional.ofNullable(room.getCurrentPlaylistItem())
-                            .map(MultiplayerRoom.CurrentPlaylistItem::getBeatmapId)
+                            .map(MultiplayerRoom.CurrentPlaylistItem::getBeatmap)
+                            .map(Beatmap::getBeatmapsetId)
                             .map(i -> dlButtonRow(String.valueOf(i)))
                             .orElse(null)
             );
