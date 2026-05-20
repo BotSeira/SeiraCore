@@ -281,7 +281,7 @@ final class ReplyFactory {
             final MultiplayerRoom.CurrentPlaylistItem cur = content.getCurrentPlaylistItem();
             if (cur != null) {
                 sb += "> 当前: " + "%s - %s - %s [%.2f★ %s]".formatted(
-                        cur.getBeatmapId(),
+                        cmd("/m " + cur.getBeatmapId(), String.valueOf(cur.getBeatmapId())),
                         cur.getBeatmap().getBeatmapset().getArtist(),
                         cur.getBeatmap().getBeatmapset().getTitle(),
                         cur.getBeatmap().getDifficultyRating(),
