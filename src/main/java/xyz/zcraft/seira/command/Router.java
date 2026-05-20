@@ -562,7 +562,7 @@ public class Router {
                     if (groupId != null && !groupId.isBlank()) {
                         List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(groupId);
                         if (groupBoundUids.isEmpty()) {
-                            return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>"));
+                            return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind" + (config.binding().requireLogin() ? "" : " <玩家ID>")));
                         }
                         String[] uidArray = groupBoundUids.stream().map(String::valueOf).toArray(String[]::new);
 
@@ -594,7 +594,7 @@ public class Router {
                         if (groupId != null && !groupId.isBlank()) {
                             List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(groupId);
                             if (groupBoundUids.isEmpty()) {
-                                return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind <玩家ID>"));
+                                return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind" + (config.binding().requireLogin() ? "" : " <玩家ID>")));
                             }
                             String[] uidArray = groupBoundUids.stream().map(String::valueOf).toArray(String[]::new);
                             return taskCoordinator.queueImageRequest(
@@ -671,7 +671,7 @@ public class Router {
             case "help" -> {
                 return RouteDecision.sync(PendingMessage.ofString("""
                         可用指令：
-                        /bind <玩家ID> - 绑定你的玩家ID
+                        /bind - 绑定你的玩家ID
                         /unbind - 解除你的玩家ID绑定
                         /clearhistory - 清除你在群聊中的记录
                         /f - 获取好友列表
@@ -745,7 +745,7 @@ public class Router {
 
     private static final class Usages {
         public static final String BO_USAGE = "用法：/bo <个数> [玩家ID/@用户]";
-        public static final String NO_BIND_TIP = "你还没有绑定玩家ID，请先使用 /bind <玩家ID>";
+        public static final String NO_BIND_TIP = "你还没有绑定玩家ID，请先使用 /bind 绑定";
         public static final String RS_USAGE = "用法：/rs <个数> [玩家ID/@用户]";
         public static final String M_USAGE = "用法：/m <铺面ID 或 快捷查询> [Mod]";
         public static final String DL_USAGE = "用法：/dl <铺面集ID 或 快捷查询>";
