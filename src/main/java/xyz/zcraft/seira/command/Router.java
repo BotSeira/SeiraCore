@@ -365,9 +365,9 @@ public class Router {
                         }
                     }
 
-                    for (FriendEntry e : content) {
-                        if (!filter.test(e.user().getId())) continue;
-                        if (content.stream().noneMatch(entry -> Objects.equals(entry.user().getId(), e.user().getId()))) {
+                    for (Long i : follower) {
+                        if (!filter.test(i)) continue;
+                        if (content.stream().noneMatch(entry -> Objects.equals(entry.user().getId(), i))) {
                             onlyFollower.add(e.user());
                         }
                     }
