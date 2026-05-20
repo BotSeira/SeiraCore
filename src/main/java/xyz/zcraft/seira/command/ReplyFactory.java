@@ -277,8 +277,18 @@ final class ReplyFactory {
             String sb = "> 进行中的多人游戏" + "\n" +
                     "> 房间名: " + content.getName() + "\n" +
                     "> 人数: " + content.getParticipantCount() + "\n" +
-                    "> ID: " + content.getId() + "\n" +
-                    "> 加入房间/下载铺面";
+                    "> ID: " + content.getId() + "\n";
+            final MultiplayerRoom.CurrentPlaylistItem cur = content.getCurrentPlaylistItem();
+            if (cur != null) {
+                sb += "> 当前: " + "%s - %s - %s [%.2f★ %s]".formatted(
+                        cur.getBeatmapId(),
+                        cur.getBeatmap().getBeatmapset().getArtist(),
+                        cur.getBeatmap().getBeatmapset().getTitle(),
+                        cur.getBeatmap().getDifficultyRating(),
+                        cur.getBeatmap().getVersion()
+                ) + "\n";
+            }
+            sb += "> 加入房间/下载铺面";
             return sb.trim();
         }
     }
