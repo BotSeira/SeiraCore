@@ -322,6 +322,7 @@ public class Router {
                 }
 
                 return taskCoordinator.queueApiRequest("f", () -> {
+                    final Response<User> self = APIHelper.getSelf(token.accessToken());
                     final Response<List<FriendEntry>> response = APIHelper.getFollowed(token.accessToken());
                     final List<FriendEntry> content = response.getContent();
                     final List<Long> ids = content.stream().map(e -> e.user().getId()).toList();
@@ -331,6 +332,11 @@ public class Router {
                                     ? (_) -> true
                                     : (i) -> UserDataStore.findBoundUidsByGroup(groupId).contains(i)
                     );
+
+                    UserDataStore.storeUserInfo(self.getContent().getId(), self.getContent().getUsername());
+                    response.getContent().stream()
+                            .map(FriendEntry::user)
+                            .forEach(u -> UserDataStore.storeUserInfo(u.getId(), u.getUsername()));
 
                     final List<Long> origFollower = UserDataStore.findFollower(uid);
 
@@ -368,8 +374,10 @@ public class Router {
                     for (Long i : follower) {
                         if (!filter.test(i)) continue;
                         if (content.stream().noneMatch(entry -> Objects.equals(entry.user().getId(), i))) {
-                            // TODO FIX THIS
-                            // onlyFollower.add(e.user());
+                            User u = new User();
+                            u.setId(i);
+                            u.setUsername(UserDataStore.findUsername(i).orElse("未知-" + i));
+                            onlyFollower.add(u);
                         }
                     }
 

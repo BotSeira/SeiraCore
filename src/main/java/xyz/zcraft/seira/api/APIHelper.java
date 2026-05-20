@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import xyz.zcraft.osu.model.User;
 import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.command.resolution.ShortcutTarget;
@@ -58,6 +59,32 @@ public class APIHelper {
 
             return Response.<List<FriendEntry>>fromHeaders(send.headers())
                     .content(followed)
+                    .build();
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static Response<User> getSelf(String accessToken) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/self"))
+                    .header("Authorization", "Bearer " + accessToken)
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw parseHttpError(send.body(), send.statusCode(), "获取用户信息失败");
+            }
+
+            final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
+            ensureApiSuccess(r, "获取用户信息失败");
+            final var data = r.getData().getAsJsonObject();
+
+            return Response.<User>fromHeaders(send.headers())
+                    .content(GSON.fromJson(data, User.class))
                     .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
