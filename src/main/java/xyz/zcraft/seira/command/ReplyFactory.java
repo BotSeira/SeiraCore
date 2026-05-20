@@ -431,8 +431,9 @@ final class ReplyFactory {
         @NotNull
         private static List<Button> dlButtonRow(String beatmapsetId) {
             return Button.row(
-                    Button.openUrl(1, "Sayobot", "https://dl.sayobot.cn/beatmaps/download/" + beatmapsetId),
-                    Button.openUrl(2, "Nekoha", "https://mirror.nekoha.moe/api4/download/" + beatmapsetId)
+                    Button.openUrl(1, "官网", "https://osu.ppy.sh/beatmapsets/" + beatmapsetId + "/download"),
+                    Button.openUrl(2, "Sayobot", "https://dl.sayobot.cn/beatmaps/download/" + beatmapsetId),
+                    Button.openUrl(3, "Nekoha", "https://mirror.nekoha.moe/api4/download/" + beatmapsetId)
             );
         }
     }
