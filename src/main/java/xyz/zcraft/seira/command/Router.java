@@ -368,7 +368,8 @@ public class Router {
                     for (Long i : follower) {
                         if (!filter.test(i)) continue;
                         if (content.stream().noneMatch(entry -> Objects.equals(entry.user().getId(), i))) {
-                            onlyFollower.add(e.user());
+                            // TODO FIX THIS
+                            // onlyFollower.add(e.user());
                         }
                     }
 
