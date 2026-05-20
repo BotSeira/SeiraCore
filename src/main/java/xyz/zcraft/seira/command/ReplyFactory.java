@@ -1,16 +1,19 @@
 package xyz.zcraft.seira.command;
 
+import org.jetbrains.annotations.NotNull;
+import xyz.zcraft.osu.model.MultiplayerRoom;
+import xyz.zcraft.osu.model.User;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.Response;
 import xyz.zcraft.seira.binding.BindingHelper;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.BindingConfig;
 import xyz.zcraft.seira.data.*;
-import xyz.zcraft.osu.model.User;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 final class ReplyFactory {
@@ -126,10 +129,10 @@ final class ReplyFactory {
         );
     }
 
-    public PendingMessage mpMessage(Response<String> response) {
+    public PendingMessage mpMessage(Response<MultiplayerRoom> response) {
         return PendingMessage.ofMarkdownRaw(
-                response.getContent(),
-                Buttons.mpButtons(response.getRoomId(), config.seira().directUrl())
+                Contents.mpContent(response.getContent()),
+                Buttons.mpButtons(response.getContent(), config.seira().directUrl())
         );
     }
 
@@ -268,13 +271,26 @@ final class ReplyFactory {
         private static String getFriendItem(User u) {
             return cmd("/u " + u.getId(), "[" + (u.isOnline() ? "▶" : "") + u.getUsername() + "]");
         }
+
+        public static String mpContent(MultiplayerRoom content) {
+            String sb = "> 进行中的多人游戏" + "\n" +
+                    "> 房间名: " + content.getName() + "\n" +
+                    "> 人数: " + content.getParticipantCount() + "\n" +
+                    "> ID: " + content.getId() +
+                    "> 加入房间/下载铺面:" + content.getId();
+            return sb.trim();
+        }
     }
 
     private static final class Buttons {
-        static List<List<Button>> mpButtons(String roomId, String directUrl) {
-            return Button.keyboard(Button.row(
-                    Button.openUrl(1, "在游戏中查看", directUrl + "/room/" + roomId)
-            ));
+        static List<List<Button>> mpButtons(MultiplayerRoom room, String directUrl) {
+            return Button.keyboard(
+                    Button.row(Button.openUrl(1, "加入房间", directUrl + "/room/" + room.getId()))
+                    , Optional.ofNullable(room.getCurrentPlaylistItem())
+                            .map(MultiplayerRoom.CurrentPlaylistItem::getBeatmapId)
+                            .map(i -> dlButtonRow(String.valueOf(i)))
+                            .orElse(null)
+            );
         }
 
         static List<List<Button>> bindButtons(String userId, String url, boolean restrict) {
@@ -396,10 +412,15 @@ final class ReplyFactory {
 
         public static List<List<Button>> dlButton(String beatmapsetId) {
             return Button.keyboard(
-                    Button.row(
-                            Button.openUrl(1, "Sayobot", "https://dl.sayobot.cn/beatmaps/download/" + beatmapsetId),
-                            Button.openUrl(2, "Nekoha", "https://mirror.nekoha.moe/api4/download/" + beatmapsetId)
-                    )
+                    dlButtonRow(beatmapsetId)
+            );
+        }
+
+        @NotNull
+        private static List<Button> dlButtonRow(String beatmapsetId) {
+            return Button.row(
+                    Button.openUrl(1, "Sayobot", "https://dl.sayobot.cn/beatmaps/download/" + beatmapsetId),
+                    Button.openUrl(2, "Nekoha", "https://mirror.nekoha.moe/api4/download/" + beatmapsetId)
             );
         }
     }

@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import xyz.zcraft.osu.model.MultiplayerRoom;
 import xyz.zcraft.osu.model.User;
 import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.command.ResolutionException;
@@ -207,7 +208,7 @@ public class APIHelper {
         }
     }
 
-    public static Response<String> getMultiplayerRoom(String accessToken) {
+    public static Response<MultiplayerRoom> getMultiplayerRoom(String accessToken) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/mp"))
@@ -225,13 +226,8 @@ public class APIHelper {
             ensureApiSuccess(r, "获取多人房间失败");
             final JsonObject data = r.getData().getAsJsonObject();
 
-            String str = "## 进行中的多人游戏\n" +
-                    "房间名: " + data.get("name") + "\n" +
-                    "人数: " + data.get("participant_count") + "\n" +
-                    "ID: " + data.get("id");
-
-            return Response.<String>fromHeaders(send.headers())
-                    .content(str.trim())
+            return Response.<MultiplayerRoom>fromHeaders(send.headers())
+                    .content(GSON.fromJson(data, MultiplayerRoom.class))
                     .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
