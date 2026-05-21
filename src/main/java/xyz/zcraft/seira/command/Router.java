@@ -2,6 +2,7 @@ package xyz.zcraft.seira.command;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.osu.model.UserExtended;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.Response;
 import xyz.zcraft.seira.binding.BindingHelper;
@@ -69,7 +70,12 @@ public class Router {
                 return;
             }
 
-            taskCoordinator.sendOutboundMessage(targetId, messageId, groupMessage, routeDecision.initialMessage(), messageSeqCounter);
+            if (routeDecision.initialMessage() != null) {
+                taskCoordinator.sendOutboundMessage(
+                        targetId, messageId, groupMessage,
+                        routeDecision.initialMessage(), messageSeqCounter
+                );
+            }
 
             ApiTask apiTask = routeDecision.apiTask();
             if (apiTask != null) {
@@ -322,7 +328,7 @@ public class Router {
                 }
 
                 return taskCoordinator.queueApiRequest("f", () -> {
-                    final Response<User> self = APIHelper.getSelf(token.accessToken());
+                    final Response<UserExtended> self = APIHelper.getSelf(token.accessToken());
                     final Response<List<FriendEntry>> response = APIHelper.getFollowed(token.accessToken());
                     final List<FriendEntry> content = response.getContent();
                     final List<Long> ids = content.stream().map(e -> e.user().getId()).toList();
@@ -381,7 +387,7 @@ public class Router {
                         }
                     }
 
-                    return replyFactory.friendMessage(!(groupId == null || groupId.isBlank()), content.size(), mutual, onlyFollowed, onlyFollower);
+                    return replyFactory.friendMessage(self.getContent(), !(groupId == null || groupId.isBlank()), content.size(), mutual, onlyFollowed, onlyFollower);
                 });
             }
             case "fclear" -> {

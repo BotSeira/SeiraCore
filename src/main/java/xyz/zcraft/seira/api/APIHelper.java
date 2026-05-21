@@ -5,7 +5,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import xyz.zcraft.osu.model.MultiplayerRoom;
-import xyz.zcraft.osu.model.User;
+import xyz.zcraft.osu.model.UserExtended;
 import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.command.resolution.ShortcutTarget;
@@ -66,7 +66,7 @@ public class APIHelper {
         }
     }
 
-    public static Response<User> getSelf(String accessToken) {
+    public static Response<UserExtended> getSelf(String accessToken) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/self"))
@@ -84,8 +84,8 @@ public class APIHelper {
             ensureApiSuccess(r, "获取用户信息失败");
             final var data = r.getData().getAsJsonObject();
 
-            return Response.<User>fromHeaders(send.headers())
-                    .content(GSON.fromJson(data, User.class))
+            return Response.<UserExtended>fromHeaders(send.headers())
+                    .content(GSON.fromJson(data, UserExtended.class))
                     .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
@@ -228,30 +228,6 @@ public class APIHelper {
 
             return Response.<MultiplayerRoom>fromHeaders(send.headers())
                     .content(GSON.fromJson(data, MultiplayerRoom.class))
-                    .build();
-        } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static Response<Base64Bytes> getMultiplayerRoomItem(String accessToken) {
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/beatmap?of=mp"))
-                    .header("Authorization", "Bearer " + accessToken)
-                    .GET()
-                    .build();
-
-            final var send = CLIENT.send(request, HttpResponse.BodyHandlers.ofByteArray());
-
-            if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取多人房间失败");
-            }
-
-            final byte[] imgBytes = send.body();
-
-            return Response.<Base64Bytes>fromHeaders(send.headers())
-                    .content(new Base64Bytes(imgBytes))
                     .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);

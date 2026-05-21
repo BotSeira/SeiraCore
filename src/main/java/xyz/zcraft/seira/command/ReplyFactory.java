@@ -4,6 +4,7 @@ import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.osu.model.Beatmap;
 import xyz.zcraft.osu.model.MultiplayerRoom;
 import xyz.zcraft.osu.model.User;
+import xyz.zcraft.osu.model.UserExtended;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.Response;
 import xyz.zcraft.seira.binding.BindingHelper;
@@ -168,10 +169,10 @@ final class ReplyFactory {
         );
     }
 
-    public PendingMessage friendMessage(boolean inGroup, int followedCount,
+    public PendingMessage friendMessage(UserExtended self, boolean inGroup, int followedCount,
                                         List<User> mutual, List<User> onlyFollowed, List<User> onlyFollower) {
         return PendingMessage.ofMarkdownRaw(
-                Contents.friendContent(inGroup, followedCount, mutual, onlyFollowed, onlyFollower),
+                Contents.friendContent(self, inGroup, followedCount, mutual, onlyFollowed, onlyFollower),
                 null
         );
     }
@@ -232,7 +233,7 @@ final class ReplyFactory {
             return sb.toString().trim();
         }
 
-        public static String friendContent(boolean inGroup, int followedCount,
+        public static String friendContent(UserExtended self, boolean inGroup, int followedCount,
                                            List<User> mutual, List<User> onlyFollowed, List<User> onlyFollower) {
             StringBuilder sb = new StringBuilder();
             if (inGroup) {
@@ -261,7 +262,7 @@ final class ReplyFactory {
                 sb.append(getFriendItem(p)).append(" ");
             }
 
-            sb.append("\n> 仅粉丝← (").append(onlyFollower.size()).append(")\n>");
+            sb.append("\n> 仅粉丝← (").append(onlyFollower.size()).append(" 已知 共").append(self.getFollowerCount()).append(")\n>");
             for (User p : onlyFollower) {
                 sb.append(getFriendItem(p)).append(" ");
             }
