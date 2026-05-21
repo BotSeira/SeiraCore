@@ -227,6 +227,21 @@ public final class UserDataStore {
         }
     }
 
+    public static int clearFollowed(long selfId) {
+        ensureInitialized();
+        String sql = """
+                DELETE FROM user_follows
+                WHERE self = ?;
+                """;
+        try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
+            PreparedStatement statement = connection.prepareStatement(sql);
+            statement.setLong(1, selfId);
+            return statement.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to clear follow", e);
+        }
+    }
+
     public static boolean haveFollowed(long selfId, long followed) {
         ensureInitialized();
         String sql = """

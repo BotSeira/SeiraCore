@@ -384,6 +384,20 @@ public class Router {
                     return replyFactory.friendMessage(!(groupId == null || groupId.isBlank()), content.size(), mutual, onlyFollowed, onlyFollower);
                 });
             }
+            case "fclear" -> {
+                if (!config.binding().requireLogin()) {
+                    return RouteDecision.sync(PendingMessage.ofString("本指令未启用：需要进行用户登录鉴权。"));
+                }
+
+                Long uid = argumentResolver.resolveBoundUid(senderUserId);
+                if (uid == null) {
+                    return RouteDecision.sync(PendingMessage.ofString(Usages.NO_BIND_TIP));
+                }
+
+                return RouteDecision.sync(PendingMessage.ofString(
+                        "已清除 " + UserDataStore.clearFollowed(uid) + " 条好友记录。"
+                ));
+            }
             case "dl" -> {
                 if (args.length < 1 || args.length > 2) {
                     return RouteDecision.sync(PendingMessage.ofString(Usages.DL_USAGE));
@@ -675,6 +689,7 @@ public class Router {
                         /unbind - 解除你的玩家ID绑定
                         /clearhistory - 清除你在群聊中的记录
                         /f - 获取好友列表
+                        /fclear - 清除好友记录
                         /bo <个数> [玩家ID] - 获取BoN图谱
                         /rs <个数> [玩家ID] - 获取最近成绩图谱
                         /m <铺面ID> - 获取铺面图谱
