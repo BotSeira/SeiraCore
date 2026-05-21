@@ -76,7 +76,7 @@ final class ReplyFactory {
     public PendingMessage lbMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "排行榜查询完成" +
-                        (response.getBeatmapId() == null ? "" : "\n谱面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId())),
+                        (response.getBeatmapId() == null ? "" : "\n> 谱面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId())),
                 Buttons.lbButtons(response.getBeatmapId())
         );
     }
