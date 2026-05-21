@@ -547,12 +547,12 @@ public class Router {
             }
             case "ms" -> {
                 if (args.length < 1 || args.length > 2) {
-                    return RouteDecision.sync(PendingMessage.ofString("用法：/ms <铺面集ID 或 快捷查询>"));
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/ms <谱面集ID 或 快捷查询>"));
                 }
 
                 TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(args, senderUserId);
                 if (args.length != targetResolution.consumedArgs()) {
-                    return RouteDecision.sync(PendingMessage.ofString("用法：/ms <铺面集ID 或 快捷查询>"));
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/ms <谱面集ID 或 快捷查询>"));
                 }
                 ShortcutTarget target = targetResolution.target();
                 if (target.isError()) {
@@ -636,18 +636,18 @@ public class Router {
                     }
 
                     if (remainingArgs != 1) {
-                        return RouteDecision.sync(PendingMessage.ofString("用法：/lb <铺面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
+                        return RouteDecision.sync(PendingMessage.ofString("用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
                     }
 
                     String[] uidTokens = args[targetResolution.consumedArgs()].split(",");
                     if (uidTokens.length == 0) {
-                        return RouteDecision.sync(PendingMessage.ofString("玩家ID列表不能为空。用法：/lb <铺面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
+                        return RouteDecision.sync(PendingMessage.ofString("玩家ID列表不能为空。用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
                     }
                     String[] uidArray = new String[uidTokens.length];
                     for (int i = 0; i < uidTokens.length; i++) {
                         Integer uid = argumentResolver.parsePositiveInt(uidTokens[i].trim());
                         if (uid == null) {
-                            return RouteDecision.sync(PendingMessage.ofString("玩家ID列表包含非法值。用法：/lb <铺面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
+                            return RouteDecision.sync(PendingMessage.ofString("玩家ID列表包含非法值。用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
                         }
                         uidArray[i] = String.valueOf(uid);
                     }
@@ -658,7 +658,7 @@ public class Router {
                             replyFactory::lbMessage
                     );
                 } else {
-                    return RouteDecision.sync(PendingMessage.ofString("用法：/lb <铺面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
+                    return RouteDecision.sync(PendingMessage.ofString("用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
                 }
             }
             case "status" -> {
@@ -698,14 +698,14 @@ public class Router {
                         /fclear - 清除好友记录
                         /bo <个数> [玩家ID] - 获取BoN图谱
                         /rs <个数> [玩家ID] - 获取最近成绩图谱
-                        /m <铺面ID> - 获取铺面图谱
-                        /ms <铺面集ID> - 获取铺面集图谱
+                        /m <谱面ID> - 获取谱面图谱
+                        /ms <谱面集ID> - 获取谱面集图谱
                         /r <成绩ID或快捷查询> - 生成成绩回放视频
-                        /rsc <铺面ID或快捷查询> [+用户ID列表] - 生成同屏回放视频
+                        /rsc <谱面ID或快捷查询> [+用户ID列表] - 生成同屏回放视频
                         /rstat [任务ID] - 查询渲染进度
                         /dl <ID或快捷查询> - 获取镜像下载链接
-                        /sms [#页数] <关键字> - 搜索铺面集
-                        /lb <铺面ID> [玩家ID列表] - 获取指定铺面排行榜
+                        /sms [#页数] <关键字> - 搜索谱面集
+                        /lb <谱面ID> [玩家ID列表] - 获取指定谱面排行榜
                         /daily - 获取每日挑战
                         /mp - 获取多人房间列表
                         /status - 获取服务器状态
@@ -768,10 +768,10 @@ public class Router {
         public static final String BO_USAGE = "用法：/bo <个数> [玩家ID/@用户]";
         public static final String NO_BIND_TIP = "你还没有绑定玩家ID，请先使用 /bind 绑定";
         public static final String RS_USAGE = "用法：/rs <个数> [玩家ID/@用户]";
-        public static final String M_USAGE = "用法：/m <铺面ID 或 快捷查询> [Mod]";
-        public static final String DL_USAGE = "用法：/dl <铺面集ID 或 快捷查询>";
+        public static final String M_USAGE = "用法：/m <谱面ID 或 快捷查询> [Mod]";
+        public static final String DL_USAGE = "用法：/dl <谱面集ID 或 快捷查询>";
         public static final String S_USAGE = "用法：/s <成绩ID 或 快捷查询>";
         private static final String R_USAGE = "用法：/r <成绩ID 或 快捷查询>";
-        private static final String RSC_USAGE = "用法：/rsc <铺面ID或快捷查询> [+用户ID列表，逗号分隔]";
+        private static final String RSC_USAGE = "用法：/rsc <谱面ID或快捷查询> [+用户ID列表，逗号分隔]";
     }
 }

@@ -19,8 +19,8 @@ public class ApiRequestException extends RuntimeException {
         }
 
         return switch (errorCode) {
-            case NO_BEATMAP_FOUND -> "未找到对应铺面，请检查输入后重试。";
-            case NO_BEATMAPSET_FOUND -> "未找到对应铺面集，请检查输入后重试。";
+            case NO_BEATMAP_FOUND -> "未找到对应谱面，请检查输入后重试。";
+            case NO_BEATMAPSET_FOUND -> "未找到对应谱面集，请检查输入后重试。";
             case NO_USER_FOUND -> "未找到对应玩家，请检查玩家ID后重试。";
             case NO_SCORE_FOUND -> "未找到对应成绩，请检查输入后重试。";
             case NO_ROOM_FOUND -> "当前没有可用的多人房间信息。";
@@ -28,8 +28,8 @@ public class ApiRequestException extends RuntimeException {
             case ILLEGAL_ARGUMENT -> "请求参数不合法，请检查指令参数格式。";
             case UNAUTHORIZED -> "缺少用户凭据，请重新绑定。";
 
-            case BEATMAP_FETCH_FAILED -> "获取铺面数据失败，请稍后重试。";
-            case BEATMAPSET_FETCH_FAILED -> "获取铺面集数据失败，请稍后重试。";
+            case BEATMAP_FETCH_FAILED -> "获取谱面数据失败，请稍后重试。";
+            case BEATMAPSET_FETCH_FAILED -> "获取谱面集数据失败，请稍后重试。";
             case USER_FETCH_FAILED -> "获取玩家数据失败，请稍后重试。";
             case SCORE_FETCH_FAILED -> "获取成绩数据失败，请稍后重试。";
             case IMAGE_FETCH_FAILED -> "获取图片数据失败，请稍后重试。";

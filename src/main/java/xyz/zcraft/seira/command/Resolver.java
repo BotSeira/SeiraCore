@@ -128,7 +128,7 @@ final class Resolver {
             Long index = parsePositiveLong(setMatcher.group(2));
 
             if (setId == null || index == null || index < 1) {
-                return new ShortcutTarget(null, null, null, null, "铺面集索引无效。例如: 12345#2");
+                return new ShortcutTarget(null, null, null, null, "谱面集索引无效。例如: 12345#2");
             }
 
             Long uid = resolveBoundUid(senderUserId);

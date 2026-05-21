@@ -270,7 +270,7 @@ public class APIHelper {
             final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
 
             if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取铺面失败");
+                throw parseHttpError(send.body(), send.statusCode(), "获取谱面失败");
             }
 
             byte[] imageBytes = send.body();
@@ -321,7 +321,7 @@ public class APIHelper {
             final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
 
             if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取铺面集失败");
+                throw parseHttpError(send.body(), send.statusCode(), "获取谱面集失败");
             }
 
             byte[] imageBytes = send.body();
@@ -406,11 +406,11 @@ public class APIHelper {
             final var send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
 
             if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "搜索铺面集失败");
+                throw parseHttpError(send.body(), send.statusCode(), "搜索谱面集失败");
             }
 
             final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
-            ensureApiSuccess(rawResponse, "搜索铺面集失败");
+            ensureApiSuccess(rawResponse, "搜索谱面集失败");
             final JsonArray data = rawResponse.getData().getAsJsonArray();
 
             final LinkedList<SearchResultItem> items = new LinkedList<>();
@@ -431,7 +431,7 @@ public class APIHelper {
 
     public static ReplayTaskInfo createShowcaseRenderTaskByBeatmap(Long beatmapId, String[] uids, TimeDurationParser.TimeRange timeRange) {
         if (beatmapId == null || beatmapId <= 0) {
-            throw new RuntimeException("铺面ID无效。");
+            throw new RuntimeException("谱面ID无效。");
         }
         if (uids == null || uids.length == 0) {
             throw new RuntimeException("回放渲染需要至少一个玩家ID。");
@@ -514,7 +514,7 @@ public class APIHelper {
         StringBuilder sb = new StringBuilder();
         if (data.has("beatmap") && data.get("beatmap").isJsonObject()) {
             JsonObject beatmap = data.getAsJsonObject("beatmap");
-            sb.append("铺面信息: \n");
+            sb.append("谱面信息: \n");
             sb.append(beatmap.get("artist").getAsString()).append(" - ").append(beatmap.get("title").getAsString()).append("\n");
             sb.append(beatmap.get("star").getAsString()).append(beatmap.get("version").getAsString()).append("\n");
         }
@@ -770,11 +770,11 @@ public class APIHelper {
             final HttpResponse<String> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
 
             if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取铺面集失败");
+                throw parseHttpError(send.body(), send.statusCode(), "获取谱面集失败");
             }
 
             final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
-            ensureApiSuccess(rawResponse, "查找铺面集失败");
+            ensureApiSuccess(rawResponse, "查找谱面集失败");
             final JsonObject data = rawResponse.getData().getAsJsonObject();
 
             return Response.<Void>fromHeaders(send.headers())

@@ -52,9 +52,9 @@ final class ReplyFactory {
 
     public PendingMessage beatmapMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 铺面查询完成\n" +
-                        "> 铺面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
-                        "> 铺面集: " + cmd("/ms m" + response.getBeatmapId(), response.getBeatmapsetId()),
+                "> 谱面查询完成\n" +
+                        "> 谱面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
+                        "> 谱面集: " + cmd("/ms m" + response.getBeatmapId(), response.getBeatmapsetId()),
                 Buttons.beatmapButtons(response.getBeatmapId(), config.seira().directUrl())
         );
 
@@ -63,7 +63,7 @@ final class ReplyFactory {
     public PendingMessage scoreMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> 成绩查询完成\n" +
-                        "> 铺面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
+                        "> 谱面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
                         "> 成绩: " + cmd("/s " + response.getScoreId(), response.getScoreId()),
                 Buttons.sButtons(response.getBeatmapId(), response.getScoreId())
         );
@@ -72,7 +72,7 @@ final class ReplyFactory {
     public PendingMessage lbMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 "> 排行榜查询完成" +
-                        (response.getBeatmapId() == null ? "" : "\n铺面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId())),
+                        (response.getBeatmapId() == null ? "" : "\n谱面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId())),
                 Buttons.lbButtons(response.getBeatmapId())
         );
     }
@@ -116,7 +116,7 @@ final class ReplyFactory {
 
     public PendingMessage dlMessage(Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 铺面集: " + response.getBeatmapsetId() + "\n" +
+                "> 谱面集: " + response.getBeatmapsetId() + "\n" +
                         "> 选择下载镜像: ",
                 Buttons.dlButton(response.getBeatmapsetId())
         );
@@ -224,8 +224,8 @@ final class ReplyFactory {
 
         static String beatmapsetContent(Response<?> response) {
             StringBuilder sb = new StringBuilder();
-            sb.append("> 铺面集查询完成").append("\n");
-            sb.append("> 铺面集: ").append(cmd("/ms " + response.getBeatmapsetId(), response.getBeatmapsetId())).append("\n");
+            sb.append("> 谱面集查询完成").append("\n");
+            sb.append("> 谱面集: ").append(cmd("/ms " + response.getBeatmapsetId(), response.getBeatmapsetId())).append("\n");
             sb.append("> ");
             for (int i = 0; i < response.getBeatmapStars().size(); i++) {
                 sb.append(cmd("/m " + response.getBeatmapIds().get(i), response.getBeatmapStars().get(i) + "★")).append(" ");
@@ -289,7 +289,7 @@ final class ReplyFactory {
                         cur.getBeatmap().getVersion()
                 ) + "\n";
             }
-            sb += "> 加入房间/下载铺面";
+            sb += "> 加入房间/下载谱面";
             return sb.trim();
         }
     }
@@ -368,8 +368,8 @@ final class ReplyFactory {
 
             return Button.keyboard(
                     Button.row(
-                            Button.command(1, "查看铺面", "/m " + beatmapId),
-                            Button.command(2, "查看铺面集", "/ms m" + beatmapId)
+                            Button.command(1, "查看谱面", "/m " + beatmapId),
+                            Button.command(2, "查看谱面集", "/ms m" + beatmapId)
                     ),
                     Button.row(
                             Button.command(1, "查询排行", "/lb " + beatmapId),
