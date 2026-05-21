@@ -31,9 +31,9 @@ final class ReplyFactory {
 
     static String at(Context ctx) {
         if (ctx.inGroup()) {
-            return "";
-        } else {
             return "<qqbot-at-user id=\"%s\" /> ".formatted(ctx.senderUserId());
+        } else {
+            return "";
         }
     }
 

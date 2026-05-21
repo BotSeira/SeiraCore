@@ -172,7 +172,7 @@ final class TaskCoordinator {
 
     private RouteDecision queueApiRequest(Context ctx, String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer) {
         long estimatedSeconds = apiRequestStats.estimateAndEnqueue(requestType);
-        PendingMessage queuedNotice = PendingMessage.ofString(at(ctx) + "请求已加入队列，预计等待时间" + estimatedSeconds + "秒。");
+        PendingMessage queuedNotice = PendingMessage.ofMarkdownRaw(at(ctx) + "请求已加入队列，预计等待时间" + estimatedSeconds + "秒。");
         return RouteDecision.async(queuedNotice, new ApiTask(requestType, executor, postProcessor, finalizer, false));
     }
 
