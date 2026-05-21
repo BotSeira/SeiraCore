@@ -81,7 +81,7 @@ public class Router {
         }
     }
 
-    private static final Pattern RS_QUERY = Pattern.compile("^rs(\\d+)$");
+    private static final Pattern RS_QUERY = Pattern.compile("^/rs(\\d+)$");
 
     private String preProcess(String rawContent) {
         Matcher matcher = RS_QUERY.matcher(rawContent);
