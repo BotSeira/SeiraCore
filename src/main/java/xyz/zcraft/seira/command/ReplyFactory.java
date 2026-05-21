@@ -29,30 +29,34 @@ final class ReplyFactory {
         return "<qqbot-cmd-input text=\"%s\" show=\"%s\" reference=\"false\" />".formatted(command, text);
     }
 
-    private static String at(String id) {
-        return "<qqbot-at-user id=\"%s\" /> ".formatted(id);
+    static String at(Context ctx) {
+        if (ctx.inGroup()) {
+            return "";
+        } else {
+            return "<qqbot-at-user id=\"%s\" /> ".formatted(ctx.senderUserId());
+        }
     }
 
-    public PendingMessage boMessage(Response<?> response) {
+    public PendingMessage boMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> B" + response.getScoreIds().size() + "查询完成\n" +
+                at(ctx) + "B" + response.getScoreIds().size() + "查询完成\n" +
                         "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()),
                 Buttons.boButtons(config.seira().directUrl(), response.getUserId())
         );
     }
 
-    public PendingMessage rsMessage(Response<?> response) {
+    public PendingMessage rsMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 最近成绩查询完成\n" +
+                at(ctx) + "最近成绩查询完成\n" +
                         "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()) + "\n" +
                         "> 数量: " + response.getScoreIds().size(),
                 Buttons.rsButtons()
         );
     }
 
-    public PendingMessage beatmapMessage(Response<?> response) {
+    public PendingMessage beatmapMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 谱面查询完成\n" +
+                at(ctx) + "谱面查询完成\n" +
                         "> 谱面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
                         "> 谱面集: " + cmd("/ms m" + response.getBeatmapId(), response.getBeatmapsetId()),
                 Buttons.beatmapButtons(response.getBeatmapId(), config.seira().directUrl())
@@ -60,25 +64,25 @@ final class ReplyFactory {
 
     }
 
-    public PendingMessage scoreMessage(Response<?> response) {
+    public PendingMessage scoreMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 成绩查询完成\n" +
+                at(ctx) + "成绩查询完成\n" +
                         "> 谱面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
                         "> 成绩: " + cmd("/s " + response.getScoreId(), response.getScoreId()),
                 Buttons.sButtons(response.getBeatmapId(), response.getScoreId())
         );
     }
 
-    public PendingMessage lbMessage(Response<?> response) {
+    public PendingMessage lbMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 排行榜查询完成" +
+                at(ctx) + "排行榜查询完成" +
                         (response.getBeatmapId() == null ? "" : "\n谱面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId())),
                 Buttons.lbButtons(response.getBeatmapId())
         );
     }
 
-    public PendingMessage replayMessage(APIHelper.ReplayTaskInfo taskInfo) {
-        String queuedText = "生成请求已提交。\n```text";
+    public PendingMessage replayMessage(Context ctx, APIHelper.ReplayTaskInfo taskInfo) {
+        String queuedText = at(ctx) + "生成请求已提交。\n```text";
         if (taskInfo.position() != null) {
             queuedText += "\n队列位置: " + taskInfo.position();
         }
@@ -92,48 +96,49 @@ final class ReplyFactory {
         return PendingMessage.ofMarkdownRaw(queuedText, Buttons.replayProgressButtons(taskInfo.taskId()));
     }
 
-    public PendingMessage replayStatMessage(String jobId, RenderStat renderStat) {
+    public PendingMessage replayStatMessage(Context ctx, String jobId, RenderStat renderStat) {
         return PendingMessage.ofMarkdownRaw(
-                Contents.replayStatContent(renderStat, jobId),
+                Contents.replayStatContent(ctx, renderStat, jobId),
                 Buttons.replayProgressButtons(jobId)
         );
     }
 
-    public PendingMessage searchMessage(Response<List<SearchResultItem>> response, SearchQuery searchQuery) {
+    public PendingMessage searchMessage(Context ctx, Response<List<SearchResultItem>> response, SearchQuery searchQuery) {
         int SEARCH_ITEMS_PER_PAGE = 10;
         return PendingMessage.ofMarkdownRaw(
-                Contents.searchContent(response, searchQuery, SEARCH_ITEMS_PER_PAGE),
+                Contents.searchContent(ctx, response, searchQuery, SEARCH_ITEMS_PER_PAGE),
                 Buttons.searchButtons(response, searchQuery, SEARCH_ITEMS_PER_PAGE)
         );
     }
 
-    public PendingMessage beatmapsetMessage(Response<?> response) {
+    public PendingMessage beatmapsetMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                Contents.beatmapsetContent(response),
+                Contents.beatmapsetContent(ctx, response),
                 null
         );
     }
 
-    public PendingMessage dlMessage(Response<?> response) {
+    public PendingMessage dlMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                "> 谱面集: " + response.getBeatmapsetId() + "\n" +
+                at(ctx) + "\n" +
+                        "> 谱面集: " + response.getBeatmapsetId() + "\n" +
                         "> 选择下载镜像: ",
                 Buttons.dlButton(response.getBeatmapsetId())
         );
     }
 
-    public PendingMessage bindMessage(BindingConfig config, BindingHelper.BindingTask task, boolean isC2C) {
+    public PendingMessage bindMessage(Context ctx, BindingConfig config, BindingHelper.BindingTask task, boolean isC2C) {
         final String url = "https://osu.ppy.sh/oauth/authorize?client_id=%d&response_type=code&scope=public+identify+friends.read&state=%s"
                 .formatted(config.clientId(), task.taskId());
         return PendingMessage.ofMarkdownRaw(
-                (isC2C ? "" : at(task.openId())) + "点击下方按钮绑定账号,或者在浏览器打开以下链接: \n```\n%s\n```".formatted(url),
+                at(ctx) + "点击下方按钮绑定账号,或者在浏览器打开以下链接: \n```\n%s\n```".formatted(url),
                 Buttons.bindButtons(task.openId(), url, !isC2C)
         );
     }
 
-    public PendingMessage mpMessage(Response<MultiplayerRoom> response) {
+    public PendingMessage mpMessage(Context ctx, Response<MultiplayerRoom> response) {
         return PendingMessage.ofMarkdownRaw(
-                Contents.mpContent(response.getContent()),
+                Contents.mpContent(ctx, response.getContent()),
                 Buttons.mpButtons(response.getContent(), config.seira().directUrl())
         );
     }
@@ -147,39 +152,41 @@ final class ReplyFactory {
         );
     }
 
-    public PendingMessage inspectMessage(String senderUserId, boolean isAdmin, String groupId, String messageId) {
+    public PendingMessage inspectMessage(Context ctx, String senderUserId, boolean isAdmin, String groupId, String messageId) {
         return PendingMessage.ofMarkdownRaw(
-                """
-                        用户ID%s:
-                        ```text
-                        %s
-                        ```
-                        
-                        群组ID:
-                        ```text
-                        %s
-                        ```
-                        
-                        消息ID:
-                        ```text
-                        %s
-                        ```
-                        """.formatted(isAdmin ? "(管理员)" : "", senderUserId, groupId, messageId),
+                at(ctx) + "\n" +
+                        """
+                                用户ID%s:
+                                ```text
+                                %s
+                                ```
+                                
+                                群组ID:
+                                ```text
+                                %s
+                                ```
+                                
+                                消息ID:
+                                ```text
+                                %s
+                                ```
+                                """.formatted(isAdmin ? "(管理员)" : "", senderUserId, groupId, messageId),
                 null
         );
     }
 
-    public PendingMessage friendMessage(UserExtended self, boolean inGroup, int followedCount,
+    public PendingMessage friendMessage(Context ctx, UserExtended self, int followedCount,
                                         List<User> mutual, List<User> onlyFollowed, List<User> onlyFollower) {
         return PendingMessage.ofMarkdownRaw(
-                Contents.friendContent(self, inGroup, followedCount, mutual, onlyFollowed, onlyFollower),
+                Contents.friendContent(ctx, self, followedCount, mutual, onlyFollowed, onlyFollower),
                 null
         );
     }
 
     private static final class Contents {
-        static String replayStatContent(RenderStat renderStat, String jobId) {
+        static String replayStatContent(Context ctx, RenderStat renderStat, String jobId) {
             StringBuilder sb = new StringBuilder();
+            sb.append(at(ctx)).append("\n");
             sb.append("> 请求: ").append(jobId, 0, 8).append("\n");
 
             sb.append("状态: ").append(switch (renderStat.getStatus()) {
@@ -200,14 +207,15 @@ final class ReplyFactory {
             return sb.toString().trim();
         }
 
-        static String searchContent(Response<List<SearchResultItem>> response, SearchQuery query, int itemsPerPage) {
+        static String searchContent(Context ctx, Response<List<SearchResultItem>> response, SearchQuery query, int itemsPerPage) {
             final List<SearchResultItem> items = response.getContent();
 
             if (items.size() <= (query.page() - 1) * itemsPerPage) {
-                return "没有找到更多的搜索结果了哦~";
+                return at(ctx) + "没有找到更多的搜索结果了哦~";
             }
 
             StringBuilder sb = new StringBuilder();
+            sb.append(at(ctx));
             sb.append("\uD83D\uDD0D").append("搜索结果 - `").append(query.query()).append("`\n");
 
             for (int i = (query.page() - 1) * itemsPerPage; i < Math.min(items.size(), query.page() * itemsPerPage); i++) {
@@ -222,9 +230,9 @@ final class ReplyFactory {
             return sb.toString();
         }
 
-        static String beatmapsetContent(Response<?> response) {
+        static String beatmapsetContent(Context ctx, Response<?> response) {
             StringBuilder sb = new StringBuilder();
-            sb.append("> 谱面集查询完成").append("\n");
+            sb.append(at(ctx)).append("谱面集查询完成").append("\n");
             sb.append("> 谱面集: ").append(cmd("/ms " + response.getBeatmapsetId(), response.getBeatmapsetId())).append("\n");
             sb.append("> ");
             for (int i = 0; i < response.getBeatmapStars().size(); i++) {
@@ -233,10 +241,11 @@ final class ReplyFactory {
             return sb.toString().trim();
         }
 
-        public static String friendContent(UserExtended self, boolean inGroup, int followedCount,
+        public static String friendContent(Context ctx, UserExtended self, int followedCount,
                                            List<User> mutual, List<User> onlyFollowed, List<User> onlyFollower) {
             StringBuilder sb = new StringBuilder();
-            if (inGroup) {
+            sb.append(at(ctx));
+            if (ctx.inGroup()) {
                 sb.append("\uD83D\uDC65").append("本群好友列表");
             } else {
                 sb.append("\uD83D\uDC65").append("全部好友列表 - 共 ").append(followedCount);
@@ -274,8 +283,8 @@ final class ReplyFactory {
             return cmd("/u " + u.getId(), "[" + (u.isOnline() ? "▶" : "") + u.getUsername() + "]");
         }
 
-        public static String mpContent(MultiplayerRoom content) {
-            String sb = "> 进行中的多人游戏" + "\n" +
+        public static String mpContent(Context ctx, MultiplayerRoom content) {
+            String sb = at(ctx) + "进行中的多人游戏" + "\n" +
                     "> 房间名: " + content.getName() + "\n" +
                     "> 人数: " + content.getParticipantCount() + "\n" +
                     "> ID: " + content.getId() + "\n";
@@ -414,13 +423,6 @@ final class ReplyFactory {
                     ),
                     Button.row(Button.command(3, "查询自己的分数", "/s m" + beatmapId))
             );
-        }
-
-        private static void fillDummyButtons(List<Button> buttons) {
-            final int c = 5 - buttons.size();
-            for (int i = 0; i < c; i++) {
-                buttons.add(Button.command(i + 100, false, "", ""));
-            }
         }
 
         public static List<List<Button>> dlButton(String beatmapsetId) {

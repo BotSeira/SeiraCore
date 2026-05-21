@@ -29,7 +29,7 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/a87afa85-bd55-4e9f-b8e3-8880f39e7bf1" />
 
-### 查询铺面、铺面集、分数信息！
+### 查询谱面、谱面集、分数信息！
 
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/ee494e4f-18e7-49fb-b7f2-98dbe36b17ef" />
 
@@ -83,15 +83,15 @@ mvn -U clean compile exec:java
 | `/f`            | `/f`                                    | 获取好友列表                |
 | `/bo`           | `/bo [n] [uid/@user]`                   | 最好n个成绩图，无参时获取最佳成绩详情   |
 | `/rs`           | `/rs [n] [uid/@user]`                   | 最近n个成绩图，无参时获取最近一个成绩详情 |
-| `/m`            | `/m <id/rsN/boN> [Mod]`                 | 获取指定铺面信息              |
+| `/m`            | `/m <id/rsN/boN> [Mod]`                 | 获取指定谱面信息              |
 | `/s`            | `/s <id/rsN/boN>`                       | 获取指定成绩图               |
 | `/r`            | `/r <id/rsN/boN> [[mm:ss]-[mm:ss]]`     | 生成并发送指定成绩回放视频         |
 | `/rsc`          | `/rsc <id/rsN/boN> [+<uid1>,<uid2>...]` | 生成并发送指定成员的成绩同屏回放视频    |
 | `/rstat`        | `/rstat [id]`                           | 获取视频生成进度              |
-| `/ms`           | `/ms <id/rsN/boN>`                      | 获取指定铺面集信息             |
-| `/dl`           | `/dl <id/rsN/boN/mp>`                   | 获取指定铺面集的镜像下载链接        |
-| `/sms`          | `/sms <query>`                          | 搜索铺面集                 |
-| `/lb`           | `/lb [id] [<uid1>,<uid2>...]`           | 列出指定铺面排行或表现分排行        |
+| `/ms`           | `/ms <id/rsN/boN>`                      | 获取指定谱面集信息             |
+| `/dl`           | `/dl <id/rsN/boN/mp>`                   | 获取指定谱面集的镜像下载链接        |
+| `/sms`          | `/sms <query>`                          | 搜索谱面集                 |
+| `/lb`           | `/lb [id] [<uid1>,<uid2>...]`           | 列出指定谱面排行或表现分排行        |
 | `/daily`        | `/daily`                                | 每日挑战信息                |
 | `/mp`           | `/mp`                                   | 多人房间列表                |
 | `/status`       | `/status`                               | 服务状态文本                |
@@ -108,7 +108,7 @@ mvn -U clean compile exec:java
 
 ### 快捷查询
 
-对于一些需要指定铺面ID或成绩ID的指令（如 `/m`、`/s`、`/ms` 等），支持快捷查询写法，格式为 `rs5`、`bo3`。
+对于一些需要指定谱面ID或成绩ID的指令（如 `/m`、`/s`、`/ms` 等），支持快捷查询写法，格式为 `rs5`、`bo3`。
 
 - `rs5`：使用你已绑定的玩家ID，查询“最近成绩第 5 条”
 - `bo3`：使用你已绑定的玩家ID，查询“最好成绩第 3 条”

@@ -115,6 +115,8 @@ public class Router {
         String query = body.substring(command.length()).trim();
         String[] args = Arrays.copyOfRange(parts, 1, parts.length);
 
+        final Context ctx = new Context(senderUserId, groupId);
+
         switch (command) {
             case "bind" -> {
                 if (senderUserId == null || senderUserId.isBlank()) {
@@ -133,7 +135,7 @@ public class Router {
                         UserDataStore.bind(senderUserId, user.getId());
                         UserDataStore.storeToken(senderUserId, token);
                     });
-                    return RouteDecision.sync(replyFactory.bindMessage(config.binding(), bindingTask, groupId == null || groupId.isBlank()));
+                    return RouteDecision.sync(replyFactory.bindMessage(ctx, config.binding(), bindingTask, groupId == null || groupId.isBlank()));
                 } else {
                     if (args.length != 1) {
                         return RouteDecision.sync(PendingMessage.ofString("用法：/bind <玩家ID>"));
@@ -185,6 +187,7 @@ public class Router {
                     var uid = uidResolution.uid();
 
                     return taskCoordinator.queueImageRequest(
+                            ctx,
                             "bo",
                             () -> APIHelper.getBoNResponse(n, uid),
                             replyFactory::boMessage
@@ -200,6 +203,7 @@ public class Router {
                     }
 
                     return taskCoordinator.queueImageRequest(
+                            ctx,
                             "bo",
                             () -> APIHelper.getBoNResponse(n, uid),
                             replyFactory::boMessage
@@ -211,6 +215,7 @@ public class Router {
                     }
 
                     return taskCoordinator.queueImageRequest(
+                            ctx,
                             "bo",
                             () -> APIHelper.getScoreResponse(target),
                             replyFactory::boMessage
@@ -220,7 +225,7 @@ public class Router {
                 }
             }
             case "daily" -> {
-                return taskCoordinator.queueApiRequest("daily", () -> PendingMessage.ofMarkdownRaw(APIHelper.getDaily()));
+                return taskCoordinator.queueApiRequest(ctx, "daily", () -> PendingMessage.ofMarkdownRaw(APIHelper.getDaily()));
             }
             case "mp" -> {
                 if (!config.binding().requireLogin()) {
@@ -233,7 +238,7 @@ public class Router {
                     return RouteDecision.sync(PendingMessage.ofString("无法获取用户凭据。"));
                 }
 
-                return taskCoordinator.queueApiRequest("mp", () -> replyFactory.mpMessage(APIHelper.getMultiplayerRoom(token.accessToken())));
+                return taskCoordinator.queueApiRequest(ctx, "mp", () -> replyFactory.mpMessage(ctx, APIHelper.getMultiplayerRoom(token.accessToken())));
             }
             case "rs" -> {
                 if (args.length == 2) {
@@ -252,6 +257,7 @@ public class Router {
                     }
 
                     return taskCoordinator.queueImageRequest(
+                            ctx,
                             "rs",
                             () -> APIHelper.getRecentResponse(n, uidResolution.uid()),
                             replyFactory::rsMessage
@@ -267,6 +273,7 @@ public class Router {
                     }
 
                     return taskCoordinator.queueImageRequest(
+                            ctx,
                             "rs",
                             () -> APIHelper.getRecentResponse(n, uid),
                             replyFactory::rsMessage
@@ -278,6 +285,7 @@ public class Router {
                     }
 
                     return taskCoordinator.queueImageRequest(
+                            ctx,
                             "rs",
                             () -> APIHelper.getScoreResponse(target),
                             replyFactory::scoreMessage
@@ -303,6 +311,7 @@ public class Router {
                             : null;
 
                     return taskCoordinator.queueImageRequest(
+                            ctx,
                             "m",
                             () -> APIHelper.getBeatmapResponse(target, mod, authHelper.getTokenFor(senderUserId).accessToken()),
                             replyFactory::beatmapMessage
@@ -327,7 +336,7 @@ public class Router {
                     return RouteDecision.sync(PendingMessage.ofString("无法获取用户凭据。"));
                 }
 
-                return taskCoordinator.queueApiRequest("f", () -> {
+                return taskCoordinator.queueApiRequest(ctx, "f", () -> {
                     final Response<UserExtended> self = APIHelper.getSelf(token.accessToken());
                     final Response<List<FriendEntry>> response = APIHelper.getFollowed(token.accessToken());
                     final List<FriendEntry> content = response.getContent();
@@ -387,7 +396,7 @@ public class Router {
                         }
                     }
 
-                    return replyFactory.friendMessage(self.getContent(), !(groupId == null || groupId.isBlank()), content.size(), mutual, onlyFollowed, onlyFollower);
+                    return replyFactory.friendMessage(ctx, self.getContent(), content.size(), mutual, onlyFollowed, onlyFollower);
                 });
             }
             case "fclear" -> {
@@ -420,9 +429,11 @@ public class Router {
                 }
 
                 return taskCoordinator.queueApiRequest(
+                        ctx,
                         "dl",
-                        () -> replyFactory.dlMessage(APIHelper.lookupBeatmapset(
-                                target, authHelper.getTokenFor(senderUserId).accessToken())
+                        () -> replyFactory.dlMessage(
+                                ctx,
+                                APIHelper.lookupBeatmapset(target, authHelper.getTokenFor(senderUserId).accessToken())
                         )
                 );
             }
@@ -441,6 +452,7 @@ public class Router {
                 }
 
                 return taskCoordinator.queueImageRequest(
+                        ctx,
                         "s",
                         () -> APIHelper.getScoreResponse(target),
                         replyFactory::scoreMessage
@@ -473,6 +485,7 @@ public class Router {
 
                 TimeDurationParser.TimeRange finalRange = range;
                 return taskCoordinator.queueReplayTask(
+                        ctx,
                         "r",
                         () -> {
                             APIHelper.ReplayTaskInfo replayRenderTask = APIHelper.createReplayRenderTask(target, finalRange);
@@ -523,6 +536,7 @@ public class Router {
 
                 if (target.isMacro()) {
                     return taskCoordinator.queueReplayTask(
+                            ctx,
                             "rsc",
                             () -> {
                                 var task = APIHelper.createReplayShowcaseTask(target, uidArray, finalRange);
@@ -537,6 +551,7 @@ public class Router {
                 }
 
                 return taskCoordinator.queueReplayTask(
+                        ctx,
                         "rsc",
                         () -> {
                             var task = APIHelper.createShowcaseRenderTaskByBeatmap(target.explicitId(), uidArray, finalRange);
@@ -560,6 +575,7 @@ public class Router {
                 }
 
                 return taskCoordinator.queueImageRequest(
+                        ctx,
                         "ms",
                         () -> APIHelper.getBeatmapsetResponse(target, authHelper.getTokenFor(senderUserId).accessToken()),
                         replyFactory::beatmapsetMessage
@@ -571,10 +587,11 @@ public class Router {
                     return RouteDecision.sync(PendingMessage.ofString("用法：/sms [#页数] <搜索关键字>"));
                 }
                 return taskCoordinator.queueApiRequest(
+                        ctx,
                         "sms",
                         () -> {
                             Response<List<SearchResultItem>> searchResponse = APIHelper.searchBeatmapSetResponse(searchQuery);
-                            return replyFactory.searchMessage(searchResponse, searchQuery);
+                            return replyFactory.searchMessage(ctx, searchResponse, searchQuery);
                         });
             }
             case "lb" -> {
@@ -587,6 +604,7 @@ public class Router {
                         String[] uidArray = groupBoundUids.stream().map(String::valueOf).toArray(String[]::new);
 
                         return taskCoordinator.queueImageRequest(
+                                ctx,
                                 "lb",
                                 () -> APIHelper.getLeaderboardResponse(uidArray),
                                 replyFactory::lbMessage
@@ -598,6 +616,7 @@ public class Router {
                     }
 
                     return taskCoordinator.queueImageRequest(
+                            ctx,
                             "lb",
                             () -> APIHelper.getLeaderboardResponse(new String[]{String.valueOf(uid)}),
                             replyFactory::lbMessage
@@ -618,6 +637,7 @@ public class Router {
                             }
                             String[] uidArray = groupBoundUids.stream().map(String::valueOf).toArray(String[]::new);
                             return taskCoordinator.queueImageRequest(
+                                    ctx,
                                     "lbm",
                                     () -> APIHelper.getGroupLeaderboardResponse(target, uidArray),
                                     replyFactory::lbMessage
@@ -629,6 +649,7 @@ public class Router {
                         }
 
                         return taskCoordinator.queueImageRequest(
+                                ctx,
                                 "lbm",
                                 () -> APIHelper.getGroupLeaderboardResponse(target, new String[]{String.valueOf(uid)}),
                                 replyFactory::lbMessage
@@ -653,6 +674,7 @@ public class Router {
                     }
 
                     return taskCoordinator.queueImageRequest(
+                            ctx,
                             "lbm",
                             () -> APIHelper.getGroupLeaderboardResponse(target, uidArray),
                             replyFactory::lbMessage
@@ -674,11 +696,11 @@ public class Router {
             }
             case "rstat" -> {
                 if (args.length == 1) {
-                    return RouteDecision.sync(replyFactory.replayStatMessage(args[0], APIHelper.getRenderStat(args[0])));
+                    return RouteDecision.sync(replyFactory.replayStatMessage(ctx, args[0], APIHelper.getRenderStat(args[0])));
                 } else if (args.length == 0) {
                     if (videoRenderRecord.hasRenderTask(senderUserId)) {
                         final String jobId = videoRenderRecord.getRenderTask(senderUserId);
-                        return RouteDecision.sync(replyFactory.replayStatMessage(jobId, APIHelper.getRenderStat(jobId)));
+                        return RouteDecision.sync(replyFactory.replayStatMessage(ctx, jobId, APIHelper.getRenderStat(jobId)));
                     }
                     return RouteDecision.sync(PendingMessage.ofString("未找到渲染请求"));
                 } else {
@@ -686,7 +708,7 @@ public class Router {
                 }
             }
             case "inspect" -> {
-                return RouteDecision.sync(replyFactory.inspectMessage(senderUserId, isAdmin(senderUserId), groupId, messageId));
+                return RouteDecision.sync(replyFactory.inspectMessage(ctx, senderUserId, isAdmin(senderUserId), groupId, messageId));
             }
             case "help" -> {
                 return RouteDecision.sync(PendingMessage.ofString("""

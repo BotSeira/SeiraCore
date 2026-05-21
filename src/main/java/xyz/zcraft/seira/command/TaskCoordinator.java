@@ -15,7 +15,9 @@ import java.nio.channels.ClosedChannelException;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
+import java.util.function.BiFunction;
+
+import static xyz.zcraft.seira.command.ReplyFactory.at;
 
 final class TaskCoordinator {
     private static final Logger LOG = LogManager.getLogger(TaskCoordinator.class);
@@ -27,9 +29,8 @@ final class TaskCoordinator {
         this.messageSender = messageSender;
     }
 
-    RouteDecision queueApiRequest(String requestType, ApiTaskExecutor executor) {
-        return queueApiRequest(requestType, executor, () -> null, () -> {
-        });
+    RouteDecision queueApiRequest(Context ctx, String requestType, ApiTaskExecutor executor) {
+        return queueApiRequest(ctx, requestType, executor, () -> null, () -> {});
     }
 
     RouteDecision queueApiRequestUntilSubmit(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer) {
@@ -38,21 +39,23 @@ final class TaskCoordinator {
         return RouteDecision.async(queuedNotice, new ApiTask(requestType, executor, postProcessor, finalizer, true));
     }
 
-    RouteDecision queueImageRequest(String requestType, ImageResponseCreator creator, ImageResponsePostProcessor postProcessor) {
+    RouteDecision queueImageRequest(Context ctx, String requestType, ImageResponseCreator creator, ImageResponsePostProcessor postProcessor) {
         AtomicReference<Response<Base64Bytes>> responseRef = new AtomicReference<>();
-        return queueApiRequest(requestType,
+        return queueApiRequest(
+                ctx,
+                requestType,
                 () -> {
                     Response<Base64Bytes> response = creator.create();
                     responseRef.set(response);
                     return PendingMessage.ofImageBase64(response.getContent().toBase64());
                 },
-                () -> postProcessor.execute(responseRef.get()),
+                () -> postProcessor.execute(ctx, responseRef.get()),
                 () -> {
                 }
         );
     }
 
-    RouteDecision queueReplayTask(String requestType, ReplayTaskCreator creator, Function<APIHelper.ReplayTaskInfo, PendingMessage> messageCreator) {
+    RouteDecision queueReplayTask(Context ctx, String requestType, ReplayTaskCreator creator, BiFunction<Context, APIHelper.ReplayTaskInfo, PendingMessage> messageCreator) {
         AtomicReference<APIHelper.ReplayTaskInfo> taskInfoRef = new AtomicReference<>();
 
         return queueApiRequestUntilSubmit(
@@ -61,7 +64,7 @@ final class TaskCoordinator {
                     APIHelper.ReplayTaskInfo taskInfo = creator.create();
                     taskInfoRef.set(taskInfo);
 
-                    return messageCreator.apply(taskInfo);
+                    return messageCreator.apply(ctx, taskInfo);
                 },
                 () -> {
                     APIHelper.ReplayTaskInfo taskInfo = taskInfoRef.get();
@@ -167,9 +170,9 @@ final class TaskCoordinator {
         }
     }
 
-    private RouteDecision queueApiRequest(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer) {
+    private RouteDecision queueApiRequest(Context ctx, String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer) {
         long estimatedSeconds = apiRequestStats.estimateAndEnqueue(requestType);
-        PendingMessage queuedNotice = PendingMessage.ofString("请求已加入队列，预计等待时间" + estimatedSeconds + "秒。");
+        PendingMessage queuedNotice = PendingMessage.ofString(at(ctx) + "请求已加入队列，预计等待时间" + estimatedSeconds + "秒。");
         return RouteDecision.async(queuedNotice, new ApiTask(requestType, executor, postProcessor, finalizer, false));
     }
 
