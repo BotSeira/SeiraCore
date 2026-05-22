@@ -516,7 +516,7 @@ public class Router {
                 String extraUidArg = null;
                 TimeDurationParser.TimeRange range = null;
 
-                for (int i = args.length - targetResolution.consumedArgs() - 1; i < args.length; i++) {
+                for (int i = targetResolution.consumedArgs(); i < args.length; i++) {
                     if (args[i].startsWith("+")) {
                         extraUidArg = args[i];
                     } else if (TimeDurationParser.isTimeRange(args[i])) {
