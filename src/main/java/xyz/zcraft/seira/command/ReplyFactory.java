@@ -302,7 +302,7 @@ final class ReplyFactory {
                         cur.getBeatmap().getVersion()
                 ) + "\n";
             }
-            sb += "> 加入房间/下载谱面";
+            sb += "加入房间或下载谱面:";
             return sb.trim();
         }
     }
@@ -310,7 +310,11 @@ final class ReplyFactory {
     private record Buttons(String directUrl) {
         List<List<Button>> mpButtons(MultiplayerRoom room) {
             return Button.keyboard(
-                    Button.row(Button.openUrl(1, "加入房间", directUrl + "/room/" + room.getId()))
+                    Button.row(
+                            room.isHasPassword() ?
+                                    Button.openUrl(1, "加入房间", directUrl + "/room/" + room.getId())
+                                    : Button.openUrl(1, "房间未公开", null).disable()
+                    )
                     , Optional.ofNullable(room.getCurrentPlaylistItem())
                             .map(MultiplayerRoom.CurrentPlaylistItem::getBeatmap)
                             .map(Beatmap::getBeatmapsetId)
@@ -381,7 +385,7 @@ final class ReplyFactory {
 
             return Button.keyboard(
                     Button.row(
-                            Button.openUrl(1, "查看", directUrl + "/b/" + beatmapId),
+                            Button.openUrl(1, "查看谱面", directUrl + "/b/" + beatmapId),
                             Button.command(2, "查询谱面", "/m " + beatmapId),
                             Button.command(3, "查询谱面集", "/ms m" + beatmapId)
                     ),

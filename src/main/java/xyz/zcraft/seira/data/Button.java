@@ -97,6 +97,20 @@ public class Button {
         return this;
     }
 
+    public Button disable() {
+        this.renderData.setStyle(0);
+
+        Action.Permission permission = new Action.Permission();
+        permission.setType(0);
+        permission.setSpecifyUserIds(List.of());
+
+        action.setPermission(permission);
+
+        this.setAction(action);
+
+        return this;
+    }
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
