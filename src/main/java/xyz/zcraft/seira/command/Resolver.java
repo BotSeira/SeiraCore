@@ -40,6 +40,12 @@ final class Resolver {
             if (mentionedUserId != null) {
                 return new TargetResolution(parseTarget(args[1], mentionedUserId, true), 2);
             }
+
+            Long l = tryParseLong(args[0]);
+            if (l != null) {
+                return new TargetResolution(parseTarget(args[1], String.valueOf(l), true), 2);
+            }
+
 //            if (looksLikeMention(args[0])) {
 //                return new TargetResolution(new ShortcutTarget(null, null, null, null, "@用户格式无效，请使用@用户后再输入快捷查询（如 rs2）。"), 2);
 //            }
@@ -197,6 +203,14 @@ final class Resolver {
     private boolean looksLikeMention(String token) {
         String trimmed = token == null ? "" : token.trim();
         return trimmed.startsWith("@") || trimmed.startsWith("[CQ:at,");
+    }
+
+    private Long tryParseLong(String token) {
+        try {
+            return Long.parseLong(token);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     private String extractMentionedUserId(String token) {
