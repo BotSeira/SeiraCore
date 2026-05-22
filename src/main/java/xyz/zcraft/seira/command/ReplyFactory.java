@@ -311,9 +311,9 @@ final class ReplyFactory {
         List<List<Button>> mpButtons(MultiplayerRoom room) {
             return Button.keyboard(
                     Button.row(
-                            room.isHasPassword() ?
-                                    Button.openUrl(1, "加入房间", directUrl + "/room/" + room.getId())
-                                    : Button.openUrl(1, "房间未公开", null).disable()
+                            room.isHasPassword()
+                                    ? Button.openUrl(1, "房间未公开", null).disable()
+                                    : Button.openUrl(1, "加入房间", directUrl + "/room/" + room.getId())
                     )
                     , Optional.ofNullable(room.getCurrentPlaylistItem())
                             .map(MultiplayerRoom.CurrentPlaylistItem::getBeatmap)
