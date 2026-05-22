@@ -43,7 +43,7 @@ final class Resolver {
 
             Long l = tryParseLong(args[0]);
             if (l != null) {
-                return new TargetResolution(parseTarget(args[1], String.valueOf(l), true), 2);
+                return new TargetResolution(parseTarget(args[1], String.valueOf(l), false), 2);
             }
 
 //            if (looksLikeMention(args[0])) {
