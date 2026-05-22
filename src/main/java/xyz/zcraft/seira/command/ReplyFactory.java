@@ -320,6 +320,11 @@ final class ReplyFactory {
                             .map(Beatmap::getBeatmapsetId)
                             .map(i -> dlButtonRow(String.valueOf(i)))
                             .orElse(null)
+                    , Optional.ofNullable(room.getCurrentPlaylistItem())
+                            .map(MultiplayerRoom.CurrentPlaylistItem::getBeatmap)
+                            .map(Beatmap::getBeatmapsetId)
+                            .map(i -> dlButtonRowSecond(String.valueOf(i)))
+                            .orElse(null)
             );
         }
 
@@ -432,16 +437,25 @@ final class ReplyFactory {
 
         public List<List<Button>> dlButton(String beatmapsetId) {
             return Button.keyboard(
-                    dlButtonRow(beatmapsetId)
+                    dlButtonRow(beatmapsetId),
+                    dlButtonRowSecond(beatmapsetId)
             );
         }
 
         @NotNull
         private List<Button> dlButtonRow(String beatmapsetId) {
             return Button.row(
-                    Button.openUrl(1, "官网", "https://osu.ppy.sh/beatmapsets/" + beatmapsetId + "/download"),
-                    Button.openUrl(2, "Sayobot", "https://dl.sayobot.cn/beatmaps/download/" + beatmapsetId),
-                    Button.openUrl(3, "Nekoha", "https://mirror.nekoha.moe/api4/download/" + beatmapsetId)
+                    Button.openUrl(101, "官网", "https://osu.ppy.sh/beatmapsets/" + beatmapsetId + "/download"),
+                    Button.openUrl(102, "Sayobot", "https://dl.sayobot.cn/beatmaps/download/" + beatmapsetId),
+                    Button.openUrl(103, "Nekoha", "https://mirror.nekoha.moe/api4/download/" + beatmapsetId)
+            );
+        }
+
+        @NotNull
+        private List<Button> dlButtonRowSecond(String beatmapsetId) {
+            return Button.row(
+                    Button.openUrl(104, "Nerinyan", "https://api.nerinyan.moe/d/" + beatmapsetId),
+                    Button.openUrl(105, "Hinamizawa", "https://mirror.hinamizawa.ai/d/" + beatmapsetId)
             );
         }
     }
