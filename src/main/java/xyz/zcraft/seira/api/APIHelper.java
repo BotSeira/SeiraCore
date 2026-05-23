@@ -514,9 +514,14 @@ public class APIHelper {
         StringBuilder sb = new StringBuilder();
         if (data.has("beatmap") && data.get("beatmap").isJsonObject()) {
             JsonObject beatmap = data.getAsJsonObject("beatmap");
-            sb.append("谱面信息: \n");
-            sb.append(beatmap.get("artist").getAsString()).append(" - ").append(beatmap.get("title").getAsString()).append("\n");
-            sb.append(beatmap.get("star").getAsString()).append(beatmap.get("version").getAsString()).append("\n");
+            sb.append("谱面: ");
+            sb.append("%d - %s - %s [%.2f★ %s]".formatted(
+                    beatmap.get("id").getAsLong(),
+                    beatmap.get("artist").getAsString(),
+                    beatmap.get("title").getAsString(),
+                    beatmap.get("star").getAsDouble(),
+                    beatmap.get("version").getAsString()
+            ));
         }
 
         if (data.has("scores") && data.get("scores").isJsonArray()) {
