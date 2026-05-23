@@ -522,6 +522,7 @@ public class APIHelper {
                     beatmap.get("star").getAsDouble(),
                     beatmap.get("version").getAsString()
             ));
+            sb.append("\n");
         }
 
         if (data.has("scores") && data.get("scores").isJsonArray()) {
