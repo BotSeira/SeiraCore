@@ -216,9 +216,9 @@ public class Router {
 
                     return taskCoordinator.queueImageRequest(
                             ctx,
-                            "bo",
+                            "s",
                             () -> APIHelper.getScoreResponse(target),
-                            replyFactory::boMessage
+                            replyFactory::scoreMessage
                     );
                 } else {
                     return RouteDecision.sync(PendingMessage.ofString(Usages.BO_USAGE));
@@ -286,7 +286,7 @@ public class Router {
 
                     return taskCoordinator.queueImageRequest(
                             ctx,
-                            "rs",
+                            "s",
                             () -> APIHelper.getScoreResponse(target),
                             replyFactory::scoreMessage
                     );
