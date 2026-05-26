@@ -37,6 +37,7 @@ final class ReplyFactory {
         }
     }
 
+    @SuppressWarnings("unused")
     static String url(String text, String url) {
         return "[" + text + "](" + url + ")";
     }
@@ -213,10 +214,7 @@ final class ReplyFactory {
                     if (line == null) {
                         continue;
                     }
-                    if (!sb.isEmpty()) {
-                        sb.append("\n");
-                    }
-                    sb.append(line);
+                    sb.append("\n").append(line);
                 }
             }
 
