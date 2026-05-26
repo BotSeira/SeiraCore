@@ -1,9 +1,6 @@
 package xyz.zcraft.seira.api;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
+import com.google.gson.*;
 import xyz.zcraft.osu.model.MultiplayerRoom;
 import xyz.zcraft.osu.model.UserExtended;
 import xyz.zcraft.seira.Seira;
@@ -258,12 +255,39 @@ public class APIHelper {
     }
 
     public static Response<Base64Bytes> getBeatmapResponse(ShortcutTarget target, String mod, String auth) {
+        long beatmapId;
+        if (!target.isMacro()) {
+            beatmapId = target.explicitId();
+        } else {
+            try {
+                final String query = getBeatmapQuery(target);
+
+                HttpRequest localRequest = HttpRequest.newBuilder()
+                        .uri(URI.create(ENDPOINT + query))
+                        .header("Authorization", "Bearer " + auth)
+                        .GET()
+                        .build();
+
+                final HttpResponse<String> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
+
+                if (send.statusCode() != 200) {
+                    throw parseHttpError(send.body(), send.statusCode(), "查找谱面失败");
+                }
+
+                final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
+
+                ensureApiSuccess(rawResponse, "查找谱面失败");
+
+                beatmapId = rawResponse.getData().getAsJsonObject().get("beatmap_id").getAsLong();
+            } catch (IOException | InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
         try {
-            final String query = getBeatmapQuery(target, mod);
+            final String query = "/beatmap/" + beatmapId + (mod != null ? "?mod=" + mod : "");
 
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + query))
-                    .header("Authorization", "Bearer " + auth)
                     .GET()
                     .build();
 
@@ -283,8 +307,8 @@ public class APIHelper {
         }
     }
 
-    private static String getBeatmapQuery(ShortcutTarget target, String mod) {
-        String query = "/beatmap?";
+    private static String getBeatmapQuery(ShortcutTarget target) {
+        String query = "/lookup/beatmap?";
         if (target.isMacro()) {
             switch (target.macroType()) {
                 case "rs", "bo" -> {
@@ -301,20 +325,43 @@ public class APIHelper {
             query = "/beatmap?m=" + target.explicitId();
         }
 
-        if (mod != null) {
-            query += "&mod=" + mod;
-        }
-
         return query;
     }
 
     public static Response<Base64Bytes> getBeatmapsetResponse(ShortcutTarget target, String auth) {
+        long beatmapsetId;
+        if (!target.isMacro()) {
+            beatmapsetId = target.explicitId();
+        } else {
+            try {
+                final String query = getBeatmapsetQuery(target);
+
+                HttpRequest localRequest = HttpRequest.newBuilder()
+                        .uri(URI.create(ENDPOINT + query))
+                        .header("Authorization", "Bearer " + auth)
+                        .GET()
+                        .build();
+
+                final HttpResponse<String> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
+
+                if (send.statusCode() != 200) {
+                    throw parseHttpError(send.body(), send.statusCode(), "查找谱面集失败");
+                }
+
+                final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
+
+                ensureApiSuccess(rawResponse, "查找谱面集失败");
+
+                beatmapsetId = rawResponse.getData().getAsJsonObject().get("beatmapset_id").getAsLong();
+            } catch (IOException | InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
         try {
-            final String query = getBeatmapsetQuery(target, "beatmapset");
+            final String query = "/beatmapset/" + beatmapsetId;
 
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + query))
-                    .header("Authorization", "Bearer " + auth)
                     .GET()
                     .build();
 
@@ -334,29 +381,24 @@ public class APIHelper {
         }
     }
 
-    private static String getBeatmapsetQuery(ShortcutTarget target, String prefix) {
-        String query = null;
-        if (target.isMacro()) {
-            if ("m".equals(target.macroType())) {
-                query = "/" + prefix + "?m=" + target.explicitId();
-            } else if ("bo".equals(target.macroType()) || "rs".equals(target.macroType())) {
-                query = "/" + prefix + "?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
-            } else if ("mp".equals(target.macroType())) {
-                query = "/" + prefix + "?of=mp";
-            }
-        } else {
-            query = "/" + prefix + "?ms=" + target.explicitId();
+    private static String getBeatmapsetQuery(ShortcutTarget target) {
+        String query = "/lookup/beatmapset";
+
+        if ("m".equals(target.macroType())) {
+            return query + "?m=" + target.explicitId();
+        } else if ("bo".equals(target.macroType()) || "rs".equals(target.macroType())) {
+            return query + "?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+        } else if ("mp".equals(target.macroType())) {
+            return query + "?of=mp";
         }
 
-        if (query == null) {
-            throw new ResolutionException("快捷查询格式错误。");
-        }
-        return query;
+        throw new ResolutionException("快捷查询格式错误。");
     }
 
     public static Response<Base64Bytes> getScoreResponse(ShortcutTarget target) {
+        long scoreId = lookupScoreId(target);
         try {
-            final String query = getScoreQuery(target);
+            final String query = "/score/" + scoreId;
 
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + query))
@@ -380,20 +422,14 @@ public class APIHelper {
     }
 
     private static String getScoreQuery(ShortcutTarget target) {
-        String query;
-        if (target.isMacro()) {
-            query = switch (target.macroType()) {
-                case "bo", "rs" ->
-                        "/score?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
-                case "m" -> "/score?m=" + target.explicitId() + "&u=" + target.boundUid();
-                case "ms" ->
-                        "/score?ms=" + target.explicitId() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
-                case null, default -> throw new IllegalArgumentException("Invalid macro type");
-            };
-        } else {
-            query = "/score?s=" + target.explicitId();
-        }
-        return query;
+        return switch (target.macroType()) {
+            case "bo", "rs" ->
+                    "/lookup/score?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+            case "m" -> "/lookup/score?m=" + target.explicitId() + "&u=" + target.boundUid();
+            case "ms" ->
+                    "/lookup/score?ms=" + target.explicitId() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+            case null, default -> throw new IllegalArgumentException("Invalid macro type");
+        };
     }
 
     public static Response<List<SearchResultItem>> searchBeatmapSetResponse(SearchQuery query) {
@@ -472,7 +508,39 @@ public class APIHelper {
     }
 
     private static ReplayTaskInfo createReplayTask(ShortcutTarget target, TimeDurationParser.TimeRange timeRange) {
-        return createReplayTask(getReplayRenderQuery(target, timeRange));
+        long scoreId = lookupScoreId(target);
+        return createReplayTask("/replay/render/" + scoreId + (timeRange != null ? timeRange.toQueryString() : ""));
+    }
+
+    private static long lookupScoreId(ShortcutTarget target) {
+        long scoreId;
+        if (!target.isMacro()) {
+            scoreId = target.explicitId();
+        } else {
+            try {
+                final String query = getScoreQuery(target);
+
+                HttpRequest localRequest = HttpRequest.newBuilder()
+                        .uri(URI.create(ENDPOINT + query))
+                        .GET()
+                        .build();
+
+                final HttpResponse<String> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
+
+                if (send.statusCode() != 200) {
+                    throw parseHttpError(send.body(), send.statusCode(), "获取成绩失败");
+                }
+
+                final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
+
+                ensureApiSuccess(rawResponse, "获取成绩失败");
+
+                scoreId = rawResponse.getData().getAsJsonObject().get("score_id").getAsLong();
+            } catch (IOException | InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return scoreId;
     }
 
     private static ReplayTaskInfo createReplayTask(String query) {
@@ -616,16 +684,6 @@ public class APIHelper {
         }
     }
 
-    private static String getReplayRenderQuery(ShortcutTarget target, TimeDurationParser.TimeRange timeRange) {
-        if (target.isMacro()) {
-            if (target.boundUid() == null) {
-                throw new RuntimeException("回放仅支持玩家快捷查询（如 rs1/bo1）或成绩ID。");
-            }
-            return "/replay/render?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid() + (timeRange != null ? timeRange.toQueryString() : "");
-        }
-        return "/replay/render?s=" + target.explicitId() + (timeRange != null ? timeRange.toQueryString() : "");
-    }
-
     private static void ensureApiSuccess(RawResponse payload, String fallbackMessage) {
         if (payload == null) {
             throw new RuntimeException(fallbackMessage);
@@ -765,7 +823,7 @@ public class APIHelper {
 
     public static Response<?> lookupBeatmapset(ShortcutTarget target, String s) {
         try {
-            final String query = getBeatmapsetQuery(target, "lookup/beatmapset");
+            final String query = getBeatmapsetQuery(target);
 
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + query))
