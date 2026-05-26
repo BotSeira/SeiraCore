@@ -547,31 +547,16 @@ public class Router {
                 if (uidListResolution.errorMessage() != null) {
                     return RouteDecision.sync(PendingMessage.ofString(uidListResolution.errorMessage()));
                 }
+
                 String[] uidArray = uidListResolution.uids();
 
                 TimeDurationParser.TimeRange finalRange = range;
-
-                if (target.isMacro()) {
-                    return taskCoordinator.queueReplayTask(
-                            ctx,
-                            "rsc",
-                            () -> {
-                                var task = APIHelper.createReplayShowcaseTask(target, uidArray, finalRange);
-                                videoRenderRecord.updateRenderTask(senderUserId, task.taskId());
-                                return task;
-                            },
-                            replyFactory::replayMessage);
-                }
-
-                if (target.explicitId() == null) {
-                    return RouteDecision.sync(PendingMessage.ofString(Usages.RSC_USAGE));
-                }
 
                 return taskCoordinator.queueReplayTask(
                         ctx,
                         "rsc",
                         () -> {
-                            var task = APIHelper.createShowcaseRenderTaskByBeatmap(target.explicitId(), uidArray, finalRange);
+                            var task = APIHelper.createReplayShowcaseTask(target, uidArray, finalRange, getAccessTokenFor(senderUserId));
                             videoRenderRecord.updateRenderTask(senderUserId, task.taskId());
                             return task;
                         },
