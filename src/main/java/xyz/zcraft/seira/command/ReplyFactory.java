@@ -240,7 +240,7 @@ final class ReplyFactory {
                 return null;
             }
 
-            return "- %s - %s \n (%s / %s / %s)".formatted(cmd("/s " + id, id), username, rank, accuracy, pp);
+            return "> - %s - %s \n (%s / %s / %s)".formatted(cmd("/s " + id, id), username, rank, accuracy, pp);
         }
 
         private static String getScoreField(JsonObject score, String field) {
