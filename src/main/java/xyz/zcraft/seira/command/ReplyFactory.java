@@ -1,10 +1,10 @@
 package xyz.zcraft.seira.command;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import org.jetbrains.annotations.NotNull;
-import xyz.zcraft.osu.model.Beatmap;
-import xyz.zcraft.osu.model.MultiplayerRoom;
-import xyz.zcraft.osu.model.User;
-import xyz.zcraft.osu.model.UserExtended;
+import xyz.zcraft.osu.model.*;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.Response;
 import xyz.zcraft.seira.binding.BindingHelper;
@@ -95,18 +95,10 @@ final class ReplyFactory {
     }
 
     public PendingMessage replayMessage(Context ctx, APIHelper.ReplayTaskInfo taskInfo) {
-        String queuedText = at(ctx) + "生成请求已提交。\n```text";
-        if (taskInfo.position() != null) {
-            queuedText += "\n队列位置: " + taskInfo.position();
-        }
-        if (taskInfo.taskId() != null) {
-            queuedText += "\n请求: " + taskInfo.taskId();
-        }
-        if (taskInfo.message() != null) {
-            queuedText += "\n" + taskInfo.message();
-        }
-        queuedText += "\n```";
-        return PendingMessage.ofMarkdownRaw(queuedText, buttons.replayProgressButtons(taskInfo.taskId()));
+        return PendingMessage.ofMarkdownRaw(
+                Contents.replayTaskContent(ctx, taskInfo),
+                buttons.replayProgressButtons(taskInfo.taskId())
+        );
     }
 
     public PendingMessage replayStatMessage(Context ctx, String jobId, RenderStat renderStat) {
@@ -197,6 +189,70 @@ final class ReplyFactory {
     }
 
     private static final class Contents {
+        static String replayTaskContent(Context ctx, APIHelper.ReplayTaskInfo taskInfo) {
+            StringBuilder sb = new StringBuilder();
+            sb.append(at(ctx)).append("回放生成请求已提交");
+
+            if (taskInfo.beatmap() != null) {
+                BeatmapExtended beatmap = taskInfo.beatmap();
+
+                sb.append("> 谱面: ");
+                sb.append("%s - %s - %s [%.2f★ %s]".formatted(
+                        cmd("/m " + beatmap.getId(), String.valueOf(beatmap.getId())),
+                        beatmap.getBeatmapset().getArtist(),
+                        beatmap.getBeatmapset().getTitle(),
+                        beatmap.getDifficultyRating(),
+                        beatmap.getVersion()
+                ));
+                sb.append("\n");
+            }
+
+            if (taskInfo.scores() != null) {
+                JsonArray scores = taskInfo.scores();
+                sb.append("> 共 %d 个成绩:".formatted(scores.size()));
+
+                for (JsonElement element : scores) {
+                    if (!element.isJsonObject()) {
+                        continue;
+                    }
+                    String line = buildScoreLine(element.getAsJsonObject());
+                    if (line == null) {
+                        continue;
+                    }
+                    if (!sb.isEmpty()) {
+                        sb.append("\n");
+                    }
+                    sb.append(line);
+                }
+            }
+
+            return sb.toString().trim();
+        }
+
+        private static String buildScoreLine(JsonObject score) {
+            String username = getScoreField(score, "username");
+            String rank = getScoreField(score, "rank");
+            String accuracy = getScoreField(score, "accuracy");
+            String pp = getScoreField(score, "pp");
+
+            if (username == null && rank == null && accuracy == null && pp == null) {
+                return null;
+            }
+
+            return "%s / %s / %s / %s".formatted(username, rank, accuracy, pp);
+        }
+
+        private static String getScoreField(JsonObject score, String field) {
+            if (score == null || !score.has(field) || score.get(field).isJsonNull()) {
+                return null;
+            }
+            try {
+                return score.get(field).getAsString();
+            } catch (Exception ignored) {
+                return null;
+            }
+        }
+
         static String replayStatContent(Context ctx, RenderStat renderStat, String jobId) {
             StringBuilder sb = new StringBuilder();
             sb.append(at(ctx)).append("\n");

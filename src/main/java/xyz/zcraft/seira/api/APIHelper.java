@@ -5,6 +5,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import org.jetbrains.annotations.Nullable;
+import xyz.zcraft.osu.model.BeatmapExtended;
 import xyz.zcraft.osu.model.MultiplayerRoom;
 import xyz.zcraft.osu.model.UserExtended;
 import xyz.zcraft.seira.Seira;
@@ -459,16 +460,21 @@ public class APIHelper {
                     .uri(URI.create(ENDPOINT + query))
                     .GET()
                     .build();
+
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
             if (codeNotOk(response.statusCode())) {
                 throw parseHttpError(response.body(), response.statusCode(), "回放渲染请求失败");
             }
+
             ensureApiSuccess(payload, "回放渲染请求失败");
+
             JsonObject data = requireDataObject(payload, "回放渲染请求缺少任务信息");
+
             if (!data.has("id") || data.get("id").isJsonNull()) {
                 throw new RuntimeException("回放渲染请求缺少任务ID");
             }
+
             String taskId = data.get("id").getAsString();
 
             String status = data.has("status") && !data.get("status").isJsonNull()
@@ -479,73 +485,14 @@ public class APIHelper {
                     ? data.get("position").getAsInt()
                     : null;
 
-            return new ReplayTaskInfo(taskId, status, position, buildReplayTaskMessage(data));
+            final BeatmapExtended beatmap = GSON.fromJson(data.get("beatmap"), BeatmapExtended.class);
+
+            return new ReplayTaskInfo(taskId, status, position, beatmap, data.getAsJsonArray("scores"));
         } catch (IOException e) {
             throw new RuntimeException(e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Replay render request interrupted", e);
-        }
-    }
-
-    private static String buildReplayTaskMessage(JsonObject data) {
-        StringBuilder sb = new StringBuilder();
-        if (data.has("beatmap") && data.get("beatmap").isJsonObject()) {
-            JsonObject beatmap = data.getAsJsonObject("beatmap");
-            sb.append("谱面: ");
-            sb.append("%d - %s - %s [%.2f★ %s]".formatted(
-                    beatmap.get("id").getAsLong(),
-                    beatmap.get("artist").getAsString(),
-                    beatmap.get("title").getAsString(),
-                    beatmap.get("star").getAsDouble(),
-                    beatmap.get("version").getAsString()
-            ));
-            sb.append("\n");
-        }
-
-        if (data.has("scores") && data.get("scores").isJsonArray()) {
-            JsonArray scores = data.getAsJsonArray("scores");
-            sb.append("共%d个成绩:".formatted(scores.size()));
-
-            for (JsonElement element : scores) {
-                if (!element.isJsonObject()) {
-                    continue;
-                }
-                String line = buildScoreLine(element.getAsJsonObject());
-                if (line == null) {
-                    continue;
-                }
-                if (!sb.isEmpty()) {
-                    sb.append("\n");
-                }
-                sb.append(line);
-            }
-        }
-
-        return sb.isEmpty() ? null : sb.toString();
-    }
-
-    private static String buildScoreLine(JsonObject score) {
-        String username = getScoreField(score, "username");
-        String rank = getScoreField(score, "rank");
-        String accuracy = getScoreField(score, "accuracy");
-        String pp = getScoreField(score, "pp");
-
-        if (username == null && rank == null && accuracy == null && pp == null) {
-            return null;
-        }
-
-        return "%s / %s / %s / %s".formatted(username, rank, accuracy, pp);
-    }
-
-    private static String getScoreField(JsonObject score, String field) {
-        if (score == null || !score.has(field) || score.get(field).isJsonNull()) {
-            return null;
-        }
-        try {
-            return score.get(field).getAsString();
-        } catch (Exception ignored) {
-            return null;
         }
     }
 
@@ -761,6 +708,6 @@ public class APIHelper {
     public record ReplayRenderResult(String videoUrl, String taskId) {
     }
 
-    public record ReplayTaskInfo(String taskId, String status, Integer position, String message) {
+    public record ReplayTaskInfo(String taskId, String status, Integer position, BeatmapExtended beatmap, JsonArray scores) {
     }
 }
