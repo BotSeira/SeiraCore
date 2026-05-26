@@ -40,7 +40,7 @@ public class APIHelper {
     public static Response<List<FriendEntry>> getFollowed(String accessToken) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/friends"))
+                    .uri(URI.create(ENDPOINT + "/users/me/friends"))
                     .header("Authorization", "Bearer " + accessToken)
                     .GET()
                     .build();
@@ -72,7 +72,7 @@ public class APIHelper {
     public static Response<UserExtended> getSelf(String accessToken) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/self"))
+                    .uri(URI.create(ENDPOINT + "/users/me"))
                     .header("Authorization", "Bearer " + accessToken)
                     .GET()
                     .build();
@@ -96,13 +96,13 @@ public class APIHelper {
     }
 
     public static Response<Base64Bytes> getBoNResponse(int n, long uid) {
-        return getBase64BytesResponse("/bestof?" + "n=" + n + "&u=" + uid, "获取最好成绩失败", null);
+        return getBase64BytesResponse("/users/" + uid + "/bestof?" + "n=" + n, "获取最好成绩失败", null);
     }
 
     public static Response<Base64Bytes> getGroupLeaderboardResponse(ShortcutTarget target, List<Long> uids, String auth) {
         final long beatmapId = lookupBeatmap(target, auth);
         return getBase64BytesResponse(
-                "/maplb/" + beatmapId,
+                "/beatmaps/" + beatmapId + "/leaderboards",
                 "获取群排行失败",
                 GSON.toJsonTree(Map.of("uids", uids)).toString()
         );
@@ -110,7 +110,7 @@ public class APIHelper {
 
     public static Response<Base64Bytes> getLeaderboardResponse(List<Long> uids) {
         return getBase64BytesResponse(
-                "/leaderboard",
+                "/users/leaderboards",
                 "获取排行失败",
                 GSON.toJsonTree(Map.of("uids", uids)).toString()
         );
@@ -159,7 +159,7 @@ public class APIHelper {
     public static Response<MultiplayerRoom> getMultiplayerRoom(String accessToken) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/mp"))
+                    .uri(URI.create(ENDPOINT + "/multiplayer/rooms/current"))
                     .header("Authorization", "Bearer " + accessToken)
                     .GET()
                     .build();
@@ -183,12 +183,12 @@ public class APIHelper {
     }
 
     public static Response<Base64Bytes> getRecentResponse(int n, long uid) {
-        return getBase64BytesResponse("/recent?" + "n=" + n + "&u=" + uid, "获取最近成绩失败", null);
+        return getBase64BytesResponse("/users/" + uid + "/recent?" + "n=" + n, "获取最近成绩失败", null);
     }
 
     public static Response<Base64Bytes> getBeatmapResponse(ShortcutTarget target, String mod, String auth) {
         final long beatmapId = lookupBeatmap(target, auth);
-        return getBase64BytesResponse("/beatmap/" + beatmapId + (mod != null ? "?mod=" + mod : ""), "获取谱面失败", null);
+        return getBase64BytesResponse("/beatmaps/" + beatmapId + (mod != null ? "?mod=" + mod : ""), "获取谱面失败", null);
     }
 
     private static long lookupBeatmap(ShortcutTarget target, String auth) {
@@ -224,7 +224,7 @@ public class APIHelper {
     }
 
     private static String getBeatmapQuery(ShortcutTarget target) {
-        String query = "/lookup/beatmap?";
+        String query = "/beatmaps/lookup?";
         if (target.isMacro()) {
             switch (target.macroType()) {
                 case "rs", "bo" -> {
@@ -246,7 +246,7 @@ public class APIHelper {
 
     public static Response<Base64Bytes> getBeatmapsetResponse(ShortcutTarget target, String auth) {
         final long beatmapsetId = lookupBeatmapset(target, auth);
-        return getBase64BytesResponse("/beatmapset/" + beatmapsetId, "获取谱面集失败", null);
+        return getBase64BytesResponse("/beatmapsets/" + beatmapsetId, "获取谱面集失败", null);
     }
 
     private static long lookupBeatmapset(ShortcutTarget target, String auth) {
@@ -282,7 +282,7 @@ public class APIHelper {
     }
 
     private static String getBeatmapsetQuery(ShortcutTarget target) {
-        String query = "/lookup/beatmapset";
+        String query = "/beatmapsets/lookup";
 
         if ("m".equals(target.macroType())) {
             return query + "?m=" + target.explicitId();
@@ -297,12 +297,12 @@ public class APIHelper {
 
     public static Response<Base64Bytes> getScoreResponse(ShortcutTarget target) {
         long scoreId = lookupScoreId(target);
-        return getBase64BytesResponse("/score/" + scoreId, "获取成绩失败", null);
+        return getBase64BytesResponse("/scores/" + scoreId, "获取成绩失败", null);
     }
 
     public static Response<Base64Bytes> getScoreAnalyzeResponse(ShortcutTarget target) {
         long scoreId = lookupScoreId(target);
-        return getBase64BytesResponse("/score/" + scoreId + "/analyze", "获取成绩分析失败", null);
+        return getBase64BytesResponse("/scores/" + scoreId + "/analysis", "获取成绩分析失败", null);
     }
 
     private static Response<Base64Bytes> getBase64BytesResponse(String query, String failMessage, @Nullable String postBody) {
@@ -335,10 +335,10 @@ public class APIHelper {
     private static String getScoreQuery(ShortcutTarget target) {
         return switch (target.macroType()) {
             case "bo", "rs" ->
-                    "/lookup/score?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
-            case "m" -> "/lookup/score?m=" + target.explicitId() + "&u=" + target.boundUid();
+                    "/scores/lookup?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+            case "m" -> "/scores/lookup?m=" + target.explicitId() + "&u=" + target.boundUid();
             case "ms" ->
-                    "/lookup/score?ms=" + target.explicitId() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+                    "/scores/lookup?ms=" + target.explicitId() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
             case null, default -> throw new IllegalArgumentException("Invalid macro type");
         };
     }
@@ -346,7 +346,7 @@ public class APIHelper {
     public static Response<List<SearchResultItem>> searchBeatmapSetResponse(SearchQuery query) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/searchms?" + "q=" + URLEncoder.encode(query.query(), StandardCharsets.UTF_8)))
+                    .uri(URI.create(ENDPOINT + "/beatmapsets/search?" + "q=" + URLEncoder.encode(query.query(), StandardCharsets.UTF_8)))
                     .GET()
                     .build();
 
@@ -385,7 +385,7 @@ public class APIHelper {
         }
 
         String uidsParam = String.join(",", uids);
-        return createReplayTask("/replay/showcase?m=" + beatmapId + "&u=" + uidsParam + (timeRange != null ? timeRange.toQueryString() : ""));
+        return createReplayTask("/replays/renders/showcase?m=" + beatmapId + "&u=" + uidsParam + (timeRange != null ? timeRange.toQueryString() : ""));
     }
 
     public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] groupUids, TimeDurationParser.TimeRange timeRange) {
@@ -397,7 +397,7 @@ public class APIHelper {
         }
 
         String groupUidsParam = String.join(",", groupUids);
-        String query = "/replay/showcase?of=" + target.macroType()
+        String query = "/replays/renders/showcase?of=" + target.macroType()
                 + "&i=" + target.macroIndex()
                 + "&us=" + target.boundUid()
                 + "&u=" + groupUidsParam;
@@ -412,7 +412,7 @@ public class APIHelper {
     public static ReplayRenderResult waitReplayVideo(String taskId) {
         try {
             waitReplayDone(taskId);
-            return new ReplayRenderResult(ENDPOINT + "/replay/video/" + taskId + "/replay.mp4", taskId);
+            return new ReplayRenderResult(ENDPOINT + "/replay/" + taskId + "/video/replay.mp4", taskId);
         } catch (RuntimeException _) {
             return null;
         }
@@ -420,7 +420,7 @@ public class APIHelper {
 
     private static ReplayTaskInfo createReplayTask(ShortcutTarget target, TimeDurationParser.TimeRange timeRange) {
         long scoreId = lookupScoreId(target);
-        return createReplayTask("/replay/render/" + scoreId + (timeRange != null ? timeRange.toQueryString() : ""));
+        return createReplayTask("replays/renders/score/" + scoreId + (timeRange != null ? timeRange.toQueryString() : ""));
     }
 
     private static long lookupScoreId(ShortcutTarget target) {
@@ -458,7 +458,7 @@ public class APIHelper {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + query))
-                    .GET()
+                    .POST(HttpRequest.BodyPublishers.noBody())
                     .build();
 
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
@@ -519,7 +519,7 @@ public class APIHelper {
     private static String getReplayStatus(String taskId) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/replay/status/" + taskId))
+                    .uri(URI.create(ENDPOINT + "/replays/" + taskId + "/status"))
                     .GET()
                     .build();
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
@@ -617,7 +617,7 @@ public class APIHelper {
     public static RenderStat getRenderStat(String jobId) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/replay/status/" + jobId))
+                    .uri(URI.create(ENDPOINT + "/replays/" + jobId + "/status"))
                     .GET()
                     .build();
 
@@ -642,7 +642,7 @@ public class APIHelper {
         boolean osu = false;
         try {
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/status"))
+                    .uri(URI.create(ENDPOINT + "/health"))
                     .GET()
                     .build();
 
@@ -679,7 +679,7 @@ public class APIHelper {
 
     public static Response<?> getLookupBeatmapsetResponse(ShortcutTarget target, String s) {
         try {
-            final String query = target.isMacro() ? getBeatmapsetQuery(target) : "/lookup/beatmapset?ms=" + target.explicitId();
+            final String query = target.isMacro() ? getBeatmapsetQuery(target) : "/beatmapsets/lookup?ms=" + target.explicitId();
 
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + query))
