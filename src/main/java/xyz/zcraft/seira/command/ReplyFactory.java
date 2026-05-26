@@ -196,15 +196,9 @@ final class ReplyFactory {
             if (taskInfo.beatmap() != null) {
                 BeatmapExtended beatmap = taskInfo.beatmap();
 
-                sb.append("> 谱面: ");
-                sb.append("%s - %s - %s [%.2f★ %s]".formatted(
-                        cmd("/m " + beatmap.getId(), String.valueOf(beatmap.getId())),
-                        beatmap.getBeatmapset().getArtist(),
-                        beatmap.getBeatmapset().getTitle(),
-                        beatmap.getDifficultyRating(),
-                        beatmap.getVersion()
-                ));
-                sb.append("\n");
+                sb.append("> 谱面: ").append(cmd("/m " + beatmap.getId(), String.valueOf(beatmap.getId()))).append("\n");
+                sb.append("> ").append(beatmap.getBeatmapset().getArtist()).append(" - ").append(beatmap.getBeatmapset().getTitle()).append("\n");
+                sb.append("> ").append(String.format("%.2f★", beatmap.getDifficultyRating())).append(" ").append(beatmap.getVersion()).append("\n");
             }
 
             if (taskInfo.scores() != null) {
