@@ -727,7 +727,7 @@ public class Router {
                 return RouteDecision.sync(replyFactory.inspectMessage(ctx, senderUserId, isAdmin(senderUserId), groupId, messageId));
             }
             case "help" -> {
-                return RouteDecision.sync(PendingMessage.ofString("""
+                return RouteDecision.sync(PendingMessage.ofMarkdownRaw("""
                         > 可用指令：
                         /bind - 绑定你的玩家ID
                         /unbind - 解除你的玩家ID绑定
