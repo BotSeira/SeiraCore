@@ -728,7 +728,7 @@ public class Router {
             }
             case "help" -> {
                 return RouteDecision.sync(PendingMessage.ofString("""
-                        可用指令：
+                        > 可用指令：
                         /bind - 绑定你的玩家ID
                         /unbind - 解除你的玩家ID绑定
                         /clearhistory - 清除你在群聊中的记录
