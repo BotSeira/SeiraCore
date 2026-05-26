@@ -38,6 +38,6 @@ public class TokenManager {
                     renew();
                 }
             }
-        }, (token.expiresIn() - 60) * 1000L);
+        }, Math.min(token.expiresIn() - 60, 60) * 1000L);
     }
 }
