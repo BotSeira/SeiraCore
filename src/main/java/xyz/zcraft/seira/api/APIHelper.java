@@ -732,7 +732,7 @@ public class APIHelper {
 
     public static Response<?> getLookupBeatmapsetResponse(ShortcutTarget target, String s) {
         try {
-            final String query = getBeatmapsetQuery(target);
+            final String query = target.isMacro() ? getBeatmapsetQuery(target) : "/lookup/beatmapset?ms=" + target.explicitId();
 
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + query))
@@ -751,7 +751,7 @@ public class APIHelper {
             final JsonObject data = rawResponse.getData().getAsJsonObject();
 
             return Response.<Void>fromHeaders(send.headers())
-                    .beatmapsetId(data.get("id").getAsString())
+                    .beatmapsetId(data.get("beatmapset_id").getAsString())
                     .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
