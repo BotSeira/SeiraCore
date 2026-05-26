@@ -1,6 +1,9 @@
 package xyz.zcraft.seira.api;
 
-import com.google.gson.*;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import xyz.zcraft.osu.model.MultiplayerRoom;
 import xyz.zcraft.osu.model.UserExtended;
 import xyz.zcraft.seira.Seira;
@@ -19,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 public class APIHelper {
     private static final String ENDPOINT;
@@ -111,19 +115,14 @@ public class APIHelper {
         }
     }
 
-    public static Response<Base64Bytes> getGroupLeaderboardResponse(ShortcutTarget target, String[] uids) {
-        String uidsParam = String.join(",", uids);
+    public static Response<Base64Bytes> getGroupLeaderboardResponse(ShortcutTarget target, List<Long> uids, String auth) {
+        final long beatmapId = lookupBeatmap(target, auth);
         try {
-            String query;
-            if (target.isMacro()) {
-                query = "/maplb?of=" + target.macroType() + "&i=" + target.macroIndex() + "&us=" + target.boundUid() + "&u=" + uidsParam;
-            } else {
-                query = "/maplb?m=" + target.explicitId() + "&u=" + uidsParam;
-            }
+            String query = "/maplb/" + beatmapId;
 
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + query))
-                    .GET()
+                    .POST(HttpRequest.BodyPublishers.ofString(GSON.toJsonTree(Map.of("uids", uids)).toString()))
                     .build();
 
             final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
@@ -142,12 +141,11 @@ public class APIHelper {
         }
     }
 
-    public static Response<Base64Bytes> getLeaderboardResponse(String[] uids) {
-        String uidsParam = String.join(",", uids);
+    public static Response<Base64Bytes> getLeaderboardResponse(List<Long> uids) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/leaderboard?" + "u=" + uidsParam))
-                    .GET()
+                    .uri(URI.create(ENDPOINT + "/leaderboard"))
+                    .POST(HttpRequest.BodyPublishers.ofString(GSON.toJsonTree(Map.of("uids", uids)).toString()))
                     .build();
             final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
 
@@ -255,6 +253,32 @@ public class APIHelper {
     }
 
     public static Response<Base64Bytes> getBeatmapResponse(ShortcutTarget target, String mod, String auth) {
+        final long beatmapId = lookupBeatmap(target, auth);
+        try {
+            final String query = "/beatmap/" + beatmapId + (mod != null ? "?mod=" + mod : "");
+
+            HttpRequest localRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + query))
+                    .GET()
+                    .build();
+
+            final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
+
+            if (send.statusCode() != 200) {
+                throw parseHttpError(send.body(), send.statusCode(), "获取谱面失败");
+            }
+
+            byte[] imageBytes = send.body();
+
+            return Response.<Base64Bytes>fromHeaders(send.headers())
+                    .content(new Base64Bytes(imageBytes))
+                    .build();
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static long lookupBeatmap(ShortcutTarget target, String auth) {
         long beatmapId;
         if (!target.isMacro()) {
             beatmapId = target.explicitId();
@@ -283,28 +307,7 @@ public class APIHelper {
                 throw new RuntimeException(e);
             }
         }
-        try {
-            final String query = "/beatmap/" + beatmapId + (mod != null ? "?mod=" + mod : "");
-
-            HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + query))
-                    .GET()
-                    .build();
-
-            final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
-
-            if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取谱面失败");
-            }
-
-            byte[] imageBytes = send.body();
-
-            return Response.<Base64Bytes>fromHeaders(send.headers())
-                    .content(new Base64Bytes(imageBytes))
-                    .build();
-        } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+        return beatmapId;
     }
 
     private static String getBeatmapQuery(ShortcutTarget target) {
@@ -329,6 +332,32 @@ public class APIHelper {
     }
 
     public static Response<Base64Bytes> getBeatmapsetResponse(ShortcutTarget target, String auth) {
+        final long beatmapsetId = lookupBeatmapset(target, auth);
+        try {
+            final String query = "/beatmapset/" + beatmapsetId;
+
+            HttpRequest localRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + query))
+                    .GET()
+                    .build();
+
+            final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
+
+            if (send.statusCode() != 200) {
+                throw parseHttpError(send.body(), send.statusCode(), "获取谱面集失败");
+            }
+
+            byte[] imageBytes = send.body();
+
+            return Response.<Base64Bytes>fromHeaders(send.headers())
+                    .content(new Base64Bytes(imageBytes))
+                    .build();
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static long lookupBeatmapset(ShortcutTarget target, String auth) {
         long beatmapsetId;
         if (!target.isMacro()) {
             beatmapsetId = target.explicitId();
@@ -357,28 +386,7 @@ public class APIHelper {
                 throw new RuntimeException(e);
             }
         }
-        try {
-            final String query = "/beatmapset/" + beatmapsetId;
-
-            HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + query))
-                    .GET()
-                    .build();
-
-            final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
-
-            if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取谱面集失败");
-            }
-
-            byte[] imageBytes = send.body();
-
-            return Response.<Base64Bytes>fromHeaders(send.headers())
-                    .content(new Base64Bytes(imageBytes))
-                    .build();
-        } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+        return beatmapsetId;
     }
 
     private static String getBeatmapsetQuery(ShortcutTarget target) {
@@ -491,7 +499,7 @@ public class APIHelper {
                 + "&us=" + target.boundUid()
                 + "&u=" + groupUidsParam;
 
-        if(timeRange != null) {
+        if (timeRange != null) {
             query += timeRange.toQueryString();
         }
 
@@ -728,7 +736,6 @@ public class APIHelper {
     }
 
     private static Integer extractErrorCode(RawResponse payload) {
-        // Error code is returned as Response.data.code.
         if (payload.getData() != null && payload.getData().isJsonObject()) {
             JsonObject data = payload.getData().getAsJsonObject();
             return readCodeFromJsonObject(data);
@@ -821,7 +828,7 @@ public class APIHelper {
 
     }
 
-    public static Response<?> lookupBeatmapset(ShortcutTarget target, String s) {
+    public static Response<?> getLookupBeatmapsetResponse(ShortcutTarget target, String s) {
         try {
             final String query = getBeatmapsetQuery(target);
 

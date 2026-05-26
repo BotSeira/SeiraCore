@@ -4,10 +4,11 @@ import io.javalin.Javalin;
 import io.javalin.http.Context;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.osu.model.User;
 import xyz.zcraft.seira.api.OsuAuthApi;
 import xyz.zcraft.seira.config.BindingConfig;
 import xyz.zcraft.seira.data.OsuToken;
-import xyz.zcraft.osu.model.User;
+
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.UUID;

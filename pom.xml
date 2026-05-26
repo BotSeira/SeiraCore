@@ -82,7 +82,7 @@
         <dependency>
             <groupId>com.github.ZayrexDev</groupId>
             <artifactId>osuModel</artifactId>
-            <version>master-4a7d2b3730-1</version>
+            <version>4a7d2b3730</version>
         </dependency>
         <!-- Source: https://mvnrepository.com/artifact/tools.jackson.core/jackson-databind -->
         <dependency>

@@ -2,6 +2,7 @@ package xyz.zcraft.seira.command;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.osu.model.User;
 import xyz.zcraft.osu.model.UserExtended;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.Response;
@@ -14,15 +15,11 @@ import xyz.zcraft.seira.command.resolution.UidListResolution;
 import xyz.zcraft.seira.command.resolution.UidResolution;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.data.*;
-import xyz.zcraft.osu.model.User;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 import xyz.zcraft.seira.util.ThreadHelper;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
@@ -32,6 +29,7 @@ public class Router {
     private static final Logger LOG = LogManager.getLogger(Router.class);
 
     private static final String PREFIX = "/";
+    private static final Pattern RS_QUERY = Pattern.compile("^/rs(\\d+)$");
     private final MessageSender messageSender;
     private final VideoRenderRecord videoRenderRecord = new VideoRenderRecord();
     private final AppConfig config;
@@ -86,8 +84,6 @@ public class Router {
             LOG.error("Failed to process inbound message {}", messageId, e);
         }
     }
-
-    private static final Pattern RS_QUERY = Pattern.compile("^/rs(\\d+)$");
 
     private String preProcess(String rawContent) {
         Matcher matcher = RS_QUERY.matcher(rawContent);
@@ -313,7 +309,7 @@ public class Router {
                     return taskCoordinator.queueImageRequest(
                             ctx,
                             "m",
-                            () -> APIHelper.getBeatmapResponse(target, mod, authHelper.getTokenFor(senderUserId).accessToken()),
+                            () -> APIHelper.getBeatmapResponse(target, mod, getAccessTokenFor(senderUserId)),
                             replyFactory::beatmapMessage
                     );
                 } else {
@@ -433,7 +429,7 @@ public class Router {
                         "dl",
                         () -> replyFactory.dlMessage(
                                 ctx,
-                                APIHelper.lookupBeatmapset(target, authHelper.getTokenFor(senderUserId).accessToken())
+                                APIHelper.getLookupBeatmapsetResponse(target, getAccessTokenFor(senderUserId))
                         )
                 );
             }
@@ -577,7 +573,7 @@ public class Router {
                 return taskCoordinator.queueImageRequest(
                         ctx,
                         "ms",
-                        () -> APIHelper.getBeatmapsetResponse(target, authHelper.getTokenFor(senderUserId).accessToken()),
+                        () -> APIHelper.getBeatmapsetResponse(target, getAccessTokenFor(senderUserId)),
                         replyFactory::beatmapsetMessage
                 );
             }
@@ -601,12 +597,11 @@ public class Router {
                         if (groupBoundUids.isEmpty()) {
                             return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind" + (config.binding().requireLogin() ? "" : " <玩家ID>")));
                         }
-                        String[] uidArray = groupBoundUids.stream().map(String::valueOf).toArray(String[]::new);
 
                         return taskCoordinator.queueImageRequest(
                                 ctx,
                                 "lb",
-                                () -> APIHelper.getLeaderboardResponse(uidArray),
+                                () -> APIHelper.getLeaderboardResponse(groupBoundUids),
                                 replyFactory::lbMessage
                         );
                     }
@@ -618,7 +613,7 @@ public class Router {
                     return taskCoordinator.queueImageRequest(
                             ctx,
                             "lb",
-                            () -> APIHelper.getLeaderboardResponse(new String[]{String.valueOf(uid)}),
+                            () -> APIHelper.getLeaderboardResponse(List.of(uid)),
                             replyFactory::lbMessage
                     );
                 } else if (args.length == 1 || args.length == 2) {
@@ -635,11 +630,10 @@ public class Router {
                             if (groupBoundUids.isEmpty()) {
                                 return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind" + (config.binding().requireLogin() ? "" : " <玩家ID>")));
                             }
-                            String[] uidArray = groupBoundUids.stream().map(String::valueOf).toArray(String[]::new);
                             return taskCoordinator.queueImageRequest(
                                     ctx,
                                     "lbm",
-                                    () -> APIHelper.getGroupLeaderboardResponse(target, uidArray),
+                                    () -> APIHelper.getGroupLeaderboardResponse(target, groupBoundUids, getAccessTokenFor(senderUserId)),
                                     replyFactory::lbMessage
                             );
                         }
@@ -651,7 +645,7 @@ public class Router {
                         return taskCoordinator.queueImageRequest(
                                 ctx,
                                 "lbm",
-                                () -> APIHelper.getGroupLeaderboardResponse(target, new String[]{String.valueOf(uid)}),
+                                () -> APIHelper.getGroupLeaderboardResponse(target, List.of(uid), getAccessTokenFor(senderUserId)),
                                 replyFactory::lbMessage
                         );
                     }
@@ -664,19 +658,20 @@ public class Router {
                     if (uidTokens.length == 0) {
                         return RouteDecision.sync(PendingMessage.ofString("玩家ID列表不能为空。用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
                     }
-                    String[] uidArray = new String[uidTokens.length];
-                    for (int i = 0; i < uidTokens.length; i++) {
-                        Integer uid = argumentResolver.parsePositiveInt(uidTokens[i].trim());
+
+                    List<Long> uids = new LinkedList<>();
+                    for (String uidToken : uidTokens) {
+                        Long uid = argumentResolver.parsePositiveLong(uidToken.trim());
                         if (uid == null) {
                             return RouteDecision.sync(PendingMessage.ofString("玩家ID列表包含非法值。用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
                         }
-                        uidArray[i] = String.valueOf(uid);
+                        uids.add(uid);
                     }
 
                     return taskCoordinator.queueImageRequest(
                             ctx,
                             "lbm",
-                            () -> APIHelper.getGroupLeaderboardResponse(target, uidArray),
+                            () -> APIHelper.getGroupLeaderboardResponse(target, uids, getAccessTokenFor(senderUserId)),
                             replyFactory::lbMessage
                     );
                 } else {
@@ -776,6 +771,12 @@ public class Router {
                 return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
             }
         }
+    }
+
+    private String getAccessTokenFor(String openId) {
+        return Optional.ofNullable(authHelper.getTokenFor(openId))
+                .map(OsuToken::accessToken)
+                .orElse(null);
     }
 
     private boolean isAdmin(String openId) {

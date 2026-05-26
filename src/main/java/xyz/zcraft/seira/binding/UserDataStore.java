@@ -119,9 +119,9 @@ public final class UserDataStore {
     public static Optional<String> findUsername(long osuId) {
         ensureInitialized();
         String sql = """
-                SELECT username FROM user_info
-                WHERE uid = ?
-        """;
+                        SELECT username FROM user_info
+                        WHERE uid = ?
+                """;
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setLong(1, osuId);

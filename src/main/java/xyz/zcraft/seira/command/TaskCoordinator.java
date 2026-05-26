@@ -30,7 +30,8 @@ final class TaskCoordinator {
     }
 
     RouteDecision queueApiRequest(Context ctx, String requestType, ApiTaskExecutor executor) {
-        return queueApiRequest(ctx, requestType, executor, () -> null, () -> {});
+        return queueApiRequest(ctx, requestType, executor, () -> null, () -> {
+        });
     }
 
     RouteDecision queueApiRequestUntilSubmit(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer) {

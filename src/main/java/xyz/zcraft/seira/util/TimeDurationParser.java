@@ -1,19 +1,6 @@
 package xyz.zcraft.seira.util;
 
 public class TimeDurationParser {
-    public record TimeRange(Integer startSeconds, Integer endSeconds) {
-        public String toQueryString() {
-            StringBuilder query = new StringBuilder();
-            if (startSeconds != null) {
-                query.append("&start=").append(startSeconds);
-            }
-            if (endSeconds != null) {
-                query.append("&end=").append(endSeconds);
-            }
-            return query.toString();
-        }
-    }
-
     public static boolean isTimeRange(String input) {
         try {
             TimeDurationParser.parseRange(input);
@@ -54,6 +41,19 @@ public class TimeDurationParser {
             return (minutes * 60) + seconds;
         } else {
             return Integer.parseInt(time);
+        }
+    }
+
+    public record TimeRange(Integer startSeconds, Integer endSeconds) {
+        public String toQueryString() {
+            StringBuilder query = new StringBuilder();
+            if (startSeconds != null) {
+                query.append("&start=").append(startSeconds);
+            }
+            if (endSeconds != null) {
+                query.append("&end=").append(endSeconds);
+            }
+            return query.toString();
         }
     }
 }
