@@ -240,7 +240,7 @@ final class ReplyFactory {
                 return null;
             }
 
-            return cmd("/s " + id, "%s / %s / %s / %s".formatted(id, rank, accuracy, pp));
+            return "%s / %s / %s / %s %s".formatted(id, rank, accuracy, pp, cmd("/s " + id, "查询"));
         }
 
         private static String getScoreField(JsonObject score, String field) {
