@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import org.jetbrains.annotations.Nullable;
 import xyz.zcraft.osu.model.MultiplayerRoom;
 import xyz.zcraft.osu.model.UserExtended;
 import xyz.zcraft.seira.Seira;
@@ -94,73 +95,24 @@ public class APIHelper {
     }
 
     public static Response<Base64Bytes> getBoNResponse(int n, long uid) {
-        try {
-            HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/bestof?" + "n=" + n + "&u=" + uid))
-                    .GET()
-                    .build();
-            final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
-
-            if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取 BoN 失败");
-            }
-
-            byte[] imageBytes = send.body();
-
-            return Response.<Base64Bytes>fromHeaders(send.headers())
-                    .content(new Base64Bytes(imageBytes))
-                    .build();
-        } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+        return getBase64BytesResponse("/bestof?" + "n=" + n + "&u=" + uid, "获取最好成绩失败", null);
     }
 
     public static Response<Base64Bytes> getGroupLeaderboardResponse(ShortcutTarget target, List<Long> uids, String auth) {
         final long beatmapId = lookupBeatmap(target, auth);
-        try {
-            String query = "/maplb/" + beatmapId;
-
-            HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + query))
-                    .POST(HttpRequest.BodyPublishers.ofString(GSON.toJsonTree(Map.of("uids", uids)).toString()))
-                    .build();
-
-            final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
-
-            if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取群排行失败");
-            }
-
-            byte[] imageBytes = send.body();
-
-            return Response.<Base64Bytes>fromHeaders(send.headers())
-                    .content(new Base64Bytes(imageBytes))
-                    .build();
-        } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+        return getBase64BytesResponse(
+                "/maplb/" + beatmapId,
+                "获取群排行失败",
+                GSON.toJsonTree(Map.of("uids", uids)).toString()
+        );
     }
 
     public static Response<Base64Bytes> getLeaderboardResponse(List<Long> uids) {
-        try {
-            HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/leaderboard"))
-                    .POST(HttpRequest.BodyPublishers.ofString(GSON.toJsonTree(Map.of("uids", uids)).toString()))
-                    .build();
-            final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
-
-            if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取排行失败");
-            }
-
-            byte[] imageBytes = send.body();
-
-            return Response.<Base64Bytes>fromHeaders(send.headers())
-                    .content(new Base64Bytes(imageBytes))
-                    .build();
-        } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+        return getBase64BytesResponse(
+                "/leaderboard",
+                "获取排行失败",
+                GSON.toJsonTree(Map.of("uids", uids)).toString()
+        );
     }
 
     public static String getDaily() {
@@ -230,52 +182,12 @@ public class APIHelper {
     }
 
     public static Response<Base64Bytes> getRecentResponse(int n, long uid) {
-        try {
-            HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/recent?" + "n=" + n + "&u=" + uid))
-                    .GET()
-                    .build();
-
-            final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
-
-            if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取最近成绩失败");
-            }
-
-            byte[] imageBytes = send.body();
-
-            return Response.<Base64Bytes>fromHeaders(send.headers())
-                    .content(new Base64Bytes(imageBytes))
-                    .build();
-        } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+        return getBase64BytesResponse("/recent?" + "n=" + n + "&u=" + uid, "获取最近成绩失败", null);
     }
 
     public static Response<Base64Bytes> getBeatmapResponse(ShortcutTarget target, String mod, String auth) {
         final long beatmapId = lookupBeatmap(target, auth);
-        try {
-            final String query = "/beatmap/" + beatmapId + (mod != null ? "?mod=" + mod : "");
-
-            HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + query))
-                    .GET()
-                    .build();
-
-            final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
-
-            if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取谱面失败");
-            }
-
-            byte[] imageBytes = send.body();
-
-            return Response.<Base64Bytes>fromHeaders(send.headers())
-                    .content(new Base64Bytes(imageBytes))
-                    .build();
-        } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+        return getBase64BytesResponse("/beatmap/" + beatmapId + (mod != null ? "?mod=" + mod : ""), "获取谱面失败", null);
     }
 
     private static long lookupBeatmap(ShortcutTarget target, String auth) {
@@ -333,28 +245,7 @@ public class APIHelper {
 
     public static Response<Base64Bytes> getBeatmapsetResponse(ShortcutTarget target, String auth) {
         final long beatmapsetId = lookupBeatmapset(target, auth);
-        try {
-            final String query = "/beatmapset/" + beatmapsetId;
-
-            HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + query))
-                    .GET()
-                    .build();
-
-            final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
-
-            if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取谱面集失败");
-            }
-
-            byte[] imageBytes = send.body();
-
-            return Response.<Base64Bytes>fromHeaders(send.headers())
-                    .content(new Base64Bytes(imageBytes))
-                    .build();
-        } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+        return getBase64BytesResponse("/beatmapset/" + beatmapsetId, "获取谱面集失败", null);
     }
 
     private static long lookupBeatmapset(ShortcutTarget target, String auth) {
@@ -405,18 +296,29 @@ public class APIHelper {
 
     public static Response<Base64Bytes> getScoreResponse(ShortcutTarget target) {
         long scoreId = lookupScoreId(target);
+        return getBase64BytesResponse("/score/" + scoreId, "获取成绩失败", null);
+    }
+
+    public static Response<Base64Bytes> getScoreAnalyzeResponse(ShortcutTarget target) {
+        long scoreId = lookupScoreId(target);
+        return getBase64BytesResponse("/score/" + scoreId + "/analyze", "获取成绩分析失败", null);
+    }
+
+    private static Response<Base64Bytes> getBase64BytesResponse(String query, String failMessage, @Nullable String postBody) {
         try {
-            final String query = "/score/" + scoreId;
+            var builder = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + query));
 
-            HttpRequest localRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + query))
-                    .GET()
-                    .build();
+            if (postBody != null) {
+                builder = builder.POST(HttpRequest.BodyPublishers.ofString(postBody));
+            } else {
+                builder = builder.GET();
+            }
 
-            final HttpResponse<byte[]> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofByteArray());
+            final HttpResponse<byte[]> send = CLIENT.send(builder.build(), HttpResponse.BodyHandlers.ofByteArray());
 
             if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取成绩失败");
+                throw parseHttpError(send.body(), send.statusCode(), failMessage);
             }
 
             byte[] imageBytes = send.body();

@@ -454,6 +454,27 @@ public class Router {
                         replyFactory::scoreMessage
                 );
             }
+            case "sa" -> {
+                if (args.length < 1 || args.length > 2) {
+                    return RouteDecision.sync(PendingMessage.ofString(Usages.SA_USAGE));
+                }
+
+                TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(args, senderUserId);
+                if (args.length != targetResolution.consumedArgs()) {
+                    return RouteDecision.sync(PendingMessage.ofString(Usages.SA_USAGE));
+                }
+                ShortcutTarget target = targetResolution.target();
+                if (target.isError()) {
+                    return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+                }
+
+                return taskCoordinator.queueImageRequest(
+                        ctx,
+                        "sa",
+                        () -> APIHelper.getScoreAnalyzeResponse(target),
+                        replyFactory::scoreAnalyzeMessage
+                );
+            }
             case "r" -> {
                 if (args.length < 1 || args.length > 3) {
                     return RouteDecision.sync(PendingMessage.ofString(Usages.R_USAGE));
@@ -794,6 +815,7 @@ public class Router {
         public static final String M_USAGE = "用法：/m <谱面ID 或 快捷查询> [Mod]";
         public static final String DL_USAGE = "用法：/dl <谱面集ID 或 快捷查询>";
         public static final String S_USAGE = "用法：/s <成绩ID 或 快捷查询>";
+        public static final String SA_USAGE = "用法：/sa <成绩ID 或 快捷查询>";
         private static final String R_USAGE = "用法：/r <成绩ID 或 快捷查询>";
         private static final String RSC_USAGE = "用法：/rsc <谱面ID或快捷查询> [+用户ID列表，逗号分隔]";
     }

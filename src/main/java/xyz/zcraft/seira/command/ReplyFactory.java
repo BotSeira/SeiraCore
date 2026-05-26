@@ -77,6 +77,15 @@ final class ReplyFactory {
         );
     }
 
+    public PendingMessage scoreAnalyzeMessage(Context ctx, Response<?> response) {
+        return PendingMessage.ofMarkdownRaw(
+                at(ctx) + "成绩分析完成\n" +
+                        "> 谱面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
+                        "> 成绩: " + cmd("/s " + response.getScoreId(), response.getScoreId()),
+                buttons.sButtons(response.getBeatmapId(), response.getScoreId())
+        );
+    }
+
     public PendingMessage lbMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "排行榜查询完成" +
@@ -395,8 +404,9 @@ final class ReplyFactory {
                             Button.command(3, "查询谱面集", "/ms m" + beatmapId)
                     ),
                     Button.row(
-                            Button.command(4, "查询排行", "/lb " + beatmapId),
-                            Button.command(5, "渲染回放", "/r " + scoreId)
+                            Button.command(4, "成绩分析", "/sa " + scoreId),
+                            Button.command(5, "查询排行", "/lb " + beatmapId),
+                            Button.command(6, "渲染回放", "/r " + scoreId)
                     )
             );
         }
