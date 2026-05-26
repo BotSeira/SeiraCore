@@ -191,7 +191,7 @@ final class ReplyFactory {
     private static final class Contents {
         static String replayTaskContent(Context ctx, APIHelper.ReplayTaskInfo taskInfo) {
             StringBuilder sb = new StringBuilder();
-            sb.append(at(ctx)).append("回放生成请求已提交");
+            sb.append(at(ctx)).append("回放生成请求已提交").append("\n");
 
             if (taskInfo.beatmap() != null) {
                 BeatmapExtended beatmap = taskInfo.beatmap();
@@ -234,12 +234,13 @@ final class ReplyFactory {
             String rank = getScoreField(score, "rank");
             String accuracy = getScoreField(score, "accuracy");
             String pp = getScoreField(score, "pp");
+            String id = getScoreField(score, "id");
 
             if (username == null && rank == null && accuracy == null && pp == null) {
                 return null;
             }
 
-            return "%s / %s / %s / %s".formatted(username, rank, accuracy, pp);
+            return cmd("/s " + id, "%s / %s / %s / %s".formatted(id, rank, accuracy, pp));
         }
 
         private static String getScoreField(JsonObject score, String field) {
