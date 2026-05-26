@@ -369,23 +369,24 @@ final class ReplyFactory {
 
     private record Buttons(String directUrl) {
         List<List<Button>> mpButtons(MultiplayerRoom room) {
-            return Button.keyboard(
-                    Button.row(
-                            room.isHasPassword()
-                                    ? Button.openUrl(1, "房间未公开", null).disable()
-                                    : Button.openUrl(1, "加入房间", directUrl + "/room/" + room.getId())
-                    )
-                    , Optional.ofNullable(room.getCurrentPlaylistItem())
-                            .map(MultiplayerRoom.CurrentPlaylistItem::getBeatmap)
-                            .map(Beatmap::getBeatmapsetId)
-                            .map(i -> dlButtonRow(String.valueOf(i)))
-                            .orElse(null)
-                    , Optional.ofNullable(room.getCurrentPlaylistItem())
-                            .map(MultiplayerRoom.CurrentPlaylistItem::getBeatmap)
-                            .map(Beatmap::getBeatmapsetId)
-                            .map(i -> dlButtonRowSecond(String.valueOf(i)))
-                            .orElse(null)
-            );
+            List<List<Button>> rows = new ArrayList<>();
+
+            rows.add(Button.row(
+                    room.isHasPassword()
+                            ? Button.openUrl(1, "房间未公开", null).disable()
+                            : Button.openUrl(1, "加入房间", directUrl + "/room/" + room.getId())
+            ));
+
+            Optional.ofNullable(room.getCurrentPlaylistItem())
+                    .map(MultiplayerRoom.CurrentPlaylistItem::getBeatmap)
+                    .map(Beatmap::getBeatmapsetId)
+                    .map(String::valueOf)
+                    .ifPresent(id -> {
+                        rows.add(dlButtonRow(id));
+                        rows.add(dlButtonRowSecond(id));
+                    });
+
+            return List.copyOf(rows);
         }
 
         List<List<Button>> bindButtons(String userId, String url, boolean restrict) {
