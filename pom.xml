@@ -12,7 +12,7 @@
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <exec.mainClass>xyz.zcraft.Seira</exec.mainClass>
+        <exec.mainClass>xyz.zcraft.seira.Seira</exec.mainClass>
     </properties>
 
     <repositories>
@@ -58,7 +58,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>xyz.zcraft.Seira</mainClass>
+                            <mainClass>xyz.zcraft.seira.Seira</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>
@@ -82,7 +82,7 @@
         <dependency>
             <groupId>com.github.ZayrexDev</groupId>
             <artifactId>osuModel</artifactId>
-            <version>master-a7b13a170e-1</version>
+            <version>4a7d2b3730</version>
         </dependency>
         <!-- Source: https://mvnrepository.com/artifact/tools.jackson.core/jackson-databind -->
         <dependency>
