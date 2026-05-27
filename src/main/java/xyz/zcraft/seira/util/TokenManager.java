@@ -50,6 +50,6 @@ public class TokenManager {
                 LOG.info("Scheduled access token renewal in progress");
                 refreshToken();
             }
-        }, Math.min(token.expiresIn() - 60, 60) * 1000L);
+        }, Math.max(token.expiresIn() - 60, 60) * 1000L);
     }
 }
