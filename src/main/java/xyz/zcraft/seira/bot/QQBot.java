@@ -34,6 +34,11 @@ public class QQBot {
 
         while (true) {
             try {
+                if (tokenManager.isExpired()) {
+                    LOG.warn("Waiting for token renewal");
+                    continue;
+                }
+
                 LOG.info("Getting wss endpoint");
                 String wssEndpoint = QQApi.getWSSEndpoint(tokenManager.getToken());
                 LOG.info("Endpoint: {}", wssEndpoint);
