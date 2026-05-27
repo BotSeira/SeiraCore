@@ -34,11 +34,7 @@ public class QQBot {
 
         while (true) {
             try {
-                if (tokenManager.isExpired()) {
-                    LOG.warn("Waiting for token renewal");
-                    tokenManager.renew();
-                    continue;
-                }
+                tokenManager.refreshToken();
 
                 LOG.info("Getting wss endpoint");
                 String wssEndpoint = QQApi.getWSSEndpoint(tokenManager.getToken());
@@ -50,7 +46,9 @@ public class QQBot {
                         tokenManager::getToken,
                         sender
                 );
+
                 client.connectBlocking();
+
                 LOG.info("Gateway session started");
 
                 while (client.isOpen()) {
