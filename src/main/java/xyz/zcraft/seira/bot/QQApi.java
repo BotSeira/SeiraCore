@@ -41,28 +41,24 @@ public class QQApi {
         }
     }
 
-    public static AccessToken getAccessToken(String appId, String appSecret) {
-        try {
-            JsonObject payload = new JsonObject();
-            payload.addProperty("appId", appId);
-            payload.addProperty("clientSecret", appSecret);
+    public static AccessToken getAccessToken(String appId, String appSecret) throws Exception {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("appId", appId);
+        payload.addProperty("clientSecret", appSecret);
 
-            HttpRequest request = HttpRequest.newBuilder()
-                    .header("Content-Type", "application/json")
-                    .uri(URI.create("https://bots.qq.com/app/getAppAccessToken"))
-                    .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
-                    .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .header("Content-Type", "application/json")
+                .uri(URI.create("https://bots.qq.com/app/getAppAccessToken"))
+                .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
+                .build();
 
-            final JsonElement jsonElement = JsonParser.parseString(CLIENT.send(request, HttpResponse.BodyHandlers.ofString()).body());
+        final JsonElement jsonElement = JsonParser.parseString(CLIENT.send(request, HttpResponse.BodyHandlers.ofString()).body());
 
-            return new AccessToken(
-                    jsonElement.getAsJsonObject().get("access_token").getAsString(),
-                    System.currentTimeMillis(),
-                    jsonElement.getAsJsonObject().get("expires_in").getAsLong()
-            );
-        } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+        return new AccessToken(
+                jsonElement.getAsJsonObject().get("access_token").getAsString(),
+                System.currentTimeMillis(),
+                jsonElement.getAsJsonObject().get("expires_in").getAsLong()
+        );
     }
 
     public static void sendPrivateMessage(AccessToken accessToken, String openId, Message message) {
