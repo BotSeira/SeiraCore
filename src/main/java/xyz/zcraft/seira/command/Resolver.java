@@ -16,6 +16,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 final class Resolver {
+    public String preProcess(String rawContent) {
+        Matcher matcher = Patterns.USER_MACRO_PATTERN.matcher(rawContent);
+        if (matcher.matches()) {
+            return "s " + rawContent;
+        }
+
+        return rawContent;
+    }
+
     public SearchQuery resolveSearchQuery(String arg) {
         final Optional<MatchResult> first = Patterns.SEARCH_PATTERN.matcher(arg.trim()).results().findFirst();
         if (first.isPresent()) {
