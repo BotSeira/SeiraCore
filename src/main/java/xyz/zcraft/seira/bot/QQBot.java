@@ -36,6 +36,8 @@ public class QQBot {
             try {
                 if (tokenManager.isExpired()) {
                     LOG.warn("Waiting for token renewal");
+                    //noinspection BusyWait
+                    Thread.sleep(10000);
                     continue;
                 }
 

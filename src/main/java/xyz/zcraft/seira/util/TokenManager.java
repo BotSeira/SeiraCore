@@ -27,13 +27,19 @@ public class TokenManager {
     }
 
     public void renew() {
-        try {
-            token = QQApi.getAccessToken(clientId, clientSecret);
-            LOG.info("Token renewed, expire in {}", token.expiresIn());
-        } catch (Exception e) {
-            token = null;
-            LOG.error("Failed to renew token, will retry in 60 sec", e);
-        }
+        do {
+            try {
+                token = QQApi.getAccessToken(clientId, clientSecret);
+                LOG.info("Token renewed, expire in {}", token.expiresIn());
+            } catch (Exception e) {
+                token = null;
+                LOG.error("Failed to renew token, will retry in 10 sec", e);
+                try {
+                    //noinspection BusyWait
+                    Thread.sleep(10 * 1000L);
+                } catch (InterruptedException _) {}
+            }
+        } while (token == null);
 
         timer.schedule(new java.util.TimerTask() {
             @Override
@@ -43,6 +49,6 @@ public class TokenManager {
                     renew();
                 }
             }
-        }, Math.min((token != null ? token.expiresIn() : 0) - 60, 60) * 1000L);
+        }, Math.min(token.expiresIn() - 60, 60) * 1000L);
     }
 }
