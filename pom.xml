@@ -82,20 +82,23 @@
         <dependency>
             <groupId>com.github.ZayrexDev</groupId>
             <artifactId>osuModel</artifactId>
-            <version>4a7d2b3730</version>
+            <version>1.0.1</version>
         </dependency>
+
         <!-- Source: https://mvnrepository.com/artifact/tools.jackson.core/jackson-databind -->
         <dependency>
             <groupId>tools.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
             <version>3.1.2</version>
         </dependency>
+
         <!-- Source: https://mvnrepository.com/artifact/tools.jackson.dataformat/jackson-dataformat-yaml -->
         <dependency>
             <groupId>tools.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-yaml</artifactId>
             <version>3.1.2</version>
         </dependency>
+
         <!-- Source: https://mvnrepository.com/artifact/org.java-websocket/Java-WebSocket -->
         <dependency>
             <groupId>org.java-websocket</groupId>
@@ -103,6 +106,7 @@
             <version>1.6.0</version>
             <scope>compile</scope>
         </dependency>
+
         <!-- Source: https://mvnrepository.com/artifact/org.projectlombok/lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
@@ -110,6 +114,7 @@
             <version>1.18.44</version>
             <scope>compile</scope>
         </dependency>
+
         <!-- Source: https://mvnrepository.com/artifact/org.apache.logging.log4j/log4j-slf4j2-impl -->
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
@@ -117,16 +122,19 @@
             <version>2.25.4</version>
             <scope>compile</scope>
         </dependency>
+
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
             <version>2.13.2</version>
         </dependency>
+
         <dependency>
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
             <version>3.50.3.0</version>
         </dependency>
+
         <!-- Source: https://mvnrepository.com/artifact/com.qcloud/cos_api -->
         <!--suppress VulnerableLibrariesLocal -->
         <dependency>
@@ -135,6 +143,7 @@
             <version>5.6.269</version>
             <scope>compile</scope>
         </dependency>
+
         <!-- Source: https://mvnrepository.com/artifact/org.apache.logging.log4j/log4j-core -->
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
@@ -142,6 +151,7 @@
             <version>2.25.4</version>
             <scope>compile</scope>
         </dependency>
+
         <!-- Source: https://mvnrepository.com/artifact/org.apache.logging.log4j/log4j-api -->
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
@@ -149,6 +159,7 @@
             <version>2.25.4</version>
             <scope>compile</scope>
         </dependency>
+
         <!--suppress VulnerableLibrariesLocal -->
         <dependency>
             <groupId>io.javalin</groupId>
