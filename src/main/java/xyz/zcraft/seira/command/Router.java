@@ -458,10 +458,42 @@ public class Router {
 
                 return taskCoordinator.queueImageRequest(
                         ctx,
-                        "sa",
+                        "Score Analysis",
                         () -> APIHelper.getScoreAnalyzeResponse(target),
                         replyFactory::scoreAnalyzeMessage
                 );
+            }
+            case "ma" -> {
+                if (args.length < 1 || args.length > 3) {
+                    return RouteDecision.sync(PendingMessage.ofString(Usages.MA_USAGE));
+                }
+
+                TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(args, senderUserId);
+
+                ShortcutTarget target = targetResolution.target();
+                if (target.isError()) {
+                    return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+                }
+
+                if (args.length == targetResolution.consumedArgs() + 1) {
+                    Integer index = argumentResolver.parsePositiveInt(args[targetResolution.consumedArgs()]);
+                    if (index == null) {
+                        return RouteDecision.sync(PendingMessage.ofString(Usages.MA_USAGE));
+                    }
+
+                    return taskCoordinator.queueImageRequest(
+                            ctx,
+                            "Miss Visualize",
+                            () -> APIHelper.getMissVisualizeResponse(target, index - 1),
+                            replyFactory::missVisualizeMessage
+                    );
+                } else {
+                    return taskCoordinator.queueApiRequest(
+                            ctx,
+                            "Get Score Misses",
+                            () -> replyFactory.scoreMissesMessage(ctx, APIHelper.getScoreMissesResponse(target))
+                    );
+                }
             }
             case "r" -> {
                 if (args.length < 1 || args.length > 3) {
@@ -793,6 +825,7 @@ public class Router {
         public static final String DL_USAGE = "用法：/dl <谱面集ID 或 快捷查询>";
         public static final String S_USAGE = "用法：/s <成绩ID 或 快捷查询>";
         public static final String SA_USAGE = "用法：/sa <成绩ID 或 快捷查询>";
+        public static final String MA_USAGE = "用法：/ma <成绩ID 或 快捷查询> [序号]";
         private static final String R_USAGE = "用法：/r <成绩ID 或 快捷查询>";
         private static final String RSC_USAGE = "用法：/rsc <谱面ID或快捷查询> [+用户ID列表，逗号分隔]";
     }

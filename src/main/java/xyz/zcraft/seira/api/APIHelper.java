@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import kotlin.Pair;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import xyz.zcraft.osu.model.BeatmapExtended;
@@ -304,6 +305,11 @@ public class APIHelper {
     public static Response<Base64Bytes> getScoreAnalyzeResponse(ShortcutTarget target) {
         long scoreId = lookupScoreId(target);
         return getBase64BytesResponse("/scores/" + scoreId + "/analysis", "获取成绩分析失败", null);
+    }
+
+    public static Response<Base64Bytes> getMissVisualizeResponse(ShortcutTarget target, int index) {
+        long scoreId = lookupScoreId(target);
+        return getBase64BytesResponse("/scores/" + scoreId + "/misses/" + index + "/visualize", "获取Miss可视化失败", null);
     }
 
     private static Response<Base64Bytes> getBase64BytesResponse(String query, String failMessage, @Nullable String postBody) {
@@ -690,6 +696,40 @@ public class APIHelper {
 
         return sb.toString().trim();
 
+    }
+
+    public static Response<List<Pair<Integer, Long>>> getScoreMissesResponse(ShortcutTarget target) {
+        final long scoreId = lookupScoreId(target);
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/scores/" + scoreId + "/misses"))
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw parseHttpError(send.body(), send.statusCode(), "获取 Miss 数据失败");
+            }
+
+            final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
+            ensureApiSuccess(r, "获取 Miss 数据失败");
+            final JsonArray data = r.getData().getAsJsonArray();
+
+            List<Pair<Integer, Long>> misses = new LinkedList<>();
+            for (JsonElement datum : data) {
+                misses.add(new Pair<>(
+                        datum.getAsJsonObject().get("index").getAsInt(),
+                        datum.getAsJsonObject().get("time").getAsLong()
+                ));
+            }
+
+            return Response.<List<Pair<Integer, Long>>>fromHeaders(send.headers())
+                    .content(misses)
+                    .build();
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public record ReplayRenderResult(String videoUrl, String taskId) {
