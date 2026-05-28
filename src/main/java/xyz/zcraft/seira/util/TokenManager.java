@@ -21,7 +21,7 @@ public class TokenManager {
     }
 
     public boolean isValid() {
-        return (token == null) || (System.currentTimeMillis() - token.tokenGrantTime() >= (token.expiresIn() - 60) * 1000);
+        return (token != null) || (System.currentTimeMillis() - token.tokenGrantTime() >= (token.expiresIn() - 60) * 1000);
     }
 
     public void refreshToken() {

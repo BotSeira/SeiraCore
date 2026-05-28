@@ -393,7 +393,7 @@ final class ReplyFactory {
             for (int i = 0; i < Math.min(10, content.size()); i++) {
                 final Pair<Integer, Long> cur = content.get(i);
                 final Duration time = Duration.of(cur.getSecond(), ChronoUnit.MILLIS);
-                sb.append("> ").append(cmd("/ma " + scoreMissesResponse.getScoreId() + " " + (i + 1), "#" + (i + 1)))
+                sb.append("> ").append(cmd("/ma " + scoreMissesResponse.getScoreId() + " " + (cur.getFirst() + 1), "#" + (i + 1)))
                         .append(" - ").append("%02d:%02d.%03d".formatted(time.toMinutesPart(), time.toSecondsPart(), time.toMillisPart())).append("\n");
             }
             if (content.size() > 10) {

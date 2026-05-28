@@ -487,12 +487,14 @@ public class Router {
                             () -> APIHelper.getMissVisualizeResponse(target, index - 1),
                             replyFactory::missVisualizeMessage
                     );
-                } else {
+                } else if (args.length == targetResolution.consumedArgs()) {
                     return taskCoordinator.queueApiRequest(
                             ctx,
                             "Get Score Misses",
                             () -> replyFactory.scoreMissesMessage(ctx, APIHelper.getScoreMissesResponse(target))
                     );
+                } else {
+                    return RouteDecision.sync(PendingMessage.ofString(Usages.MA_USAGE));
                 }
             }
             case "r" -> {
