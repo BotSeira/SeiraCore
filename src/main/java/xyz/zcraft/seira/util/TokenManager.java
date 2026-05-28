@@ -18,31 +18,38 @@ public class TokenManager {
     public TokenManager(String clientId, String clientSecret) {
         this.clientId = clientId;
         this.clientSecret = clientSecret;
-
-        renew();
     }
 
-    public boolean isExpired() {
-        return (token == null) || (System.currentTimeMillis() - token.tokenGrantTime() >= (token.expiresIn() - 60) * 1000);
+    public boolean isValid() {
+        return (token != null) || (System.currentTimeMillis() - token.tokenGrantTime() >= (token.expiresIn() - 60) * 1000);
     }
 
-    public void renew() {
-        try {
-            token = QQApi.getAccessToken(clientId, clientSecret);
-            LOG.info("Token renewed, expire in {}", token.expiresIn());
-        } catch (Exception e) {
-            token = null;
-            LOG.error("Failed to renew token, will retry in 60 sec", e);
-        }
+    public void refreshToken() {
+        LOG.info("Refreshing access token");
+
+        do {
+            try {
+                token = QQApi.getAccessToken(clientId, clientSecret);
+                break;
+            } catch (Exception e) {
+                LOG.error("Failed to renew token, will retry in 10 sec", e);
+            }
+
+            try {
+                //noinspection BusyWait
+                Thread.sleep(10 * 1000L);
+            } catch (InterruptedException _) {
+            }
+        } while (!isValid());
+
+        LOG.info("Token renewed, expire in {}", token.expiresIn());
 
         timer.schedule(new java.util.TimerTask() {
             @Override
             public void run() {
-                if (isExpired()) {
-                    LOG.info("Access token expired, renewing...");
-                    renew();
-                }
+                LOG.info("Scheduled access token renewal in progress");
+                refreshToken();
             }
-        }, Math.min((token != null ? token.expiresIn() : 0) - 60, 60) * 1000L);
+        }, Math.max(token.expiresIn() - 60, 60) * 1000L);
     }
 }

@@ -89,6 +89,7 @@ mvn -U clean compile exec:java
 | `/m`            | `/m <id/rsN/boN> [Mod]`                 | 获取指定谱面信息              |
 | `/s`            | `/s <id/rsN/boN>`                       | 获取指定成绩图               |
 | `/sa`           | `/sa <id/rsN/boN>`                      | 获取指定成绩分析图             |
+| `/ma`           | `/ma <id/rsN/boN> [n]`                  | 获取指定成绩的Miss分析         |
 | `/u`            | `/u <id>`                               | 获取指定用户信息              |
 | `/r`            | `/r <id/rsN/boN> [[mm:ss]-[mm:ss]]`     | 生成并发送指定成绩回放视频         |
 | `/rsc`          | `/rsc <id/rsN/boN> [+<uid1>,<uid2>...]` | 生成并发送指定成员的成绩同屏回放视频    |

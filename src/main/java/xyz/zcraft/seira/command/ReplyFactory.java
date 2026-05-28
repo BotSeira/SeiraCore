@@ -3,6 +3,7 @@ package xyz.zcraft.seira.command;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import kotlin.Pair;
 import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.osu.model.*;
 import xyz.zcraft.seira.api.APIHelper;
@@ -12,6 +13,8 @@ import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.BindingConfig;
 import xyz.zcraft.seira.data.*;
 
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -83,7 +86,7 @@ final class ReplyFactory {
                 at(ctx) + "成绩分析完成\n" +
                         "> 谱面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
                         "> 成绩: " + cmd("/s " + response.getScoreId(), response.getScoreId()),
-                buttons.sButtons(response.getBeatmapId(), response.getScoreId())
+                buttons.saButtons(response.getBeatmapId(), response.getScoreId())
         );
     }
 
@@ -185,6 +188,21 @@ final class ReplyFactory {
                                         List<User> mutual, List<User> onlyFollowed, List<User> onlyFollower) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.friendContent(ctx, self, followedCount, mutual, onlyFollowed, onlyFollower),
+                null
+        );
+    }
+
+    public PendingMessage missVisualizeMessage(Context context, Response<?> response) {
+        return PendingMessage.ofMarkdownRaw(
+                at(context) + "Miss可视化完成\n" +
+                        "> 成绩: " + cmd("/s " + response.getScoreId(), response.getScoreId()),
+                null
+        );
+    }
+
+    public PendingMessage scoreMissesMessage(Context ctx, Response<List<Pair<Integer, Long>>> scoreMissesResponse) {
+        return PendingMessage.ofMarkdownRaw(
+                Contents.scoreMissesContent(ctx, scoreMissesResponse),
                 null
         );
     }
@@ -363,6 +381,27 @@ final class ReplyFactory {
             sb += "加入房间或下载谱面:";
             return sb.trim();
         }
+
+        public static String scoreMissesContent(Context ctx, Response<List<Pair<Integer, Long>>> scoreMissesResponse) {
+            final List<Pair<Integer, Long>> content = scoreMissesResponse.getContent();
+            if (content.isEmpty()) {
+                return at(ctx) + "本成绩没有 Miss~";
+            }
+
+            StringBuilder sb = new StringBuilder();
+            sb.append(at(ctx)).append("成绩 Miss 列表 (共 ").append(content.size()).append(" )\n");
+            for (int i = 0; i < Math.min(10, content.size()); i++) {
+                final Pair<Integer, Long> cur = content.get(i);
+                final Duration time = Duration.of(cur.getSecond(), ChronoUnit.MILLIS);
+                sb.append("> ").append(cmd("/ma " + scoreMissesResponse.getScoreId() + " " + (cur.getFirst() + 1), "#" + (i + 1)))
+                        .append(" - ").append("%02d:%02d.%03d".formatted(time.toMinutesPart(), time.toSecondsPart(), time.toMillisPart())).append("\n");
+            }
+            if (content.size() > 10) {
+                sb.append("...剩余 ").append(content.size() - 10).append(" 个").append("\n");
+            }
+
+            return sb.toString().trim();
+        }
     }
 
     private record Buttons(String directUrl) {
@@ -455,6 +494,25 @@ final class ReplyFactory {
                     ),
                     Button.row(
                             Button.command(4, "成绩分析", "/sa " + scoreId),
+                            Button.command(5, "查询排行", "/lb " + beatmapId),
+                            Button.command(6, "渲染回放", "/r " + scoreId)
+                    )
+            );
+        }
+
+        List<List<Button>> saButtons(String beatmapId, String scoreId) {
+            if (beatmapId == null || beatmapId.isBlank()) {
+                return null;
+            }
+
+            return Button.keyboard(
+                    Button.row(
+                            Button.openUrl(1, "查看谱面", directUrl + "/b/" + beatmapId),
+                            Button.command(2, "查询谱面", "/m " + beatmapId),
+                            Button.command(3, "查询谱面集", "/ms m" + beatmapId)
+                    ),
+                    Button.row(
+                            Button.command(4, "Misses", "/ma " + scoreId),
                             Button.command(5, "查询排行", "/lb " + beatmapId),
                             Button.command(6, "渲染回放", "/r " + scoreId)
                     )
