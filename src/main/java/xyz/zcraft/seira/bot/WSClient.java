@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import lombok.Getter;
+import lombok.Setter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.java_websocket.client.WebSocketClient;
@@ -45,6 +46,9 @@ public class WSClient extends WebSocketClient {
         LOG.info("QQ Gateway WebSocket Client created");
     }
 
+    @Setter
+    private Runnable onCloseCallback = null;
+
     @Override
     public void onOpen(ServerHandshake handshake) {
         LOG.info("Gateway connected");
@@ -74,6 +78,10 @@ public class WSClient extends WebSocketClient {
     public void onClose(int code, String reason, boolean remote) {
         LOG.warn("Gateway closed. code={}, reason={}, remote={}", code, reason, remote);
         heartbeatExecutor.shutdownNow();
+
+        if (onCloseCallback != null) {
+            onCloseCallback.run();
+        }
     }
 
     @Override

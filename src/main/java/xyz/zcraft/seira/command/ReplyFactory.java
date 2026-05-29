@@ -351,7 +351,7 @@ final class ReplyFactory {
                 sb.append(getFriendItem(p)).append(" ");
             }
 
-            sb.append("\n> 仅粉丝← (").append(onlyFollower.size()).append(" 已知 共").append(self.getFollowerCount()).append(")\n>");
+            sb.append("\n> 仅粉丝← (").append(onlyFollower.size()).append(" 已知 共").append(self.getFollowerCount() - mutual.size()).append(")\n>");
             for (User p : onlyFollower) {
                 sb.append(getFriendItem(p)).append(" ");
             }
