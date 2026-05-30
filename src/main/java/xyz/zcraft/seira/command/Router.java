@@ -2,6 +2,7 @@ package xyz.zcraft.seira.command;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.bouncycastle.util.encoders.Base64Encoder;
 import xyz.zcraft.osu.model.User;
 import xyz.zcraft.osu.model.UserExtended;
 import xyz.zcraft.seira.api.APIHelper;
@@ -19,6 +20,7 @@ import xyz.zcraft.seira.util.OsuAuthHelper;
 import xyz.zcraft.seira.util.ThreadHelper;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
+import java.io.ByteArrayOutputStream;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
@@ -105,89 +107,36 @@ public class Router {
         final Context ctx = new Context(senderUserId, groupId);
         final CommandContext commandContext = new CommandContext(ctx, senderUserId, groupId, messageId, args, query);
 
-        switch (command) {
-            case "bind" -> {
-                return handleBind(commandContext);
-            }
-            case "unbind" -> {
-                return handleUnbind(commandContext);
-            }
-            case "clearhistory" -> {
-                return handleClearHistory(commandContext);
-            }
-            case "bo" -> {
-                return handleBo(commandContext);
-            }
-            case "daily" -> {
-                return handleDaily(commandContext);
-            }
-            case "mp" -> {
-                return handleMp(commandContext);
-            }
-            case "rs" -> {
-                return handleRs(commandContext);
-            }
-            case "m" -> {
-                return handleM(commandContext);
-            }
-            case "f" -> {
-                return handleF(commandContext);
-            }
-            case "fclear" -> {
-                return handleFclear(commandContext);
-            }
-            case "dl" -> {
-                return handleDl(commandContext);
-            }
-            case "s" -> {
-                return handleS(commandContext);
-            }
-            case "sa" -> {
-                return handleSa(commandContext);
-            }
-            case "ma" -> {
-                return handleMa(commandContext);
-            }
-            case "r" -> {
-                return handleR(commandContext);
-            }
-            case "rsc" -> {
-                return handleRsc(commandContext);
-            }
-            case "ms" -> {
-                return handleMs(commandContext);
-            }
-            case "sms" -> {
-                return handleSms(commandContext);
-            }
-            case "lb" -> {
-                return handleLb(commandContext);
-            }
-            case "status" -> {
-                return handleStatus();
-            }
-            case "u" -> {
-                return handleU(commandContext);
-            }
-            case "rstat" -> {
-                return handleRstat(commandContext);
-            }
-            case "inspect" -> {
-                return handleInspect(commandContext);
-            }
-            case "help" -> {
-                return handleHelp();
-            }
-            case "debug.upload" -> {
-                return handleDebugUpload(commandContext);
-            }
-            case "debug.test" -> {
-                return handleDebugTest(commandContext);
-            }
-            default -> {
-                return handleUnknown();
-            }
-        }
+        return switch (command) {
+            case "bind" -> handleBind(commandContext);
+            case "unbind" -> handleUnbind(commandContext);
+            case "clearhistory" -> handleClearHistory(commandContext);
+            case "bo" -> handleBo(commandContext);
+            case "daily" -> handleDaily(commandContext);
+            case "mp" -> handleMp(commandContext);
+            case "rs" -> handleRs(commandContext);
+            case "m" -> handleM(commandContext);
+            case "f" -> handleF(commandContext);
+            case "fclear" -> handleFclear(commandContext);
+            case "dl" -> handleDl(commandContext);
+            case "s" -> handleS(commandContext);
+            case "sa" -> handleSa(commandContext);
+            case "ma" -> handleMa(commandContext);
+            case "r" -> handleR(commandContext);
+            case "rsc" -> handleRsc(commandContext);
+            case "ms" -> handleMs(commandContext);
+            case "sms" -> handleSms(commandContext);
+            case "lb" -> handleLb(commandContext);
+            case "status" -> handleStatus();
+            case "u" -> handleU(commandContext);
+            case "rstat" -> handleRstat(commandContext);
+            case "inspect" -> handleInspect(commandContext);
+            case "help" -> handleHelp();
+            case "debug.upload" -> handleDebugUpload(commandContext);
+            case "debug.test" -> handleDebugTest(commandContext);
+            case "debug.message" -> handleDebugMessage(commandContext);
+            default -> handleUnknown();
+        };
     }
 
     private RouteDecision handleBind(CommandContext commandContext) {
@@ -932,21 +881,21 @@ public class Router {
         return RouteDecision.sync(replyFactory.testMessage());
     }
 
-    private static final class CommandContext {
-        private final Context ctx;
-        private final String senderUserId;
-        private final String groupId;
-        private final String messageId;
-        private final String[] args;
-        private final String query;
+    private RouteDecision handleDebugMessage(CommandContext commandContext) {
+        if (!config.seira().debugMode()) {
+            return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
+        }
 
-        private CommandContext(Context ctx, String senderUserId, String groupId, String messageId, String[] args, String query) {
-            this.ctx = ctx;
-            this.senderUserId = senderUserId;
-            this.groupId = groupId;
-            this.messageId = messageId;
-            this.args = args;
-            this.query = query;
+        if (!isAdmin(commandContext.senderUserId)) {
+            return RouteDecision.sync(PendingMessage.ofString("你没有权限使用此指令。"));
+        }
+
+        try {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            new Base64Encoder().decode(commandContext.query, out);
+            return RouteDecision.sync(PendingMessage.ofMarkdownRaw(out.toString()));
+        } catch (Exception e) {
+            return RouteDecision.sync(PendingMessage.ofString("解码失败"));
         }
     }
 
@@ -962,6 +911,10 @@ public class Router {
             return false;
         }
         return adminIds.contains(openId);
+    }
+
+    private record CommandContext(Context ctx, String senderUserId, String groupId, String messageId, String[] args,
+                                  String query) {
     }
 
     private static final class Usages {
