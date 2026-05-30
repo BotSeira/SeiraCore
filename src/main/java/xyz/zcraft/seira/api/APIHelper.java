@@ -422,7 +422,7 @@ public class APIHelper {
         final long beatmapId = lookupBeatmap(target, auth);
 
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(ENDPOINT + "/replays/renders/showcase/" + beatmapId + (timeRange != null ? timeRange.toQueryString() : "")))
+                .uri(URI.create(ENDPOINT + "/replays/renders/showcase/" + beatmapId + (timeRange != null ? "?" + timeRange.toQueryString() : "")))
                 .POST(HttpRequest.BodyPublishers.ofString(GSON.toJsonTree(Map.of("ids", groupUids)).toString()))
                 .build();
 
@@ -441,7 +441,7 @@ public class APIHelper {
     private static ReplayTaskInfo createReplayTask(ShortcutTarget target, TimeDurationParser.TimeRange timeRange) {
         long scoreId = lookupScoreId(target);
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(ENDPOINT + "/replays/renders/score/" + scoreId + (timeRange != null ? timeRange.toQueryString() : "")))
+                .uri(URI.create(ENDPOINT + "/replays/renders/score/" + scoreId + (timeRange != null ? "?" + timeRange.toQueryString() : "")))
                 .POST(HttpRequest.BodyPublishers.noBody())
                 .build();
 
