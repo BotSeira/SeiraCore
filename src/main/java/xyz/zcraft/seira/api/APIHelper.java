@@ -574,14 +574,10 @@ public class APIHelper {
 
     private static RuntimeException parseHttpError(String responseBody, int statusCode, String fallbackMessage) {
         Integer errorCode = null;
-        String message = null;
+        String message = fallbackMessage;
         try {
             JsonObject root = GSON.fromJson(responseBody, JsonObject.class);
             if (root != null) {
-                if (root.has("message") && root.get("message").isJsonPrimitive()) {
-                    message = root.get("message").getAsString();
-                }
-                // Error code is primarily returned as Response.data.code.
                 if (root.has("data") && root.get("data").isJsonObject()) {
                     JsonObject data = root.getAsJsonObject("data");
                     errorCode = readCodeFromJsonObject(data);
@@ -593,10 +589,11 @@ public class APIHelper {
         } catch (Exception ignored) {
         }
 
-        String resolvedMessage = (message != null && !message.isBlank())
-                ? message
-                : fallbackMessage + "（HTTP " + statusCode + "）";
-        return new ApiRequestException(errorCode, resolvedMessage);
+        if (statusCode == 500) {
+            message += "(" + errorCode + " HTTP " + statusCode + " - 发生了一个内部错误)";
+        }
+
+        return new ApiRequestException(errorCode, message);
     }
 
     private static RuntimeException parseHttpError(byte[] responseBody, int statusCode, String fallbackMessage) {
