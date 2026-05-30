@@ -587,7 +587,7 @@ public class Router {
             return taskCoordinator.queueImageRequest(
                     commandContext.ctx,
                     "Miss Visualize",
-                    () -> APIHelper.getMissVisualizeResponse(target, index - 1),
+                    () -> APIHelper.getMissVisualizeResponse(target, index),
                     replyFactory::missVisualizeMessage
             );
         } else if (commandContext.args.length == targetResolution.consumedArgs()) {
