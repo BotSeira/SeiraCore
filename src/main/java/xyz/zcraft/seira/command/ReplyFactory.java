@@ -192,11 +192,12 @@ final class ReplyFactory {
     }
 
     public PendingMessage missVisualizeMessage(Context context, Response<?> response) {
-        return PendingMessage.ofMarkdownRaw(
-                at(context) + "Miss可视化完成\n" +
-                        "> 成绩: " + cmd("/s " + response.getScoreId(), response.getScoreId()),
-                null
-        );
+        return null;
+//        return PendingMessage.ofMarkdownRaw(
+//                at(context) + "Miss可视化完成\n" +
+//                        "> 成绩: " + cmd("/s " + response.getScoreId(), response.getScoreId()),
+//                null
+//        );
     }
 
     public PendingMessage scoreMissesMessage(Context ctx, Response<List<MissData>> scoreMissesResponse) {
