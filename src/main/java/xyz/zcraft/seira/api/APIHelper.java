@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import kotlin.Pair;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import xyz.zcraft.osu.model.BeatmapExtended;
@@ -698,7 +697,7 @@ public class APIHelper {
 
     }
 
-    public static Response<List<Pair<Integer, Long>>> getScoreMissesResponse(ShortcutTarget target) {
+    public static Response<List<MissData>> getScoreMissesResponse(ShortcutTarget target) {
         final long scoreId = lookupScoreId(target);
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -716,15 +715,17 @@ public class APIHelper {
             ensureApiSuccess(r, "获取 Miss 数据失败");
             final JsonArray data = r.getData().getAsJsonArray();
 
-            List<Pair<Integer, Long>> misses = new LinkedList<>();
+            List<MissData> misses = new LinkedList<>();
             for (JsonElement datum : data) {
-                misses.add(new Pair<>(
-                        datum.getAsJsonObject().get("index").getAsInt(),
-                        datum.getAsJsonObject().get("time").getAsLong()
+                final JsonObject obj = datum.getAsJsonObject();
+                misses.add(new MissData(
+                        obj.get("index").getAsInt(),
+                        obj.get("time").getAsLong(),
+                        MissData.Type.valueOf(obj.get("type").getAsString())
                 ));
             }
 
-            return Response.<List<Pair<Integer, Long>>>fromHeaders(send.headers())
+            return Response.<List<MissData>>fromHeaders(send.headers())
                     .content(misses)
                     .build();
         } catch (IOException | InterruptedException e) {

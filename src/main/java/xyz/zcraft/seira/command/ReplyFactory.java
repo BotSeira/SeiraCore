@@ -3,7 +3,6 @@ package xyz.zcraft.seira.command;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import kotlin.Pair;
 import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.osu.model.*;
 import xyz.zcraft.seira.api.APIHelper;
@@ -200,7 +199,7 @@ final class ReplyFactory {
         );
     }
 
-    public PendingMessage scoreMissesMessage(Context ctx, Response<List<Pair<Integer, Long>>> scoreMissesResponse) {
+    public PendingMessage scoreMissesMessage(Context ctx, Response<List<MissData>> scoreMissesResponse) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.scoreMissesContent(ctx, scoreMissesResponse),
                 null
@@ -382,8 +381,8 @@ final class ReplyFactory {
             return sb.trim();
         }
 
-        public static String scoreMissesContent(Context ctx, Response<List<Pair<Integer, Long>>> scoreMissesResponse) {
-            final List<Pair<Integer, Long>> content = scoreMissesResponse.getContent();
+        public static String scoreMissesContent(Context ctx, Response<List<MissData>> scoreMissesResponse) {
+            final List<MissData> content = scoreMissesResponse.getContent();
             if (content.isEmpty()) {
                 return at(ctx) + "本成绩没有 Miss~";
             }
@@ -391,10 +390,11 @@ final class ReplyFactory {
             StringBuilder sb = new StringBuilder();
             sb.append(at(ctx)).append("成绩 Miss 列表 (共 ").append(content.size()).append(" )\n");
             for (int i = 0; i < Math.min(10, content.size()); i++) {
-                final Pair<Integer, Long> cur = content.get(i);
-                final Duration time = Duration.of(cur.getSecond(), ChronoUnit.MILLIS);
-                sb.append("> ").append(cmd("/ma " + scoreMissesResponse.getScoreId() + " " + (cur.getFirst() + 1), "#" + (i + 1)))
-                        .append(" - ").append("%02d:%02d.%03d".formatted(time.toMinutesPart(), time.toSecondsPart(), time.toMillisPart())).append("\n");
+                final MissData cur = content.get(i);
+                final Duration time = Duration.of(cur.time(), ChronoUnit.MILLIS);
+                sb.append("> ").append(cmd("/ma " + scoreMissesResponse.getScoreId() + " " + cur.index(), "#" + cur.index()))
+                        .append(" - ").append("%02d:%02d.%03d".formatted(time.toMinutesPart(), time.toSecondsPart(), time.toMillisPart()))
+                        .append(" - ").append(cur.type().toString()).append("\n");
             }
             if (content.size() > 10) {
                 sb.append("...剩余 ").append(content.size() - 10).append(" 个").append("\n");
