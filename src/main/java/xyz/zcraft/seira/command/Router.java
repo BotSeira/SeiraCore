@@ -56,7 +56,8 @@ public class Router {
         LOG.info("Received {} message {} from {}: {}", groupMessage ? "group" : "private", messageId, userId, rawContent);
         AtomicInteger messageSeqCounter = new AtomicInteger(1);
         try {
-            if (groupMessage && groupId != null && !groupId.isBlank() && userId != null && !userId.isBlank()) {
+            final boolean group = groupMessage && groupId != null && !groupId.isBlank();
+            if (group && userId != null && !userId.isBlank()) {
                 UserDataStore.upsertGroupMember(groupId, userId);
             }
 
@@ -66,10 +67,12 @@ public class Router {
             }
 
             if (routeDecision.initialMessage() != null) {
-                taskCoordinator.sendOutboundMessage(
-                        targetId, messageId, groupMessage,
-                        routeDecision.initialMessage(), messageSeqCounter
-                );
+                if (!group || config.seira().queueMessageInGroup()) {
+                    taskCoordinator.sendOutboundMessage(
+                            targetId, messageId, groupMessage,
+                            routeDecision.initialMessage(), messageSeqCounter
+                    );
+                }
             }
 
             ApiTask apiTask = routeDecision.apiTask();
