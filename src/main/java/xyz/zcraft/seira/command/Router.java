@@ -69,7 +69,7 @@ public class Router {
             }
 
             if (routeDecision.initialMessage() != null) {
-                if (!group || config.seira().queueMessageInGroup()) {
+                if (!routeDecision.enqueueMessage() || !group || config.seira().queueMessageInGroup()) {
                     taskCoordinator.sendOutboundMessage(
                             targetId, messageId, groupMessage,
                             routeDecision.initialMessage(), messageSeqCounter
