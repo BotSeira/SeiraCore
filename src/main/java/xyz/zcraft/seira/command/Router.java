@@ -846,7 +846,7 @@ public class Router {
 
     private RouteDecision handleHelp() {
         return RouteDecision.sync(PendingMessage.ofMarkdownRaw("""
-                > 常用指令：
+                常用指令：
                 > /bind - 绑定你的玩家ID
                 > /rs - 获取最近的一个成绩
                 > /bo [个数] [玩家ID] - 获取一个或多个最佳成绩
@@ -859,7 +859,7 @@ public class Router {
                 > /lb <谱面ID> [玩家ID列表] - 获取指定谱面排行榜
                 > /f - 获取好友列表
                 
-                > 其他指令：
+                其他指令：
                 > /unbind - 解除你的玩家ID绑定
                 > /clearhistory - 清除你在群聊中的记录
                 > /fclear - 清除好友记录
@@ -875,12 +875,12 @@ public class Router {
                 > /inspect - 获取ID信息
                 > /help - 显示此帮助信息
                 
-                > 快捷查询参考：
+                快捷查询参考：
                 > - /m rs2 - 获取最近第二个成绩的谱面
                 > - /ms bo10 - 获取第十个最好成绩的谱面集
                 > - /r 12345 rs1 - 生成ID为12345的玩家的最近一个成绩的回放
                 
-                > 详细使用说明请在Github查看"""));
+                详细使用说明请在Github查看"""));
     }
 
     private RouteDecision handleStatus() {
