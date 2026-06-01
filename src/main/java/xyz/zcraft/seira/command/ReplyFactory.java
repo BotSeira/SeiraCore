@@ -183,10 +183,10 @@ final class ReplyFactory {
         );
     }
 
-    public PendingMessage friendMessage(Context ctx, UserExtended self, int followedCount,
+    public PendingMessage friendMessage(Context ctx, boolean all, UserExtended self, int followedCount,
                                         List<User> mutual, List<User> onlyFollowed, List<User> onlyFollower) {
         return PendingMessage.ofMarkdownRaw(
-                Contents.friendContent(ctx, self, followedCount, mutual, onlyFollowed, onlyFollower),
+                Contents.friendContent(ctx, all, self, followedCount, mutual, onlyFollowed, onlyFollower),
                 null
         );
     }
@@ -321,11 +321,11 @@ final class ReplyFactory {
             return sb.toString().trim();
         }
 
-        public static String friendContent(Context ctx, UserExtended self, int followedCount,
+        public static String friendContent(Context ctx, boolean all, UserExtended self, int followedCount,
                                            List<User> mutual, List<User> onlyFollowed, List<User> onlyFollower) {
             StringBuilder sb = new StringBuilder();
             sb.append(at(ctx));
-            if (ctx.inGroup()) {
+            if (ctx.inGroup() && !all) {
                 sb.append("\uD83D\uDC65").append("本群好友列表");
             } else {
                 sb.append("\uD83D\uDC65").append("全部好友列表 - 共 ").append(followedCount);

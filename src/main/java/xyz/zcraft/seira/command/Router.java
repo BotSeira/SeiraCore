@@ -437,7 +437,7 @@ public class Router {
                 }
             }
 
-            return replyFactory.friendMessage(commandContext.ctx, self.getContent(), content.size(), mutual, onlyFollowed, onlyFollower);
+            return replyFactory.friendMessage(commandContext.ctx, all, self.getContent(), content.size(), mutual, onlyFollowed, onlyFollower);
         });
     }
 
