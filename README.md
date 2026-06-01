@@ -83,6 +83,7 @@ mvn -U clean compile exec:java
 | `/unbind`       | `/unbind`                               | 解除当前用户的 uid 绑定        |
 | `/clearhistory` | `/clearhistory`                         | 清除当前用户在群聊中的记录         |
 | `/f`            | `/f`                                    | 获取好友列表                |
+| `/fall`         | `/fall`                                 | 获取全部好友列表              |
 | `/fclear`       | `/fclear`                               | 清除好友记录                |
 | `/bo`           | `/bo [n] [uid/@user]`                   | 最好n个成绩图，无参时获取最佳成绩详情   |
 | `/rs`           | `/rs [n] [uid/@user]`                   | 最近n个成绩图，无参时获取最近一个成绩详情 |

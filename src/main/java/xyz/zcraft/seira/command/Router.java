@@ -123,7 +123,8 @@ public class Router {
             case "mp" -> handleMp(commandContext);
             case "rs" -> handleRs(commandContext);
             case "m" -> handleM(commandContext);
-            case "f" -> handleF(commandContext);
+            case "f" -> handleF(commandContext, false);
+            case "fall" -> handleF(commandContext, true);
             case "fclear" -> handleFclear(commandContext);
             case "dl" -> handleDl(commandContext);
             case "s" -> handleS(commandContext);
@@ -358,7 +359,7 @@ public class Router {
         }
     }
 
-    private RouteDecision handleF(CommandContext commandContext) {
+    private RouteDecision handleF(CommandContext commandContext, boolean all) {
         if (!config.binding().requireLogin()) {
             return RouteDecision.sync(PendingMessage.ofString("本指令未启用：需要进行用户登录鉴权。"));
         }
@@ -380,11 +381,13 @@ public class Router {
             final List<FriendEntry> content = response.getContent();
             final List<Long> ids = content.stream().map(e -> e.user().getId()).toList();
 
-            final Predicate<Long> filter = (
-                    (commandContext.groupId == null || commandContext.groupId.isBlank())
-                            ? (_) -> true
-                            : (i) -> UserDataStore.findBoundUidsByGroup(commandContext.groupId).contains(i)
-            );
+            final Predicate<Long> filter;
+            if (commandContext.inGroup() && !all) {
+                final var groupIds = UserDataStore.findBoundUidsByGroup(commandContext.groupId);
+                filter = groupIds::contains;
+            } else {
+                filter = (_) -> true;
+            }
 
             UserDataStore.storeUserInfo(self.getContent().getId(), self.getContent().getUsername());
             response.getContent().stream()
@@ -830,6 +833,7 @@ public class Router {
                 其他指令：
                 > /unbind - 解除你的玩家ID绑定
                 > /clearhistory - 清除你在群聊中的记录
+                > /fall - 获取全部好友列表
                 > /fclear - 清除好友记录
                 > /sa <成绩ID或快捷查询> - 获取指定成绩分析
                 > /ma <成绩ID或快捷查询> [序号] - 获取指定成绩的Miss分析
@@ -848,7 +852,10 @@ public class Router {
                 > - /ms bo10 - 获取第十个最好成绩的谱面集
                 > - /r 12345 rs1 - 生成ID为12345的玩家的最近一个成绩的回放
                 
-                详细使用说明请在Github查看"""));
+                > 注：由于官机限制，群聊中需要@机器人才可以接收到指令
+                
+                详细使用说明请在Github查看
+                """));
     }
 
     private RouteDecision handleStatus() {
@@ -934,6 +941,9 @@ public class Router {
 
     private record CommandContext(Context ctx, String senderUserId, String groupId, String messageId, String[] args,
                                   String query) {
+        public boolean inGroup() {
+            return groupId != null && !groupId.isBlank();
+        }
     }
 
     private static final class Usages {
