@@ -24,13 +24,15 @@ final class TaskCoordinator {
 
     private final MessageSender messageSender;
     private final ApiRequestStats apiRequestStats = new ApiRequestStats();
+    private final Router router;
 
-    TaskCoordinator(MessageSender messageSender) {
+    TaskCoordinator(Router router, MessageSender messageSender) {
+        this.router = router;
         this.messageSender = messageSender;
     }
 
     RouteDecision queueApiRequest(Context ctx, String requestType, ApiTaskExecutor executor) {
-        return queueApiRequest(ctx, requestType, executor, () -> null, () -> {
+        return queueApiRequest(ctx, requestType, executor, () -> null, (_) -> {
         });
     }
 
@@ -51,14 +53,14 @@ final class TaskCoordinator {
                     return PendingMessage.ofImageBase64(response.getContent().toBase64());
                 },
                 () -> postProcessor.execute(ctx, responseRef.get()),
-                () -> {
+                (_) -> {
                 }
         );
     }
 
     RouteDecision queueReplayTask(Context ctx, String requestType, ReplayTaskCreator creator, BiFunction<Context, APIHelper.ReplayTaskInfo, PendingMessage> messageCreator) {
         AtomicReference<APIHelper.ReplayTaskInfo> taskInfoRef = new AtomicReference<>();
-
+        AtomicReference<String> taskId = new AtomicReference<>();
         return queueApiRequestUntilSubmit(
                 requestType,
                 () -> {
@@ -73,13 +75,16 @@ final class TaskCoordinator {
                         return PendingMessage.ofString("回放任务未返回有效请求ID，无法获取视频结果。请稍后重试。");
                     }
 
+                    taskId.set(taskInfo.taskId());
                     APIHelper.ReplayRenderResult result = APIHelper.waitReplayVideo(taskInfo.taskId());
                     if (result != null) {
+                        router.getRenderResults().put(taskInfo.taskId(), result);
                         return PendingMessage.ofVideoUrl(result.videoUrl());
                     }
                     return PendingMessage.ofString("回放视频生成失败，请稍后重试。");
                 },
-                () -> {
+                (b) -> {
+                    if (b) router.getRenderResults().remove(taskId.get());
                 }
         );
     }
@@ -87,10 +92,11 @@ final class TaskCoordinator {
     void processApiTask(String targetId, String messageId, boolean groupMessage, ApiTask apiTask, AtomicInteger messageSeqCounter) {
         long startedAt = System.nanoTime();
         boolean statsCompleted = false;
+        boolean responseSent = false;
         try {
             PendingMessage response = apiTask.executor().execute();
             if (response != null) {
-                sendOutboundMessage(targetId, messageId, groupMessage, response, messageSeqCounter);
+                responseSent = sendOutboundMessage(targetId, messageId, groupMessage, response, messageSeqCounter);
             }
 
             if (apiTask.completeStatsAfterExecutor()) {
@@ -108,7 +114,7 @@ final class TaskCoordinator {
             LOG.error("Failed to execute API task for message {}", messageId, e);
         } finally {
             try {
-                apiTask.finalizer().execute();
+                apiTask.finalizer().execute(responseSent);
             } catch (Exception e) {
                 LOG.warn("Failed to run finalizer for message {}", messageId, e);
             }
@@ -119,7 +125,9 @@ final class TaskCoordinator {
         }
     }
 
-    void sendOutboundMessage(String targetId, String messageId, boolean groupMessage, PendingMessage pendingMsg, AtomicInteger messageSeqCounter) {
+    boolean sendOutboundMessage(String targetId, String messageId, boolean groupMessage, PendingMessage pendingMsg, AtomicInteger messageSeqCounter) {
+        boolean result = true;
+
         Message message = new Message();
         message.setMsgType(pendingMsg.getMsgType());
         message.setMsgId(messageId);
@@ -146,6 +154,7 @@ final class TaskCoordinator {
                 LOG.error("Failed to upload media for message {}", messageId);
                 message.setContent("媒体文件上传失败");
                 message.setMsgType(0);
+                result = false;
             } else {
                 LOG.info("Media uploaded for message {}", messageId);
                 message.setMedia(fileInfo);
@@ -158,6 +167,7 @@ final class TaskCoordinator {
                 LOG.error("Failed to upload base64 media for message {}", messageId);
                 message.setContent("媒体文件上传失败");
                 message.setMsgType(0);
+                result = false;
             } else {
                 LOG.info("Base64 media uploaded for message {}", messageId);
                 message.setMedia(fileInfo);
@@ -169,6 +179,8 @@ final class TaskCoordinator {
         } else {
             messageSender.sendPrivateMessage(targetId, message);
         }
+
+        return result;
     }
 
     private RouteDecision queueApiRequest(Context ctx, String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer) {

@@ -1,5 +1,6 @@
 package xyz.zcraft.seira.command;
 
+import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bouncycastle.util.encoders.Base64Encoder;
@@ -31,6 +32,8 @@ public class Router {
     private static final String PREFIX = "/";
     private final MessageSender messageSender;
     private final VideoRenderRecord videoRenderRecord = new VideoRenderRecord();
+    @Getter
+    private final HashMap<String, APIHelper.ReplayRenderResult> renderResults = new HashMap<>();
     private final AppConfig config;
     private final Resolver argumentResolver;
     private final ReplyFactory replyFactory;
@@ -42,7 +45,7 @@ public class Router {
         this.config = config;
         this.argumentResolver = new Resolver();
         this.replyFactory = new ReplyFactory(config);
-        this.taskCoordinator = new TaskCoordinator(messageSender);
+        this.taskCoordinator = new TaskCoordinator(this, messageSender);
         this.authHelper = new OsuAuthHelper(config.binding());
     }
 
@@ -70,10 +73,14 @@ public class Router {
 
             if (routeDecision.initialMessage() != null) {
                 if (!routeDecision.enqueueMessage() || !group || config.seira().queueMessageInGroup()) {
-                    taskCoordinator.sendOutboundMessage(
+                    boolean res = taskCoordinator.sendOutboundMessage(
                             targetId, messageId, groupMessage,
                             routeDecision.initialMessage(), messageSeqCounter
                     );
+
+                    if (routeDecision.onSent() != null) {
+                        routeDecision.onSent().accept(res);
+                    }
                 }
             }
 
@@ -580,9 +587,9 @@ public class Router {
                 commandContext.ctx,
                 "Score Render",
                 () -> {
-                    APIHelper.ReplayTaskInfo replayRenderTask = APIHelper.createReplayRenderTask(target, finalRange);
-                    videoRenderRecord.updateRenderTask(commandContext.senderUserId, replayRenderTask.taskId());
-                    return replayRenderTask;
+                    APIHelper.ReplayTaskInfo task = APIHelper.createReplayRenderTask(target, finalRange);
+                    videoRenderRecord.updateRenderTask(commandContext.senderUserId, task.taskId());
+                    return task;
                 },
                 replyFactory::replayMessage);
     }
@@ -774,18 +781,30 @@ public class Router {
     }
 
     private RouteDecision handleRstat(CommandContext commandContext) {
-        if (commandContext.args.length == 1) {
-            return RouteDecision.sync(replyFactory.replayStatMessage(commandContext.ctx, commandContext.args[0],
-                    APIHelper.getRenderStat(commandContext.args[0])));
-        } else if (commandContext.args.length == 0) {
-            if (videoRenderRecord.hasRenderTask(commandContext.senderUserId)) {
-                final String jobId = videoRenderRecord.getRenderTask(commandContext.senderUserId);
-                return RouteDecision.sync(replyFactory.replayStatMessage(commandContext.ctx, jobId, APIHelper.getRenderStat(jobId)));
-            }
-            return RouteDecision.sync(PendingMessage.ofString("未找到渲染请求"));
-        } else {
+        if (commandContext.args.length != 1 && commandContext.args.length != 0) {
             return RouteDecision.sync(PendingMessage.ofString("用法：/rstat [任务ID]"));
         }
+
+        String jobId;
+        if (commandContext.args.length == 0) {
+            if (videoRenderRecord.hasRenderTask(commandContext.senderUserId)) {
+                jobId = videoRenderRecord.getRenderTask(commandContext.senderUserId);
+            } else {
+                return RouteDecision.sync(PendingMessage.ofString("未找到渲染请求"));
+            }
+        } else {
+            jobId = commandContext.args[0];
+        }
+
+        if (renderResults.containsKey(jobId)) {
+            return RouteDecision.sync(PendingMessage.ofVideoUrl(renderResults.get(jobId).videoUrl()), b -> {
+                if (b) {
+                    renderResults.remove(jobId);
+                }
+            });
+        }
+
+        return RouteDecision.sync(replyFactory.replayStatMessage(commandContext.ctx, jobId, APIHelper.getRenderStat(jobId)));
     }
 
     private RouteDecision handleInspect(CommandContext commandContext) {

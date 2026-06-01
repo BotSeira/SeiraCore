@@ -85,7 +85,7 @@ public class MessageSender {
             }
 
             try {
-                Thread.sleep(i * 1000);
+                Thread.sleep(i * 2000);
             } catch (Exception _) {
             }
         }
