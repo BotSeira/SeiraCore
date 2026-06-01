@@ -174,13 +174,14 @@ final class TaskCoordinator {
             }
         }
 
+        boolean sendResult;
         if (groupMessage) {
-            messageSender.sendGroupMessage(targetId, message);
+            sendResult = messageSender.sendGroupMessage(targetId, message);
         } else {
-            messageSender.sendPrivateMessage(targetId, message);
+            sendResult = messageSender.sendPrivateMessage(targetId, message);
         }
 
-        return result;
+        return result && sendResult;
     }
 
     private RouteDecision queueApiRequest(Context ctx, String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer) {

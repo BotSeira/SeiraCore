@@ -17,19 +17,23 @@ public class MessageSender {
         this.cos = cos;
     }
 
-    public void sendPrivateMessage(String userId, Message message) {
+    public boolean sendPrivateMessage(String userId, Message message) {
         try {
             QQApi.sendPrivateMessage(tokenManager.getToken(), userId, message);
+            return true;
         } catch (RuntimeException e) {
             LOG.error("Failed to send message to private {}", userId, e);
+            return false;
         }
     }
 
-    public void sendGroupMessage(String groupId, Message message) {
+    public boolean sendGroupMessage(String groupId, Message message) {
         try {
             QQApi.sendGroupMessage(tokenManager.getToken(), groupId, message);
+            return true;
         } catch (RuntimeException e) {
             LOG.error("Failed to send message to group {}", groupId, e);
+            return false;
         }
     }
 
