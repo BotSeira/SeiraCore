@@ -539,7 +539,7 @@ public class APIHelper {
             final BeatmapExtended beatmap = GSON.fromJson(data.get("beatmap"), BeatmapExtended.class);
 
             Double start = data.has("start") ? data.get("start").getAsDouble() : null;
-            Double end = data.has("start") ? data.get("start").getAsDouble() : null;
+            Double end = data.has("end") ? data.get("end").getAsDouble() : null;
 
             return new ReplayTaskInfo(taskId, status, position, beatmap, data.getAsJsonArray("scores"), start, end);
         } catch (IOException e) {
