@@ -84,6 +84,7 @@ final class TaskCoordinator {
                     return PendingMessage.ofString("回放视频生成失败，请稍后重试。");
                 },
                 (b) -> {
+                    LOG.debug("Running finalizer for request {}", taskId.get());
                     if (b) router.getRenderResults().remove(taskId.get());
                 }
         );
