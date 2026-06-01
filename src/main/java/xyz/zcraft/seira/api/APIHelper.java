@@ -470,8 +470,8 @@ public class APIHelper {
             final JsonObject data = rawResponse.getData().getAsJsonObject();
 
             return new TimeDurationParser.TimeRange(
-                    (int) (data.get("start").getAsLong() / 1000),
-                    (int) (data.get("end").getAsLong() / 1000)
+                    Math.max(0, (int) (data.get("start").getAsLong() / 1000)) - 5,
+                    (int) (data.get("end").getAsLong() / 1000) + 5
             );
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
