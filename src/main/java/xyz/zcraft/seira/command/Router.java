@@ -547,7 +547,7 @@ public class Router {
                     commandContext.ctx,
                     "Miss Visualize",
                     () -> APIHelper.getMissVisualizeResponse(target, index),
-                    replyFactory::missVisualizeMessage
+                    null
             );
         } else if (commandContext.args.length == targetResolution.consumedArgs()) {
             return taskCoordinator.queueApiRequest(

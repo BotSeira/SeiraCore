@@ -15,6 +15,10 @@ public class TimeDurationParser {
             throw new IllegalArgumentException("Input cannot be null or empty");
         }
 
+        if (input.trim().equals("-")) {
+            return TimeRange.ALL;
+        }
+
         String[] parts = input.trim().split("-", -1);
 
         if (parts.length != 2) {
@@ -45,7 +49,11 @@ public class TimeDurationParser {
     }
 
     public record TimeRange(Integer startSeconds, Integer endSeconds) {
+        public static final TimeRange ALL = new TimeRange(0, Integer.MAX_VALUE);
+
         public String toQueryString() {
+            if (this == ALL) return "";
+
             StringBuilder query = new StringBuilder();
             if (startSeconds != null) {
                 query.append("&start=").append(startSeconds);

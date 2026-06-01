@@ -439,12 +439,43 @@ public class APIHelper {
 
     private static ReplayTaskInfo createReplayTask(ShortcutTarget target, TimeDurationParser.TimeRange timeRange) {
         long scoreId = lookupScoreId(target);
+
+        if (timeRange == null) {
+            timeRange = getScoreHighlight(scoreId);
+        }
+
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(ENDPOINT + "/replays/renders/score/" + scoreId + (timeRange != null ? "?" + timeRange.toQueryString() : "")))
+                .uri(URI.create(ENDPOINT + "/replays/renders/score/" + scoreId + "?" + timeRange.toQueryString()))
                 .POST(HttpRequest.BodyPublishers.noBody())
                 .build();
 
         return getReplayTaskInfo(request);
+    }
+
+    private static TimeDurationParser.TimeRange getScoreHighlight(long scoreId) {
+        try {
+            HttpRequest localRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/scores/" + scoreId + "/highlight"))
+                    .GET()
+                    .build();
+
+            final var send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw parseHttpError(send.body(), send.statusCode(), "搜索谱面集失败");
+            }
+
+            final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
+            ensureApiSuccess(rawResponse, "搜索谱面集失败");
+            final JsonObject data = rawResponse.getData().getAsJsonObject();
+
+            return new TimeDurationParser.TimeRange(
+                    (int) (data.get("start").getAsLong() / 1000),
+                    (int) (data.get("end").getAsLong() / 1000)
+            );
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private static long lookupScoreId(ShortcutTarget target) {
@@ -507,7 +538,10 @@ public class APIHelper {
 
             final BeatmapExtended beatmap = GSON.fromJson(data.get("beatmap"), BeatmapExtended.class);
 
-            return new ReplayTaskInfo(taskId, status, position, beatmap, data.getAsJsonArray("scores"));
+            Double start = data.has("start") ? data.get("start").getAsDouble() : null;
+            Double end = data.has("start") ? data.get("start").getAsDouble() : null;
+
+            return new ReplayTaskInfo(taskId, status, position, beatmap, data.getAsJsonArray("scores"), start, end);
         } catch (IOException e) {
             throw new RuntimeException(e);
         } catch (InterruptedException e) {
@@ -733,7 +767,14 @@ public class APIHelper {
     public record ReplayRenderResult(String videoUrl, String taskId) {
     }
 
-    public record ReplayTaskInfo(String taskId, String status, Integer position, BeatmapExtended beatmap,
-                                 JsonArray scores) {
+    public record ReplayTaskInfo(
+            String taskId,
+            String status,
+            Integer position,
+            BeatmapExtended beatmap,
+            JsonArray scores,
+            Double start,
+            Double end
+    ) {
     }
 }

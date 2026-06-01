@@ -191,15 +191,6 @@ final class ReplyFactory {
         );
     }
 
-    public PendingMessage missVisualizeMessage(Context context, Response<?> response) {
-        return null;
-//        return PendingMessage.ofMarkdownRaw(
-//                at(context) + "Miss可视化完成\n" +
-//                        "> 成绩: " + cmd("/s " + response.getScoreId(), response.getScoreId()),
-//                null
-//        );
-    }
-
     public PendingMessage scoreMissesMessage(Context ctx, Response<List<MissData>> scoreMissesResponse) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.scoreMissesContent(ctx, scoreMissesResponse),
@@ -218,6 +209,19 @@ final class ReplyFactory {
                 sb.append("> 谱面: ").append(cmd("/m " + beatmap.getId(), String.valueOf(beatmap.getId()))).append("\n");
                 sb.append("> ").append(beatmap.getBeatmapset().getArtist()).append(" - ").append(beatmap.getBeatmapset().getTitle()).append("\n");
                 sb.append("> ").append(String.format("%.2f★", beatmap.getDifficultyRating())).append(" ").append(beatmap.getVersion()).append("\n");
+            }
+
+            if (taskInfo.start() != null || taskInfo.end() != null) {
+                sb.append("> 时间: ");
+                if (taskInfo.start() != null) {
+                    Duration start = Duration.of(taskInfo.start().longValue(), ChronoUnit.SECONDS);
+                    sb.append("从 ").append("%02d:%02d".formatted(start.toMinutesPart(), start.toSecondsPart())).append(" ");
+                }
+                if (taskInfo.end() != null) {
+                    Duration end = Duration.of(taskInfo.end().longValue(), ChronoUnit.SECONDS);
+                    sb.append("到 ").append("%02d:%02d".formatted(end.toMinutesPart(), end.toSecondsPart()));
+                }
+                sb.append("\n");
             }
 
             if (taskInfo.scores() != null) {
