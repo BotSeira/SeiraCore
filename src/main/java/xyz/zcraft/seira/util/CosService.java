@@ -19,13 +19,19 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 
 public class CosService {
     private static final Logger LOG = LogManager.getLogger(CosService.class);
     private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
+
+    private final HashMap<String, String> urlCache = new HashMap<>();
 
     private final CosConfig config;
     private final COSClient client;
@@ -51,8 +57,15 @@ public class CosService {
             objectKey = buildObjectKey(fileType, sourceUrl, media.contentType());
         }
 
-        final String s = doUpload(objectKey, media);
-        LOG.info("Uploaded media to COS. sourceUrl={}, cosUrl={}", sourceUrl, s);
+        final String s;
+        if (urlCache.containsKey(media.digest()) && urlCache.get(media.digest()) != null) {
+            s = urlCache.get(media.digest());
+            LOG.info("Cache hit for {}", objectKey);
+        } else {
+            s = doUpload(objectKey, media);
+            urlCache.put(media.digest(), s);
+            LOG.info("Uploaded media to COS. sourceUrl={}, cosUrl={}", sourceUrl, s);
+        }
         return s;
     }
 
@@ -88,7 +101,7 @@ public class CosService {
             }
 
             String contentType = response.headers().firstValue("Content-Type").orElse(null);
-            return new DownloadedMedia(response.body(), contentType);
+            return DownloadedMedia.create(response.body(), contentType);
         } catch (IOException | InterruptedException e) {
             if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
@@ -183,7 +196,33 @@ public class CosService {
         return result;
     }
 
-    private record DownloadedMedia(byte[] content, String contentType) {
+    private record DownloadedMedia(byte[] content, String contentType, String digest) {
+        public static DownloadedMedia create(byte[] content, String contentType) {
+            try {
+                MessageDigest md = MessageDigest.getInstance("SHA-256");
+                byte[] digest = md.digest(content);
+
+                StringBuilder hexString = new StringBuilder();
+                for (byte b : digest) {
+                    hexString.append(String.format("%02x", b));
+                }
+
+                return new DownloadedMedia(content, contentType, hexString.toString());
+            } catch (NoSuchAlgorithmException e) {
+                LOG.error("Failed to create media digest", e);
+                return new DownloadedMedia(content, contentType, null);
+            }
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj instanceof DownloadedMedia another
+                    && digest != null && another.digest != null) {
+                return Objects.equals(another.digest, digest);
+            }
+
+            return false;
+        }
     }
 }
 

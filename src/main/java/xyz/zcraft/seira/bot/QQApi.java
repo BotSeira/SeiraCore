@@ -113,7 +113,7 @@ public class QQApi {
 
             final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
 
-            LOG.debug("Upload private media response: status={}, body={}", response.statusCode(), response.body());
+            LOG.debug("Upload private media response: status={}", response.statusCode());
             return parseUploadedFileInfo(response, "upload private media");
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
@@ -139,7 +139,7 @@ public class QQApi {
                 throw new RuntimeException("Failed to upload group media! Status code: " + response.statusCode());
             }
 
-            LOG.debug("Upload group media status={}, body={}", response.statusCode(), response.body());
+            LOG.debug("Upload group media status={}", response.statusCode());
 
             return parseUploadedFileInfo(response, "upload private media");
         } catch (IOException | InterruptedException e) {
