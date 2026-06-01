@@ -95,7 +95,6 @@ public class QQApi {
 
     public static String buildMessageJson(Message message) {
         final JsonObject asJsonObject = new Gson().toJsonTree(message).getAsJsonObject();
-        LOG.debug("Build body {}", asJsonObject.toString());
 
         return asJsonObject.toString();
     }

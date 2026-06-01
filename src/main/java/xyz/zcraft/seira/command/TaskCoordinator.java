@@ -84,7 +84,7 @@ final class TaskCoordinator {
                     return PendingMessage.ofString("回放视频生成失败，请稍后重试。");
                 },
                 (b) -> {
-                    LOG.debug("Running finalizer for request {}", taskId.get());
+                    LOG.debug("Running finalizer of {} for request {}", b, taskId.get());
                     if (b) router.getRenderResults().remove(taskId.get());
                 }
         );
@@ -108,7 +108,7 @@ final class TaskCoordinator {
 
             PendingMessage postResponse = apiTask.postProcessor().execute();
             if (postResponse != null) {
-                sendOutboundMessage(targetId, messageId, groupMessage, postResponse, messageSeqCounter);
+                responseSent &= sendOutboundMessage(targetId, messageId, groupMessage, postResponse, messageSeqCounter);
             }
         } catch (Exception e) {
             sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString(resolveErrorMessage(e)), messageSeqCounter);
@@ -127,8 +127,6 @@ final class TaskCoordinator {
     }
 
     boolean sendOutboundMessage(String targetId, String messageId, boolean groupMessage, PendingMessage pendingMsg, AtomicInteger messageSeqCounter) {
-        boolean result = true;
-
         Message message = new Message();
         message.setMsgType(pendingMsg.getMsgType());
         message.setMsgId(messageId);
@@ -146,6 +144,7 @@ final class TaskCoordinator {
             message.setContent(pendingMsg.getContent());
         }
 
+        boolean uploadResult = true;
         if (pendingMsg.getFileUrl() != null) {
             LOG.info("Uploading media for {}", messageId);
             FileInfo fileInfo = groupMessage
@@ -155,7 +154,7 @@ final class TaskCoordinator {
                 LOG.error("Failed to upload media for message {}", messageId);
                 message.setContent("媒体文件上传失败");
                 message.setMsgType(0);
-                result = false;
+                uploadResult = false;
             } else {
                 LOG.info("Media uploaded for message {}", messageId);
                 message.setMedia(fileInfo);
@@ -168,7 +167,7 @@ final class TaskCoordinator {
                 LOG.error("Failed to upload base64 media for message {}", messageId);
                 message.setContent("媒体文件上传失败");
                 message.setMsgType(0);
-                result = false;
+                uploadResult = false;
             } else {
                 LOG.info("Base64 media uploaded for message {}", messageId);
                 message.setMedia(fileInfo);
@@ -182,7 +181,7 @@ final class TaskCoordinator {
             sendResult = messageSender.sendPrivateMessage(targetId, message);
         }
 
-        return result && sendResult;
+        return uploadResult && sendResult;
     }
 
     private RouteDecision queueApiRequest(Context ctx, String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer) {
