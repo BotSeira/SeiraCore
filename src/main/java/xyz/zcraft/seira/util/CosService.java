@@ -22,16 +22,16 @@ import java.net.http.HttpResponse;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
-import java.util.HashMap;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class CosService {
     private static final Logger LOG = LogManager.getLogger(CosService.class);
     private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
 
-    private final HashMap<String, String> urlCache = new HashMap<>();
+    private final ConcurrentHashMap<String, FileUpload> urlCache = new ConcurrentHashMap<>();
 
     private final CosConfig config;
     private final COSClient client;
@@ -57,16 +57,15 @@ public class CosService {
             objectKey = buildObjectKey(fileType, sourceUrl, media.contentType());
         }
 
-        final String s;
-        if (urlCache.containsKey(media.digest()) && urlCache.get(media.digest()) != null) {
-            s = urlCache.get(media.digest());
-            LOG.info("Cache hit for {}", objectKey);
-        } else {
-            s = doUpload(objectKey, media);
-            urlCache.put(media.digest(), s);
-            LOG.info("Uploaded media to COS. sourceUrl={}, cosUrl={}", sourceUrl, s);
-        }
-        return s;
+        final String finalObjectKey = objectKey;
+
+        urlCache.entrySet().removeIf(entry -> entry.getValue().uploadedAt() < System.currentTimeMillis() - 24 * 3600 * 1000);
+
+        return urlCache.computeIfAbsent(media.digest(), _ -> {
+            String url = doUpload(finalObjectKey, media);
+            LOG.info("Uploaded media to COS. sourceUrl={}, cosUrl={}", sourceUrl, url);
+            return new FileUpload(url, System.currentTimeMillis());
+        }).url();
     }
 
     @NotNull
@@ -224,5 +223,7 @@ public class CosService {
             return false;
         }
     }
+
+    private record FileUpload(String url, long uploadedAt){}
 }
 
