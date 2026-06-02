@@ -111,107 +111,106 @@ public class Router {
         String query = body.substring(command.length()).trim();
         String[] args = Arrays.copyOfRange(parts, 1, parts.length);
 
-        final Context ctx = new Context(senderUserId, groupId);
-        final CommandContext cmdCtx = new CommandContext(ctx, senderUserId, groupId, messageId, command, args, query);
+        final Context ctx = new Context(senderUserId, groupId, messageId, command, args, query);
 
         return switch (command) {
-            case "bind" -> handleBind(cmdCtx);
-            case "unbind" -> handleUnbind(cmdCtx);
-            case "clearhistory" -> handleClearHistory(cmdCtx);
-            case "bo" -> handleBo(cmdCtx);
-            case "daily" -> handleDaily(cmdCtx);
-            case "mp" -> handleMp(cmdCtx);
-            case "rs" -> handleRs(cmdCtx, true);
-            case "rp" -> handleRs(cmdCtx, false);
-            case "m" -> handleM(cmdCtx);
-            case "f" -> handleF(cmdCtx, false);
-            case "fall" -> handleF(cmdCtx, true);
-            case "fclear" -> handleFclear(cmdCtx);
-            case "dl" -> handleDl(cmdCtx);
-            case "s" -> handleS(cmdCtx);
-            case "sa" -> handleSa(cmdCtx);
-            case "ma" -> handleMa(cmdCtx);
-            case "r" -> handleR(cmdCtx);
-            case "rsc" -> handleRsc(cmdCtx);
-            case "ms" -> handleMs(cmdCtx);
-            case "sms" -> handleSms(cmdCtx);
-            case "lb" -> handleLb(cmdCtx);
+            case "bind" -> handleBind(ctx);
+            case "unbind" -> handleUnbind(ctx);
+            case "clearhistory" -> handleClearHistory(ctx);
+            case "bo" -> handleBo(ctx);
+            case "daily" -> handleDaily(ctx);
+            case "mp" -> handleMp(ctx);
+            case "rs" -> handleRs(ctx, true);
+            case "rp" -> handleRs(ctx, false);
+            case "m" -> handleM(ctx);
+            case "f" -> handleF(ctx, false);
+            case "fall" -> handleF(ctx, true);
+            case "fclear" -> handleFclear(ctx);
+            case "dl" -> handleDl(ctx);
+            case "s" -> handleS(ctx);
+            case "sa" -> handleSa(ctx);
+            case "ma" -> handleMa(ctx);
+            case "r" -> handleR(ctx);
+            case "rsc" -> handleRsc(ctx);
+            case "ms" -> handleMs(ctx);
+            case "sms" -> handleSms(ctx);
+            case "lb" -> handleLb(ctx);
             case "status" -> handleStatus();
-            case "u" -> handleU(cmdCtx);
-            case "rstat" -> handleRstat(cmdCtx);
-            case "inspect" -> handleInspect(cmdCtx);
+            case "u" -> handleU(ctx);
+            case "rstat" -> handleRstat(ctx);
+            case "inspect" -> handleInspect(ctx);
             case "help" -> handleHelp();
-            case "debug.upload" -> handleDebugUpload(cmdCtx);
-            case "debug.test" -> handleDebugTest(cmdCtx);
-            case "debug.message" -> handleDebugMessage(cmdCtx);
+            case "debug.upload" -> handleDebugUpload(ctx);
+            case "debug.test" -> handleDebugTest(ctx);
+            case "debug.message" -> handleDebugMessage(ctx);
             default -> handleUnknown();
         };
     }
 
-    private RouteDecision handleBind(CommandContext commandContext) {
-        if (commandContext.senderUserId == null || commandContext.senderUserId.isBlank()) {
+    private RouteDecision handleBind(Context ctx) {
+        if (ctx.senderUserId() == null || ctx.senderUserId().isBlank()) {
             return RouteDecision.sync(PendingMessage.ofString("无法识别你的用户ID，暂时无法绑定。请稍后重试。"));
         }
 
-        if (UserDataStore.findBoundUid(commandContext.senderUserId) != null) {
+        if (UserDataStore.findBoundUid(ctx.senderUserId()) != null) {
             return RouteDecision.sync(PendingMessage.ofString("你已经绑定了玩家ID，如果要更换绑定请先使用 /unbind 解绑当前玩家ID。"));
         }
 
         if (config.binding().requireLogin()) {
-            if (commandContext.args.length != 0) {
+            if (ctx.args().length != 0) {
                 return RouteDecision.sync(PendingMessage.ofString("用法：/bind"));
             }
-            final var bindingTask = BindingHelper.createBindingTask(commandContext.senderUserId, commandContext.messageId, (user, token) -> {
-                UserDataStore.bind(commandContext.senderUserId, user.getId());
-                UserDataStore.storeToken(commandContext.senderUserId, token);
+            final var bindingTask = BindingHelper.createBindingTask(ctx.senderUserId(), ctx.messageId(), (user, token) -> {
+                UserDataStore.bind(ctx.senderUserId(), user.getId());
+                UserDataStore.storeToken(ctx.senderUserId(), token);
             });
-            return RouteDecision.sync(replyFactory.bindMessage(commandContext.ctx, config.binding(), bindingTask,
-                    commandContext.groupId == null || commandContext.groupId.isBlank()));
+            return RouteDecision.sync(replyFactory.bindMessage(ctx, config.binding(), bindingTask,
+                    ctx.groupId() == null || ctx.groupId().isBlank()));
         } else {
-            if (commandContext.args.length != 1) {
+            if (ctx.args().length != 1) {
                 return RouteDecision.sync(PendingMessage.ofString("用法：/bind <玩家ID>"));
             }
-            Integer uid = argumentResolver.parsePositiveInt(commandContext.args[0]);
+            Integer uid = argumentResolver.parsePositiveInt(ctx.args()[0]);
             if (uid == null) {
                 return RouteDecision.sync(PendingMessage.ofString("玩家ID必须是正整数。用法：/bind <玩家ID>"));
             }
 
-            UserDataStore.bind(commandContext.senderUserId, uid);
+            UserDataStore.bind(ctx.senderUserId(), uid);
             return RouteDecision.sync(PendingMessage.ofString("绑定成功，已绑定到玩家ID: " + uid));
         }
     }
 
-    private RouteDecision handleUnbind(CommandContext commandContext) {
-        if (commandContext.senderUserId == null || commandContext.senderUserId.isBlank()) {
+    private RouteDecision handleUnbind(Context ctx) {
+        if (ctx.senderUserId() == null || ctx.senderUserId().isBlank()) {
             return RouteDecision.sync(PendingMessage.ofString("无法识别你的用户ID，暂时无法解绑。请稍后重试。"));
         }
-        if (commandContext.args.length != 0) {
+        if (ctx.args().length != 0) {
             return RouteDecision.sync(PendingMessage.ofString("用法：/unbind"));
         }
-        boolean removed = UserDataStore.unbind(commandContext.senderUserId);
+        boolean removed = UserDataStore.unbind(ctx.senderUserId());
         return RouteDecision.sync(PendingMessage.ofString(removed
                 ? "解绑成功。"
                 : "你当前还没有绑定玩家ID，无需解绑。"));
     }
 
-    private RouteDecision handleClearHistory(CommandContext commandContext) {
-        if (commandContext.senderUserId == null || commandContext.senderUserId.isBlank()) {
+    private RouteDecision handleClearHistory(Context ctx) {
+        if (ctx.senderUserId() == null || ctx.senderUserId().isBlank()) {
             return RouteDecision.sync(PendingMessage.ofString("无法识别你的用户ID，无法清除历史记录。请稍后重试。"));
         }
-        if (commandContext.args.length != 0) {
+        if (ctx.args().length != 0) {
             return RouteDecision.sync(PendingMessage.ofString("用法：/clearhistory"));
         }
-        int removed = UserDataStore.clearGroupMember(commandContext.senderUserId);
+        int removed = UserDataStore.clearGroupMember(ctx.senderUserId());
         return RouteDecision.sync(PendingMessage.ofString("清除了 " + removed + " 条群聊记录。"));
     }
 
-    private RouteDecision handleBo(CommandContext commandContext) {
-        if (commandContext.args.length == 2) {
-            Integer n = argumentResolver.parsePositiveInt(commandContext.args[0]);
+    private RouteDecision handleBo(Context ctx) {
+        if (ctx.args().length == 2) {
+            Integer n = argumentResolver.parsePositiveInt(ctx.args()[0]);
             if (n == null) {
                 return RouteDecision.sync(PendingMessage.ofString(Usages.BO_USAGE));
             }
-            UidResolution uidResolution = argumentResolver.resolveUidArgument(commandContext.args[1]);
+            UidResolution uidResolution = argumentResolver.resolveUidArgument(ctx.args()[1]);
             if (uidResolution.errorMessage() != null) {
                 return RouteDecision.sync(PendingMessage.ofString(uidResolution.errorMessage()));
             }
@@ -221,35 +220,35 @@ public class Router {
             var uid = uidResolution.uid();
 
             return taskCoordinator.queueImageRequest(
-                    commandContext.ctx,
+                    ctx,
                     "Best Scores",
                     () -> APIHelper.getBoNResponse(n, uid),
                     replyFactory::boMessage
             );
-        } else if (commandContext.args.length == 1) {
-            Integer n = argumentResolver.parsePositiveInt(commandContext.args[0]);
+        } else if (ctx.args().length == 1) {
+            Integer n = argumentResolver.parsePositiveInt(ctx.args()[0]);
             if (n == null) {
                 return RouteDecision.sync(PendingMessage.ofString(Usages.BO_USAGE));
             }
-            Long uid = argumentResolver.resolveBoundUid(commandContext.senderUserId);
+            Long uid = argumentResolver.resolveBoundUid(ctx.senderUserId());
             if (uid == null) {
                 return RouteDecision.sync(PendingMessage.ofString(Usages.NO_BIND_TIP));
             }
 
             return taskCoordinator.queueImageRequest(
-                    commandContext.ctx,
+                    ctx,
                     "Best Scores",
                     () -> APIHelper.getBoNResponse(n, uid),
                     replyFactory::boMessage
             );
-        } else if (commandContext.args.length == 0) {
-            ShortcutTarget target = argumentResolver.parseTarget("bo1", commandContext.senderUserId);
+        } else if (ctx.args().length == 0) {
+            ShortcutTarget target = argumentResolver.parseTarget("bo1", ctx.senderUserId());
             if (target.isError()) {
                 return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
             }
 
             return taskCoordinator.queueImageRequest(
-                    commandContext.ctx,
+                    ctx,
                     "Score",
                     () -> APIHelper.getScoreResponse(target),
                     replyFactory::scoreMessage
@@ -259,33 +258,33 @@ public class Router {
         }
     }
 
-    private RouteDecision handleDaily(CommandContext commandContext) {
-        return taskCoordinator.queueApiRequest(commandContext.ctx, "Daily Challenge", () -> PendingMessage.ofMarkdownRaw(APIHelper.getDaily()));
+    private RouteDecision handleDaily(Context ctx) {
+        return taskCoordinator.queueApiRequest(ctx, "Daily Challenge", () -> PendingMessage.ofMarkdownRaw(APIHelper.getDaily()));
     }
 
-    private RouteDecision handleMp(CommandContext commandContext) {
+    private RouteDecision handleMp(Context ctx) {
         if (!config.binding().requireLogin()) {
             return RouteDecision.sync(PendingMessage.ofString("本指令未启用：需要进行用户登录鉴权。"));
         }
 
-        OsuToken token = authHelper.getTokenFor(commandContext.senderUserId);
+        OsuToken token = authHelper.getTokenFor(ctx.senderUserId());
 
         if (token == null) {
             return RouteDecision.sync(PendingMessage.ofString("无法获取用户凭据。"));
         }
 
-        return taskCoordinator.queueApiRequest(commandContext.ctx, "Multiplayer Room",
-                () -> replyFactory.mpMessage(commandContext.ctx, APIHelper.getMultiplayerRoom(token.accessToken())));
+        return taskCoordinator.queueApiRequest(ctx, "Multiplayer Room",
+                () -> replyFactory.mpMessage(ctx, APIHelper.getMultiplayerRoom(token.accessToken())));
     }
 
-    private RouteDecision handleRs(CommandContext ctx, boolean includeFail) {
-        if (ctx.args.length == 2) {
-            Integer n = argumentResolver.parsePositiveInt(ctx.args[0]);
+    private RouteDecision handleRs(Context ctx, boolean includeFail) {
+        if (ctx.args().length == 2) {
+            Integer n = argumentResolver.parsePositiveInt(ctx.args()[0]);
             if (n == null) {
                 return RouteDecision.sync(PendingMessage.ofString(Usages.RS_USAGE));
             }
 
-            UidResolution uidResolution = argumentResolver.resolveUidArgument(ctx.args[1]);
+            UidResolution uidResolution = argumentResolver.resolveUidArgument(ctx.args()[1]);
             if (uidResolution.errorMessage() != null) {
                 return RouteDecision.sync(PendingMessage.ofString(uidResolution.errorMessage()));
             }
@@ -295,35 +294,35 @@ public class Router {
             }
 
             return taskCoordinator.queueImageRequest(
-                    ctx.ctx,
+                    ctx,
                     "Recent Score",
                     () -> APIHelper.getRecentResponse(n, uidResolution.uid(), includeFail),
                     replyFactory::rsMessage
             );
-        } else if (ctx.args.length == 1) {
-            Integer n = argumentResolver.parsePositiveInt(ctx.args[0]);
+        } else if (ctx.args().length == 1) {
+            Integer n = argumentResolver.parsePositiveInt(ctx.args()[0]);
             if (n == null) {
                 return RouteDecision.sync(PendingMessage.ofString(Usages.RS_USAGE));
             }
-            Long uid = argumentResolver.resolveBoundUid(ctx.senderUserId);
+            Long uid = argumentResolver.resolveBoundUid(ctx.senderUserId());
             if (uid == null) {
                 return RouteDecision.sync(PendingMessage.ofString(Usages.NO_BIND_TIP));
             }
 
             return taskCoordinator.queueImageRequest(
-                    ctx.ctx,
+                    ctx,
                     "Recent Score",
                     () -> APIHelper.getRecentResponse(n, uid, includeFail),
                     replyFactory::rsMessage
             );
-        } else if (ctx.args.length == 0) {
-            ShortcutTarget target = argumentResolver.parseTarget(ctx.command + "1", ctx.senderUserId);
+        } else if (ctx.args().length == 0) {
+            ShortcutTarget target = argumentResolver.parseTarget(ctx.command() + "1", ctx.senderUserId());
             if (target.isError()) {
                 return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
             }
 
             return taskCoordinator.queueImageRequest(
-                    ctx.ctx,
+                    ctx,
                     "Score",
                     () -> APIHelper.getScoreResponse(target),
                     replyFactory::scoreMessage
@@ -333,26 +332,26 @@ public class Router {
         }
     }
 
-    private RouteDecision handleM(CommandContext commandContext) {
-        if (commandContext.args.length >= 1) {
-            TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(commandContext.args, commandContext.senderUserId);
+    private RouteDecision handleM(Context ctx) {
+        if (ctx.args().length >= 1) {
+            TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
             ShortcutTarget target = targetResolution.target();
             if (target.isError()) {
                 return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
             }
 
-            if (commandContext.args.length > targetResolution.consumedArgs() + 1) {
+            if (ctx.args().length > targetResolution.consumedArgs() + 1) {
                 return RouteDecision.sync(PendingMessage.ofString(Usages.M_USAGE));
             }
 
-            String mod = commandContext.args.length == targetResolution.consumedArgs() + 1
-                    ? commandContext.args[targetResolution.consumedArgs()]
+            String mod = ctx.args().length == targetResolution.consumedArgs() + 1
+                    ? ctx.args()[targetResolution.consumedArgs()]
                     : null;
 
             return taskCoordinator.queueImageRequest(
-                    commandContext.ctx,
+                    ctx,
                     "Beatmap",
-                    () -> APIHelper.getBeatmapResponse(target, mod, getAccessTokenFor(commandContext.senderUserId)),
+                    () -> APIHelper.getBeatmapResponse(target, mod, getAccessTokenFor(ctx.senderUserId())),
                     replyFactory::beatmapMessage
             );
         } else {
@@ -360,31 +359,31 @@ public class Router {
         }
     }
 
-    private RouteDecision handleF(CommandContext commandContext, boolean all) {
+    private RouteDecision handleF(Context ctx, boolean all) {
         if (!config.binding().requireLogin()) {
             return RouteDecision.sync(PendingMessage.ofString("本指令未启用：需要进行用户登录鉴权。"));
         }
 
-        Long uid = argumentResolver.resolveBoundUid(commandContext.senderUserId);
+        Long uid = argumentResolver.resolveBoundUid(ctx.senderUserId());
         if (uid == null) {
             return RouteDecision.sync(PendingMessage.ofString(Usages.NO_BIND_TIP));
         }
 
-        OsuToken token = authHelper.getTokenFor(commandContext.senderUserId);
+        OsuToken token = authHelper.getTokenFor(ctx.senderUserId());
 
         if (token == null) {
             return RouteDecision.sync(PendingMessage.ofString("无法获取用户凭据。"));
         }
 
-        return taskCoordinator.queueApiRequest(commandContext.ctx, "Friend List", () -> {
+        return taskCoordinator.queueApiRequest(ctx, "Friend List", () -> {
             final Response<UserExtended> self = APIHelper.getSelf(token.accessToken());
             final Response<List<FriendEntry>> response = APIHelper.getFollowed(token.accessToken());
             final List<FriendEntry> content = response.getContent();
             final List<Long> ids = content.stream().map(e -> e.user().getId()).toList();
 
             final Predicate<Long> filter;
-            if (commandContext.inGroup() && !all) {
-                final var groupIds = UserDataStore.findBoundUidsByGroup(commandContext.groupId);
+            if (ctx.inGroup() && !all) {
+                final var groupIds = UserDataStore.findBoundUidsByGroup(ctx.groupId());
                 filter = groupIds::contains;
             } else {
                 filter = (_) -> true;
@@ -438,16 +437,16 @@ public class Router {
                 }
             }
 
-            return replyFactory.friendMessage(commandContext.ctx, all, self.getContent(), content.size(), mutual, onlyFollowed, onlyFollower);
+            return replyFactory.friendMessage(ctx, all, self.getContent(), content.size(), mutual, onlyFollowed, onlyFollower);
         });
     }
 
-    private RouteDecision handleFclear(CommandContext commandContext) {
+    private RouteDecision handleFclear(Context ctx) {
         if (!config.binding().requireLogin()) {
             return RouteDecision.sync(PendingMessage.ofString("本指令未启用：需要进行用户登录鉴权。"));
         }
 
-        Long uid = argumentResolver.resolveBoundUid(commandContext.senderUserId);
+        Long uid = argumentResolver.resolveBoundUid(ctx.senderUserId());
         if (uid == null) {
             return RouteDecision.sync(PendingMessage.ofString(Usages.NO_BIND_TIP));
         }
@@ -457,13 +456,13 @@ public class Router {
         ));
     }
 
-    private RouteDecision handleDl(CommandContext commandContext) {
-        if (commandContext.args.length < 1 || commandContext.args.length > 2) {
+    private RouteDecision handleDl(Context ctx) {
+        if (ctx.args().length < 1 || ctx.args().length > 2) {
             return RouteDecision.sync(PendingMessage.ofString(Usages.DL_USAGE));
         }
 
-        TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(commandContext.args, commandContext.senderUserId);
-        if (commandContext.args.length != targetResolution.consumedArgs()) {
+        TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
+        if (ctx.args().length != targetResolution.consumedArgs()) {
             return RouteDecision.sync(PendingMessage.ofString(Usages.DL_USAGE));
         }
 
@@ -473,22 +472,22 @@ public class Router {
         }
 
         return taskCoordinator.queueApiRequest(
-                commandContext.ctx,
+                ctx,
                 "Download Beatmap",
                 () -> replyFactory.dlMessage(
-                        commandContext.ctx,
-                        APIHelper.getLookupBeatmapsetResponse(target, getAccessTokenFor(commandContext.senderUserId))
+                        ctx,
+                        APIHelper.getLookupBeatmapsetResponse(target, getAccessTokenFor(ctx.senderUserId()))
                 )
         );
     }
 
-    private RouteDecision handleS(CommandContext commandContext) {
-        if (commandContext.args.length < 1 || commandContext.args.length > 2) {
+    private RouteDecision handleS(Context ctx) {
+        if (ctx.args().length < 1 || ctx.args().length > 2) {
             return RouteDecision.sync(PendingMessage.ofString(Usages.S_USAGE));
         }
 
-        TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(commandContext.args, commandContext.senderUserId);
-        if (commandContext.args.length != targetResolution.consumedArgs()) {
+        TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
+        if (ctx.args().length != targetResolution.consumedArgs()) {
             return RouteDecision.sync(PendingMessage.ofString(Usages.S_USAGE));
         }
         ShortcutTarget target = targetResolution.target();
@@ -497,20 +496,20 @@ public class Router {
         }
 
         return taskCoordinator.queueImageRequest(
-                commandContext.ctx,
+                ctx,
                 "Score",
                 () -> APIHelper.getScoreResponse(target),
                 replyFactory::scoreMessage
         );
     }
 
-    private RouteDecision handleSa(CommandContext commandContext) {
-        if (commandContext.args.length < 1 || commandContext.args.length > 2) {
+    private RouteDecision handleSa(Context ctx) {
+        if (ctx.args().length < 1 || ctx.args().length > 2) {
             return RouteDecision.sync(PendingMessage.ofString(Usages.SA_USAGE));
         }
 
-        TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(commandContext.args, commandContext.senderUserId);
-        if (commandContext.args.length != targetResolution.consumedArgs()) {
+        TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
+        if (ctx.args().length != targetResolution.consumedArgs()) {
             return RouteDecision.sync(PendingMessage.ofString(Usages.SA_USAGE));
         }
         ShortcutTarget target = targetResolution.target();
@@ -519,55 +518,55 @@ public class Router {
         }
 
         return taskCoordinator.queueImageRequest(
-                commandContext.ctx,
+                ctx,
                 "Score Analysis",
                 () -> APIHelper.getScoreAnalyzeResponse(target),
                 replyFactory::scoreAnalyzeMessage
         );
     }
 
-    private RouteDecision handleMa(CommandContext commandContext) {
-        if (commandContext.args.length < 1 || commandContext.args.length > 3) {
+    private RouteDecision handleMa(Context ctx) {
+        if (ctx.args().length < 1 || ctx.args().length > 3) {
             return RouteDecision.sync(PendingMessage.ofString(Usages.MA_USAGE));
         }
 
-        TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(commandContext.args, commandContext.senderUserId);
+        TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
 
         ShortcutTarget target = targetResolution.target();
         if (target.isError()) {
             return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
         }
 
-        if (commandContext.args.length == targetResolution.consumedArgs() + 1) {
-            Integer index = argumentResolver.parsePositiveInt(commandContext.args[targetResolution.consumedArgs()]);
+        if (ctx.args().length == targetResolution.consumedArgs() + 1) {
+            Integer index = argumentResolver.parsePositiveInt(ctx.args()[targetResolution.consumedArgs()]);
             if (index == null) {
                 return RouteDecision.sync(PendingMessage.ofString(Usages.MA_USAGE));
             }
 
             return taskCoordinator.queueImageRequest(
-                    commandContext.ctx,
+                    ctx,
                     "Miss Visualize",
                     () -> APIHelper.getMissVisualizeResponse(target, index),
                     null
             );
-        } else if (commandContext.args.length == targetResolution.consumedArgs()) {
+        } else if (ctx.args().length == targetResolution.consumedArgs()) {
             return taskCoordinator.queueApiRequest(
-                    commandContext.ctx,
+                    ctx,
                     "Get Score Misses",
-                    () -> replyFactory.scoreMissesMessage(commandContext.ctx, APIHelper.getScoreMissesResponse(target))
+                    () -> replyFactory.scoreMissesMessage(ctx, APIHelper.getScoreMissesResponse(target))
             );
         } else {
             return RouteDecision.sync(PendingMessage.ofString(Usages.MA_USAGE));
         }
     }
 
-    private RouteDecision handleR(CommandContext commandContext) {
-        if (commandContext.args.length < 1 || commandContext.args.length > 3) {
+    private RouteDecision handleR(Context ctx) {
+        if (ctx.args().length < 1 || ctx.args().length > 3) {
             return RouteDecision.sync(PendingMessage.ofString(Usages.R_USAGE));
         }
 
-        TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(commandContext.args, commandContext.senderUserId);
-        if (commandContext.args.length - targetResolution.consumedArgs() > 1) {
+        TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
+        if (ctx.args().length - targetResolution.consumedArgs() > 1) {
             return RouteDecision.sync(PendingMessage.ofString(Usages.R_USAGE));
         }
 
@@ -578,9 +577,9 @@ public class Router {
 
         TimeDurationParser.TimeRange range = null;
 
-        if (commandContext.args.length == 2) {
+        if (ctx.args().length == 2) {
             try {
-                range = TimeDurationParser.parseRange(commandContext.args[1]);
+                range = TimeDurationParser.parseRange(ctx.args()[1]);
             } catch (IllegalArgumentException e) {
                 return RouteDecision.sync(PendingMessage.ofString("无法解析时间范围"));
             }
@@ -588,27 +587,27 @@ public class Router {
 
         TimeDurationParser.TimeRange finalRange = range;
         return taskCoordinator.queueReplayTask(
-                commandContext.ctx,
+                ctx,
                 "Score Render",
                 () -> {
                     APIHelper.ReplayTaskInfo task = APIHelper.createReplayRenderTask(target, finalRange);
-                    videoRenderRecord.updateRenderTask(commandContext.senderUserId, task.taskId());
+                    videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
                     return task;
                 },
                 replyFactory::replayMessage);
     }
 
-    private RouteDecision handleRsc(CommandContext commandContext) {
-        if (commandContext.args.length < 1 || commandContext.args.length > 3) {
+    private RouteDecision handleRsc(Context ctx) {
+        if (ctx.args().length < 1 || ctx.args().length > 3) {
             return RouteDecision.sync(PendingMessage.ofString(Usages.RSC_USAGE));
         }
 
-        if (commandContext.groupId == null || commandContext.groupId.isBlank()) {
+        if (ctx.groupId() == null || ctx.groupId().isBlank()) {
             return RouteDecision.sync(PendingMessage.ofString("/rsc 仅支持群聊使用。"));
         }
 
-        TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(commandContext.args, commandContext.senderUserId);
-        if (commandContext.args.length - targetResolution.consumedArgs() > 2) {
+        TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
+        if (ctx.args().length - targetResolution.consumedArgs() > 2) {
             return RouteDecision.sync(PendingMessage.ofString(Usages.RSC_USAGE));
         }
 
@@ -620,17 +619,17 @@ public class Router {
         String extraUidArg = null;
         TimeDurationParser.TimeRange range = null;
 
-        for (int i = targetResolution.consumedArgs(); i < commandContext.args.length; i++) {
-            if (commandContext.args[i].startsWith("+")) {
-                extraUidArg = commandContext.args[i];
-            } else if (TimeDurationParser.isTimeRange(commandContext.args[i])) {
-                range = TimeDurationParser.parseRange(commandContext.args[i]);
+        for (int i = targetResolution.consumedArgs(); i < ctx.args().length; i++) {
+            if (ctx.args()[i].startsWith("+")) {
+                extraUidArg = ctx.args()[i];
+            } else if (TimeDurationParser.isTimeRange(ctx.args()[i])) {
+                range = TimeDurationParser.parseRange(ctx.args()[i]);
             } else {
                 return RouteDecision.sync(PendingMessage.ofString(Usages.RSC_USAGE));
             }
         }
 
-        UidListResolution uidListResolution = argumentResolver.resolveRscUidList(commandContext.groupId, extraUidArg);
+        UidListResolution uidListResolution = argumentResolver.resolveRscUidList(ctx.groupId(), extraUidArg);
         if (uidListResolution.errorMessage() != null) {
             return RouteDecision.sync(PendingMessage.ofString(uidListResolution.errorMessage()));
         }
@@ -640,23 +639,23 @@ public class Router {
         TimeDurationParser.TimeRange finalRange = range;
 
         return taskCoordinator.queueReplayTask(
-                commandContext.ctx,
+                ctx,
                 "Showcase Render",
                 () -> {
-                    var task = APIHelper.createReplayShowcaseTask(target, uidArray, finalRange, getAccessTokenFor(commandContext.senderUserId));
-                    videoRenderRecord.updateRenderTask(commandContext.senderUserId, task.taskId());
+                    var task = APIHelper.createReplayShowcaseTask(target, uidArray, finalRange, getAccessTokenFor(ctx.senderUserId()));
+                    videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
                     return task;
                 },
                 replyFactory::replayMessage);
     }
 
-    private RouteDecision handleMs(CommandContext commandContext) {
-        if (commandContext.args.length < 1 || commandContext.args.length > 2) {
+    private RouteDecision handleMs(Context ctx) {
+        if (ctx.args().length < 1 || ctx.args().length > 2) {
             return RouteDecision.sync(PendingMessage.ofString("用法：/ms <谱面集ID 或 快捷查询>"));
         }
 
-        TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(commandContext.args, commandContext.senderUserId);
-        if (commandContext.args.length != targetResolution.consumedArgs()) {
+        TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
+        if (ctx.args().length != targetResolution.consumedArgs()) {
             return RouteDecision.sync(PendingMessage.ofString("用法：/ms <谱面集ID 或 快捷查询>"));
         }
         ShortcutTarget target = targetResolution.target();
@@ -665,83 +664,83 @@ public class Router {
         }
 
         return taskCoordinator.queueImageRequest(
-                commandContext.ctx,
+                ctx,
                 "Beatmapset",
-                () -> APIHelper.getBeatmapsetResponse(target, getAccessTokenFor(commandContext.senderUserId)),
+                () -> APIHelper.getBeatmapsetResponse(target, getAccessTokenFor(ctx.senderUserId())),
                 replyFactory::beatmapsetMessage
         );
     }
 
-    private RouteDecision handleSms(CommandContext commandContext) {
-        final SearchQuery searchQuery = argumentResolver.resolveSearchQuery(commandContext.query);
+    private RouteDecision handleSms(Context ctx) {
+        final SearchQuery searchQuery = argumentResolver.resolveSearchQuery(ctx.query());
         if (searchQuery == null) {
             return RouteDecision.sync(PendingMessage.ofString("用法：/sms [#页数] <搜索关键字>"));
         }
         return taskCoordinator.queueApiRequest(
-                commandContext.ctx,
+                ctx,
                 "Search Beatmapset",
                 () -> {
                     Response<List<SearchResultItem>> searchResponse = APIHelper.searchBeatmapSetResponse(searchQuery);
-                    return replyFactory.searchMessage(commandContext.ctx, searchResponse, searchQuery);
+                    return replyFactory.searchMessage(ctx, searchResponse, searchQuery);
                 });
     }
 
-    private RouteDecision handleLb(CommandContext commandContext) {
-        if (commandContext.args.length == 0) {
-            if (commandContext.groupId != null && !commandContext.groupId.isBlank()) {
-                List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(commandContext.groupId);
+    private RouteDecision handleLb(Context ctx) {
+        if (ctx.args().length == 0) {
+            if (ctx.groupId() != null && !ctx.groupId().isBlank()) {
+                List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(ctx.groupId());
                 if (groupBoundUids.isEmpty()) {
                     return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind" + (config.binding().requireLogin() ? "" : " <玩家ID>")));
                 }
 
                 return taskCoordinator.queueImageRequest(
-                        commandContext.ctx,
+                        ctx,
                         "Leaderboard",
                         () -> APIHelper.getLeaderboardResponse(groupBoundUids),
                         replyFactory::lbMessage
                 );
             }
-            Long uid = argumentResolver.resolveBoundUid(commandContext.senderUserId);
+            Long uid = argumentResolver.resolveBoundUid(ctx.senderUserId());
             if (uid == null) {
                 return RouteDecision.sync(PendingMessage.ofString(Usages.NO_BIND_TIP));
             }
 
             return taskCoordinator.queueImageRequest(
-                    commandContext.ctx,
+                    ctx,
                     "Leaderboard",
                     () -> APIHelper.getLeaderboardResponse(List.of(uid)),
                     replyFactory::lbMessage
             );
-        } else if (commandContext.args.length == 1 || commandContext.args.length == 2) {
-            TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(commandContext.args, commandContext.senderUserId);
+        } else if (ctx.args().length == 1 || ctx.args().length == 2) {
+            TargetResolution targetResolution = argumentResolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
             ShortcutTarget target = targetResolution.target();
             if (target.isError()) {
                 return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
             }
 
-            int remainingArgs = commandContext.args.length - targetResolution.consumedArgs();
+            int remainingArgs = ctx.args().length - targetResolution.consumedArgs();
             if (remainingArgs == 0) {
-                if (commandContext.groupId != null && !commandContext.groupId.isBlank()) {
-                    List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(commandContext.groupId);
+                if (ctx.groupId() != null && !ctx.groupId().isBlank()) {
+                    List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(ctx.groupId());
                     if (groupBoundUids.isEmpty()) {
                         return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind" + (config.binding().requireLogin() ? "" : " <玩家ID>")));
                     }
                     return taskCoordinator.queueImageRequest(
-                            commandContext.ctx,
+                            ctx,
                             "Map Leaderboard",
-                            () -> APIHelper.getGroupLeaderboardResponse(target, groupBoundUids, getAccessTokenFor(commandContext.senderUserId)),
+                            () -> APIHelper.getGroupLeaderboardResponse(target, groupBoundUids, getAccessTokenFor(ctx.senderUserId())),
                             replyFactory::lbMessage
                     );
                 }
-                Long uid = argumentResolver.resolveBoundUid(commandContext.senderUserId);
+                Long uid = argumentResolver.resolveBoundUid(ctx.senderUserId());
                 if (uid == null) {
                     return RouteDecision.sync(PendingMessage.ofString(Usages.NO_BIND_TIP));
                 }
 
                 return taskCoordinator.queueImageRequest(
-                        commandContext.ctx,
+                        ctx,
                         "Map Leaderboard",
-                        () -> APIHelper.getGroupLeaderboardResponse(target, List.of(uid), getAccessTokenFor(commandContext.senderUserId)),
+                        () -> APIHelper.getGroupLeaderboardResponse(target, List.of(uid), getAccessTokenFor(ctx.senderUserId())),
                         replyFactory::lbMessage
                 );
             }
@@ -750,7 +749,7 @@ public class Router {
                 return RouteDecision.sync(PendingMessage.ofString("用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
             }
 
-            String[] uidTokens = commandContext.args[targetResolution.consumedArgs()].split(",");
+            String[] uidTokens = ctx.args()[targetResolution.consumedArgs()].split(",");
             if (uidTokens.length == 0) {
                 return RouteDecision.sync(PendingMessage.ofString("玩家ID列表不能为空。用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
             }
@@ -765,9 +764,9 @@ public class Router {
             }
 
             return taskCoordinator.queueImageRequest(
-                    commandContext.ctx,
+                    ctx,
                     "Map Leaderboard",
-                    () -> APIHelper.getGroupLeaderboardResponse(target, uids, getAccessTokenFor(commandContext.senderUserId)),
+                    () -> APIHelper.getGroupLeaderboardResponse(target, uids, getAccessTokenFor(ctx.senderUserId())),
                     replyFactory::lbMessage
             );
         } else {
@@ -775,29 +774,29 @@ public class Router {
         }
     }
 
-    private RouteDecision handleU(CommandContext commandContext) {
+    private RouteDecision handleU(Context ctx) {
         // TODO: 暂时使用bo8
-        if (commandContext.args.length == 1) {
-            return route("/bo 8 " + commandContext.args[0], commandContext.senderUserId, commandContext.groupId, commandContext.messageId);
+        if (ctx.args().length == 1) {
+            return route("/bo 8 " + ctx.args()[0], ctx.senderUserId(), ctx.groupId(), ctx.messageId());
         } else {
             return RouteDecision.sync(PendingMessage.ofString("用法：/u <玩家ID>"));
         }
     }
 
-    private RouteDecision handleRstat(CommandContext commandContext) {
-        if (commandContext.args.length != 1 && commandContext.args.length != 0) {
+    private RouteDecision handleRstat(Context ctx) {
+        if (ctx.args().length != 1 && ctx.args().length != 0) {
             return RouteDecision.sync(PendingMessage.ofString("用法：/rstat [任务ID]"));
         }
 
         String jobId;
-        if (commandContext.args.length == 0) {
-            if (videoRenderRecord.hasRenderTask(commandContext.senderUserId)) {
-                jobId = videoRenderRecord.getRenderTask(commandContext.senderUserId);
+        if (ctx.args().length == 0) {
+            if (videoRenderRecord.hasRenderTask(ctx.senderUserId())) {
+                jobId = videoRenderRecord.getRenderTask(ctx.senderUserId());
             } else {
                 return RouteDecision.sync(PendingMessage.ofString("未找到渲染请求"));
             }
         } else {
-            jobId = commandContext.args[0];
+            jobId = ctx.args()[0];
         }
 
         if (renderResults.containsKey(jobId)) {
@@ -808,12 +807,12 @@ public class Router {
             });
         }
 
-        return RouteDecision.sync(replyFactory.replayStatMessage(commandContext.ctx, jobId, APIHelper.getRenderStat(jobId)));
+        return RouteDecision.sync(replyFactory.replayStatMessage(ctx, jobId, APIHelper.getRenderStat(jobId)));
     }
 
-    private RouteDecision handleInspect(CommandContext commandContext) {
-        return RouteDecision.sync(replyFactory.inspectMessage(commandContext.ctx, commandContext.senderUserId,
-                isAdmin(commandContext.senderUserId), commandContext.groupId, commandContext.messageId));
+    private RouteDecision handleInspect(Context ctx) {
+        return RouteDecision.sync(replyFactory.inspectMessage(ctx, ctx.senderUserId(),
+                isAdmin(ctx.senderUserId()), ctx.groupId(), ctx.messageId()));
     }
 
     private RouteDecision handleHelp() {
@@ -868,28 +867,28 @@ public class Router {
         return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
     }
 
-    private RouteDecision handleDebugUpload(CommandContext commandContext) {
+    private RouteDecision handleDebugUpload(Context ctx) {
         if (!config.seira().debugMode()) {
             return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
         }
 
-        if (!isAdmin(commandContext.senderUserId)) {
+        if (!isAdmin(ctx.senderUserId())) {
             return RouteDecision.sync(PendingMessage.ofString("你没有权限使用此指令。"));
         }
 
-        if (commandContext.args.length != 3) {
+        if (ctx.args().length != 3) {
             return RouteDecision.sync(PendingMessage.ofString("用法：/debug.upload <type> <cos> <url>"));
         }
 
-        String typeStr = commandContext.args[0];
-        String cosStr = commandContext.args[1];
-        String urlStr = commandContext.args[2];
+        String typeStr = ctx.args()[0];
+        String cosStr = ctx.args()[1];
+        String urlStr = ctx.args()[2];
 
         FileInfo fileInfo;
-        if (commandContext.groupId != null && !commandContext.groupId.isBlank()) {
-            fileInfo = messageSender.uploadGroupMedia(commandContext.groupId, Integer.parseInt(typeStr), urlStr, "true".equals(cosStr));
+        if (ctx.groupId() != null && !ctx.groupId().isBlank()) {
+            fileInfo = messageSender.uploadGroupMedia(ctx.groupId(), Integer.parseInt(typeStr), urlStr, "true".equals(cosStr));
         } else {
-            fileInfo = messageSender.uploadPrivateMedia(commandContext.senderUserId, Integer.parseInt(typeStr), urlStr, "true".equals(cosStr));
+            fileInfo = messageSender.uploadPrivateMedia(ctx.senderUserId(), Integer.parseInt(typeStr), urlStr, "true".equals(cosStr));
         }
 
         return RouteDecision.sync(PendingMessage.ofString(fileInfo != null
@@ -897,30 +896,30 @@ public class Router {
                 : "上传失败，请检查日志获取详情"));
     }
 
-    private RouteDecision handleDebugTest(CommandContext commandContext) {
+    private RouteDecision handleDebugTest(Context ctx) {
         if (!config.seira().debugMode()) {
             return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
         }
 
-        if (!isAdmin(commandContext.senderUserId)) {
+        if (!isAdmin(ctx.senderUserId())) {
             return RouteDecision.sync(PendingMessage.ofString("你没有权限使用此指令。"));
         }
 
         return RouteDecision.sync(replyFactory.testMessage());
     }
 
-    private RouteDecision handleDebugMessage(CommandContext commandContext) {
+    private RouteDecision handleDebugMessage(Context ctx) {
         if (!config.seira().debugMode()) {
             return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
         }
 
-        if (!isAdmin(commandContext.senderUserId)) {
+        if (!isAdmin(ctx.senderUserId())) {
             return RouteDecision.sync(PendingMessage.ofString("你没有权限使用此指令。"));
         }
 
         try {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
-            new Base64Encoder().decode(commandContext.query, out);
+            new Base64Encoder().decode(ctx.query(), out);
             return RouteDecision.sync(PendingMessage.ofMarkdownRaw(out.toString()));
         } catch (Exception e) {
             return RouteDecision.sync(PendingMessage.ofString("解码失败"));
@@ -939,19 +938,6 @@ public class Router {
             return false;
         }
         return adminIds.contains(openId);
-    }
-
-    private record CommandContext(
-            Context ctx,
-            String senderUserId,
-            String groupId,
-            String messageId,
-            String command,
-            String[] args,
-            String query) {
-        public boolean inGroup() {
-            return groupId != null && !groupId.isBlank();
-        }
     }
 
     private static final class Usages {

@@ -1,7 +1,7 @@
 package xyz.zcraft.seira.command.iface;
 
 import xyz.zcraft.seira.api.Response;
-import xyz.zcraft.seira.data.Context;
+import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.data.PendingMessage;
 
 @FunctionalInterface
