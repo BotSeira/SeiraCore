@@ -1,7 +1,7 @@
 package xyz.zcraft.seira.command;
 
-import xyz.zcraft.seira.data.ApiTask;
-import xyz.zcraft.seira.data.PendingMessage;
+import xyz.zcraft.seira.api.data.ApiTask;
+import xyz.zcraft.seira.bot.data.PendingMessage;
 
 import java.util.function.Consumer;
 

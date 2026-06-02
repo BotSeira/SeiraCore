@@ -1,7 +1,7 @@
 package xyz.zcraft.seira.api;
 
 import lombok.Getter;
-import xyz.zcraft.seira.data.ErrorCode;
+import xyz.zcraft.seira.api.data.ErrorCode;
 
 @Getter
 public class ApiRequestException extends RuntimeException {

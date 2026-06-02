@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.data;
+package xyz.zcraft.seira.bot.data;
 
 import com.google.gson.annotations.SerializedName;
 import lombok.Data;

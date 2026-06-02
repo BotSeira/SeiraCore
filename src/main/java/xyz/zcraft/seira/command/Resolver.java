@@ -5,7 +5,7 @@ import xyz.zcraft.seira.command.resolution.ShortcutTarget;
 import xyz.zcraft.seira.command.resolution.TargetResolution;
 import xyz.zcraft.seira.command.resolution.UidListResolution;
 import xyz.zcraft.seira.command.resolution.UidResolution;
-import xyz.zcraft.seira.data.SearchQuery;
+import xyz.zcraft.seira.api.data.SearchQuery;
 
 import java.util.LinkedHashSet;
 import java.util.List;

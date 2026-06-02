@@ -11,7 +11,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.seira.config.CosConfig;
-import xyz.zcraft.seira.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.PendingMessage;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;

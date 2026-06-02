@@ -2,7 +2,7 @@ package xyz.zcraft.seira.binding;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.seira.data.OsuToken;
+import xyz.zcraft.seira.api.data.OsuToken;
 
 import java.nio.file.Files;
 import java.nio.file.Path;

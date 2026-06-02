@@ -2,8 +2,8 @@ package xyz.zcraft.seira.bot;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.seira.data.FileInfo;
-import xyz.zcraft.seira.data.Message;
+import xyz.zcraft.seira.bot.data.FileInfo;
+import xyz.zcraft.seira.bot.data.Message;
 import xyz.zcraft.seira.util.CosService;
 import xyz.zcraft.seira.util.TokenManager;
 

@@ -10,9 +10,9 @@ import xyz.zcraft.osu.model.BeatmapExtended;
 import xyz.zcraft.osu.model.MultiplayerRoom;
 import xyz.zcraft.osu.model.UserExtended;
 import xyz.zcraft.seira.Seira;
+import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.command.resolution.ShortcutTarget;
-import xyz.zcraft.seira.data.*;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
 import java.io.IOException;

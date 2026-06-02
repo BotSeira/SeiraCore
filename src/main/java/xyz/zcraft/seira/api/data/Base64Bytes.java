@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.data;
+package xyz.zcraft.seira.api.data;
 
 public record Base64Bytes(byte[] bytes) {
     public String toBase64() {

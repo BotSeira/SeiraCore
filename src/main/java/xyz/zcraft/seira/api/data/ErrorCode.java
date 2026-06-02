@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.data;
+package xyz.zcraft.seira.api.data;
 
 import lombok.Getter;
 
