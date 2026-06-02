@@ -112,38 +112,38 @@ public class Router {
         String[] args = Arrays.copyOfRange(parts, 1, parts.length);
 
         final Context ctx = new Context(senderUserId, groupId);
-        final CommandContext commandContext = new CommandContext(ctx, senderUserId, groupId, messageId, args, query);
+        final CommandContext cmdCtx = new CommandContext(ctx, senderUserId, groupId, messageId, command, args, query);
 
         return switch (command) {
-            case "bind" -> handleBind(commandContext);
-            case "unbind" -> handleUnbind(commandContext);
-            case "clearhistory" -> handleClearHistory(commandContext);
-            case "bo" -> handleBo(commandContext);
-            case "daily" -> handleDaily(commandContext);
-            case "mp" -> handleMp(commandContext);
-            case "rs" -> handleRs(commandContext, true);
-            case "rp" -> handleRs(commandContext, false);
-            case "m" -> handleM(commandContext);
-            case "f" -> handleF(commandContext, false);
-            case "fall" -> handleF(commandContext, true);
-            case "fclear" -> handleFclear(commandContext);
-            case "dl" -> handleDl(commandContext);
-            case "s" -> handleS(commandContext);
-            case "sa" -> handleSa(commandContext);
-            case "ma" -> handleMa(commandContext);
-            case "r" -> handleR(commandContext);
-            case "rsc" -> handleRsc(commandContext);
-            case "ms" -> handleMs(commandContext);
-            case "sms" -> handleSms(commandContext);
-            case "lb" -> handleLb(commandContext);
+            case "bind" -> handleBind(cmdCtx);
+            case "unbind" -> handleUnbind(cmdCtx);
+            case "clearhistory" -> handleClearHistory(cmdCtx);
+            case "bo" -> handleBo(cmdCtx);
+            case "daily" -> handleDaily(cmdCtx);
+            case "mp" -> handleMp(cmdCtx);
+            case "rs" -> handleRs(cmdCtx, true);
+            case "rp" -> handleRs(cmdCtx, false);
+            case "m" -> handleM(cmdCtx);
+            case "f" -> handleF(cmdCtx, false);
+            case "fall" -> handleF(cmdCtx, true);
+            case "fclear" -> handleFclear(cmdCtx);
+            case "dl" -> handleDl(cmdCtx);
+            case "s" -> handleS(cmdCtx);
+            case "sa" -> handleSa(cmdCtx);
+            case "ma" -> handleMa(cmdCtx);
+            case "r" -> handleR(cmdCtx);
+            case "rsc" -> handleRsc(cmdCtx);
+            case "ms" -> handleMs(cmdCtx);
+            case "sms" -> handleSms(cmdCtx);
+            case "lb" -> handleLb(cmdCtx);
             case "status" -> handleStatus();
-            case "u" -> handleU(commandContext);
-            case "rstat" -> handleRstat(commandContext);
-            case "inspect" -> handleInspect(commandContext);
+            case "u" -> handleU(cmdCtx);
+            case "rstat" -> handleRstat(cmdCtx);
+            case "inspect" -> handleInspect(cmdCtx);
             case "help" -> handleHelp();
-            case "debug.upload" -> handleDebugUpload(commandContext);
-            case "debug.test" -> handleDebugTest(commandContext);
-            case "debug.message" -> handleDebugMessage(commandContext);
+            case "debug.upload" -> handleDebugUpload(cmdCtx);
+            case "debug.test" -> handleDebugTest(cmdCtx);
+            case "debug.message" -> handleDebugMessage(cmdCtx);
             default -> handleUnknown();
         };
     }
@@ -278,14 +278,14 @@ public class Router {
                 () -> replyFactory.mpMessage(commandContext.ctx, APIHelper.getMultiplayerRoom(token.accessToken())));
     }
 
-    private RouteDecision handleRs(CommandContext commandContext, boolean includeFail) {
-        if (commandContext.args.length == 2) {
-            Integer n = argumentResolver.parsePositiveInt(commandContext.args[0]);
+    private RouteDecision handleRs(CommandContext ctx, boolean includeFail) {
+        if (ctx.args.length == 2) {
+            Integer n = argumentResolver.parsePositiveInt(ctx.args[0]);
             if (n == null) {
                 return RouteDecision.sync(PendingMessage.ofString(Usages.RS_USAGE));
             }
 
-            UidResolution uidResolution = argumentResolver.resolveUidArgument(commandContext.args[1]);
+            UidResolution uidResolution = argumentResolver.resolveUidArgument(ctx.args[1]);
             if (uidResolution.errorMessage() != null) {
                 return RouteDecision.sync(PendingMessage.ofString(uidResolution.errorMessage()));
             }
@@ -295,35 +295,35 @@ public class Router {
             }
 
             return taskCoordinator.queueImageRequest(
-                    commandContext.ctx,
+                    ctx.ctx,
                     "Recent Score",
                     () -> APIHelper.getRecentResponse(n, uidResolution.uid(), includeFail),
                     replyFactory::rsMessage
             );
-        } else if (commandContext.args.length == 1) {
-            Integer n = argumentResolver.parsePositiveInt(commandContext.args[0]);
+        } else if (ctx.args.length == 1) {
+            Integer n = argumentResolver.parsePositiveInt(ctx.args[0]);
             if (n == null) {
                 return RouteDecision.sync(PendingMessage.ofString(Usages.RS_USAGE));
             }
-            Long uid = argumentResolver.resolveBoundUid(commandContext.senderUserId);
+            Long uid = argumentResolver.resolveBoundUid(ctx.senderUserId);
             if (uid == null) {
                 return RouteDecision.sync(PendingMessage.ofString(Usages.NO_BIND_TIP));
             }
 
             return taskCoordinator.queueImageRequest(
-                    commandContext.ctx,
+                    ctx.ctx,
                     "Recent Score",
                     () -> APIHelper.getRecentResponse(n, uid, includeFail),
                     replyFactory::rsMessage
             );
-        } else if (commandContext.args.length == 0) {
-            ShortcutTarget target = argumentResolver.parseTarget("rs1", commandContext.senderUserId);
+        } else if (ctx.args.length == 0) {
+            ShortcutTarget target = argumentResolver.parseTarget(ctx.command + "1", ctx.senderUserId);
             if (target.isError()) {
                 return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
             }
 
             return taskCoordinator.queueImageRequest(
-                    commandContext.ctx,
+                    ctx.ctx,
                     "Score",
                     () -> APIHelper.getScoreResponse(target),
                     replyFactory::scoreMessage
@@ -941,8 +941,14 @@ public class Router {
         return adminIds.contains(openId);
     }
 
-    private record CommandContext(Context ctx, String senderUserId, String groupId, String messageId, String[] args,
-                                  String query) {
+    private record CommandContext(
+            Context ctx,
+            String senderUserId,
+            String groupId,
+            String messageId,
+            String command,
+            String[] args,
+            String query) {
         public boolean inGroup() {
             return groupId != null && !groupId.isBlank();
         }
