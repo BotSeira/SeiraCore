@@ -183,8 +183,8 @@ public class APIHelper {
         }
     }
 
-    public static Response<Base64Bytes> getRecentResponse(int n, long uid) {
-        return getBase64BytesResponse("/users/" + uid + "/scores/recent?" + "n=" + n, "获取最近成绩失败", null);
+    public static Response<Base64Bytes> getRecentResponse(int n, long uid, boolean includeFail) {
+        return getBase64BytesResponse("/users/" + uid + "/scores/recent" + "?n=" + n + "&fail=" + includeFail, "获取最近成绩失败", null);
     }
 
     public static Response<Base64Bytes> getBeatmapResponse(ShortcutTarget target, String mod, String auth) {
@@ -227,8 +227,8 @@ public class APIHelper {
     private static String getBeatmapQuery(ShortcutTarget target) {
         String query = "/beatmaps/lookup?";
         if (target.isMacro()) {
-            switch (target.macroType()) {
-                case "rs", "bo" -> {
+            switch (target.macroType().toLowerCase()) {
+                case "rs", "bo", "rp" -> {
                     query += "&of=" + target.macroType() + "&u=" + target.boundUid();
                     query += "&i=" + target.macroIndex();
                 }
@@ -285,15 +285,13 @@ public class APIHelper {
     private static String getBeatmapsetQuery(ShortcutTarget target) {
         String query = "/beatmapsets/lookup";
 
-        if ("m".equals(target.macroType())) {
-            return query + "?m=" + target.explicitId();
-        } else if ("bo".equals(target.macroType()) || "rs".equals(target.macroType())) {
-            return query + "?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
-        } else if ("mp".equals(target.macroType())) {
-            return query + "?of=mp";
-        }
-
-        throw new ResolutionException("快捷查询格式错误。");
+        return switch (target.macroType().toLowerCase()) {
+            case "m" -> query + "?m=" + target.explicitId();
+            case "rs", "bo", "rp" ->
+                    query + "?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+            case "mp" -> query + "?of=mp";
+            case null, default -> throw new ResolutionException("快捷查询格式错误。");
+        };
     }
 
     public static Response<Base64Bytes> getScoreResponse(ShortcutTarget target) {
@@ -339,8 +337,8 @@ public class APIHelper {
     }
 
     private static String getScoreQuery(ShortcutTarget target) {
-        return switch (target.macroType()) {
-            case "bo", "rs" ->
+        return switch (target.macroType().toLowerCase()) {
+            case "rs", "bo", "rp" ->
                     "/scores/lookup?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
             case "m" -> "/scores/lookup?m=" + target.explicitId() + "&u=" + target.boundUid();
             case "ms" ->

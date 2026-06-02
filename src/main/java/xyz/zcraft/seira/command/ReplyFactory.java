@@ -500,7 +500,7 @@ final class ReplyFactory {
                     Button.row(
                             Button.command(4, "成绩分析", "/sa " + scoreId),
                             Button.command(5, "查询排行", "/lb " + beatmapId),
-                            Button.command(6, "渲染回放", "/r " + scoreId)
+                            Button.command(6, "渲染高光", "/r " + scoreId)
                     )
             );
         }
@@ -519,7 +519,7 @@ final class ReplyFactory {
                     Button.row(
                             Button.command(4, "Misses", "/ma " + scoreId),
                             Button.command(5, "查询排行", "/lb " + beatmapId),
-                            Button.command(6, "渲染回放", "/r " + scoreId)
+                            Button.command(6, "渲染高光", "/r " + scoreId)
                     )
             );
         }

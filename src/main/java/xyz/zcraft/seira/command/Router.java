@@ -121,7 +121,8 @@ public class Router {
             case "bo" -> handleBo(commandContext);
             case "daily" -> handleDaily(commandContext);
             case "mp" -> handleMp(commandContext);
-            case "rs" -> handleRs(commandContext);
+            case "rs" -> handleRs(commandContext, true);
+            case "rp" -> handleRs(commandContext, false);
             case "m" -> handleM(commandContext);
             case "f" -> handleF(commandContext, false);
             case "fall" -> handleF(commandContext, true);
@@ -277,7 +278,7 @@ public class Router {
                 () -> replyFactory.mpMessage(commandContext.ctx, APIHelper.getMultiplayerRoom(token.accessToken())));
     }
 
-    private RouteDecision handleRs(CommandContext commandContext) {
+    private RouteDecision handleRs(CommandContext commandContext, boolean includeFail) {
         if (commandContext.args.length == 2) {
             Integer n = argumentResolver.parsePositiveInt(commandContext.args[0]);
             if (n == null) {
@@ -296,7 +297,7 @@ public class Router {
             return taskCoordinator.queueImageRequest(
                     commandContext.ctx,
                     "Recent Score",
-                    () -> APIHelper.getRecentResponse(n, uidResolution.uid()),
+                    () -> APIHelper.getRecentResponse(n, uidResolution.uid(), includeFail),
                     replyFactory::rsMessage
             );
         } else if (commandContext.args.length == 1) {
@@ -312,7 +313,7 @@ public class Router {
             return taskCoordinator.queueImageRequest(
                     commandContext.ctx,
                     "Recent Score",
-                    () -> APIHelper.getRecentResponse(n, uid),
+                    () -> APIHelper.getRecentResponse(n, uid, includeFail),
                     replyFactory::rsMessage
             );
         } else if (commandContext.args.length == 0) {
@@ -819,6 +820,7 @@ public class Router {
         return RouteDecision.sync(PendingMessage.ofMarkdownRaw("""
                 常用指令：
                 > /bind - 绑定你的玩家ID
+                > /rp - 获取最近通过的一个成绩
                 > /rs - 获取最近的一个成绩
                 > /bo [个数] [玩家ID] - 获取一个或多个最佳成绩
                 > /rs [个数] [玩家ID] - 获取最近一个或多个成绩
@@ -848,9 +850,9 @@ public class Router {
                 > /help - 显示此帮助信息
                 
                 快捷查询参考：
-                > - /m rs2 - 获取最近第二个成绩的谱面
+                > - /m rp2 - 获取最近第二个通过成绩的谱面
                 > - /ms bo10 - 获取第十个最好成绩的谱面集
-                > - /r 12345 rs1 - 生成ID为12345的玩家的最近一个成绩的回放
+                > - /r 12345 rs1 - 生成ID为12345的玩家的最近一个成绩的30秒高光
                 
                 > 注：由于官机限制，群聊中需要@机器人才可以接收到指令
                 
