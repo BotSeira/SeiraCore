@@ -460,11 +460,11 @@ public class APIHelper {
             final var send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
 
             if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "搜索谱面集失败");
+                throw parseHttpError(send.body(), send.statusCode(), "高光获取失败");
             }
 
             final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
-            ensureApiSuccess(rawResponse, "搜索谱面集失败");
+            ensureApiSuccess(rawResponse, "高光获取失败");
             final JsonObject data = rawResponse.getData().getAsJsonObject();
 
             return new TimeDurationParser.TimeRange(
@@ -622,7 +622,7 @@ public class APIHelper {
         }
 
         if (statusCode == 500) {
-            message += "(" + errorCode + " HTTP " + statusCode + " - 发生了一个内部错误)";
+            message += "(" + (errorCode == null ? "未知错误码" : errorCode) + " / HTTP " + statusCode + " / 发生了一个内部错误)";
         }
 
         return new ApiRequestException(errorCode, message);

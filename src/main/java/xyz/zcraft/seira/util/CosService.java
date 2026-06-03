@@ -10,8 +10,8 @@ import com.qcloud.cos.region.Region;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
-import xyz.zcraft.seira.config.CosConfig;
 import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.config.CosConfig;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -61,11 +61,19 @@ public class CosService {
 
         urlCache.entrySet().removeIf(entry -> entry.getValue().uploadedAt() < System.currentTimeMillis() - 24 * 3600 * 1000);
 
-        return urlCache.computeIfAbsent(media.digest(), _ -> {
-            String url = doUpload(finalObjectKey, media);
-            LOG.info("Uploaded media to COS. sourceUrl={}, cosUrl={}", sourceUrl, url);
-            return new FileUpload(url, System.currentTimeMillis());
-        }).url();
+        if (urlCache.containsKey(media.digest())) {
+            return urlCache.get(media.digest()).url();
+        }
+
+        String url = doUpload(finalObjectKey, media);
+        LOG.info("Uploaded media to COS. sourceUrl={}, cosUrl={}", sourceUrl, url);
+
+        if (media.digest() != null) {
+            final FileUpload fileUpload = new FileUpload(url, System.currentTimeMillis());
+            urlCache.put(media.digest(), fileUpload);
+        }
+
+        return url;
     }
 
     @NotNull
@@ -224,6 +232,7 @@ public class CosService {
         }
     }
 
-    private record FileUpload(String url, long uploadedAt){}
+    private record FileUpload(String url, long uploadedAt) {
+    }
 }
 

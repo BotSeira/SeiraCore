@@ -24,6 +24,7 @@ import xyz.zcraft.seira.util.TimeDurationParser;
 
 import java.io.ByteArrayOutputStream;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 
@@ -34,7 +35,7 @@ public class Router {
     private final MessageSender messageSender;
     private final VideoRenderRecord videoRenderRecord = new VideoRenderRecord();
     @Getter
-    private final HashMap<String, APIHelper.ReplayRenderResult> renderResults = new HashMap<>();
+    private final ConcurrentHashMap<String, APIHelper.ReplayRenderResult> renderResults = new ConcurrentHashMap<>();
     private final AppConfig config;
     private final Resolver argumentResolver;
     private final ReplyFactory replyFactory;
@@ -827,8 +828,8 @@ public class Router {
                 > /s <成绩ID或快捷查询> - 获取指定成绩
                 > /m <谱面ID或快捷查询> - 获取谱面
                 > /ms <谱面集ID或快捷查询> - 获取谱面集
-                > /r <成绩ID或快捷查询> - 生成成绩回放视频
-                > /mp - 获取当前所在的多人房间信息和铺面镜像下载链接
+                > /r <成绩ID或快捷查询> [[mm:ss]-[mm:ss]] - 生成成绩30秒高光视频或指定片段
+                > /mp - 获取当前所在的多人房间信息和谱面镜像下载链接
                 > /lb <谱面ID> [玩家ID列表] - 获取指定谱面排行榜
                 > /f - 获取好友列表
                 
@@ -856,7 +857,7 @@ public class Router {
                 
                 > 注：由于官机限制，群聊中需要@机器人才可以接收到指令
                 
-                详细使用说明请在Github查看
+                详细使用说明请在 GitHub 查看
                 """));
     }
 
