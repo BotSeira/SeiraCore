@@ -9,20 +9,24 @@ import xyz.zcraft.seira.util.ThreadHelper;
 import xyz.zcraft.seira.util.TokenManager;
 
 import java.net.URI;
+import java.util.concurrent.CountDownLatch;
 
 public class QQBot {
     private static final Logger LOG = LogManager.getLogger(QQBot.class);
+
     @Getter
     private final TokenManager tokenManager;
     @Getter
     private final CosService cos;
     @Getter
     private final MessageSender sender;
+    private final AppConfig config;
 
     public QQBot(AppConfig config) {
         LOG.info("Initializing QQBot");
+        this.config = config;
 
-        LOG.info("Getting access token");
+        LOG.info("Authorizing QQ API");
         this.tokenManager = new TokenManager(config.qq().appId(), config.qq().appSecret());
 
         LOG.info("Initializing COS service");
@@ -31,10 +35,14 @@ public class QQBot {
         this.sender = new MessageSender(tokenManager, cos);
 
         Runtime.getRuntime().addShutdownHook(new Thread(ThreadHelper::close));
+    }
+
+    public void start() {
+        LOG.info("Starting bot connection loop...");
 
         while (true) {
             try {
-                tokenManager.refreshToken();
+                tokenManager.blockUntilValid();
 
                 LOG.info("Getting wss endpoint");
                 String wssEndpoint = QQApi.getWSSEndpoint(tokenManager.getToken());
@@ -48,13 +56,16 @@ public class QQBot {
                 );
 
                 client.connectBlocking();
-
                 LOG.info("Gateway session started");
 
-                while (client.isOpen()) {
-                    //noinspection BusyWait
-                    Thread.sleep(500);
-                }
+                CountDownLatch disconnectLatch = new CountDownLatch(1);
+
+                client.setOnCloseCallback(disconnectLatch::countDown);
+
+                disconnectLatch.await();
+
+                LOG.warn("Gateway session closed. Preparing to reconnect...");
+
             } catch (Exception e) {
                 LOG.error("Gateway loop failed", e);
             }
@@ -63,6 +74,7 @@ public class QQBot {
                 //noinspection BusyWait
                 Thread.sleep(3000);
             } catch (InterruptedException e) {
+                LOG.info("Bot interrupted. Shutting down connection loop.");
                 Thread.currentThread().interrupt();
                 return;
             }

@@ -6,7 +6,7 @@ import com.google.gson.JsonParser;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.osu.model.User;
-import xyz.zcraft.seira.data.OsuToken;
+import xyz.zcraft.seira.api.data.OsuToken;
 
 import java.net.URI;
 import java.net.http.HttpClient;

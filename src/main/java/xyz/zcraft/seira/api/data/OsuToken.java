@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.data;
+package xyz.zcraft.seira.api.data;
 
 public record OsuToken(String accessToken, String refreshToken, long expiresIn, long refreshedAt) {
     public boolean isExpired() {

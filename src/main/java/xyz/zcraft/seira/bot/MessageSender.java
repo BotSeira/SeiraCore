@@ -2,8 +2,8 @@ package xyz.zcraft.seira.bot;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.seira.data.FileInfo;
-import xyz.zcraft.seira.data.Message;
+import xyz.zcraft.seira.bot.data.FileInfo;
+import xyz.zcraft.seira.bot.data.Message;
 import xyz.zcraft.seira.util.CosService;
 import xyz.zcraft.seira.util.TokenManager;
 
@@ -17,19 +17,23 @@ public class MessageSender {
         this.cos = cos;
     }
 
-    public void sendPrivateMessage(String userId, Message message) {
+    public boolean sendPrivateMessage(String userId, Message message) {
         try {
             QQApi.sendPrivateMessage(tokenManager.getToken(), userId, message);
+            return true;
         } catch (RuntimeException e) {
             LOG.error("Failed to send message to private {}", userId, e);
+            return false;
         }
     }
 
-    public void sendGroupMessage(String groupId, Message message) {
+    public boolean sendGroupMessage(String groupId, Message message) {
         try {
             QQApi.sendGroupMessage(tokenManager.getToken(), groupId, message);
+            return true;
         } catch (RuntimeException e) {
             LOG.error("Failed to send message to group {}", groupId, e);
+            return false;
         }
     }
 
@@ -85,7 +89,7 @@ public class MessageSender {
             }
 
             try {
-                Thread.sleep(i * 1000);
+                Thread.sleep(i * 2000);
             } catch (Exception _) {
             }
         }

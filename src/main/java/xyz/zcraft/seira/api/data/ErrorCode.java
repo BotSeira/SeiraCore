@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.data;
+package xyz.zcraft.seira.api.data;
 
 import lombok.Getter;
 
@@ -24,10 +24,11 @@ public enum ErrorCode {
     TOKEN_FETCH_FAILED(3008),
 
     REPLAY_UNAVAILABLE(4001),
+    BEATMAP_PARSE_FAILED(4002),
+    SCORE_PARSE_FAILED(4003),
+    REPLAY_PARSE_FAILED(4004),
 
-    RENDER_QUEUE_FULL(5001),
-
-    ROSU_ERROR(6001);
+    RENDER_QUEUE_FULL(5001);
 
     private final int code;
 

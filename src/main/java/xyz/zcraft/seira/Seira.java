@@ -47,6 +47,8 @@ public class Seira {
         UserDataStore.init(config.seira().sqlitePath());
         BindingHelper.init(config.binding());
 
-        new QQBot(config);
+        final QQBot qqBot = new QQBot(config);
+
+        qqBot.start();
     }
 }

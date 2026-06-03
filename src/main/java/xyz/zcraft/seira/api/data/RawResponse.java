@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.api;
+package xyz.zcraft.seira.api.data;
 
 import com.google.gson.JsonElement;
 import lombok.Data;

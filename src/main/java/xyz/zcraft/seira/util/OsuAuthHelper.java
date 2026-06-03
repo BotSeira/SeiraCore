@@ -3,7 +3,7 @@ package xyz.zcraft.seira.util;
 import xyz.zcraft.seira.api.OsuAuthApi;
 import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.config.BindingConfig;
-import xyz.zcraft.seira.data.OsuToken;
+import xyz.zcraft.seira.api.data.OsuToken;
 
 public class OsuAuthHelper {
     private final BindingConfig bindingConfig;

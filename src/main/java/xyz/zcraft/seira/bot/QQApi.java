@@ -6,8 +6,8 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.seira.data.FileInfo;
-import xyz.zcraft.seira.data.Message;
+import xyz.zcraft.seira.bot.data.FileInfo;
+import xyz.zcraft.seira.bot.data.Message;
 import xyz.zcraft.seira.util.AccessToken;
 
 import java.io.IOException;
@@ -95,7 +95,6 @@ public class QQApi {
 
     public static String buildMessageJson(Message message) {
         final JsonObject asJsonObject = new Gson().toJsonTree(message).getAsJsonObject();
-        LOG.debug("Build body {}", asJsonObject.toString());
 
         return asJsonObject.toString();
     }
@@ -114,7 +113,7 @@ public class QQApi {
 
             final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
 
-            LOG.debug("Upload private media response: status={}, body={}", response.statusCode(), response.body());
+            LOG.debug("Upload private media response: status={}", response.statusCode());
             return parseUploadedFileInfo(response, "upload private media");
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
@@ -140,7 +139,7 @@ public class QQApi {
                 throw new RuntimeException("Failed to upload group media! Status code: " + response.statusCode());
             }
 
-            LOG.debug("Upload group media status={}, body={}", response.statusCode(), response.body());
+            LOG.debug("Upload group media status={}", response.statusCode());
 
             return parseUploadedFileInfo(response, "upload private media");
         } catch (IOException | InterruptedException e) {

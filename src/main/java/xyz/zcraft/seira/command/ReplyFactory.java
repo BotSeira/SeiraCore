@@ -3,15 +3,15 @@ package xyz.zcraft.seira.command;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import kotlin.Pair;
 import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.osu.model.*;
 import xyz.zcraft.seira.api.APIHelper;
-import xyz.zcraft.seira.api.Response;
+import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.binding.BindingHelper;
+import xyz.zcraft.seira.bot.data.Button;
+import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.BindingConfig;
-import xyz.zcraft.seira.data.*;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
@@ -184,23 +184,15 @@ final class ReplyFactory {
         );
     }
 
-    public PendingMessage friendMessage(Context ctx, UserExtended self, int followedCount,
+    public PendingMessage friendMessage(Context ctx, boolean all, UserExtended self, int followedCount,
                                         List<User> mutual, List<User> onlyFollowed, List<User> onlyFollower) {
         return PendingMessage.ofMarkdownRaw(
-                Contents.friendContent(ctx, self, followedCount, mutual, onlyFollowed, onlyFollower),
+                Contents.friendContent(ctx, all, self, followedCount, mutual, onlyFollowed, onlyFollower),
                 null
         );
     }
 
-    public PendingMessage missVisualizeMessage(Context context, Response<?> response) {
-        return PendingMessage.ofMarkdownRaw(
-                at(context) + "Miss可视化完成\n" +
-                        "> 成绩: " + cmd("/s " + response.getScoreId(), response.getScoreId()),
-                null
-        );
-    }
-
-    public PendingMessage scoreMissesMessage(Context ctx, Response<List<Pair<Integer, Long>>> scoreMissesResponse) {
+    public PendingMessage scoreMissesMessage(Context ctx, Response<List<MissData>> scoreMissesResponse) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.scoreMissesContent(ctx, scoreMissesResponse),
                 null
@@ -218,6 +210,19 @@ final class ReplyFactory {
                 sb.append("> 谱面: ").append(cmd("/m " + beatmap.getId(), String.valueOf(beatmap.getId()))).append("\n");
                 sb.append("> ").append(beatmap.getBeatmapset().getArtist()).append(" - ").append(beatmap.getBeatmapset().getTitle()).append("\n");
                 sb.append("> ").append(String.format("%.2f★", beatmap.getDifficultyRating())).append(" ").append(beatmap.getVersion()).append("\n");
+            }
+
+            if (taskInfo.start() != null || taskInfo.end() != null) {
+                sb.append("> 时间: ");
+                if (taskInfo.start() != null) {
+                    Duration start = Duration.of(taskInfo.start().longValue(), ChronoUnit.SECONDS);
+                    sb.append("从 ").append("%02d:%02d".formatted(start.toMinutesPart(), start.toSecondsPart())).append(" ");
+                }
+                if (taskInfo.end() != null) {
+                    Duration end = Duration.of(taskInfo.end().longValue(), ChronoUnit.SECONDS);
+                    sb.append("到 ").append("%02d:%02d".formatted(end.toMinutesPart(), end.toSecondsPart()));
+                }
+                sb.append("\n");
             }
 
             if (taskInfo.scores() != null) {
@@ -321,11 +326,11 @@ final class ReplyFactory {
             return sb.toString().trim();
         }
 
-        public static String friendContent(Context ctx, UserExtended self, int followedCount,
+        public static String friendContent(Context ctx, boolean all, UserExtended self, int followedCount,
                                            List<User> mutual, List<User> onlyFollowed, List<User> onlyFollower) {
             StringBuilder sb = new StringBuilder();
             sb.append(at(ctx));
-            if (ctx.inGroup()) {
+            if (ctx.inGroup() && !all) {
                 sb.append("\uD83D\uDC65").append("本群好友列表");
             } else {
                 sb.append("\uD83D\uDC65").append("全部好友列表 - 共 ").append(followedCount);
@@ -351,7 +356,7 @@ final class ReplyFactory {
                 sb.append(getFriendItem(p)).append(" ");
             }
 
-            sb.append("\n> 仅粉丝← (").append(onlyFollower.size()).append(" 已知 共").append(self.getFollowerCount()).append(")\n>");
+            sb.append("\n> 仅粉丝← (").append(onlyFollower.size()).append(" 已知 共").append(self.getFollowerCount() - mutual.size()).append(")\n>");
             for (User p : onlyFollower) {
                 sb.append(getFriendItem(p)).append(" ");
             }
@@ -382,8 +387,8 @@ final class ReplyFactory {
             return sb.trim();
         }
 
-        public static String scoreMissesContent(Context ctx, Response<List<Pair<Integer, Long>>> scoreMissesResponse) {
-            final List<Pair<Integer, Long>> content = scoreMissesResponse.getContent();
+        public static String scoreMissesContent(Context ctx, Response<List<MissData>> scoreMissesResponse) {
+            final List<MissData> content = scoreMissesResponse.getContent();
             if (content.isEmpty()) {
                 return at(ctx) + "本成绩没有 Miss~";
             }
@@ -391,10 +396,11 @@ final class ReplyFactory {
             StringBuilder sb = new StringBuilder();
             sb.append(at(ctx)).append("成绩 Miss 列表 (共 ").append(content.size()).append(" )\n");
             for (int i = 0; i < Math.min(10, content.size()); i++) {
-                final Pair<Integer, Long> cur = content.get(i);
-                final Duration time = Duration.of(cur.getSecond(), ChronoUnit.MILLIS);
-                sb.append("> ").append(cmd("/ma " + scoreMissesResponse.getScoreId() + " " + (cur.getFirst() + 1), "#" + (i + 1)))
-                        .append(" - ").append("%02d:%02d.%03d".formatted(time.toMinutesPart(), time.toSecondsPart(), time.toMillisPart())).append("\n");
+                final MissData cur = content.get(i);
+                final Duration time = Duration.of(cur.time(), ChronoUnit.MILLIS);
+                sb.append("> ").append(cmd("/ma " + scoreMissesResponse.getScoreId() + " " + cur.index(), "#" + cur.index()))
+                        .append(" - ").append("%02d:%02d.%03d".formatted(time.toMinutesPart(), time.toSecondsPart(), time.toMillisPart()))
+                        .append(" - ").append(cur.type().toString()).append("\n");
             }
             if (content.size() > 10) {
                 sb.append("...剩余 ").append(content.size() - 10).append(" 个").append("\n");
@@ -495,7 +501,7 @@ final class ReplyFactory {
                     Button.row(
                             Button.command(4, "成绩分析", "/sa " + scoreId),
                             Button.command(5, "查询排行", "/lb " + beatmapId),
-                            Button.command(6, "渲染回放", "/r " + scoreId)
+                            Button.command(6, "渲染高光", "/r " + scoreId)
                     )
             );
         }
@@ -514,7 +520,7 @@ final class ReplyFactory {
                     Button.row(
                             Button.command(4, "Misses", "/ma " + scoreId),
                             Button.command(5, "查询排行", "/lb " + beatmapId),
-                            Button.command(6, "渲染回放", "/r " + scoreId)
+                            Button.command(6, "渲染高光", "/r " + scoreId)
                     )
             );
         }

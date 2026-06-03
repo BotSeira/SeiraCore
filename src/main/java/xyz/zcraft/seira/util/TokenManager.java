@@ -5,51 +5,95 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.bot.QQApi;
 
-import java.util.Timer;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class TokenManager {
     private static final Logger LOG = LogManager.getLogger(TokenManager.class);
-    private static final Timer timer = new Timer("access-token-renewal", true);
+
+    private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread thread = new Thread(r, "access-token-poller");
+        thread.setDaemon(true);
+        return thread;
+    });
+
     private final String clientId;
     private final String clientSecret;
+
     @Getter
-    private AccessToken token;
+    private volatile AccessToken token;
 
     public TokenManager(String clientId, String clientSecret) {
         this.clientId = clientId;
         this.clientSecret = clientSecret;
+
+        startPolling();
+    }
+
+    private void startPolling() {
+        scheduler.scheduleAtFixedRate(() -> {
+            try {
+                if (!isValid()) {
+                    LOG.info("Token missing or nearing expiration. Initiating background renewal.");
+                    renewToken();
+                }
+            } catch (Exception e) {
+                LOG.error("Background token check encountered an error", e);
+            }
+        }, 0, 60, TimeUnit.SECONDS);
     }
 
     public boolean isValid() {
-        return (token != null) || (System.currentTimeMillis() - token.tokenGrantTime() >= (token.expiresIn() - 60) * 1000);
+        AccessToken currentToken = this.token;
+        if (currentToken == null) {
+            return false;
+        }
+
+        long elapsedMillis = System.currentTimeMillis() - currentToken.tokenGrantTime();
+
+        long maxValidMillis = (currentToken.expiresIn() - 300) * 1000L;
+
+        return elapsedMillis < maxValidMillis;
     }
 
-    public void refreshToken() {
-        LOG.info("Refreshing access token");
+    private synchronized void renewToken() {
+        try {
+            this.token = QQApi.getAccessToken(clientId, clientSecret);
+            LOG.info("Token successfully renewed. Expires in {} seconds", token.expiresIn());
+        } catch (Exception e) {
+            LOG.error("Failed to fetch new token from QQ API. Will try again on next polling cycle.", e);
+        }
+    }
 
-        do {
-            try {
-                token = QQApi.getAccessToken(clientId, clientSecret);
-                break;
-            } catch (Exception e) {
-                LOG.error("Failed to renew token, will retry in 10 sec", e);
+    public void blockUntilValid() {
+        if (isValid()) {
+            return;
+        }
+
+        LOG.info("Startup paused: Waiting for a valid QQ API access token...");
+
+        while (!isValid()) {
+            synchronized (this) {
+                if (isValid()) {
+                    break;
+                }
+
+                try {
+                    this.token = QQApi.getAccessToken(clientId, clientSecret);
+                    LOG.info("Startup token successfully acquired. Expires in {} seconds.", token.expiresIn());
+                    break;
+                } catch (Exception e) {
+                    LOG.error("Failed to fetch token during startup. Retrying in 5 seconds...", e);
+                    try {
+                        //noinspection BusyWait
+                        Thread.sleep(5000L);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException("Startup interrupted while waiting for access token", ie);
+                    }
+                }
             }
-
-            try {
-                //noinspection BusyWait
-                Thread.sleep(10 * 1000L);
-            } catch (InterruptedException _) {
-            }
-        } while (!isValid());
-
-        LOG.info("Token renewed, expire in {}", token.expiresIn());
-
-        timer.schedule(new java.util.TimerTask() {
-            @Override
-            public void run() {
-                LOG.info("Scheduled access token renewal in progress");
-                refreshToken();
-            }
-        }, Math.max(token.expiresIn() - 60, 60) * 1000L);
+        }
     }
 }

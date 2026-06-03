@@ -3,6 +3,7 @@ package xyz.zcraft.seira.config;
 public record SeiraConfig(
         String sqlitePath,
         String directUrl,
+        boolean queueMessageInGroup,
         boolean debugMode,
         java.util.List<String> adminIds
 ) {

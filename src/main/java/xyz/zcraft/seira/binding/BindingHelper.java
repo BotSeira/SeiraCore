@@ -7,7 +7,7 @@ import org.apache.logging.log4j.Logger;
 import xyz.zcraft.osu.model.User;
 import xyz.zcraft.seira.api.OsuAuthApi;
 import xyz.zcraft.seira.config.BindingConfig;
-import xyz.zcraft.seira.data.OsuToken;
+import xyz.zcraft.seira.api.data.OsuToken;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;

@@ -4,16 +4,15 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import kotlin.Pair;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import xyz.zcraft.osu.model.BeatmapExtended;
 import xyz.zcraft.osu.model.MultiplayerRoom;
 import xyz.zcraft.osu.model.UserExtended;
 import xyz.zcraft.seira.Seira;
+import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.command.resolution.ShortcutTarget;
-import xyz.zcraft.seira.data.*;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
 import java.io.IOException;
@@ -184,8 +183,8 @@ public class APIHelper {
         }
     }
 
-    public static Response<Base64Bytes> getRecentResponse(int n, long uid) {
-        return getBase64BytesResponse("/users/" + uid + "/scores/recent?" + "n=" + n, "获取最近成绩失败", null);
+    public static Response<Base64Bytes> getRecentResponse(int n, long uid, boolean includeFail) {
+        return getBase64BytesResponse("/users/" + uid + "/scores/recent" + "?n=" + n + "&fail=" + includeFail, "获取最近成绩失败", null);
     }
 
     public static Response<Base64Bytes> getBeatmapResponse(ShortcutTarget target, String mod, String auth) {
@@ -228,8 +227,8 @@ public class APIHelper {
     private static String getBeatmapQuery(ShortcutTarget target) {
         String query = "/beatmaps/lookup?";
         if (target.isMacro()) {
-            switch (target.macroType()) {
-                case "rs", "bo" -> {
+            switch (target.macroType().toLowerCase()) {
+                case "rs", "bo", "rp" -> {
                     query += "&of=" + target.macroType() + "&u=" + target.boundUid();
                     query += "&i=" + target.macroIndex();
                 }
@@ -286,15 +285,13 @@ public class APIHelper {
     private static String getBeatmapsetQuery(ShortcutTarget target) {
         String query = "/beatmapsets/lookup";
 
-        if ("m".equals(target.macroType())) {
-            return query + "?m=" + target.explicitId();
-        } else if ("bo".equals(target.macroType()) || "rs".equals(target.macroType())) {
-            return query + "?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
-        } else if ("mp".equals(target.macroType())) {
-            return query + "?of=mp";
-        }
-
-        throw new ResolutionException("快捷查询格式错误。");
+        return switch (target.macroType().toLowerCase()) {
+            case "m" -> query + "?m=" + target.explicitId();
+            case "rs", "bo", "rp" ->
+                    query + "?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+            case "mp" -> query + "?of=mp";
+            case null, default -> throw new ResolutionException("快捷查询格式错误。");
+        };
     }
 
     public static Response<Base64Bytes> getScoreResponse(ShortcutTarget target) {
@@ -340,8 +337,8 @@ public class APIHelper {
     }
 
     private static String getScoreQuery(ShortcutTarget target) {
-        return switch (target.macroType()) {
-            case "bo", "rs" ->
+        return switch (target.macroType().toLowerCase()) {
+            case "rs", "bo", "rp" ->
                     "/scores/lookup?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
             case "m" -> "/scores/lookup?m=" + target.explicitId() + "&u=" + target.boundUid();
             case "ms" ->
@@ -422,7 +419,7 @@ public class APIHelper {
         final long beatmapId = lookupBeatmap(target, auth);
 
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(ENDPOINT + "/replays/renders/showcase/" + beatmapId + (timeRange != null ? timeRange.toQueryString() : "")))
+                .uri(URI.create(ENDPOINT + "/replays/renders/showcase/" + beatmapId + (timeRange != null ? "?" + timeRange.toQueryString() : "")))
                 .POST(HttpRequest.BodyPublishers.ofString(GSON.toJsonTree(Map.of("ids", groupUids)).toString()))
                 .build();
 
@@ -440,12 +437,43 @@ public class APIHelper {
 
     private static ReplayTaskInfo createReplayTask(ShortcutTarget target, TimeDurationParser.TimeRange timeRange) {
         long scoreId = lookupScoreId(target);
+
+        if (timeRange == null) {
+            timeRange = getScoreHighlight(scoreId);
+        }
+
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(ENDPOINT + "/replays/renders/score/" + scoreId + (timeRange != null ? timeRange.toQueryString() : "")))
+                .uri(URI.create(ENDPOINT + "/replays/renders/score/" + scoreId + "?" + timeRange.toQueryString()))
                 .POST(HttpRequest.BodyPublishers.noBody())
                 .build();
 
         return getReplayTaskInfo(request);
+    }
+
+    private static TimeDurationParser.TimeRange getScoreHighlight(long scoreId) {
+        try {
+            HttpRequest localRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/scores/" + scoreId + "/highlight"))
+                    .GET()
+                    .build();
+
+            final var send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw parseHttpError(send.body(), send.statusCode(), "高光获取失败");
+            }
+
+            final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
+            ensureApiSuccess(rawResponse, "高光获取失败");
+            final JsonObject data = rawResponse.getData().getAsJsonObject();
+
+            return new TimeDurationParser.TimeRange(
+                    Math.max(0, (int) (data.get("start").getAsLong() / 1000)) - 5,
+                    (int) (data.get("end").getAsLong() / 1000) + 5
+            );
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private static long lookupScoreId(ShortcutTarget target) {
@@ -508,7 +536,10 @@ public class APIHelper {
 
             final BeatmapExtended beatmap = GSON.fromJson(data.get("beatmap"), BeatmapExtended.class);
 
-            return new ReplayTaskInfo(taskId, status, position, beatmap, data.getAsJsonArray("scores"));
+            Double start = data.has("start") ? data.get("start").getAsDouble() : null;
+            Double end = data.has("end") ? data.get("end").getAsDouble() : null;
+
+            return new ReplayTaskInfo(taskId, status, position, beatmap, data.getAsJsonArray("scores"), start, end);
         } catch (IOException e) {
             throw new RuntimeException(e);
         } catch (InterruptedException e) {
@@ -575,14 +606,10 @@ public class APIHelper {
 
     private static RuntimeException parseHttpError(String responseBody, int statusCode, String fallbackMessage) {
         Integer errorCode = null;
-        String message = null;
+        String message = fallbackMessage;
         try {
             JsonObject root = GSON.fromJson(responseBody, JsonObject.class);
             if (root != null) {
-                if (root.has("message") && root.get("message").isJsonPrimitive()) {
-                    message = root.get("message").getAsString();
-                }
-                // Error code is primarily returned as Response.data.code.
                 if (root.has("data") && root.get("data").isJsonObject()) {
                     JsonObject data = root.getAsJsonObject("data");
                     errorCode = readCodeFromJsonObject(data);
@@ -594,10 +621,11 @@ public class APIHelper {
         } catch (Exception ignored) {
         }
 
-        String resolvedMessage = (message != null && !message.isBlank())
-                ? message
-                : fallbackMessage + "（HTTP " + statusCode + "）";
-        return new ApiRequestException(errorCode, resolvedMessage);
+        if (statusCode == 500) {
+            message += "(" + (errorCode == null ? "未知错误码" : errorCode) + " / HTTP " + statusCode + " / 发生了一个内部错误)";
+        }
+
+        return new ApiRequestException(errorCode, message);
     }
 
     private static RuntimeException parseHttpError(byte[] responseBody, int statusCode, String fallbackMessage) {
@@ -698,7 +726,7 @@ public class APIHelper {
 
     }
 
-    public static Response<List<Pair<Integer, Long>>> getScoreMissesResponse(ShortcutTarget target) {
+    public static Response<List<MissData>> getScoreMissesResponse(ShortcutTarget target) {
         final long scoreId = lookupScoreId(target);
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -716,15 +744,17 @@ public class APIHelper {
             ensureApiSuccess(r, "获取 Miss 数据失败");
             final JsonArray data = r.getData().getAsJsonArray();
 
-            List<Pair<Integer, Long>> misses = new LinkedList<>();
+            List<MissData> misses = new LinkedList<>();
             for (JsonElement datum : data) {
-                misses.add(new Pair<>(
-                        datum.getAsJsonObject().get("index").getAsInt(),
-                        datum.getAsJsonObject().get("time").getAsLong()
+                final JsonObject obj = datum.getAsJsonObject();
+                misses.add(new MissData(
+                        obj.get("index").getAsInt(),
+                        obj.get("time").getAsLong(),
+                        MissData.Type.valueOf(obj.get("type").getAsString())
                 ));
             }
 
-            return Response.<List<Pair<Integer, Long>>>fromHeaders(send.headers())
+            return Response.<List<MissData>>fromHeaders(send.headers())
                     .content(misses)
                     .build();
         } catch (IOException | InterruptedException e) {
@@ -735,7 +765,14 @@ public class APIHelper {
     public record ReplayRenderResult(String videoUrl, String taskId) {
     }
 
-    public record ReplayTaskInfo(String taskId, String status, Integer position, BeatmapExtended beatmap,
-                                 JsonArray scores) {
+    public record ReplayTaskInfo(
+            String taskId,
+            String status,
+            Integer position,
+            BeatmapExtended beatmap,
+            JsonArray scores,
+            Double start,
+            Double end
+    ) {
     }
 }
