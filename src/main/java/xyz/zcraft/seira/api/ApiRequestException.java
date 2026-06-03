@@ -15,7 +15,7 @@ public class ApiRequestException extends RuntimeException {
     public static String getDefaultMessage(Integer code) {
         ErrorCode errorCode = ErrorCode.fromCode(code);
         if (errorCode == null) {
-            return null;
+            return "发生了一个未知错误。";
         }
 
         return switch (errorCode) {
@@ -39,9 +39,10 @@ public class ApiRequestException extends RuntimeException {
             case TOKEN_FETCH_FAILED -> "令牌获取失败。";
 
             case REPLAY_UNAVAILABLE -> "该成绩暂不支持回放渲染。";
+            case BEATMAP_PARSE_FAILED -> "谱面数据解析失败，请稍后重试。";
+            case SCORE_PARSE_FAILED -> "成绩数据解析失败，请稍后重试。";
+            case REPLAY_PARSE_FAILED -> "回放数据解析失败，请稍后重试。";
             case RENDER_QUEUE_FULL -> "回放渲染队列已满，请稍后再试。";
-
-            case ROSU_ERROR -> "oStella API 发生 Rosu 错误，请稍后重试。";
         };
     }
 }
