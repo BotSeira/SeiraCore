@@ -184,10 +184,16 @@ final class ReplyFactory {
         );
     }
 
-    public PendingMessage friendMessage(Context ctx, boolean all, UserExtended self, int followedCount,
-                                        List<User> mutual, List<User> onlyFollowed, List<User> onlyFollower) {
+    public PendingMessage friendMessage(Context ctx,
+                                        boolean all,
+                                        UserExtended self,
+                                        int allFollowedCount,
+                                        long allMutualCount,
+                                        List<User> mutual,
+                                        List<User> onlyFollowed,
+                                        List<User> onlyFollower) {
         return PendingMessage.ofMarkdownRaw(
-                Contents.friendContent(ctx, all, self, followedCount, mutual, onlyFollowed, onlyFollower),
+                Contents.friendContent(ctx, all, self, allFollowedCount, allMutualCount, mutual, onlyFollowed, onlyFollower),
                 null
         );
     }
@@ -326,12 +332,24 @@ final class ReplyFactory {
             return sb.toString().trim();
         }
 
-        public static String friendContent(Context ctx, boolean all, UserExtended self, int followedCount,
-                                           List<User> mutual, List<User> onlyFollowed, List<User> onlyFollower) {
+        public static String friendContent(Context ctx,
+                                           boolean all,
+                                           UserExtended self,
+                                           int followedCount,
+                                           long allMutualCount,
+                                           List<User> mutual,
+                                           List<User> onlyFollowed,
+                                           List<User> onlyFollower) {
             StringBuilder sb = new StringBuilder();
             sb.append(at(ctx));
             if (ctx.inGroup() && !all) {
-                sb.append("\uD83D\uDC65").append("本群好友列表");
+                sb.append("\uD83D\uDC65").append("本群好友列表 - 共 ")
+                        .append(
+                                Stream.of(mutual, onlyFollowed)
+                                        .flatMap(List::stream)
+                                        .distinct()
+                                        .count()
+                        );
             } else {
                 sb.append("\uD83D\uDC65").append("全部好友列表 - 共 ").append(followedCount);
             }
@@ -342,7 +360,7 @@ final class ReplyFactory {
                     .filter(User::isOnline)
                     .count();
 
-            sb.append(" - ").append(onlineCount).append(" 在线").append("\n");
+            sb.append(" ").append(onlineCount).append(" 在线").append("\n");
 
             sb.append("\n");
 
@@ -356,7 +374,11 @@ final class ReplyFactory {
                 sb.append(getFriendItem(p)).append(" ");
             }
 
-            sb.append("\n> 仅粉丝← (").append(onlyFollower.size()).append(" 已知 共").append(self.getFollowerCount() - mutual.size()).append(")\n>");
+            sb.append("\n> 仅粉丝← (");
+            sb.append(onlyFollower.size()).append(" 已知");
+            if (all) sb.append(" 共 ").append(self.getFollowerCount() - allMutualCount);
+            sb.append(")\n>");
+
             for (User p : onlyFollower) {
                 sb.append(getFriendItem(p)).append(" ");
             }

@@ -439,7 +439,9 @@ public class Router {
                 }
             }
 
-            return replyFactory.friendMessage(ctx, all, self.getContent(), content.size(), mutual, onlyFollowed, onlyFollower);
+            long allMutualCount = content.stream().filter(FriendEntry::mutual).count();
+
+            return replyFactory.friendMessage(ctx, all, self.getContent(), content.size(), allMutualCount, mutual, onlyFollowed, onlyFollower);
         });
     }
 
