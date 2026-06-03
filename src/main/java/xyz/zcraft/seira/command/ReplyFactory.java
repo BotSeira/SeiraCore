@@ -360,7 +360,7 @@ final class ReplyFactory {
                     .filter(User::isOnline)
                     .count();
 
-            sb.append(" ").append(onlineCount).append(" 在线").append("\n");
+            sb.append(" - ").append(onlineCount).append(" 在线").append("\n");
 
             sb.append("\n");
 
