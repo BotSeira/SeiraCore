@@ -125,7 +125,7 @@ public class Router {
             case "rs" -> handleRs(ctx, true);
             case "rp" -> handleRs(ctx, false);
             case "m" -> handleM(ctx);
-            case "f" -> handleF(ctx, false);
+            case "f" -> handleF(ctx, !ctx.inGroup());
             case "fall" -> handleF(ctx, true);
             case "fclear" -> handleFclear(ctx);
             case "dl" -> handleDl(ctx);
