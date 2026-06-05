@@ -44,3 +44,4 @@ build/
 /.env
 /data/
 /config.yml
+/.idea/
