@@ -686,7 +686,7 @@ public class APIHelper {
         }
     }
 
-    public static String getServerStatus() {
+    public static boolean[] getServerStatus() {
         boolean oStella = false;
         boolean osu = false;
         try {
@@ -713,17 +713,7 @@ public class APIHelper {
         } catch (Exception _) {
         }
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("服务器状态: \n");
-        sb.append("消息网关: ✅ 正常\n");
-        sb.append("oStella API: ").append(oStella ? "✅ 正常" : "❌ 无法访问").append("\n");
-
-        if (oStella) {
-            sb.append("osu! API: ").append(osu ? "✅ 正常" : "❌ 无法访问").append("\n");
-        }
-
-        return sb.toString().trim();
-
+        return new boolean[]{true, oStella, osu};
     }
 
     public static Response<List<MissData>> getScoreMissesResponse(ShortcutTarget target) {

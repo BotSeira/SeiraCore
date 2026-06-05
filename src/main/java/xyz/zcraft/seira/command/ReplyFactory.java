@@ -207,9 +207,9 @@ final class ReplyFactory {
         );
     }
 
-    public PendingMessage statusMessage(Context ctx) {
+    public PendingMessage statusMessage(Context ctx, boolean[] status) {
         return PendingMessage.ofMarkdownRaw(
-                Contents.statContent(ctx),null
+                Contents.statContent(ctx, status),null
         );
     }
 
@@ -439,15 +439,25 @@ final class ReplyFactory {
             return sb.toString().trim();
         }
 
-        public static String statContent(Context ctx) {
-            String sb = at(ctx) + "\n" +
+        public static String statContent(Context ctx, boolean[] status) {
+            String stat = at(ctx) + "\n" +
+                    "## 服务器状态: \n" +
+                    "> 消息网关: ✅ 正常\n" +
+                    "> oStella API: " + (status[1] ? "✅ 正常" : "❌ 无法访问") + "\n";
+
+            if (status[1]) {
+                stat += "> osu! API: " + (status[2] ? "✅ 正常" : "❌ 无法访问") + "\n";
+            }
+
+
+            String res = "## 统计信息\n" +
                     "> Seira已经" + "\n" +
                     "> - 总共运行了 `" + BotStat.getTotalUptime() / 1000 / 60 + "` 分钟" + "\n" +
                     "> - 连续运行了 `" + BotStat.getCurrentUptime() / 1000 / 60 + "` 分钟" + "\n" +
                     "> - 总共处理了 `" + BotStat.getTotalCommands() + "` 条指令" + "\n" +
                     "> - 总共渲染了 `" + BotStat.getTotalReplays() + "` 条回放" + "\n" +
                     "> - 并正在为 `" + UserDataStore.countGroups() + "` 个群聊和 `" + UserDataStore.countBoundUser() + "` 位用户提供服务~" + "\n";
-            return sb.trim();
+            return (stat + res).trim();
         }
     }
 

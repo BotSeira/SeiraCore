@@ -140,7 +140,6 @@ public class Router {
             case "ms" -> handleMs(ctx);
             case "sms" -> handleSms(ctx);
             case "lb" -> handleLb(ctx);
-            case "status" -> handleStatus();
             case "stat" -> handleStat(ctx);
             case "u" -> handleU(ctx);
             case "rstat" -> handleRstat(ctx);
@@ -858,7 +857,7 @@ public class Router {
                 > /dl <ID或快捷查询> - 获取镜像下载链接
                 > /sms [#页数] <关键字> - 搜索谱面集
                 > /daily - 获取每日挑战
-                > /status - 获取服务器状态
+                > /stat - 获取状态
                 > /inspect - 获取ID信息
                 > /help - 显示此帮助信息
                 
@@ -873,12 +872,8 @@ public class Router {
                 """));
     }
 
-    private RouteDecision handleStatus() {
-        return RouteDecision.sync(PendingMessage.ofString(APIHelper.getServerStatus()));
-    }
-
     private RouteDecision handleStat(Context ctx) {
-        return RouteDecision.sync(replyFactory.statusMessage(ctx));
+        return RouteDecision.sync(replyFactory.statusMessage(ctx, APIHelper.getServerStatus()));
     }
 
     private RouteDecision handleUnknown() {

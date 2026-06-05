@@ -119,12 +119,12 @@ final class TaskCoordinator {
             }
         } catch (Exception e) {
             sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString(resolveErrorMessage(e)), messageSeqCounter);
-            LOG.error("Failed to execute API task for message {}", messageId, e);
+            LOG.error("Failed to execute API task: {}", e.getMessage(), e);
         } finally {
             try {
                 apiTask.finalizer().execute(responseSent);
             } catch (Exception e) {
-                LOG.warn("Failed to run finalizer for message {}", messageId, e);
+                LOG.warn("Failed to run finalizer: {}", e.getMessage(), e);
             }
             if (!statsCompleted) {
                 long elapsedMillis = Math.max(1L, (System.nanoTime() - startedAt) / 1_000_000L);
