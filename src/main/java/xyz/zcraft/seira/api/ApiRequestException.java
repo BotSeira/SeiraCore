@@ -38,7 +38,7 @@ public class ApiRequestException extends RuntimeException {
             case FETCH_FAILED -> "数据获取失败，请稍后重试。";
             case TOKEN_FETCH_FAILED -> "令牌获取失败。";
 
-            case REPLAY_UNAVAILABLE -> "该成绩暂不支持回放渲染。";
+            case REPLAY_UNAVAILABLE -> "该成绩回放不可用。";
             case BEATMAP_PARSE_FAILED -> "谱面数据解析失败，请稍后重试。";
             case SCORE_PARSE_FAILED -> "成绩数据解析失败，请稍后重试。";
             case REPLAY_PARSE_FAILED -> "回放数据解析失败，请稍后重试。";
