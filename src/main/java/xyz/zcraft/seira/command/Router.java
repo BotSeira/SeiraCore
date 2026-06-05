@@ -446,6 +446,11 @@ public class Router {
 
             long allMutualCount = content.stream().filter(FriendEntry::mutual).count();
 
+            final Comparator<User> userComparator = Comparator.comparing(User::isOnline, Comparator.reverseOrder()).thenComparing(User::getUsername);
+            mutual.sort(userComparator);
+            onlyFollower.sort(userComparator);
+            onlyFollowed.sort(userComparator);
+
             return replyFactory.friendMessage(ctx, all, self.getContent(), content.size(), allMutualCount, mutual, onlyFollowed, onlyFollower);
         });
     }
