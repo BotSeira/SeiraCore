@@ -440,13 +440,13 @@ final class ReplyFactory {
         }
 
         public static String statContent(Context ctx, BotStat botStat) {
-            String sb = at(ctx) + "统计数据" + "\n" +
-                    "Seira已经" + "\n" +
-                    "- 总共运行了`" + botStat.getTotalUptime() / 1000 / 60 + "`分钟" + "\n" +
-                    "- 连续运行了`" + botStat.getCurrentUptime() / 1000 / 60 + "`分钟" + "\n" +
-                    "- 总共处理了`" + botStat.getTotalCommands() + "`条指令" + "\n" +
-                    "- 总共渲染了`" + botStat.getTotalReplays() + "`条回放" + "\n" +
-                    "- 并正在为`" + UserDataStore.countGroups() + "`个群聊中的`" + UserDataStore.countBoundUser() + "`位用户提供服务~" + "\n";
+            String sb = at(ctx) + "\n" +
+                    "> Seira已经" + "\n" +
+                    "> - 总共运行了 `" + botStat.getTotalUptime() / 1000 / 60 + "` 分钟" + "\n" +
+                    "> - 连续运行了 `" + botStat.getCurrentUptime() / 1000 / 60 + "` 分钟" + "\n" +
+                    "> - 总共处理了 `" + botStat.getTotalCommands() + "` 条指令" + "\n" +
+                    "> - 总共渲染了 `" + botStat.getTotalReplays() + "` 条回放" + "\n" +
+                    "> - 并正在为 `" + UserDataStore.countGroups() + "` 个群聊和 `" + UserDataStore.countBoundUser() + "` 位用户提供服务~" + "\n";
             return sb.trim();
         }
     }
