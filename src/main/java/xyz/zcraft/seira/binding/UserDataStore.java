@@ -350,6 +350,42 @@ public final class UserDataStore {
         return uids;
     }
 
+    public static int countBoundUser() {
+        ensureInitialized();
+
+        String sql = "SELECT COUNT(*) AS count FROM user_bindings";
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             Statement statement = connection.createStatement()) {
+            try (ResultSet resultSet = statement.executeQuery(sql)) {
+                if (resultSet.next()) {
+                    return resultSet.getInt("count");
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to query binding", e);
+        }
+
+        return 0;
+    }
+
+    public static int countGroups() {
+        ensureInitialized();
+
+        String sql = "SELECT COUNT(DISTINCT group_id) AS count FROM group_members";
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             Statement statement = connection.createStatement()) {
+            try (ResultSet resultSet = statement.executeQuery(sql)) {
+                if (resultSet.next()) {
+                    return resultSet.getInt("count");
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to query group", e);
+        }
+
+        return 0;
+    }
+
     private static void createTablesIfNeeded() throws SQLException {
         String bindingSql = """
                 CREATE TABLE IF NOT EXISTS user_bindings (

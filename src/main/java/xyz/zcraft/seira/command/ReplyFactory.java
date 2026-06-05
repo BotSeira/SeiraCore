@@ -8,10 +8,12 @@ import xyz.zcraft.osu.model.*;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.binding.BindingHelper;
+import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.bot.data.Button;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.BindingConfig;
+import xyz.zcraft.seira.util.BotStat;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
@@ -202,6 +204,12 @@ final class ReplyFactory {
         return PendingMessage.ofMarkdownRaw(
                 Contents.scoreMissesContent(ctx, scoreMissesResponse),
                 null
+        );
+    }
+
+    public PendingMessage statusMessage(Context ctx, BotStat botStat) {
+        return PendingMessage.ofMarkdownRaw(
+                Contents.statContent(ctx, botStat),null
         );
     }
 
@@ -429,6 +437,17 @@ final class ReplyFactory {
             }
 
             return sb.toString().trim();
+        }
+
+        public static String statContent(Context ctx, BotStat botStat) {
+            String sb = at(ctx) + "统计数据" + "\n" +
+                    "Seira已经" + "\n" +
+                    "- 总共运行了`" + botStat.getTotalUptime() / 1000 / 60 + "`分钟" + "\n" +
+                    "- 连续运行了`" + botStat.getCurrentUptime() / 1000 / 60 + "`分钟" + "\n" +
+                    "- 总共处理了`" + botStat.getTotalCommands() + "`条指令" + "\n" +
+                    "- 总共渲染了`" + botStat.getTotalReplays() + "`条回放" + "\n" +
+                    "- 并正在为`" + UserDataStore.countGroups() + "`个群聊中的`" + UserDataStore.countBoundUser() + "`位用户提供服务~" + "\n";
+            return sb.trim();
         }
     }
 

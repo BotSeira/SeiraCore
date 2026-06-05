@@ -18,6 +18,7 @@ import xyz.zcraft.seira.command.resolution.TargetResolution;
 import xyz.zcraft.seira.command.resolution.UidListResolution;
 import xyz.zcraft.seira.command.resolution.UidResolution;
 import xyz.zcraft.seira.config.AppConfig;
+import xyz.zcraft.seira.util.BotStat;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 import xyz.zcraft.seira.util.ThreadHelper;
 import xyz.zcraft.seira.util.TimeDurationParser;
@@ -41,6 +42,8 @@ public class Router {
     private final ReplyFactory replyFactory;
     private final TaskCoordinator taskCoordinator;
     private final OsuAuthHelper authHelper;
+    @Getter
+    private final BotStat botStat;
 
     public Router(MessageSender messageSender, AppConfig config) {
         this.messageSender = messageSender;
@@ -49,6 +52,12 @@ public class Router {
         this.replyFactory = new ReplyFactory(config);
         this.taskCoordinator = new TaskCoordinator(this, messageSender);
         this.authHelper = new OsuAuthHelper(config.binding());
+        this.botStat = new BotStat();
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            LOG.info("Saving bot stat...");
+            botStat.saveToFile();
+        }));
     }
 
     public void onPrivateMessageReceived(String userId, String messageId, String rawContent) {
@@ -113,6 +122,8 @@ public class Router {
         String query = body.substring(command.length()).trim();
         String[] args = Arrays.copyOfRange(parts, 1, parts.length);
 
+        botStat.incrementCommands();
+
         final Context ctx = new Context(senderUserId, groupId, messageId, command, args, query);
 
         return switch (command) {
@@ -138,6 +149,7 @@ public class Router {
             case "sms" -> handleSms(ctx);
             case "lb" -> handleLb(ctx);
             case "status" -> handleStatus();
+            case "stat" -> handleStat(ctx);
             case "u" -> handleU(ctx);
             case "rstat" -> handleRstat(ctx);
             case "inspect" -> handleInspect(ctx);
@@ -865,6 +877,10 @@ public class Router {
 
     private RouteDecision handleStatus() {
         return RouteDecision.sync(PendingMessage.ofString(APIHelper.getServerStatus()));
+    }
+
+    private RouteDecision handleStat(Context ctx) {
+        return RouteDecision.sync(replyFactory.statusMessage(ctx, botStat));
     }
 
     private RouteDecision handleUnknown() {
