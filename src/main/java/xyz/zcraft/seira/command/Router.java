@@ -149,6 +149,7 @@ public class Router {
             case "debug.upload" -> handleDebugUpload(ctx);
             case "debug.test" -> handleDebugTest(ctx);
             case "debug.message" -> handleDebugMessage(ctx);
+            case "debug.image" -> handleDebugImage(ctx);
             default -> handleUnknown();
         };
     }
@@ -933,6 +934,22 @@ public class Router {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             new Base64Encoder().decode(ctx.query(), out);
             return RouteDecision.sync(PendingMessage.ofMarkdownRaw(out.toString()));
+        } catch (Exception e) {
+            return RouteDecision.sync(PendingMessage.ofString("解码失败"));
+        }
+    }
+
+    private RouteDecision handleDebugImage(Context ctx) {
+        if (!config.seira().debugMode()) {
+            return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
+        }
+
+        if (!isAdmin(ctx.senderUserId())) {
+            return RouteDecision.sync(PendingMessage.ofString("你没有权限使用此指令。"));
+        }
+
+        try {
+            return RouteDecision.sync(PendingMessage.ofImageBase64(ctx.query()));
         } catch (Exception e) {
             return RouteDecision.sync(PendingMessage.ofString("解码失败"));
         }
