@@ -26,7 +26,7 @@ public class BotStat {
             JsonObject obj = null;
             try {
                 obj = JsonParser.parseString(Files.readString(STAT_FILE)).getAsJsonObject();
-            } catch (IOException e) {
+            } catch (Exception e) {
                 LOG.warn("Failed to load stat file, defaulting to 0", e);
             }
 
@@ -87,6 +87,7 @@ public class BotStat {
         obj.addProperty("total-uptime", totalUptime.get() + (System.currentTimeMillis() - startTime));
 
         try {
+            Files.deleteIfExists(STAT_FILE);
             Files.writeString(STAT_FILE, obj.toString());
         } catch (IOException e) {
             LOG.error("Failed to write bot stat to file", e);
