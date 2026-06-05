@@ -15,6 +15,7 @@ import xyz.zcraft.seira.bot.data.Message;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.iface.*;
 import xyz.zcraft.seira.util.ApiRequestStats;
+import xyz.zcraft.seira.util.BotStat;
 
 import java.nio.channels.ClosedChannelException;
 import java.util.Map;
@@ -84,7 +85,7 @@ final class TaskCoordinator {
                     APIHelper.ReplayRenderResult result = APIHelper.waitReplayVideo(taskInfo.taskId());
                     if (result != null) {
                         router.getRenderResults().put(taskInfo.taskId(), result);
-                        router.getBotStat().incrementReplays();
+                        BotStat.incrementReplays();
                         return PendingMessage.ofVideoUrl(result.videoUrl());
                     }
                     return PendingMessage.ofString("回放视频生成失败，请稍后重试。");

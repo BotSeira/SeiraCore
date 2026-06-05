@@ -14,13 +14,13 @@ import java.util.concurrent.atomic.AtomicLong;
 public class BotStat {
     private static final Path STAT_FILE = Path.of("data", "bot-stat.json");
     private static final Logger LOG = LogManager.getLogger(BotStat.class);
-    private final AtomicLong totalCommands;
-    private final AtomicLong totalReplays;
-    private final AtomicLong totalUptime;
+    private static AtomicLong totalCommands;
+    private static AtomicLong totalReplays;
+    private static AtomicLong totalUptime;
 
-    private final long startTime;
+    private static long startTime;
 
-    public BotStat() {
+    public static void initialize() {
         startTime = System.currentTimeMillis();
         if (Files.exists(STAT_FILE)) {
             JsonObject obj = null;
@@ -31,19 +31,19 @@ public class BotStat {
             }
 
             if (obj != null) {
-                this.totalCommands = new AtomicLong(getNum(obj, "total-commands"));
-                this.totalReplays = new AtomicLong(getNum(obj, "total-replays"));
-                this.totalUptime = new AtomicLong(getNum(obj, "total-uptime"));
+                totalCommands = new AtomicLong(getNum(obj, "total-commands"));
+                totalReplays = new AtomicLong(getNum(obj, "total-replays"));
+                totalUptime = new AtomicLong(getNum(obj, "total-uptime"));
                 return;
             }
         }
 
-        this.totalCommands = new AtomicLong(0);
-        this.totalReplays = new AtomicLong(0);
-        this.totalUptime = new AtomicLong(0);
+        totalCommands = new AtomicLong(0);
+        totalReplays = new AtomicLong(0);
+        totalUptime = new AtomicLong(0);
     }
 
-    private long getNum(JsonObject obj, String key) {
+    private static long getNum(JsonObject obj, String key) {
         final JsonElement element = obj.get(key);
         if (element.isJsonNull()) {
             LOG.warn("{} is null in bot-stat.json, defaulting to 0", key);
@@ -56,31 +56,31 @@ public class BotStat {
         }
     }
 
-    public void incrementCommands() {
+    public static void incrementCommands() {
         totalCommands.incrementAndGet();
     }
 
-    public void incrementReplays() {
+    public static void incrementReplays() {
         totalReplays.incrementAndGet();
     }
 
-    public long getTotalCommands() {
+    public static long getTotalCommands() {
         return totalCommands.get();
     }
 
-    public long getTotalReplays() {
+    public static long getTotalReplays() {
         return totalReplays.get();
     }
 
-    public long getTotalUptime() {
+    public static long getTotalUptime() {
         return totalUptime.get() + getCurrentUptime();
     }
 
-    public long getCurrentUptime() {
+    public static long getCurrentUptime() {
         return System.currentTimeMillis() - startTime;
     }
 
-    public void saveToFile() {
+    public static void saveToFile() {
         JsonObject obj = new JsonObject();
         obj.addProperty("total-commands", totalCommands.get());
         obj.addProperty("total-replays", totalReplays.get());
