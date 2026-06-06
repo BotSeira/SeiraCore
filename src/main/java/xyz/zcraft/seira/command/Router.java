@@ -61,7 +61,7 @@ public class Router {
     }
 
     private void handleMessageReceived(String targetId, String groupId, String userId, String messageId, String rawContent, boolean groupMessage) {
-        LOG.info("Received {} message {} from {}: {}", groupMessage ? "group" : "private", messageId, userId, rawContent);
+        LOG.info("Received {} message : {}", groupMessage ? "group" : "private", rawContent);
         AtomicInteger messageSeqCounter = new AtomicInteger(1);
         try {
             final boolean group = groupMessage && groupId != null && !groupId.isBlank();
