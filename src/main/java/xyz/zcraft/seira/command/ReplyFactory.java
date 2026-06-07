@@ -213,6 +213,14 @@ final class ReplyFactory {
         );
     }
 
+    public PendingMessage helpMessage(Context ctx) {
+        return PendingMessage.ofMarkdownRaw(Contents.helpContent(ctx));
+    }
+
+    public PendingMessage faqMessage(Context ctx) {
+        return PendingMessage.ofMarkdownRaw(Contents.faqContent(ctx));
+    }
+
     private static final class Contents {
         static String replayTaskContent(Context ctx, APIHelper.ReplayTaskInfo taskInfo) {
             StringBuilder sb = new StringBuilder();
@@ -269,7 +277,7 @@ final class ReplyFactory {
                 return null;
             }
 
-            return "> - %s - %s \n (%s / %s / %s)".formatted(cmd("/s " + id, id), username, rank, accuracy, pp);
+            return "> - %s - %s \n (%s %s %s)".formatted(cmd("/s " + id, id), username, rank, accuracy, pp);
         }
 
         private static String getScoreField(JsonObject score, String field) {
@@ -454,10 +462,69 @@ final class ReplyFactory {
                     "> Seira已经" + "\n" +
                     "> - 总共运行了 `" + BotStat.getTotalUptime() / 1000 / 60 + "` 分钟" + "\n" +
                     "> - 连续运行了 `" + BotStat.getCurrentUptime() / 1000 / 60 + "` 分钟" + "\n" +
-                    "> - 总共处理了 `" + BotStat.getTotalCommands() + "` 条指令" + "\n" +
+                    "> - 总共处理了 `" + BotStat.getTotalCommands() + "` 条指令" + "(近30分钟 `" + BotStat.getCommandCountFor(30) + "` )\n" +
                     "> - 总共渲染了 `" + BotStat.getTotalReplays() + "` 条回放" + "\n" +
                     "> - 并正在为 `" + UserDataStore.countGroups() + "` 个群聊和 `" + UserDataStore.countBoundUser() + "` 位用户提供服务~" + "\n";
             return (stat + res).trim();
+        }
+
+        public static String helpContent(Context ctx) {
+            return at(ctx) + "\n" +
+                """
+                常用指令：
+                > /bind - 绑定你的玩家ID
+                > /rp - 获取最近通过的一个成绩
+                > /rs - 获取最近的一个成绩
+                > /bo [个数] [玩家ID] - 获取一个或多个最佳成绩
+                > /rs [个数] [玩家ID] - 获取最近一个或多个成绩
+                > /s <成绩ID或快捷查询> - 获取指定成绩
+                > /m <谱面ID或快捷查询> - 获取谱面
+                > /ms <谱面集ID或快捷查询> - 获取谱面集
+                > /r <成绩ID或快捷查询> [[mm:ss]-[mm:ss]] - 生成成绩30秒高光视频或指定片段
+                > /mp - 获取当前所在的多人房间信息和谱面镜像下载链接
+                > /lb <谱面ID> [玩家ID列表] - 获取指定谱面排行榜
+                > /f - 获取好友列表
+                
+                其他指令：
+                > /unbind - 解除你的玩家ID绑定
+                > /clearhistory - 清除你在群聊中的记录
+                > /fall - 获取全部好友列表
+                > /fclear - 清除好友记录
+                > /sa <成绩ID或快捷查询> - 获取指定成绩分析
+                > /ma <成绩ID或快捷查询> [序号] - 获取指定成绩的Miss分析
+                > /u <玩家ID> - 获取玩家信息
+                > /rsc <谱面ID或快捷查询> [+用户ID列表] - 生成同屏回放视频
+                > /rstat [任务ID] - 查询渲染进度
+                > /dl <ID或快捷查询> - 获取镜像下载链接
+                > /sms [#页数] <关键字> - 搜索谱面集
+                > /daily - 获取每日挑战
+                > /stat - 获取状态
+                > /inspect - 获取ID信息
+                > /help - 显示此帮助信息
+                
+                快捷查询参考：
+                > - /m rp2 - 获取最近第二个通过成绩的谱面
+                > - /ms bo10 - 获取第十个最好成绩的谱面集
+                > - /r 12345 rs1 - 生成ID为12345的玩家的最近一个成绩的30秒高光
+                
+                > 注：由于官机限制，群聊中需要@机器人才可以接收到指令
+                
+                详细使用说明请在 GitHub 查看
+                """ + "\n"
+                    + cmd("/faq", "常见问题") + " " + cmd("/stat", "状态信息").trim();
+        }
+
+        public static String faqContent(Context ctx) {
+            return at(ctx) + "\n" + """
+                    常见问题
+                    > **Q: 为什么群聊中发送指令没有反应**
+                    > A: 由于QQ机器人能力限制，机器人暂时只能接收到群聊中@机器人的消息，所以在群聊中使用需要在开头加上@机器人的操作。
+                    > **Q: 被误绑定其他玩家的档案了怎么办**
+                    > A: 使用/unbind解绑即可重新绑定。建议在单聊中绑定以防止此类情况的发生。
+                    > **Q: 发现了Bug或者想提出新功能建议怎么办**
+                    > A: 感谢大家的贡献~不论是Bug反馈还是新功能建议均可在Github仓库提交Issue，链接如下：
+                    > `https://github.com/ZayrexDev/Seira/issues`
+                    """.trim();
         }
     }
 

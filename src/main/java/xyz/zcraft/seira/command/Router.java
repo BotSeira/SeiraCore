@@ -122,7 +122,7 @@ public class Router {
             case "bind" -> handleBind(ctx);
             case "unbind" -> handleUnbind(ctx);
             case "clearhistory" -> handleClearHistory(ctx);
-            case "bo" -> handleBo(ctx);
+            case "bp", "bo" -> handleBo(ctx);
             case "daily" -> handleDaily(ctx);
             case "mp" -> handleMp(ctx);
             case "rs" -> handleRs(ctx, true);
@@ -144,7 +144,8 @@ public class Router {
             case "u" -> handleU(ctx);
             case "rstat" -> handleRstat(ctx);
             case "inspect" -> handleInspect(ctx);
-            case "help" -> handleHelp();
+            case "help" -> handleHelp(ctx);
+            case "faq" -> handleFaq(ctx);
             case "debug.upload" -> handleDebugUpload(ctx);
             case "debug.test" -> handleDebugTest(ctx);
             case "debug.message" -> handleDebugMessage(ctx);
@@ -828,48 +829,12 @@ public class Router {
                 isAdmin(ctx.senderUserId()), ctx.groupId(), ctx.messageId()));
     }
 
-    private RouteDecision handleHelp() {
-        return RouteDecision.sync(PendingMessage.ofMarkdownRaw("""
-                常用指令：
-                > /bind - 绑定你的玩家ID
-                > /rp - 获取最近通过的一个成绩
-                > /rs - 获取最近的一个成绩
-                > /bo [个数] [玩家ID] - 获取一个或多个最佳成绩
-                > /rs [个数] [玩家ID] - 获取最近一个或多个成绩
-                > /s <成绩ID或快捷查询> - 获取指定成绩
-                > /m <谱面ID或快捷查询> - 获取谱面
-                > /ms <谱面集ID或快捷查询> - 获取谱面集
-                > /r <成绩ID或快捷查询> [[mm:ss]-[mm:ss]] - 生成成绩30秒高光视频或指定片段
-                > /mp - 获取当前所在的多人房间信息和谱面镜像下载链接
-                > /lb <谱面ID> [玩家ID列表] - 获取指定谱面排行榜
-                > /f - 获取好友列表
-                
-                其他指令：
-                > /unbind - 解除你的玩家ID绑定
-                > /clearhistory - 清除你在群聊中的记录
-                > /fall - 获取全部好友列表
-                > /fclear - 清除好友记录
-                > /sa <成绩ID或快捷查询> - 获取指定成绩分析
-                > /ma <成绩ID或快捷查询> [序号] - 获取指定成绩的Miss分析
-                > /u <玩家ID> - 获取玩家信息
-                > /rsc <谱面ID或快捷查询> [+用户ID列表] - 生成同屏回放视频
-                > /rstat [任务ID] - 查询渲染进度
-                > /dl <ID或快捷查询> - 获取镜像下载链接
-                > /sms [#页数] <关键字> - 搜索谱面集
-                > /daily - 获取每日挑战
-                > /stat - 获取状态
-                > /inspect - 获取ID信息
-                > /help - 显示此帮助信息
-                
-                快捷查询参考：
-                > - /m rp2 - 获取最近第二个通过成绩的谱面
-                > - /ms bo10 - 获取第十个最好成绩的谱面集
-                > - /r 12345 rs1 - 生成ID为12345的玩家的最近一个成绩的30秒高光
-                
-                > 注：由于官机限制，群聊中需要@机器人才可以接收到指令
-                
-                详细使用说明请在 GitHub 查看
-                """));
+    private RouteDecision handleHelp(Context ctx) {
+        return RouteDecision.sync(replyFactory.helpMessage(ctx));
+    }
+
+    private RouteDecision handleFaq(Context ctx) {
+        return RouteDecision.sync(replyFactory.faqMessage(ctx));
     }
 
     private RouteDecision handleStat(Context ctx) {

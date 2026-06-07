@@ -9,6 +9,9 @@ import org.apache.logging.log4j.Logger;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class BotStat {
@@ -18,10 +21,25 @@ public class BotStat {
     private static AtomicLong totalReplays;
     private static AtomicLong totalUptime;
 
+    private static final LinkedList<Long> commandCountHistory = new LinkedList<>();
+
+    private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread thread = new Thread(r, "bot-stat-tracker");
+        thread.setDaemon(true);
+        return thread;
+    });
+
     private static long startTime;
 
     public static void initialize() {
         startTime = System.currentTimeMillis();
+
+        loadStatFromFile();
+
+        setupTracker();
+    }
+
+    private static void loadStatFromFile() {
         if (Files.exists(STAT_FILE)) {
             JsonObject obj = null;
             try {
@@ -41,6 +59,22 @@ public class BotStat {
         totalCommands = new AtomicLong(0);
         totalReplays = new AtomicLong(0);
         totalUptime = new AtomicLong(0);
+    }
+
+    private static void setupTracker() {
+        commandCountHistory.add(totalCommands.get());
+
+        scheduler.scheduleAtFixedRate(() -> {
+            long current = totalCommands.get();
+            commandCountHistory.add(current);
+            if (commandCountHistory.size() > 61) {
+                commandCountHistory.removeFirst();
+            }
+        }, 0, 1, java.util.concurrent.TimeUnit.MINUTES);
+    }
+
+    public static long getCommandCountFor(int min) {
+        return commandCountHistory.getLast() - commandCountHistory.get(Math.max(0, commandCountHistory.size() - 1 - min));
     }
 
     private static long getNum(JsonObject obj, String key) {
