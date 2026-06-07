@@ -15,6 +15,7 @@ import xyz.zcraft.seira.bot.data.Message;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.iface.*;
 import xyz.zcraft.seira.util.ApiRequestStats;
+import xyz.zcraft.seira.util.BotStat;
 
 import java.nio.channels.ClosedChannelException;
 import java.util.Map;
@@ -84,6 +85,7 @@ final class TaskCoordinator {
                     APIHelper.ReplayRenderResult result = APIHelper.waitReplayVideo(taskInfo.taskId());
                     if (result != null) {
                         router.getRenderResults().put(taskInfo.taskId(), result);
+                        BotStat.incrementReplays();
                         return PendingMessage.ofVideoUrl(result.videoUrl());
                     }
                     return PendingMessage.ofString("回放视频生成失败，请稍后重试。");
@@ -117,12 +119,12 @@ final class TaskCoordinator {
             }
         } catch (Exception e) {
             sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString(resolveErrorMessage(e)), messageSeqCounter);
-            LOG.error("Failed to execute API task for message {}", messageId, e);
+            LOG.error("Failed to execute API task: {}", e.getMessage(), e);
         } finally {
             try {
                 apiTask.finalizer().execute(responseSent);
             } catch (Exception e) {
-                LOG.warn("Failed to run finalizer for message {}", messageId, e);
+                LOG.warn("Failed to run finalizer: {}", e.getMessage(), e);
             }
             if (!statsCompleted) {
                 long elapsedMillis = Math.max(1L, (System.nanoTime() - startedAt) / 1_000_000L);
@@ -200,15 +202,7 @@ final class TaskCoordinator {
         while (cursor != null) {
             switch (cursor) {
                 case ApiRequestException e -> {
-                    String mapped = ApiRequestException.getDefaultMessage(e.getErrorCode());
-                    if (mapped != null) {
-                        return mapped;
-                    }
-
-                    String rawMessage = e.getMessage();
-                    if (rawMessage != null && !rawMessage.isBlank()) {
-                        return rawMessage;
-                    }
+                    return ApiRequestException.getDefaultMessage(e.getErrorCode());
                 }
                 case ClosedChannelException _ -> {
                     return "oStella API 无法连接，请稍后再试。";

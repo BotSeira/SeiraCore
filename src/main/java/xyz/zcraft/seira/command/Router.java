@@ -18,6 +18,7 @@ import xyz.zcraft.seira.command.resolution.TargetResolution;
 import xyz.zcraft.seira.command.resolution.UidListResolution;
 import xyz.zcraft.seira.command.resolution.UidResolution;
 import xyz.zcraft.seira.config.AppConfig;
+import xyz.zcraft.seira.util.BotStat;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 import xyz.zcraft.seira.util.ThreadHelper;
 import xyz.zcraft.seira.util.TimeDurationParser;
@@ -60,7 +61,7 @@ public class Router {
     }
 
     private void handleMessageReceived(String targetId, String groupId, String userId, String messageId, String rawContent, boolean groupMessage) {
-        LOG.info("Received {} message {} from {}: {}", groupMessage ? "group" : "private", messageId, userId, rawContent);
+        LOG.info("Received {} message : {}", groupMessage ? "group" : "private", rawContent);
         AtomicInteger messageSeqCounter = new AtomicInteger(1);
         try {
             final boolean group = groupMessage && groupId != null && !groupId.isBlank();
@@ -113,19 +114,21 @@ public class Router {
         String query = body.substring(command.length()).trim();
         String[] args = Arrays.copyOfRange(parts, 1, parts.length);
 
+        BotStat.incrementCommands();
+
         final Context ctx = new Context(senderUserId, groupId, messageId, command, args, query);
 
         return switch (command) {
             case "bind" -> handleBind(ctx);
             case "unbind" -> handleUnbind(ctx);
             case "clearhistory" -> handleClearHistory(ctx);
-            case "bo" -> handleBo(ctx);
+            case "bp", "bo" -> handleBo(ctx);
             case "daily" -> handleDaily(ctx);
             case "mp" -> handleMp(ctx);
             case "rs" -> handleRs(ctx, true);
             case "rp" -> handleRs(ctx, false);
             case "m" -> handleM(ctx);
-            case "f" -> handleF(ctx, false);
+            case "f" -> handleF(ctx, !ctx.inGroup());
             case "fall" -> handleF(ctx, true);
             case "fclear" -> handleFclear(ctx);
             case "dl" -> handleDl(ctx);
@@ -137,14 +140,16 @@ public class Router {
             case "ms" -> handleMs(ctx);
             case "sms" -> handleSms(ctx);
             case "lb" -> handleLb(ctx);
-            case "status" -> handleStatus();
+            case "stat" -> handleStat(ctx);
             case "u" -> handleU(ctx);
             case "rstat" -> handleRstat(ctx);
             case "inspect" -> handleInspect(ctx);
-            case "help" -> handleHelp();
+            case "help" -> handleHelp(ctx);
+            case "faq" -> handleFaq(ctx);
             case "debug.upload" -> handleDebugUpload(ctx);
             case "debug.test" -> handleDebugTest(ctx);
             case "debug.message" -> handleDebugMessage(ctx);
+            case "debug.image" -> handleDebugImage(ctx);
             default -> handleUnknown();
         };
     }
@@ -439,7 +444,14 @@ public class Router {
                 }
             }
 
-            return replyFactory.friendMessage(ctx, all, self.getContent(), content.size(), mutual, onlyFollowed, onlyFollower);
+            long allMutualCount = content.stream().filter(FriendEntry::mutual).count();
+
+            final Comparator<User> userComparator = Comparator.comparing(User::isOnline, Comparator.reverseOrder()).thenComparing(User::getUsername);
+            mutual.sort(userComparator);
+            onlyFollower.sort(userComparator);
+            onlyFollowed.sort(userComparator);
+
+            return replyFactory.friendMessage(ctx, all, self.getContent(), content.size(), allMutualCount, mutual, onlyFollowed, onlyFollower);
         });
     }
 
@@ -817,52 +829,16 @@ public class Router {
                 isAdmin(ctx.senderUserId()), ctx.groupId(), ctx.messageId()));
     }
 
-    private RouteDecision handleHelp() {
-        return RouteDecision.sync(PendingMessage.ofMarkdownRaw("""
-                常用指令：
-                > /bind - 绑定你的玩家ID
-                > /rp - 获取最近通过的一个成绩
-                > /rs - 获取最近的一个成绩
-                > /bo [个数] [玩家ID] - 获取一个或多个最佳成绩
-                > /rs [个数] [玩家ID] - 获取最近一个或多个成绩
-                > /s <成绩ID或快捷查询> - 获取指定成绩
-                > /m <谱面ID或快捷查询> - 获取谱面
-                > /ms <谱面集ID或快捷查询> - 获取谱面集
-                > /r <成绩ID或快捷查询> [[mm:ss]-[mm:ss]] - 生成成绩30秒高光视频或指定片段
-                > /mp - 获取当前所在的多人房间信息和谱面镜像下载链接
-                > /lb <谱面ID> [玩家ID列表] - 获取指定谱面排行榜
-                > /f - 获取好友列表
-                
-                其他指令：
-                > /unbind - 解除你的玩家ID绑定
-                > /clearhistory - 清除你在群聊中的记录
-                > /fall - 获取全部好友列表
-                > /fclear - 清除好友记录
-                > /sa <成绩ID或快捷查询> - 获取指定成绩分析
-                > /ma <成绩ID或快捷查询> [序号] - 获取指定成绩的Miss分析
-                > /u <玩家ID> - 获取玩家信息
-                > /rsc <谱面ID或快捷查询> [+用户ID列表] - 生成同屏回放视频
-                > /rstat [任务ID] - 查询渲染进度
-                > /dl <ID或快捷查询> - 获取镜像下载链接
-                > /sms [#页数] <关键字> - 搜索谱面集
-                > /daily - 获取每日挑战
-                > /status - 获取服务器状态
-                > /inspect - 获取ID信息
-                > /help - 显示此帮助信息
-                
-                快捷查询参考：
-                > - /m rp2 - 获取最近第二个通过成绩的谱面
-                > - /ms bo10 - 获取第十个最好成绩的谱面集
-                > - /r 12345 rs1 - 生成ID为12345的玩家的最近一个成绩的30秒高光
-                
-                > 注：由于官机限制，群聊中需要@机器人才可以接收到指令
-                
-                详细使用说明请在 GitHub 查看
-                """));
+    private RouteDecision handleHelp(Context ctx) {
+        return RouteDecision.sync(replyFactory.helpMessage(ctx));
     }
 
-    private RouteDecision handleStatus() {
-        return RouteDecision.sync(PendingMessage.ofString(APIHelper.getServerStatus()));
+    private RouteDecision handleFaq(Context ctx) {
+        return RouteDecision.sync(replyFactory.faqMessage(ctx));
+    }
+
+    private RouteDecision handleStat(Context ctx) {
+        return RouteDecision.sync(replyFactory.statusMessage(ctx, APIHelper.getServerStatus()));
     }
 
     private RouteDecision handleUnknown() {
@@ -923,6 +899,22 @@ public class Router {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             new Base64Encoder().decode(ctx.query(), out);
             return RouteDecision.sync(PendingMessage.ofMarkdownRaw(out.toString()));
+        } catch (Exception e) {
+            return RouteDecision.sync(PendingMessage.ofString("解码失败"));
+        }
+    }
+
+    private RouteDecision handleDebugImage(Context ctx) {
+        if (!config.seira().debugMode()) {
+            return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
+        }
+
+        if (!isAdmin(ctx.senderUserId())) {
+            return RouteDecision.sync(PendingMessage.ofString("你没有权限使用此指令。"));
+        }
+
+        try {
+            return RouteDecision.sync(PendingMessage.ofImageBase64(ctx.query()));
         } catch (Exception e) {
             return RouteDecision.sync(PendingMessage.ofString("解码失败"));
         }

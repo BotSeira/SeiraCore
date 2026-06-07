@@ -7,10 +7,7 @@ import xyz.zcraft.seira.command.resolution.UidListResolution;
 import xyz.zcraft.seira.command.resolution.UidResolution;
 import xyz.zcraft.seira.api.data.SearchQuery;
 
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -154,6 +151,10 @@ final class Resolver {
         if (userMatcher.matches()) {
             String type = userMatcher.group(1).toLowerCase();
 
+            if (Objects.equals("bp", type)) {
+                type = "bo";
+            }
+
             switch (type) {
                 case "rs", "bo", "rp" -> {
                     Long index = parsePositiveLong(userMatcher.group(2));
@@ -263,7 +264,7 @@ final class Resolver {
     }
 
     private static final class Patterns {
-        private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo|rp)(\\d+)$");
+        private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo|rp|bp)(\\d+)$");
         private static final Pattern SET_MACRO_PATTERN = Pattern.compile("^(\\d+)#(\\d+)$");
         private static final Pattern BEATMAP_MACRO_PATTERN = Pattern.compile("^m(\\d+)$");
         private static final Pattern CQ_AT_PATTERN = Pattern.compile("^\\[CQ:at,qq=(\\d+)(?:,.*)?]$");

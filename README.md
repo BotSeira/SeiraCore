@@ -102,7 +102,7 @@ mvn -U clean compile exec:java
 | `/lb`           | `/lb [id] [<uid1>,<uid2>...]`           | 列出指定谱面排行或表现分排行                      |
 | `/daily`        | `/daily`                                | 每日挑战信息                              |
 | `/mp`           | `/mp`                                   | 多人房间列表                              |
-| `/status`       | `/status`                               | 服务状态文本                              |
+| `/stat`         | `/stat`                                 | 服务状态和统计信息文本                         |
 | `/inspect`      | `/inspect`                              | 获取当前上下文信息                           |
 | `/help`         | `/help`                                 | 显示帮助信息                              |
 

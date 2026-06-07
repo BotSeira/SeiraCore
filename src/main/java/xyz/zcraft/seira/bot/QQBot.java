@@ -4,6 +4,7 @@ import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.config.AppConfig;
+import xyz.zcraft.seira.util.BotStat;
 import xyz.zcraft.seira.util.CosService;
 import xyz.zcraft.seira.util.ThreadHelper;
 import xyz.zcraft.seira.util.TokenManager;
@@ -35,6 +36,18 @@ public class QQBot {
         this.sender = new MessageSender(tokenManager, cos);
 
         Runtime.getRuntime().addShutdownHook(new Thread(ThreadHelper::close));
+
+        initializeBotStat();
+    }
+
+    private void initializeBotStat() {
+        LOG.info("Initializing BotStat");
+        BotStat.initialize();
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            LOG.info("Saving bot stat...");
+            BotStat.saveToFile();
+        }));
     }
 
     public void start() {
