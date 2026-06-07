@@ -74,7 +74,7 @@ public class BotStat {
     }
 
     public static long getCommandCountFor(int min) {
-        return commandCountHistory.getLast() - commandCountHistory.get(Math.max(0, commandCountHistory.size() - 1 - min));
+        return totalCommands.get() - commandCountHistory.get(Math.max(0, commandCountHistory.size() - 1 - min));
     }
 
     private static long getNum(JsonObject obj, String key) {
