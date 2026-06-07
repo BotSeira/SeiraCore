@@ -17,18 +17,15 @@ import java.util.concurrent.atomic.AtomicLong;
 public class BotStat {
     private static final Path STAT_FILE = Path.of("data", "bot-stat.json");
     private static final Logger LOG = LogManager.getLogger(BotStat.class);
-    private static AtomicLong totalCommands;
-    private static AtomicLong totalReplays;
-    private static AtomicLong totalUptime;
-
     private static final LinkedList<Long> commandCountHistory = new LinkedList<>();
-
     private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread thread = new Thread(r, "bot-stat-tracker");
         thread.setDaemon(true);
         return thread;
     });
-
+    private static AtomicLong totalCommands;
+    private static AtomicLong totalReplays;
+    private static AtomicLong totalUptime;
     private static long startTime;
 
     public static void initialize() {
@@ -65,19 +62,26 @@ public class BotStat {
         commandCountHistory.add(totalCommands.get());
 
         scheduler.scheduleAtFixedRate(() -> {
-            long current = totalCommands.get();
-            commandCountHistory.add(current);
-            if (commandCountHistory.size() > 61) {
-                commandCountHistory.removeFirst();
+            synchronized (commandCountHistory) {
+                long current = totalCommands.get();
+                commandCountHistory.add(current);
+                if (commandCountHistory.size() > 61) {
+                    commandCountHistory.removeFirst();
+                }
             }
         }, 0, 1, java.util.concurrent.TimeUnit.MINUTES);
     }
 
     public static long getCommandCountFor(int min) {
-        return totalCommands.get() - commandCountHistory.get(Math.max(0, commandCountHistory.size() - 1 - min));
+        synchronized (commandCountHistory) {
+            return totalCommands.get() - commandCountHistory.get(Math.max(0, commandCountHistory.size() - 1 - min));
+        }
     }
 
     private static long getNum(JsonObject obj, String key) {
+        if (obj == null) {
+            return 0;
+        }
         final JsonElement element = obj.get(key);
         if (element.isJsonNull()) {
             LOG.warn("{} is null in bot-stat.json, defaulting to 0", key);
@@ -121,7 +125,7 @@ public class BotStat {
         obj.addProperty("total-uptime", totalUptime.get() + (System.currentTimeMillis() - startTime));
 
         try {
-            Files.deleteIfExists(STAT_FILE);
+            Files.createDirectories(STAT_FILE.getParent());
             Files.writeString(STAT_FILE, obj.toString());
         } catch (IOException e) {
             LOG.error("Failed to write bot stat to file", e);

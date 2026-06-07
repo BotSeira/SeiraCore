@@ -31,7 +31,7 @@
         </RollingFile>
         <RollingFile name="ERROR_FILE"
                      fileName="${LOG_DIR}/error.log"
-                     filePattern="${LOG_DIR}/%d{yyyy-MM-dd}-%i.log.gz">
+                     filePattern="${LOG_DIR}/%d{yyyy-MM-dd}-error-%i.log.gz">
             <PatternLayout pattern="${FILE_PATTERN}"/>
             <Filters>
                 <ThresholdFilter level="ERROR" onMatch="ACCEPT" onMismatch="DENY"/>
