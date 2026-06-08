@@ -7,9 +7,7 @@ import xyz.zcraft.seira.api.data.OsuToken;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 public final class UserDataStore {
     private static final Logger LOG = LogManager.getLogger(UserDataStore.class);
@@ -416,7 +414,7 @@ public final class UserDataStore {
     public static List<Long> findAllUsers() {
         ensureInitialized();
 
-        List<Long> result = new ArrayList<>();
+        List<Long> result = new LinkedList<>();
 
         var queries = new String[]{
                 "SELECT self AS id FROM user_follows",
@@ -438,7 +436,7 @@ public final class UserDataStore {
             }
         }
 
-        return result;
+        return result.stream().distinct().toList();
     }
 
     private static void createTablesIfNeeded() throws SQLException {
