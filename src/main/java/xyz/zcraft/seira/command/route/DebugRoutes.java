@@ -20,7 +20,7 @@ public class DebugRoutes {
         this.router = router;
     }
 
-    public RouteDecision handleDebugUpload(Context ctx) {
+    public RouteDecision routeDebug(Context ctx) {
         if (!router.config.seira().debugMode()) {
             return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
         }
@@ -29,6 +29,18 @@ public class DebugRoutes {
             return RouteDecision.sync(PendingMessage.ofString("你没有权限使用此指令。"));
         }
 
+        return switch (ctx.command()) {
+            case "debug.upload" -> handleDebugUpload(ctx);
+            case "debug.test" -> handleDebugTest();
+            case "debug.message" -> handleDebugMessage(ctx);
+            case "debug.image" -> handleDebugImage(ctx);
+            case "debug.db" -> handleDebugDb(ctx);
+            case "debug.update-user-info" -> handleDebugUpdateUserInfo(ctx);
+            default -> router.handleUnknown();
+        };
+    }
+
+    public RouteDecision handleDebugUpload(Context ctx) {
         if (ctx.args().length != 3) {
             return RouteDecision.sync(PendingMessage.ofString("用法：/debug.upload <type> <cos> <url>"));
         }
@@ -49,27 +61,11 @@ public class DebugRoutes {
                 : "上传失败，请检查日志获取详情"));
     }
 
-    public RouteDecision handleDebugTest(Context ctx) {
-        if (!router.config.seira().debugMode()) {
-            return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
-        }
-
-        if (!router.isAdmin(ctx.senderUserId())) {
-            return RouteDecision.sync(PendingMessage.ofString("你没有权限使用此指令。"));
-        }
-
+    public RouteDecision handleDebugTest() {
         return RouteDecision.sync(router.replyFactory.testMessage());
     }
 
     public RouteDecision handleDebugMessage(Context ctx) {
-        if (!router.config.seira().debugMode()) {
-            return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
-        }
-
-        if (!router.isAdmin(ctx.senderUserId())) {
-            return RouteDecision.sync(PendingMessage.ofString("你没有权限使用此指令。"));
-        }
-
         try {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             new Base64Encoder().decode(ctx.query(), out);
@@ -80,14 +76,6 @@ public class DebugRoutes {
     }
 
     public RouteDecision handleDebugImage(Context ctx) {
-        if (!router.config.seira().debugMode()) {
-            return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
-        }
-
-        if (!router.isAdmin(ctx.senderUserId())) {
-            return RouteDecision.sync(PendingMessage.ofString("你没有权限使用此指令。"));
-        }
-
         try {
             return RouteDecision.sync(PendingMessage.ofImageBase64(ctx.query()));
         } catch (Exception e) {
@@ -96,14 +84,6 @@ public class DebugRoutes {
     }
 
     public RouteDecision handleDebugDb(Context ctx) {
-        if (!router.config.seira().debugMode()) {
-            return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
-        }
-
-        if (!router.isAdmin(ctx.senderUserId())) {
-            return RouteDecision.sync(PendingMessage.ofString("你没有权限使用此指令。"));
-        }
-
         try {
             return RouteDecision.sync(PendingMessage.ofMarkdownRaw(UserDataStore.executeQueryOrEdit(ctx.query())));
         } catch (Exception e) {
@@ -126,14 +106,6 @@ public class DebugRoutes {
     }
 
     public RouteDecision handleDebugUpdateUserInfo(Context ctx) {
-        if (!router.config.seira().debugMode()) {
-            return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
-        }
-
-        if (!router.isAdmin(ctx.senderUserId())) {
-            return RouteDecision.sync(PendingMessage.ofString("你没有权限使用此指令。"));
-        }
-
         try {
             final List<Long> allUsers = UserDataStore.findAllUsers();
             return router.taskCoordinator.queueApiRequest(ctx, "Update All User Info", () -> {
@@ -144,5 +116,4 @@ public class DebugRoutes {
             return RouteDecision.sync(PendingMessage.ofString("用户信息更新失败"));
         }
     }
-
 }

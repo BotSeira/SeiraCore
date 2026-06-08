@@ -119,6 +119,10 @@ public class Router {
 
         final Context ctx = new Context(senderUserId, groupId, messageId, command, args, query);
 
+        if (command.startsWith("debug.")) {
+            return debugRoutes.routeDebug(ctx);
+        }
+
         return switch (command) {
             case "bind" -> handleBind(ctx);
             case "unbind" -> handleUnbind(ctx);
@@ -147,12 +151,6 @@ public class Router {
             case "inspect" -> handleInspect(ctx);
             case "help" -> handleHelp(ctx);
             case "faq" -> handleFaq(ctx);
-            case "debug.upload" -> debugRoutes.handleDebugUpload(ctx);
-            case "debug.test" -> debugRoutes.handleDebugTest(ctx);
-            case "debug.message" -> debugRoutes.handleDebugMessage(ctx);
-            case "debug.image" -> debugRoutes.handleDebugImage(ctx);
-            case "debug.db" -> debugRoutes.handleDebugDb(ctx);
-            case "debug.update-user-info" -> debugRoutes.handleDebugUpdateUserInfo(ctx);
             default -> handleUnknown();
         };
     }
@@ -845,7 +843,7 @@ public class Router {
         return RouteDecision.sync(replyFactory.statusMessage(ctx, APIHelper.getServerStatus()));
     }
 
-    private RouteDecision handleUnknown() {
+    public RouteDecision handleUnknown() {
         return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
     }
 
