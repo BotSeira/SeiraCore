@@ -3,7 +3,6 @@ package xyz.zcraft.seira.command;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.bouncycastle.util.encoders.Base64Encoder;
 import xyz.zcraft.osu.model.User;
 import xyz.zcraft.osu.model.UserExtended;
 import xyz.zcraft.seira.api.APIHelper;
@@ -11,19 +10,18 @@ import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.binding.BindingHelper;
 import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.bot.MessageSender;
-import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.resolution.ShortcutTarget;
 import xyz.zcraft.seira.command.resolution.TargetResolution;
 import xyz.zcraft.seira.command.resolution.UidListResolution;
 import xyz.zcraft.seira.command.resolution.UidResolution;
+import xyz.zcraft.seira.command.route.DebugRoutes;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.util.BotStat;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 import xyz.zcraft.seira.util.ThreadHelper;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
-import java.io.ByteArrayOutputStream;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -33,15 +31,16 @@ public class Router {
     private static final Logger LOG = LogManager.getLogger(Router.class);
 
     private static final String PREFIX = "/";
-    private final MessageSender messageSender;
+    public final MessageSender messageSender;
     private final VideoRenderRecord videoRenderRecord = new VideoRenderRecord();
     @Getter
     private final ConcurrentHashMap<String, APIHelper.ReplayRenderResult> renderResults = new ConcurrentHashMap<>();
-    private final AppConfig config;
+    public final AppConfig config;
     private final Resolver argumentResolver;
-    private final ReplyFactory replyFactory;
-    private final TaskCoordinator taskCoordinator;
+    public final ReplyFactory replyFactory;
+    public final TaskCoordinator taskCoordinator;
     private final OsuAuthHelper authHelper;
+    private final DebugRoutes debugRoutes;
 
     public Router(MessageSender messageSender, AppConfig config) {
         this.messageSender = messageSender;
@@ -50,6 +49,8 @@ public class Router {
         this.replyFactory = new ReplyFactory(config);
         this.taskCoordinator = new TaskCoordinator(this, messageSender);
         this.authHelper = new OsuAuthHelper(config.binding());
+
+        this.debugRoutes = new DebugRoutes(this);
     }
 
     public void onPrivateMessageReceived(String userId, String messageId, String rawContent) {
@@ -146,10 +147,12 @@ public class Router {
             case "inspect" -> handleInspect(ctx);
             case "help" -> handleHelp(ctx);
             case "faq" -> handleFaq(ctx);
-            case "debug.upload" -> handleDebugUpload(ctx);
-            case "debug.test" -> handleDebugTest(ctx);
-            case "debug.message" -> handleDebugMessage(ctx);
-            case "debug.image" -> handleDebugImage(ctx);
+            case "debug.upload" -> debugRoutes.handleDebugUpload(ctx);
+            case "debug.test" -> debugRoutes.handleDebugTest(ctx);
+            case "debug.message" -> debugRoutes.handleDebugMessage(ctx);
+            case "debug.image" -> debugRoutes.handleDebugImage(ctx);
+            case "debug.db" -> debugRoutes.handleDebugDb(ctx);
+            case "debug.update-user-info" -> debugRoutes.handleDebugUpdateUserInfo(ctx);
             default -> handleUnknown();
         };
     }
@@ -170,6 +173,7 @@ public class Router {
             final var bindingTask = BindingHelper.createBindingTask(ctx.senderUserId(), ctx.messageId(), (user, token) -> {
                 UserDataStore.bind(ctx.senderUserId(), user.getId());
                 UserDataStore.storeToken(ctx.senderUserId(), token);
+                UserDataStore.storeUserInfo(user.getId(), user.getUsername());
             });
             return RouteDecision.sync(replyFactory.bindMessage(ctx, config.binding(), bindingTask,
                     ctx.groupId() == null || ctx.groupId().isBlank()));
@@ -845,88 +849,13 @@ public class Router {
         return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
     }
 
-    private RouteDecision handleDebugUpload(Context ctx) {
-        if (!config.seira().debugMode()) {
-            return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
-        }
-
-        if (!isAdmin(ctx.senderUserId())) {
-            return RouteDecision.sync(PendingMessage.ofString("你没有权限使用此指令。"));
-        }
-
-        if (ctx.args().length != 3) {
-            return RouteDecision.sync(PendingMessage.ofString("用法：/debug.upload <type> <cos> <url>"));
-        }
-
-        String typeStr = ctx.args()[0];
-        String cosStr = ctx.args()[1];
-        String urlStr = ctx.args()[2];
-
-        FileInfo fileInfo;
-        if (ctx.groupId() != null && !ctx.groupId().isBlank()) {
-            fileInfo = messageSender.uploadGroupMedia(ctx.groupId(), Integer.parseInt(typeStr), urlStr, "true".equals(cosStr));
-        } else {
-            fileInfo = messageSender.uploadPrivateMedia(ctx.senderUserId(), Integer.parseInt(typeStr), urlStr, "true".equals(cosStr));
-        }
-
-        return RouteDecision.sync(PendingMessage.ofString(fileInfo != null
-                ? "上传成功，fileId: " + fileInfo
-                : "上传失败，请检查日志获取详情"));
-    }
-
-    private RouteDecision handleDebugTest(Context ctx) {
-        if (!config.seira().debugMode()) {
-            return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
-        }
-
-        if (!isAdmin(ctx.senderUserId())) {
-            return RouteDecision.sync(PendingMessage.ofString("你没有权限使用此指令。"));
-        }
-
-        return RouteDecision.sync(replyFactory.testMessage());
-    }
-
-    private RouteDecision handleDebugMessage(Context ctx) {
-        if (!config.seira().debugMode()) {
-            return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
-        }
-
-        if (!isAdmin(ctx.senderUserId())) {
-            return RouteDecision.sync(PendingMessage.ofString("你没有权限使用此指令。"));
-        }
-
-        try {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            new Base64Encoder().decode(ctx.query(), out);
-            return RouteDecision.sync(PendingMessage.ofMarkdownRaw(out.toString()));
-        } catch (Exception e) {
-            return RouteDecision.sync(PendingMessage.ofString("解码失败"));
-        }
-    }
-
-    private RouteDecision handleDebugImage(Context ctx) {
-        if (!config.seira().debugMode()) {
-            return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
-        }
-
-        if (!isAdmin(ctx.senderUserId())) {
-            return RouteDecision.sync(PendingMessage.ofString("你没有权限使用此指令。"));
-        }
-
-        try {
-            return RouteDecision.sync(PendingMessage.ofImageBase64(ctx.query()));
-        } catch (Exception e) {
-            return RouteDecision.sync(PendingMessage.ofString("解码失败"));
-        }
-    }
-
     private String getAccessTokenFor(String openId) {
         return Optional.ofNullable(authHelper.getTokenFor(openId))
                 .map(OsuToken::accessToken)
                 .orElse(null);
     }
 
-    private boolean isAdmin(String openId) {
+    public boolean isAdmin(String openId) {
         final List<String> adminIds = config.seira().adminIds();
         if (adminIds == null || adminIds.isEmpty()) {
             return false;

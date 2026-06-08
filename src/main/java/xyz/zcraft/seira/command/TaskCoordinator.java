@@ -25,7 +25,7 @@ import java.util.function.BiFunction;
 
 import static xyz.zcraft.seira.command.ReplyFactory.at;
 
-final class TaskCoordinator {
+public final class TaskCoordinator {
     private static final Logger LOG = LogManager.getLogger(TaskCoordinator.class);
 
     private final MessageSender messageSender;
@@ -37,7 +37,7 @@ final class TaskCoordinator {
         this.messageSender = messageSender;
     }
 
-    RouteDecision queueApiRequest(Context ctx, String requestType, ApiTaskExecutor executor) {
+    public RouteDecision queueApiRequest(Context ctx, String requestType, ApiTaskExecutor executor) {
         return queueApiRequest(ctx, requestType, executor, () -> null, (_) -> {
         });
     }

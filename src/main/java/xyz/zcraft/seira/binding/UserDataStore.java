@@ -101,21 +101,6 @@ public final class UserDataStore {
         }
     }
 
-    public static void removeUserInfo(long osuId) {
-        ensureInitialized();
-        String sql = """
-                DELETE FROM user_info
-                WHERE uid = ?
-                """;
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setLong(1, osuId);
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to delete user info", e);
-        }
-    }
-
     public static Optional<String> findUsername(long osuId) {
         ensureInitialized();
         String sql = """
@@ -242,6 +227,7 @@ public final class UserDataStore {
         }
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public static boolean haveFollowed(long selfId, long followed) {
         ensureInitialized();
         String sql = """
@@ -384,6 +370,75 @@ public final class UserDataStore {
         }
 
         return 0;
+    }
+
+    public static String executeQueryOrEdit(String sql) {
+        ensureInitialized();
+
+        try (Connection c = DriverManager.getConnection(jdbcUrl);
+             Statement stmt = c.createStatement()) {
+
+            // This method should be invoked only in debug context.
+            //noinspection SqlSourceToSinkFlow
+            boolean isResultSet = stmt.execute(sql);
+
+            if (isResultSet) {
+                try (ResultSet rs = stmt.getResultSet()) {
+                    StringBuilder sb = new StringBuilder();
+                    ResultSetMetaData metaData = rs.getMetaData();
+                    int columnCount = metaData.getColumnCount();
+
+                    for (int i = 1; i <= columnCount; i++) {
+                        sb.append(metaData.getColumnName(i)).append(i == columnCount ? "\n" : "\t");
+                    }
+
+                    int rowCount = 0;
+                    while (rs.next()) {
+                        rowCount++;
+                        for (int i = 1; i <= columnCount; i++) {
+                            sb.append(rs.getString(i)).append(i == columnCount ? "\n" : "\t");
+                        }
+                    }
+
+                    sb.append("\n\n").append("Rows returned: ").append(rowCount);
+                    return sb.toString();
+                }
+            } else {
+                int updateCount = stmt.getUpdateCount();
+                return "Edit executed successfully. Rows affected: " + updateCount;
+            }
+
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to execute SQL: " + sql, e);
+        }
+    }
+
+    public static List<Long> findAllUsers() {
+        ensureInitialized();
+
+        List<Long> result = new ArrayList<>();
+
+        var queries = new String[]{
+                "SELECT self AS id FROM user_follows",
+                "SELECT followed AS id FROM user_follows",
+                "SELECT osu_uid AS id FROM user_bindings",
+                "SELECT uid AS id FROM user_info"
+        };
+
+        for (String sql : queries) {
+            try (Connection connection = DriverManager.getConnection(jdbcUrl);
+                 Statement statement = connection.createStatement();
+                 ResultSet rs = statement.executeQuery(sql)) {
+                while (rs.next()) {
+                    long id = rs.getLong("id");
+                    result.add(id);
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException("Failed to query binding", e);
+            }
+        }
+
+        return result;
     }
 
     private static void createTablesIfNeeded() throws SQLException {

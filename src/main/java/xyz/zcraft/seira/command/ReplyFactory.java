@@ -23,7 +23,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-final class ReplyFactory {
+public final class ReplyFactory {
     private final Buttons buttons;
 
     ReplyFactory(AppConfig config) {

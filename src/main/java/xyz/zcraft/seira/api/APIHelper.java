@@ -8,6 +8,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import xyz.zcraft.osu.model.BeatmapExtended;
 import xyz.zcraft.osu.model.MultiplayerRoom;
+import xyz.zcraft.osu.model.User;
 import xyz.zcraft.osu.model.UserExtended;
 import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.api.data.*;
@@ -347,7 +348,7 @@ public class APIHelper {
         };
     }
 
-    public static Response<?> getLookupBeatmapsetResponse(ShortcutTarget target, String s) {
+    public static Response<?> getLookupBeatmapsetResponse(@NotNull ShortcutTarget target, String s) {
         try {
             final String query = target.isMacro() ? getBeatmapsetQuery(target) : "/beatmapsets/lookup?ms=" + target.explicitId();
 
@@ -747,6 +748,34 @@ public class APIHelper {
             return Response.<List<MissData>>fromHeaders(send.headers())
                     .content(misses)
                     .build();
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static List<User> getUsers(List<Long> u) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/users"))
+                    .POST(HttpRequest.BodyPublishers.ofString(GSON.toJsonTree(Map.of("ids", u)).toString()))
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw parseHttpError(send.body(), send.statusCode(), "获取用户信息失败");
+            }
+
+            final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
+            ensureApiSuccess(r, "获取用户信息失败");
+            final JsonArray data = r.getData().getAsJsonArray();
+
+            List<User> users = new LinkedList<>();
+            for (JsonElement datum : data) {
+                users.add(GSON.fromJson(datum, User.class));
+            }
+
+            return users;
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
