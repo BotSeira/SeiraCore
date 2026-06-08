@@ -104,7 +104,7 @@ public class DebugRoutes {
         }
 
         try {
-            return RouteDecision.sync(PendingMessage.ofString(UserDataStore.executeQueryOrEdit(ctx.query())));
+            return RouteDecision.sync(PendingMessage.ofMarkdownRaw(UserDataStore.executeQueryOrEdit(ctx.query())));
         } catch (Exception e) {
             return RouteDecision.sync(PendingMessage.ofString("解码失败"));
         }

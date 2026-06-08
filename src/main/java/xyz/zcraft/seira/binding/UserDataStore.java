@@ -382,28 +382,29 @@ public final class UserDataStore {
 
             if (isResultSet) {
                 try (ResultSet rs = stmt.getResultSet()) {
-                    StringBuilder sb = new StringBuilder();
+                    StringBuilder sb = new StringBuilder("```\n");
+
                     ResultSetMetaData metaData = rs.getMetaData();
                     int columnCount = metaData.getColumnCount();
 
                     for (int i = 1; i <= columnCount; i++) {
-                        sb.append(metaData.getColumnName(i)).append(i == columnCount ? "\n" : "\t");
+                        sb.append(metaData.getColumnName(i)).append(i == columnCount ? "\n" : " | ");
                     }
 
                     int rowCount = 0;
                     while (rs.next()) {
                         rowCount++;
                         for (int i = 1; i <= columnCount; i++) {
-                            sb.append(rs.getString(i)).append(i == columnCount ? "\n" : "\t");
+                            sb.append(rs.getString(i)).append(i == columnCount ? "\n" : " | ");
                         }
                     }
 
-                    sb.append("\n\n").append("Rows returned: ").append(rowCount);
+                    sb.append("\n```\n").append("> Rows returned: ").append(rowCount);
                     return sb.toString();
                 }
             } else {
                 int updateCount = stmt.getUpdateCount();
-                return "Edit executed successfully. Rows affected: " + updateCount;
+                return "> Edit executed successfully. Rows affected: " + updateCount;
             }
 
         } catch (SQLException e) {
