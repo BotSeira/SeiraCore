@@ -11,7 +11,6 @@ import xyz.zcraft.seira.command.Router;
 
 import java.io.ByteArrayOutputStream;
 import java.sql.SQLException;
-import java.util.Arrays;
 import java.util.List;
 
 public class DebugRoutes {
@@ -108,15 +107,20 @@ public class DebugRoutes {
         try {
             return RouteDecision.sync(PendingMessage.ofMarkdownRaw(UserDataStore.executeQueryOrEdit(ctx.query())));
         } catch (Exception e) {
+            Throwable cause = e;
+
+            while (cause != null && !(cause instanceof SQLException)) {
+                cause = cause.getCause();
+            }
+
+            if (cause != null) {
+                return RouteDecision.sync(
+                        PendingMessage.ofString("执行失败: " + cause.getMessage())
+                );
+            }
+
             return RouteDecision.sync(
-                    PendingMessage.ofString(
-                            Arrays.stream(e.getSuppressed())
-                                    .filter(t -> t instanceof SQLException)
-                                    .map(t -> (SQLException) t)
-                                    .map(ex -> "执行失败: " + ex.getMessage())
-                                    .findFirst()
-                                    .orElse("执行失败")
-                    )
+                    PendingMessage.ofString("执行失败")
             );
         }
     }
