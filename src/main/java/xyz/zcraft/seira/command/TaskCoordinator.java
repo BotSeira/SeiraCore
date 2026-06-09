@@ -119,7 +119,11 @@ public final class TaskCoordinator {
             }
         } catch (Exception e) {
             sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString(resolveErrorMessage(e)), messageSeqCounter);
-            LOG.error("Failed to execute API task: {}", e.getMessage(), e);
+            String msg = e.getMessage();
+            if (e instanceof ApiRequestException ex) {
+                msg += " - " + ex.getDefaultMessage();
+            }
+            LOG.error("Failed to execute API task: {}", msg, e);
         } finally {
             try {
                 apiTask.finalizer().execute(responseSent);

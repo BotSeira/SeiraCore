@@ -12,6 +12,10 @@ public class ApiRequestException extends RuntimeException {
         this.errorCode = errorCode;
     }
 
+    public String getDefaultMessage() {
+        return getDefaultMessage(this.errorCode);
+    }
+
     public static String getDefaultMessage(Integer code) {
         ErrorCode errorCode = ErrorCode.fromCode(code);
         if (errorCode == null) {
