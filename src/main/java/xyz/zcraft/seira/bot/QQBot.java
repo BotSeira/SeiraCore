@@ -68,17 +68,26 @@ public class QQBot {
                         sender
                 );
 
-                client.connectBlocking();
-                LOG.info("Gateway session started");
-
                 CountDownLatch disconnectLatch = new CountDownLatch(1);
-
                 client.setOnCloseCallback(disconnectLatch::countDown);
 
-                disconnectLatch.await();
+                try {
+                    client.connectBlocking();
+                    LOG.info("Gateway session started");
+                } catch (InterruptedException e) {
+                    LOG.error("Connection interrupted", e);
+                    Thread.currentThread().interrupt();
+                    return;
+                }
 
-                LOG.warn("Gateway session closed. Preparing to reconnect...");
-
+                try {
+                    disconnectLatch.await();
+                    LOG.warn("Gateway session closed. Preparing to reconnect...");
+                } catch (InterruptedException e) {
+                    LOG.warn("Bot interrupted while waiting for disconnect.");
+                    Thread.currentThread().interrupt();
+                    return;
+                }
             } catch (Exception e) {
                 LOG.error("Gateway loop failed", e);
             }
