@@ -52,7 +52,7 @@ public class TokenManager {
 
         long elapsedMillis = System.currentTimeMillis() - currentToken.tokenGrantTime();
 
-        long maxValidMillis = (currentToken.expiresIn() - 300) * 1000L;
+        long maxValidMillis = (currentToken.expiresIn() - 120) * 1000L;
 
         return elapsedMillis < maxValidMillis;
     }

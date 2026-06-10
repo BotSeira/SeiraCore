@@ -125,7 +125,7 @@ public class WSClient extends WebSocketClient {
     private void sendIdentify() {
         JsonObject data = new JsonObject();
         data.addProperty("token", "QQBot " + tokenSupplier.get().token());
-        data.addProperty("intents", 33554432);
+        data.addProperty("intents", 1 << 25);
 
         JsonObject payload = new JsonObject();
         payload.addProperty("op", 2);
