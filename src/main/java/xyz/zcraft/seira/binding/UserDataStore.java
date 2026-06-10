@@ -164,7 +164,7 @@ public final class UserDataStore {
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
              Statement statement = connection.createStatement();
              final ResultSet rs = statement.executeQuery(sql)) {
-            if (rs.next()) {
+            while(rs.next()) {
                 tokens.add(new OsuToken(
                         rs.getString("access_token"),
                         rs.getString("refresh_token"),

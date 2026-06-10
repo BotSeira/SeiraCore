@@ -1,5 +1,7 @@
 package xyz.zcraft.seira.command.route;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.bouncycastle.util.encoders.Base64Encoder;
 import xyz.zcraft.osu.model.UserExtended;
 import xyz.zcraft.seira.api.APIHelper;
@@ -18,6 +20,7 @@ import java.sql.SQLException;
 import java.util.List;
 
 public class DebugRoutes {
+    private static final Logger LOG = LogManager.getLogger(DebugRoutes.class);
     private final Router router;
 
     public DebugRoutes(Router router) {
@@ -151,6 +154,7 @@ public class DebugRoutes {
 
                 return PendingMessage.ofString("获取完成，共获取了" + allOsuTokens.size() + "个用户的好友列表");
             } catch (Exception e) {
+                LOG.error("Failed to get friends", e);
                 return PendingMessage.ofString("用户信息更新失败");
             }
         });
