@@ -1,7 +1,11 @@
 package xyz.zcraft.seira.command.route;
 
 import org.bouncycastle.util.encoders.Base64Encoder;
+import xyz.zcraft.osu.model.UserExtended;
 import xyz.zcraft.seira.api.APIHelper;
+import xyz.zcraft.seira.api.data.FriendEntry;
+import xyz.zcraft.seira.api.data.OsuToken;
+import xyz.zcraft.seira.api.data.Response;
 import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.bot.data.PendingMessage;
@@ -30,17 +34,17 @@ public class DebugRoutes {
         }
 
         return switch (ctx.command()) {
-            case "debug.upload" -> handleDebugUpload(ctx);
-            case "debug.test" -> handleDebugTest();
-            case "debug.message" -> handleDebugMessage(ctx);
-            case "debug.image" -> handleDebugImage(ctx);
-            case "debug.db" -> handleDebugDb(ctx);
-            case "debug.update-user-info" -> handleDebugUpdateUserInfo(ctx);
+            case "debug.upload" -> handleUpload(ctx);
+            case "debug.test" -> handleTest();
+            case "debug.message" -> handleMessage(ctx);
+            case "debug.db" -> handleDb(ctx);
+            case "debug.update-user-info" -> handleUpdateUserInfo(ctx);
+            case "debug.get-all-friends" -> handleGetAllFriends(ctx);
             default -> router.handleUnknown();
         };
     }
 
-    public RouteDecision handleDebugUpload(Context ctx) {
+    public RouteDecision handleUpload(Context ctx) {
         if (ctx.args().length != 3) {
             return RouteDecision.sync(PendingMessage.ofString("用法：/debug.upload <type> <cos> <url>"));
         }
@@ -61,11 +65,11 @@ public class DebugRoutes {
                 : "上传失败，请检查日志获取详情"));
     }
 
-    public RouteDecision handleDebugTest() {
+    public RouteDecision handleTest() {
         return RouteDecision.sync(router.replyFactory.testMessage());
     }
 
-    public RouteDecision handleDebugMessage(Context ctx) {
+    public RouteDecision handleMessage(Context ctx) {
         try {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             new Base64Encoder().decode(ctx.query(), out);
@@ -75,15 +79,7 @@ public class DebugRoutes {
         }
     }
 
-    public RouteDecision handleDebugImage(Context ctx) {
-        try {
-            return RouteDecision.sync(PendingMessage.ofImageBase64(ctx.query()));
-        } catch (Exception e) {
-            return RouteDecision.sync(PendingMessage.ofString("解码失败"));
-        }
-    }
-
-    public RouteDecision handleDebugDb(Context ctx) {
+    public RouteDecision handleDb(Context ctx) {
         try {
             return RouteDecision.sync(PendingMessage.ofMarkdownRaw(UserDataStore.executeQueryOrEdit(ctx.query())));
         } catch (Exception e) {
@@ -105,7 +101,7 @@ public class DebugRoutes {
         }
     }
 
-    public RouteDecision handleDebugUpdateUserInfo(Context ctx) {
+    public RouteDecision handleUpdateUserInfo(Context ctx) {
         try {
             final List<Long> allUsers = UserDataStore.findAllUsers();
             return router.taskCoordinator.queueApiRequest(ctx, "Update All User Info", () -> {
@@ -115,5 +111,48 @@ public class DebugRoutes {
         } catch (Exception e) {
             return RouteDecision.sync(PendingMessage.ofString("用户信息更新失败"));
         }
+    }
+
+    public RouteDecision handleGetAllFriends(Context ctx) {
+        return router.taskCoordinator.queueApiRequest(ctx, "Get All Friends", () -> {
+            try {
+                final List<OsuToken> allOsuTokens = UserDataStore.getAllOsuTokens();
+                allOsuTokens.forEach(token -> {
+                    final Response<UserExtended> self = APIHelper.getSelf(token.accessToken());
+                    final Response<List<FriendEntry>> response = APIHelper.getFollowed(token.accessToken());
+                    final List<FriendEntry> content = response.getContent();
+                    final List<Long> ids = content.stream().map(e -> e.user().getId()).toList();
+
+                    final long uid = self.getContent().getId();
+
+                    UserDataStore.storeUserInfo(uid, self.getContent().getUsername());
+                    response.getContent().stream()
+                            .map(FriendEntry::user)
+                            .forEach(u -> UserDataStore.storeUserInfo(u.getId(), u.getUsername()));
+
+                    final List<Long> origFollower = UserDataStore.findFollower(uid);
+
+                    origFollower.stream()
+                            .filter(i -> !ids.contains(i))
+                            .forEach(i -> UserDataStore.removeFollowed(uid, i));
+
+                    for (FriendEntry friendEntry : content) {
+                        if (!UserDataStore.haveFollowed(uid, friendEntry.user().getId())) {
+                            UserDataStore.storeFollowed(uid, friendEntry.user().getId());
+                        }
+
+                        if (friendEntry.mutual()) {
+                            if (!UserDataStore.haveFollowed(friendEntry.user().getId(), uid)) {
+                                UserDataStore.storeFollowed(friendEntry.user().getId(), uid);
+                            }
+                        }
+                    }
+                });
+
+                return PendingMessage.ofString("获取完成，共获取了" + allOsuTokens.size() + "个用户的好友列表");
+            } catch (Exception e) {
+                return PendingMessage.ofString("用户信息更新失败");
+            }
+        });
     }
 }

@@ -157,6 +157,27 @@ public final class UserDataStore {
         return null;
     }
 
+    public static List<OsuToken> getAllOsuTokens() {
+        ensureInitialized();
+        List<OsuToken> tokens = new LinkedList<>();
+        String sql = "SELECT access_token, refresh_token, expires_in, refreshed_at FROM token_store";
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             Statement statement = connection.createStatement();
+             final ResultSet rs = statement.executeQuery(sql)) {
+            if (rs.next()) {
+                tokens.add(new OsuToken(
+                        rs.getString("access_token"),
+                        rs.getString("refresh_token"),
+                        rs.getLong("expires_in"),
+                        rs.getLong("refreshed_at")
+                ));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to query binding", e);
+        }
+        return tokens;
+    }
+
     public static List<Long> findFollower(long uid) {
         ensureInitialized();
         List<Long> followers = new ArrayList<>();

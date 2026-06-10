@@ -141,6 +141,5 @@ mvn -U clean compile exec:java
 | `/debug.upload <type> <cos> <url>` | 上传指定文件                     |
 | `/debug.test`                      | 发送一段测试文本                   |
 | `/debug.message <base64>`          | 将指定Base64解码并作为Markdown消息发出 |
-| `/debug.image <base64>`            | 将指定Base64解码并作为图片发出         |
 | `/debug.db <sql>`                  | 对后端数据库执行指定的SQL语句           |
 | `/debug.update-user-info`          | 更新数据库中所有玩家的信息              |
