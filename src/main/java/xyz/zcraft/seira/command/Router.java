@@ -563,7 +563,7 @@ public class Router {
                     ctx,
                     "Miss Visualize",
                     () -> APIHelper.getMissVisualizeResponse(target, index),
-                    null
+                    (_, _) -> null
             );
         } else if (ctx.args().length == targetResolution.consumedArgs()) {
             return taskCoordinator.queueApiRequest(
