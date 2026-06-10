@@ -1,11 +1,14 @@
 package xyz.zcraft.seira.util;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.api.OsuAuthApi;
+import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.config.BindingConfig;
-import xyz.zcraft.seira.api.data.OsuToken;
 
 public class OsuAuthHelper {
+    private static final Logger LOG = LogManager.getLogger();
     private final BindingConfig bindingConfig;
 
     public OsuAuthHelper(BindingConfig bindingConfig) {
@@ -19,19 +22,19 @@ public class OsuAuthHelper {
             return null;
         }
 
-        final OsuToken token = refreshToken(osuToken);
-        if (token != null) {
-            UserDataStore.storeToken(openId, token);
+        if (osuToken.isExpired()) {
+            LOG.debug("Auto refreshing token for openId {}", openId);
+            final OsuToken newToken = refreshToken(osuToken);
+            if (newToken != null) {
+                UserDataStore.storeToken(openId, newToken);
+            }
+            return newToken;
         }
 
-        return token;
+        return osuToken;
     }
 
     public OsuToken refreshToken(OsuToken originalToken) {
-        if (originalToken.isExpired()) {
-            return OsuAuthApi.refreshToken(originalToken, bindingConfig.clientId(), bindingConfig.clientSecret());
-        } else {
-            return originalToken;
-        }
+        return OsuAuthApi.refreshToken(originalToken, bindingConfig.clientId(), bindingConfig.clientSecret());
     }
 }

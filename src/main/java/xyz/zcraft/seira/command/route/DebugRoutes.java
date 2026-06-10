@@ -123,11 +123,19 @@ public class DebugRoutes {
                 final List<OsuToken> allOsuTokens = UserDataStore.getAllOsuTokens();
                 allOsuTokens
                         .stream()
-                        .map(router.authHelper::refreshToken)
+                        .map(token -> {
+                            if (token.isExpired()) {
+                                return router.authHelper.refreshToken(token);
+                            } else {
+                                return token;
+                            }
+                        })
                         .filter(Objects::nonNull)
-                        .forEach(token -> {
-                            final Response<UserExtended> self = APIHelper.getSelf(token.accessToken());
-                            final Response<List<FriendEntry>> response = APIHelper.getFollowed(token.accessToken());
+                        .map(OsuToken::accessToken)
+                        .filter(Objects::nonNull)
+                        .forEach(accessToken -> {
+                            final Response<UserExtended> self = APIHelper.getSelf(accessToken);
+                            final Response<List<FriendEntry>> response = APIHelper.getFollowed(accessToken);
                             final List<FriendEntry> content = response.getContent();
                             final List<Long> ids = content.stream().map(e -> e.user().getId()).toList();
 

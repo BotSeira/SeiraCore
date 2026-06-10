@@ -180,7 +180,7 @@ public final class TaskCoordinator {
                 message.setMsgType(0);
                 uploadResult = false;
             } else {
-                LOG.info("Base64 media uploaded for message {}", messageId);
+                LOG.debug("Base64 media uploaded for message {}", messageId);
                 message.setMedia(fileInfo);
             }
         }
