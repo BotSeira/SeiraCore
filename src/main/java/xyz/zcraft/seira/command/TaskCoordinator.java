@@ -113,9 +113,11 @@ public final class TaskCoordinator {
                 statsCompleted = true;
             }
 
-            PendingMessage postResponse = apiTask.postProcessor().execute();
-            if (postResponse != null) {
-                responseSent &= sendOutboundMessage(targetId, messageId, groupMessage, postResponse, messageSeqCounter);
+            if (apiTask.postProcessor() != null) {
+                PendingMessage postResponse = apiTask.postProcessor().execute();
+                if (postResponse != null) {
+                    responseSent &= sendOutboundMessage(targetId, messageId, groupMessage, postResponse, messageSeqCounter);
+                }
             }
         } catch (Exception e) {
             sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString(resolveErrorMessage(e)), messageSeqCounter);
@@ -167,7 +169,7 @@ public final class TaskCoordinator {
                 message.setMsgType(0);
                 uploadResult = false;
             } else {
-                LOG.info("Media uploaded for message {}", messageId);
+                LOG.debug("Media uploaded for message {}", messageId);
                 message.setMedia(fileInfo);
             }
         } else if (pendingMsg.getFileBase64() != null) {
