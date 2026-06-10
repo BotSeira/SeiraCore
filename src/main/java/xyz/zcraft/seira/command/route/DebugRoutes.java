@@ -18,6 +18,7 @@ import xyz.zcraft.seira.command.Router;
 import java.io.ByteArrayOutputStream;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Objects;
 
 public class DebugRoutes {
     private static final Logger LOG = LogManager.getLogger(DebugRoutes.class);
@@ -120,37 +121,41 @@ public class DebugRoutes {
         return router.taskCoordinator.queueApiRequest(ctx, "Get All Friends", () -> {
             try {
                 final List<OsuToken> allOsuTokens = UserDataStore.getAllOsuTokens();
-                allOsuTokens.forEach(token -> {
-                    final Response<UserExtended> self = APIHelper.getSelf(token.accessToken());
-                    final Response<List<FriendEntry>> response = APIHelper.getFollowed(token.accessToken());
-                    final List<FriendEntry> content = response.getContent();
-                    final List<Long> ids = content.stream().map(e -> e.user().getId()).toList();
+                allOsuTokens
+                        .stream()
+                        .map(router.authHelper::refreshToken)
+                        .filter(Objects::nonNull)
+                        .forEach(token -> {
+                            final Response<UserExtended> self = APIHelper.getSelf(token.accessToken());
+                            final Response<List<FriendEntry>> response = APIHelper.getFollowed(token.accessToken());
+                            final List<FriendEntry> content = response.getContent();
+                            final List<Long> ids = content.stream().map(e -> e.user().getId()).toList();
 
-                    final long uid = self.getContent().getId();
+                            final long uid = self.getContent().getId();
 
-                    UserDataStore.storeUserInfo(uid, self.getContent().getUsername());
-                    response.getContent().stream()
-                            .map(FriendEntry::user)
-                            .forEach(u -> UserDataStore.storeUserInfo(u.getId(), u.getUsername()));
+                            UserDataStore.storeUserInfo(uid, self.getContent().getUsername());
+                            response.getContent().stream()
+                                    .map(FriendEntry::user)
+                                    .forEach(u -> UserDataStore.storeUserInfo(u.getId(), u.getUsername()));
 
-                    final List<Long> origFollower = UserDataStore.findFollower(uid);
+                            final List<Long> origFollower = UserDataStore.findFollower(uid);
 
-                    origFollower.stream()
-                            .filter(i -> !ids.contains(i))
-                            .forEach(i -> UserDataStore.removeFollowed(uid, i));
+                            origFollower.stream()
+                                    .filter(i -> !ids.contains(i))
+                                    .forEach(i -> UserDataStore.removeFollowed(uid, i));
 
-                    for (FriendEntry friendEntry : content) {
-                        if (!UserDataStore.haveFollowed(uid, friendEntry.user().getId())) {
-                            UserDataStore.storeFollowed(uid, friendEntry.user().getId());
-                        }
+                            for (FriendEntry friendEntry : content) {
+                                if (!UserDataStore.haveFollowed(uid, friendEntry.user().getId())) {
+                                    UserDataStore.storeFollowed(uid, friendEntry.user().getId());
+                                }
 
-                        if (friendEntry.mutual()) {
-                            if (!UserDataStore.haveFollowed(friendEntry.user().getId(), uid)) {
-                                UserDataStore.storeFollowed(friendEntry.user().getId(), uid);
+                                if (friendEntry.mutual()) {
+                                    if (!UserDataStore.haveFollowed(friendEntry.user().getId(), uid)) {
+                                        UserDataStore.storeFollowed(friendEntry.user().getId(), uid);
+                                    }
+                                }
                             }
-                        }
-                    }
-                });
+                        });
 
                 return PendingMessage.ofString("获取完成，共获取了" + allOsuTokens.size() + "个用户的好友列表");
             } catch (Exception e) {

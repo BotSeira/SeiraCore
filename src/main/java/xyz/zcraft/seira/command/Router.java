@@ -39,7 +39,7 @@ public class Router {
     private final Resolver argumentResolver;
     public final ReplyFactory replyFactory;
     public final TaskCoordinator taskCoordinator;
-    private final OsuAuthHelper authHelper;
+    public final OsuAuthHelper authHelper;
     private final DebugRoutes debugRoutes;
 
     public Router(MessageSender messageSender, AppConfig config) {

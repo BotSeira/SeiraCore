@@ -19,14 +19,19 @@ public class OsuAuthHelper {
             return null;
         }
 
-        if (osuToken.isExpired()) {
-            var newToken = OsuAuthApi.refreshToken(osuToken, bindingConfig.clientId(), bindingConfig.clientSecret());
-            if (newToken != null) {
-                UserDataStore.storeToken(openId, newToken);
-            }
-            return newToken;
+        final OsuToken token = refreshToken(osuToken);
+        if (token != null) {
+            UserDataStore.storeToken(openId, token);
+        }
+
+        return token;
+    }
+
+    public OsuToken refreshToken(OsuToken originalToken) {
+        if (originalToken.isExpired()) {
+            return OsuAuthApi.refreshToken(originalToken, bindingConfig.clientId(), bindingConfig.clientSecret());
         } else {
-            return osuToken;
+            return originalToken;
         }
     }
 }
