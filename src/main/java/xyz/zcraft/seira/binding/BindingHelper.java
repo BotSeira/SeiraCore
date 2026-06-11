@@ -21,11 +21,6 @@ public class BindingHelper {
     private static final ConcurrentHashMap<String, BindingTask> bindingTasks = new ConcurrentHashMap<>();
 
     public static void init(BindingConfig bindingConfig) {
-        if (!bindingConfig.requireLogin()) {
-            LOG.info("Required login is disabled, callback service will be disabled.");
-            return;
-        }
-
         final Javalin javalin = Javalin.create(config -> config.routes
                 .get(bindingConfig.listenPath(), ctx -> handleCallback(ctx, bindingConfig)));
 

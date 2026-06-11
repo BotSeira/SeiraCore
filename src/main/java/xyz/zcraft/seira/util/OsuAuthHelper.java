@@ -15,7 +15,7 @@ public class OsuAuthHelper {
         this.bindingConfig = bindingConfig;
     }
 
-    public OsuToken getTokenFor(String openId) {
+    public OsuToken updateTokenAndGet(String openId) {
         final OsuToken osuToken = UserDataStore.findOsuToken(openId);
 
         if (osuToken == null) {
@@ -34,7 +34,12 @@ public class OsuAuthHelper {
         return osuToken;
     }
 
-    public OsuToken refreshToken(OsuToken originalToken) {
+    private OsuToken refreshToken(OsuToken originalToken) {
         return OsuAuthApi.refreshToken(originalToken, bindingConfig.clientId(), bindingConfig.clientSecret());
     }
+
+    public record TokenStore(
+            String openId,
+            OsuToken osuToken
+    ) {}
 }

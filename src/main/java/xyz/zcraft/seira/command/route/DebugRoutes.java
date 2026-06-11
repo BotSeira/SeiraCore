@@ -14,11 +14,11 @@ import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.RouteDecision;
 import xyz.zcraft.seira.command.Router;
+import xyz.zcraft.seira.util.OsuAuthHelper;
 
 import java.io.ByteArrayOutputStream;
 import java.sql.SQLException;
 import java.util.List;
-import java.util.Objects;
 
 public class DebugRoutes {
     private static final Logger LOG = LogManager.getLogger(DebugRoutes.class);
@@ -44,6 +44,7 @@ public class DebugRoutes {
             case "debug.db" -> handleDb(ctx);
             case "debug.update-user-info" -> handleUpdateUserInfo(ctx);
             case "debug.get-all-friends" -> handleGetAllFriends(ctx);
+            case "debug.validate-token" -> handleValidateToken(ctx);
             default -> router.handleUnknown();
         };
     }
@@ -120,19 +121,12 @@ public class DebugRoutes {
     public RouteDecision handleGetAllFriends(Context ctx) {
         return router.taskCoordinator.queueApiRequest(ctx, "Get All Friends", () -> {
             try {
-                final List<OsuToken> allOsuTokens = UserDataStore.getAllOsuTokens();
+                final List<OsuAuthHelper.TokenStore> allOsuTokens = UserDataStore.getAllOsuTokens();
                 allOsuTokens
                         .stream()
-                        .map(token -> {
-                            if (token.isExpired()) {
-                                return router.authHelper.refreshToken(token);
-                            } else {
-                                return token;
-                            }
-                        })
-                        .filter(Objects::nonNull)
+                        .map(OsuAuthHelper.TokenStore::openId)
+                        .map(router.authHelper::updateTokenAndGet)
                         .map(OsuToken::accessToken)
-                        .filter(Objects::nonNull)
                         .forEach(accessToken -> {
                             final Response<UserExtended> self = APIHelper.getSelf(accessToken);
                             final Response<List<FriendEntry>> response = APIHelper.getFollowed(accessToken);
@@ -166,6 +160,31 @@ public class DebugRoutes {
                         });
 
                 return PendingMessage.ofString("获取完成，共获取了" + allOsuTokens.size() + "个用户的好友列表");
+            } catch (Exception e) {
+                LOG.error("Failed to get friends", e);
+                return PendingMessage.ofString("用户信息更新失败");
+            }
+        });
+    }
+
+    public RouteDecision handleValidateToken(Context ctx) {
+        return router.taskCoordinator.queueApiRequest(ctx, "Validate Token", () -> {
+            int updated = 0, removed = 0;
+            try {
+                final List<OsuAuthHelper.TokenStore> allOsuTokens = UserDataStore.getAllOsuTokens();
+                for (var token : allOsuTokens) {
+                    if (token.osuToken().isExpired()) {
+                        final OsuToken newToken = router.authHelper.updateTokenAndGet(token.openId());
+                        if (newToken == null) {
+                            UserDataStore.removeToken(token.openId());
+                            removed++;
+                        } else {
+                            updated++;
+                        }
+                    }
+                }
+
+                return PendingMessage.ofString("Token验证完成，共更新了" + updated + "，移除了" + removed);
             } catch (Exception e) {
                 LOG.error("Failed to get friends", e);
                 return PendingMessage.ofString("用户信息更新失败");

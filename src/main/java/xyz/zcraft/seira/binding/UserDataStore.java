@@ -3,6 +3,7 @@ package xyz.zcraft.seira.binding;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.api.data.OsuToken;
+import xyz.zcraft.seira.util.OsuAuthHelper;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -78,6 +79,21 @@ public final class UserDataStore {
             statement.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to store token", e);
+        }
+    }
+
+    public static void removeToken(String openId) {
+        ensureInitialized();
+        String sql = """
+                DELETE FROM token_store
+                WHERE open_id = ?
+                """;
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, openId);
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to remove token", e);
         }
     }
 
@@ -157,20 +173,25 @@ public final class UserDataStore {
         return null;
     }
 
-    public static List<OsuToken> getAllOsuTokens() {
+    public static List<OsuAuthHelper.TokenStore> getAllOsuTokens() {
         ensureInitialized();
-        List<OsuToken> tokens = new LinkedList<>();
-        String sql = "SELECT access_token, refresh_token, expires_in, refreshed_at FROM token_store";
+        List<OsuAuthHelper.TokenStore> tokens = new LinkedList<>();
+        String sql = "SELECT open_id, access_token, refresh_token, expires_in, refreshed_at FROM token_store";
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
              Statement statement = connection.createStatement();
              final ResultSet rs = statement.executeQuery(sql)) {
             while(rs.next()) {
-                tokens.add(new OsuToken(
-                        rs.getString("access_token"),
-                        rs.getString("refresh_token"),
-                        rs.getLong("expires_in"),
-                        rs.getLong("refreshed_at")
-                ));
+                tokens.add(
+                        new OsuAuthHelper.TokenStore(
+                                rs.getString("open_id"),
+                                new OsuToken(
+                                        rs.getString("access_token"),
+                                        rs.getString("refresh_token"),
+                                        rs.getLong("expires_in"),
+                                        rs.getLong("refreshed_at")
+                                )
+                        )
+                );
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to query binding", e);
