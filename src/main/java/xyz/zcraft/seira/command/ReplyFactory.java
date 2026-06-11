@@ -142,7 +142,7 @@ public final class ReplyFactory {
         final String url = "https://osu.ppy.sh/oauth/authorize?client_id=%d&response_type=code&scope=public+identify+friends.read&state=%s"
                 .formatted(config.clientId(), task.taskId());
         return PendingMessage.ofMarkdownRaw(
-                at(ctx) + "点击下方按钮绑定账号,或者在浏览器打开以下链接: \n```\n%s\n```".formatted(url),
+                at(ctx) + "点击下方按钮绑定账号,或者在浏览器打开以下链接: \n```\n%s\n```\n> 绑定请求20分钟内有效。".formatted(url),
                 buttons.bindButtons(task.openId(), url, !isC2C)
         );
     }
