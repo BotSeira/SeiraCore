@@ -487,8 +487,8 @@ public final class UserDataStore {
                 CREATE TABLE IF NOT EXISTS user_bindings (
                     open_id TEXT NOT NULL,
                     osu_uid BIGINT NOT NULL,
-                    created_at BIGINT NOT NULL,
-                    updated_at BIGINT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     PRIMARY KEY(open_id)
                 )
                 """;
@@ -496,7 +496,7 @@ public final class UserDataStore {
                 CREATE TABLE IF NOT EXISTS group_members (
                     group_id TEXT NOT NULL,
                     open_id TEXT NOT NULL,
-                    updated_at BIGINT NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     PRIMARY KEY(group_id, open_id)
                 )
                 """;
