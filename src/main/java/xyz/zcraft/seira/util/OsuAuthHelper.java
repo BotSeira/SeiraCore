@@ -41,5 +41,6 @@ public class OsuAuthHelper {
     public record TokenStore(
             String openId,
             OsuToken osuToken
-    ) {}
+    ) {
+    }
 }

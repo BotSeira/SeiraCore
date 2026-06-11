@@ -32,6 +32,8 @@ public class WSClient extends WebSocketClient {
     private final AtomicLong sequence = new AtomicLong(-1);
     private final Router router;
     private volatile boolean heartbeatAcked = true;
+    @Setter
+    private Runnable onCloseCallback = null;
 
     public WSClient(
             URI serverUri,
@@ -45,9 +47,6 @@ public class WSClient extends WebSocketClient {
         this.router = new Router(messageSender, config);
         LOG.info("QQ Gateway WebSocket Client created");
     }
-
-    @Setter
-    private Runnable onCloseCallback = null;
 
     @Override
     public void onOpen(ServerHandshake handshake) {

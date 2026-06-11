@@ -8,7 +8,10 @@ import xyz.zcraft.seira.util.OsuAuthHelper;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Optional;
 
 public final class UserDataStore {
     private static final Logger LOG = LogManager.getLogger(UserDataStore.class);
@@ -180,7 +183,7 @@ public final class UserDataStore {
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
              Statement statement = connection.createStatement();
              final ResultSet rs = statement.executeQuery(sql)) {
-            while(rs.next()) {
+            while (rs.next()) {
                 tokens.add(
                         new OsuAuthHelper.TokenStore(
                                 rs.getString("open_id"),

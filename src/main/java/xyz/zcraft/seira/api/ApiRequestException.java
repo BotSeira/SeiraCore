@@ -12,10 +12,6 @@ public class ApiRequestException extends RuntimeException {
         this.errorCode = errorCode;
     }
 
-    public String getDefaultMessage() {
-        return getDefaultMessage(this.errorCode);
-    }
-
     public static String getDefaultMessage(Integer code) {
         ErrorCode errorCode = ErrorCode.fromCode(code);
         if (errorCode == null) {
@@ -48,6 +44,10 @@ public class ApiRequestException extends RuntimeException {
             case REPLAY_PARSE_FAILED -> "回放数据解析失败，请稍后重试喵";
             case RENDER_QUEUE_FULL -> "回放渲染队列已满，请稍后再试喵";
         };
+    }
+
+    public String getDefaultMessage() {
+        return getDefaultMessage(this.errorCode);
     }
 }
 
