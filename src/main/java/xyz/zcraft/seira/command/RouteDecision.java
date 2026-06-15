@@ -5,8 +5,12 @@ import xyz.zcraft.seira.bot.data.PendingMessage;
 
 import java.util.function.Consumer;
 
-public record RouteDecision(PendingMessage initialMessage, ApiTask apiTask, boolean enqueueMessage, Consumer<Boolean> onSent) {
-    static RouteDecision sync(PendingMessage message) {
+public record RouteDecision(
+        PendingMessage initialMessage,
+        ApiTask apiTask,
+        boolean enqueueMessage,
+        Consumer<Boolean> onSent) {
+    public static RouteDecision sync(PendingMessage message) {
         return new RouteDecision(message, null, false, null);
     }
 
@@ -14,7 +18,7 @@ public record RouteDecision(PendingMessage initialMessage, ApiTask apiTask, bool
         return new RouteDecision(message, null, false, onSent);
     }
 
-    static RouteDecision async(PendingMessage message, ApiTask apiTask) {
+    public static RouteDecision async(PendingMessage message, ApiTask apiTask) {
         return new RouteDecision(message, apiTask, true, null);
     }
 }

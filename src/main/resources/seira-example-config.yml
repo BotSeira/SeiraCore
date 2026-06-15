@@ -8,7 +8,6 @@ seira:
 
 # === 用户绑定配置 ===
 binding:
-  requireLogin: true # 设置为 true 以使绑定用户在绑定账号时需要登录，未启用登录绑定会导致某些功能不可用
   listenPort: 8722 # 账号绑定回调监听端口
   listenPath: "/callback" # 账号绑定回调监听路径
   # 用于账号绑定的 Osu! API应用凭据

@@ -32,6 +32,8 @@ public class WSClient extends WebSocketClient {
     private final AtomicLong sequence = new AtomicLong(-1);
     private final Router router;
     private volatile boolean heartbeatAcked = true;
+    @Setter
+    private Runnable onCloseCallback = null;
 
     public WSClient(
             URI serverUri,
@@ -45,9 +47,6 @@ public class WSClient extends WebSocketClient {
         this.router = new Router(messageSender, config);
         LOG.info("QQ Gateway WebSocket Client created");
     }
-
-    @Setter
-    private Runnable onCloseCallback = null;
 
     @Override
     public void onOpen(ServerHandshake handshake) {
@@ -125,7 +124,7 @@ public class WSClient extends WebSocketClient {
     private void sendIdentify() {
         JsonObject data = new JsonObject();
         data.addProperty("token", "QQBot " + tokenSupplier.get().token());
-        data.addProperty("intents", 33554432);
+        data.addProperty("intents", 1 << 25);
 
         JsonObject payload = new JsonObject();
         payload.addProperty("op", 2);

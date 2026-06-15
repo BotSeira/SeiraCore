@@ -1,11 +1,11 @@
 package xyz.zcraft.seira.command;
 
+import xyz.zcraft.seira.api.data.SearchQuery;
 import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.command.resolution.ShortcutTarget;
 import xyz.zcraft.seira.command.resolution.TargetResolution;
 import xyz.zcraft.seira.command.resolution.UidListResolution;
 import xyz.zcraft.seira.command.resolution.UidResolution;
-import xyz.zcraft.seira.api.data.SearchQuery;
 
 import java.util.*;
 import java.util.regex.MatchResult;

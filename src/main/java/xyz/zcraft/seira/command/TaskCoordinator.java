@@ -25,7 +25,7 @@ import java.util.function.BiFunction;
 
 import static xyz.zcraft.seira.command.ReplyFactory.at;
 
-final class TaskCoordinator {
+public final class TaskCoordinator {
     private static final Logger LOG = LogManager.getLogger(TaskCoordinator.class);
 
     private final MessageSender messageSender;
@@ -37,7 +37,7 @@ final class TaskCoordinator {
         this.messageSender = messageSender;
     }
 
-    RouteDecision queueApiRequest(Context ctx, String requestType, ApiTaskExecutor executor) {
+    public RouteDecision queueApiRequest(Context ctx, String requestType, ApiTaskExecutor executor) {
         return queueApiRequest(ctx, requestType, executor, () -> null, (_) -> {
         });
     }
@@ -113,13 +113,19 @@ final class TaskCoordinator {
                 statsCompleted = true;
             }
 
-            PendingMessage postResponse = apiTask.postProcessor().execute();
-            if (postResponse != null) {
-                responseSent &= sendOutboundMessage(targetId, messageId, groupMessage, postResponse, messageSeqCounter);
+            if (apiTask.postProcessor() != null) {
+                PendingMessage postResponse = apiTask.postProcessor().execute();
+                if (postResponse != null) {
+                    responseSent &= sendOutboundMessage(targetId, messageId, groupMessage, postResponse, messageSeqCounter);
+                }
             }
         } catch (Exception e) {
             sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString(resolveErrorMessage(e)), messageSeqCounter);
-            LOG.error("Failed to execute API task: {}", e.getMessage(), e);
+            String msg = e.getMessage();
+            if (e instanceof ApiRequestException ex) {
+                msg += " - " + ex.getDefaultMessage();
+            }
+            LOG.error("Failed to execute API task: {}", msg, e);
         } finally {
             try {
                 apiTask.finalizer().execute(responseSent);
@@ -163,7 +169,7 @@ final class TaskCoordinator {
                 message.setMsgType(0);
                 uploadResult = false;
             } else {
-                LOG.info("Media uploaded for message {}", messageId);
+                LOG.debug("Media uploaded for message {}", messageId);
                 message.setMedia(fileInfo);
             }
         } else if (pendingMsg.getFileBase64() != null) {
@@ -176,7 +182,7 @@ final class TaskCoordinator {
                 message.setMsgType(0);
                 uploadResult = false;
             } else {
-                LOG.info("Base64 media uploaded for message {}", messageId);
+                LOG.debug("Base64 media uploaded for message {}", messageId);
                 message.setMedia(fileInfo);
             }
         }

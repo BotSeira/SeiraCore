@@ -23,7 +23,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-final class ReplyFactory {
+public final class ReplyFactory {
     private final Buttons buttons;
 
     ReplyFactory(AppConfig config) {
@@ -142,7 +142,7 @@ final class ReplyFactory {
         final String url = "https://osu.ppy.sh/oauth/authorize?client_id=%d&response_type=code&scope=public+identify+friends.read&state=%s"
                 .formatted(config.clientId(), task.taskId());
         return PendingMessage.ofMarkdownRaw(
-                at(ctx) + "点击下方按钮绑定账号,或者在浏览器打开以下链接: \n```\n%s\n```".formatted(url),
+                at(ctx) + "点击下方按钮绑定账号,或者在浏览器打开以下链接: \n```\n%s\n```\n> 绑定请求20分钟内有效。".formatted(url),
                 buttons.bindButtons(task.openId(), url, !isC2C)
         );
     }
@@ -209,7 +209,7 @@ final class ReplyFactory {
 
     public PendingMessage statusMessage(Context ctx, boolean[] status) {
         return PendingMessage.ofMarkdownRaw(
-                Contents.statContent(ctx, status),null
+                Contents.statContent(ctx, status), null
         );
     }
 
@@ -470,47 +470,48 @@ final class ReplyFactory {
 
         public static String helpContent(Context ctx) {
             return at(ctx) + "\n" +
-                """
-                常用指令：
-                > /bind - 绑定你的玩家ID
-                > /rp - 获取最近通过的一个成绩
-                > /rs - 获取最近的一个成绩
-                > /bo [个数] [玩家ID] - 获取一个或多个最佳成绩
-                > /rs [个数] [玩家ID] - 获取最近一个或多个成绩
-                > /s <成绩ID或快捷查询> - 获取指定成绩
-                > /m <谱面ID或快捷查询> - 获取谱面
-                > /ms <谱面集ID或快捷查询> - 获取谱面集
-                > /r <成绩ID或快捷查询> [[mm:ss]-[mm:ss]] - 生成成绩30秒高光视频或指定片段
-                > /mp - 获取当前所在的多人房间信息和谱面镜像下载链接
-                > /lb <谱面ID> [玩家ID列表] - 获取指定谱面排行榜
-                > /f - 获取好友列表
-                
-                其他指令：
-                > /unbind - 解除你的玩家ID绑定
-                > /clearhistory - 清除你在群聊中的记录
-                > /fall - 获取全部好友列表
-                > /fclear - 清除好友记录
-                > /sa <成绩ID或快捷查询> - 获取指定成绩分析
-                > /ma <成绩ID或快捷查询> [序号] - 获取指定成绩的Miss分析
-                > /u <玩家ID> - 获取玩家信息
-                > /rsc <谱面ID或快捷查询> [+用户ID列表] - 生成同屏回放视频
-                > /rstat [任务ID] - 查询渲染进度
-                > /dl <ID或快捷查询> - 获取镜像下载链接
-                > /sms [#页数] <关键字> - 搜索谱面集
-                > /daily - 获取每日挑战
-                > /stat - 获取状态
-                > /inspect - 获取ID信息
-                > /help - 显示此帮助信息
-                
-                快捷查询参考：
-                > - /m rp2 - 获取最近第二个通过成绩的谱面
-                > - /ms bo10 - 获取第十个最好成绩的谱面集
-                > - /r 12345 rs1 - 生成ID为12345的玩家的最近一个成绩的30秒高光
-                
-                > 注：由于官机限制，群聊中需要@机器人才可以接收到指令
-                
-                详细使用说明请在 GitHub 查看
-                """ + "\n"
+                    """
+                            常用指令：
+                            > /bind - 绑定你的玩家ID
+                            > /rp - 获取最近通过的一个成绩
+                            > /rs - 获取最近的一个成绩
+                            > /bo [个数] [玩家ID] - 获取一个或多个最佳成绩
+                            > /rp [个数] [玩家ID] - 获取最近通过一个或多个成绩
+                            > /rs [个数] [玩家ID] - 获取最近一个或多个成绩，包括失败
+                            > /s <成绩ID或快捷查询> - 获取指定成绩
+                            > /m <谱面ID或快捷查询> - 获取谱面
+                            > /ms <谱面集ID或快捷查询> - 获取谱面集
+                            > /r <成绩ID或快捷查询> [[mm:ss]-[mm:ss]] - 生成成绩30秒高光视频或指定片段
+                            > /mp - 获取当前所在的多人房间信息和谱面镜像下载链接
+                            > /lb <谱面ID> [玩家ID列表] - 获取指定谱面排行榜
+                            > /f - 获取好友列表
+                            
+                            其他指令：
+                            > /unbind - 解除你的玩家ID绑定
+                            > /clearhistory - 清除你在群聊中的记录
+                            > /fall - 获取全部好友列表
+                            > /fclear - 清除好友记录
+                            > /sa <成绩ID或快捷查询> - 获取指定成绩分析
+                            > /ma <成绩ID或快捷查询> [序号] - 获取指定成绩的Miss分析
+                            > /u <玩家ID> - 获取玩家信息
+                            > /rsc <谱面ID或快捷查询> [+用户ID列表] - 生成同屏回放视频
+                            > /rstat [任务ID] - 查询渲染进度
+                            > /dl <ID或快捷查询> - 获取镜像下载链接
+                            > /sms [#页数] <关键字> - 搜索谱面集
+                            > /daily - 获取每日挑战
+                            > /stat - 获取状态
+                            > /inspect - 获取ID信息
+                            > /help - 显示此帮助信息
+                            
+                            快捷查询参考：
+                            > - /m rp2 - 获取最近第二个通过成绩的谱面
+                            > - /ms bo10 - 获取第十个最好成绩的谱面集
+                            > - /r 12345 rs1 - 生成ID为12345的玩家的最近一个成绩的30秒高光
+                            
+                            > 注：由于官机限制，群聊中需要@机器人才可以接收到指令
+                            
+                            详细使用说明请在 GitHub 查看
+                            """ + "\n"
                     + cmd("/faq", "常见问题") + " " + cmd("/stat", "状态信息").trim();
         }
 

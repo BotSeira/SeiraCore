@@ -45,5 +45,9 @@ public class ApiRequestException extends RuntimeException {
             case RENDER_QUEUE_FULL -> "回放渲染队列已满，请稍后再试喵";
         };
     }
+
+    public String getDefaultMessage() {
+        return getDefaultMessage(this.errorCode);
+    }
 }
 

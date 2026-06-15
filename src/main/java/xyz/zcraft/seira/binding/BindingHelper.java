@@ -6,32 +6,43 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.osu.model.User;
 import xyz.zcraft.seira.api.OsuAuthApi;
-import xyz.zcraft.seira.config.BindingConfig;
 import xyz.zcraft.seira.api.data.OsuToken;
+import xyz.zcraft.seira.config.BindingConfig;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.BiConsumer;
 
 public class BindingHelper {
     private static final Logger LOG = LogManager.getLogger(BindingHelper.class);
     private static final ConcurrentHashMap<String, BindingTask> bindingTasks = new ConcurrentHashMap<>();
+    private static final ScheduledExecutorService taskCleaner = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread thread = new Thread(r, "binding-task-cleaner");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     public static void init(BindingConfig bindingConfig) {
-        if (!bindingConfig.requireLogin()) {
-            LOG.info("Required login is disabled, callback service will be disabled.");
-            return;
-        }
-
         final Javalin javalin = Javalin.create(config -> config.routes
                 .get(bindingConfig.listenPath(), ctx -> handleCallback(ctx, bindingConfig)));
 
         javalin.start(bindingConfig.listenPort());
 
         LOG.info("Callback listener started");
+
+        taskCleaner.scheduleAtFixedRate(() -> bindingTasks.entrySet().removeIf(entry -> {
+            long ageMillis = System.currentTimeMillis() - entry.getValue().createdAt();
+            boolean expired = ageMillis > 20 * 60 * 1000L;
+            if (expired) {
+                LOG.info("Removing expired binding task for {}", entry.getKey());
+            }
+            return expired;
+        }), 0L, 1L, java.util.concurrent.TimeUnit.MINUTES);
     }
 
     private static void handleCallback(Context ctx, BindingConfig bindingConfig) {
@@ -86,7 +97,11 @@ public class BindingHelper {
         return task;
     }
 
-    public record BindingTask(String taskId, String openId, String messageId, BiConsumer<User, OsuToken> onFinish) {
+    public record BindingTask(String taskId, String openId, String messageId, BiConsumer<User, OsuToken> onFinish,
+                              long createdAt) {
+        public BindingTask(String taskId, String openId, String messageId, BiConsumer<User, OsuToken> onFinish) {
+            this(taskId, openId, messageId, onFinish, System.currentTimeMillis());
+        }
     }
 }
 

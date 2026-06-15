@@ -3,11 +3,13 @@ package xyz.zcraft.seira.binding;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.api.data.OsuToken;
+import xyz.zcraft.seira.util.OsuAuthHelper;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
 
@@ -83,6 +85,21 @@ public final class UserDataStore {
         }
     }
 
+    public static void removeToken(String openId) {
+        ensureInitialized();
+        String sql = """
+                DELETE FROM token_store
+                WHERE open_id = ?
+                """;
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, openId);
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to remove token", e);
+        }
+    }
+
     public static void storeUserInfo(long osuId, String username) {
         ensureInitialized();
         String sql = """
@@ -98,21 +115,6 @@ public final class UserDataStore {
             statement.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to store user info", e);
-        }
-    }
-
-    public static void removeUserInfo(long osuId) {
-        ensureInitialized();
-        String sql = """
-                DELETE FROM user_info
-                WHERE uid = ?
-                """;
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setLong(1, osuId);
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to delete user info", e);
         }
     }
 
@@ -172,6 +174,32 @@ public final class UserDataStore {
             throw new RuntimeException("Failed to query binding", e);
         }
         return null;
+    }
+
+    public static List<OsuAuthHelper.TokenStore> getAllOsuTokens() {
+        ensureInitialized();
+        List<OsuAuthHelper.TokenStore> tokens = new LinkedList<>();
+        String sql = "SELECT open_id, access_token, refresh_token, expires_in, refreshed_at FROM token_store";
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             Statement statement = connection.createStatement();
+             final ResultSet rs = statement.executeQuery(sql)) {
+            while (rs.next()) {
+                tokens.add(
+                        new OsuAuthHelper.TokenStore(
+                                rs.getString("open_id"),
+                                new OsuToken(
+                                        rs.getString("access_token"),
+                                        rs.getString("refresh_token"),
+                                        rs.getLong("expires_in"),
+                                        rs.getLong("refreshed_at")
+                                )
+                        )
+                );
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to query binding", e);
+        }
+        return tokens;
     }
 
     public static List<Long> findFollower(long uid) {
@@ -242,6 +270,7 @@ public final class UserDataStore {
         }
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public static boolean haveFollowed(long selfId, long followed) {
         ensureInitialized();
         String sql = """
@@ -386,13 +415,83 @@ public final class UserDataStore {
         return 0;
     }
 
+    public static String executeQueryOrEdit(String sql) {
+        ensureInitialized();
+
+        try (Connection c = DriverManager.getConnection(jdbcUrl);
+             Statement stmt = c.createStatement()) {
+
+            // This method should be invoked only in debug context.
+            //noinspection SqlSourceToSinkFlow
+            boolean isResultSet = stmt.execute(sql);
+
+            if (isResultSet) {
+                try (ResultSet rs = stmt.getResultSet()) {
+                    StringBuilder sb = new StringBuilder("```\n");
+
+                    ResultSetMetaData metaData = rs.getMetaData();
+                    int columnCount = metaData.getColumnCount();
+
+                    for (int i = 1; i <= columnCount; i++) {
+                        sb.append(metaData.getColumnName(i)).append(i == columnCount ? "\n" : " | ");
+                    }
+
+                    int rowCount = 0;
+                    while (rs.next()) {
+                        rowCount++;
+                        for (int i = 1; i <= columnCount; i++) {
+                            sb.append(rs.getString(i)).append(i == columnCount ? "\n" : " | ");
+                        }
+                    }
+
+                    sb.append("\n```\n").append("> Rows returned: ").append(rowCount);
+                    return sb.toString();
+                }
+            } else {
+                int updateCount = stmt.getUpdateCount();
+                return "> Edit executed successfully. Rows affected: " + updateCount;
+            }
+
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to execute SQL: " + sql, e);
+        }
+    }
+
+    public static List<Long> findAllUsers() {
+        ensureInitialized();
+
+        List<Long> result = new LinkedList<>();
+
+        var queries = new String[]{
+                "SELECT self AS id FROM user_follows",
+                "SELECT followed AS id FROM user_follows",
+                "SELECT osu_uid AS id FROM user_bindings",
+                "SELECT uid AS id FROM user_info"
+        };
+
+        for (String sql : queries) {
+            try (Connection connection = DriverManager.getConnection(jdbcUrl);
+                 Statement statement = connection.createStatement();
+                 ResultSet rs = statement.executeQuery(sql)) {
+                while (rs.next()) {
+                    long id = rs.getLong("id");
+                    result.add(id);
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException("Failed to query binding", e);
+            }
+        }
+
+        return result.stream().distinct().toList();
+    }
+
     private static void createTablesIfNeeded() throws SQLException {
         String bindingSql = """
                 CREATE TABLE IF NOT EXISTS user_bindings (
                     open_id TEXT NOT NULL,
                     osu_uid BIGINT NOT NULL,
-                    created_at BIGINT NOT NULL,
-                    updated_at BIGINT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     PRIMARY KEY(open_id)
                 )
                 """;
@@ -400,7 +499,7 @@ public final class UserDataStore {
                 CREATE TABLE IF NOT EXISTS group_members (
                     group_id TEXT NOT NULL,
                     open_id TEXT NOT NULL,
-                    updated_at BIGINT NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     PRIMARY KEY(group_id, open_id)
                 )
                 """;
