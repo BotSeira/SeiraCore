@@ -410,9 +410,6 @@ public class APIHelper {
     }
 
     public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] groupUids, TimeDurationParser.TimeRange timeRange, String auth) {
-        if (!target.isMacro() || target.boundUid() == null) {
-            throw new RuntimeException("同屏回放仅支持玩家快捷查询（如 rs1/bo1）。");
-        }
         if (groupUids == null || groupUids.length == 0) {
             throw new RuntimeException("同屏回放需要至少一个玩家ID。");
         }
