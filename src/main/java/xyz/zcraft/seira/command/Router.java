@@ -42,6 +42,8 @@ public class Router {
     private final Resolver resolver;
     private final DebugRoutes debugRoutes;
 
+    private final ConcurrentHashMap<String, ShortcutTarget> lastTarget = new ConcurrentHashMap<>();
+
     public Router(MessageSender messageSender, AppConfig config) {
         this.messageSender = messageSender;
         this.config = config;
@@ -339,6 +341,8 @@ public class Router {
                 return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
             }
 
+            lastTarget.put(ctx.senderUserId(), target);
+
             if (ctx.args().length > targetResolution.consumedArgs() + 1) {
                 return RouteDecision.sync(PendingMessage.ofString(Usages.M_USAGE));
             }
@@ -354,33 +358,45 @@ public class Router {
                     replyFactory::beatmapMessage
             );
         } else {
+            if (lastTarget.get(ctx.senderUserId()) != null) {
+                ShortcutTarget target = lastTarget.get(ctx.senderUserId());
+                return taskCoordinator.queueImageRequest(
+                        ctx,
+                        "Beatmap",
+                        () -> APIHelper.getBeatmapResponse(target, null, getAccessTokenFor(ctx.senderUserId())),
+                        replyFactory::beatmapMessage
+                );
+            }
+
             return RouteDecision.sync(PendingMessage.ofString(Usages.M_USAGE));
         }
     }
 
     private RouteDecision handleAp(Context ctx) {
+        ShortcutTarget target;
+
         if (ctx.args().length >= 1) {
             TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
-            ShortcutTarget target = targetResolution.target();
+            target = targetResolution.target();
             if (target.isError()) {
                 return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
             }
 
-            if (ctx.args().length > targetResolution.consumedArgs() + 1) {
-                return RouteDecision.sync(PendingMessage.ofString(Usages.AP_USAGE));
-            }
-
-            return taskCoordinator.queueApiRequest(
-                    ctx,
-                    "Audio Preview",
-                    () -> {
-                        final long id = APIHelper.lookupBeatmapset(target, getAccessTokenFor(ctx.senderUserId()));
-                        return PendingMessage.ofVoiceUrl("https://b.ppy.sh/preview/" + id + ".mp3").doUpload(false);
-                    }
-            );
+            lastTarget.put(ctx.senderUserId(), target);
         } else {
-            return RouteDecision.sync(PendingMessage.ofString(Usages.M_USAGE));
+            if (lastTarget.get(ctx.senderUserId()) != null) {
+                target = lastTarget.get(ctx.senderUserId());
+            } else return RouteDecision.sync(PendingMessage.ofString(Usages.AP_USAGE));
         }
+
+        return taskCoordinator.queueApiRequest(
+                ctx,
+                "Audio Preview",
+                () -> {
+                    final long id = APIHelper.lookupBeatmapset(target, getAccessTokenFor(ctx.senderUserId()));
+                    return PendingMessage.ofVoiceUrl("https://b.ppy.sh/preview/" + id + ".mp3").doUpload(false);
+                }
+        );
     }
 
     private RouteDecision handleF(Context ctx, boolean all) {
@@ -480,18 +496,28 @@ public class Router {
     }
 
     private RouteDecision handleDl(Context ctx) {
-        if (ctx.args().length < 1 || ctx.args().length > 2) {
-            return RouteDecision.sync(PendingMessage.ofString(Usages.DL_USAGE));
+        ShortcutTarget target;
+
+        if (ctx.args().length == 0) {
+            target = lastTarget.get(ctx.senderUserId());
+        } else if (ctx.args().length <= 2) {
+            TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
+            if (ctx.args().length != targetResolution.consumedArgs()) {
+                return RouteDecision.sync(PendingMessage.ofString(Usages.DL_USAGE));
+            }
+
+            target = targetResolution.target();
+            if (target.isError()) {
+                return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+            }
+
+            lastTarget.put(ctx.senderUserId(), target);
+        } else {
+            target = null;
         }
 
-        TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
-        if (ctx.args().length != targetResolution.consumedArgs()) {
+        if (target == null) {
             return RouteDecision.sync(PendingMessage.ofString(Usages.DL_USAGE));
-        }
-
-        ShortcutTarget target = targetResolution.target();
-        if (target.isError()) {
-            return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
         }
 
         return taskCoordinator.queueApiRequest(
@@ -505,17 +531,29 @@ public class Router {
     }
 
     private RouteDecision handleS(Context ctx) {
-        if (ctx.args().length < 1 || ctx.args().length > 2) {
-            return RouteDecision.sync(PendingMessage.ofString(Usages.S_USAGE));
+        ShortcutTarget target;
+        if (ctx.args().length == 0) {
+            target = lastTarget.get(ctx.senderUserId());
+        } else if (ctx.args().length <= 2) {
+            TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
+
+            if (ctx.args().length != targetResolution.consumedArgs()) {
+                return RouteDecision.sync(PendingMessage.ofString(Usages.S_USAGE));
+            }
+
+            target = targetResolution.target();
+
+            if (target.isError()) {
+                return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+            }
+
+            lastTarget.put(ctx.senderUserId(), target);
+        } else {
+            target = null;
         }
 
-        TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
-        if (ctx.args().length != targetResolution.consumedArgs()) {
+        if (target == null) {
             return RouteDecision.sync(PendingMessage.ofString(Usages.S_USAGE));
-        }
-        ShortcutTarget target = targetResolution.target();
-        if (target.isError()) {
-            return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
         }
 
         return taskCoordinator.queueImageRequest(
@@ -527,17 +565,29 @@ public class Router {
     }
 
     private RouteDecision handleSa(Context ctx) {
-        if (ctx.args().length < 1 || ctx.args().length > 2) {
-            return RouteDecision.sync(PendingMessage.ofString(Usages.SA_USAGE));
+        ShortcutTarget target;
+        if (ctx.args().length == 0) {
+            target = lastTarget.get(ctx.senderUserId());
+        }  else if (ctx.args().length <= 2) {
+            TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
+
+            if (ctx.args().length != targetResolution.consumedArgs()) {
+                return RouteDecision.sync(PendingMessage.ofString(Usages.SA_USAGE));
+            }
+
+            target = targetResolution.target();
+
+            if (target.isError()) {
+                return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+            }
+
+            lastTarget.put(ctx.senderUserId(), target);
+        } else {
+            target = null;
         }
 
-        TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
-        if (ctx.args().length != targetResolution.consumedArgs()) {
+        if (target == null) {
             return RouteDecision.sync(PendingMessage.ofString(Usages.SA_USAGE));
-        }
-        ShortcutTarget target = targetResolution.target();
-        if (target.isError()) {
-            return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
         }
 
         return taskCoordinator.queueImageRequest(
@@ -549,6 +599,7 @@ public class Router {
     }
 
     private RouteDecision handleMa(Context ctx) {
+        // TODO Rewrite the logic
         if (ctx.args().length < 1 || ctx.args().length > 3) {
             return RouteDecision.sync(PendingMessage.ofString(Usages.MA_USAGE));
         }
@@ -584,6 +635,7 @@ public class Router {
     }
 
     private RouteDecision handleR(Context ctx) {
+        // TODO Rewrite the logic
         if (ctx.args().length < 1 || ctx.args().length > 3) {
             return RouteDecision.sync(PendingMessage.ofString(Usages.R_USAGE));
         }
@@ -621,6 +673,7 @@ public class Router {
     }
 
     private RouteDecision handleRsc(Context ctx) {
+        // TODO Rewrite the logic
         if (ctx.args().length < 1 || ctx.args().length > 3) {
             return RouteDecision.sync(PendingMessage.ofString(Usages.RSC_USAGE));
         }
@@ -673,17 +726,26 @@ public class Router {
     }
 
     private RouteDecision handleMs(Context ctx) {
-        if (ctx.args().length < 1 || ctx.args().length > 2) {
-            return RouteDecision.sync(PendingMessage.ofString("用法：/ms <谱面集ID 或 快捷查询>"));
+        ShortcutTarget target;
+        if (ctx.args().length == 0) {
+            target = lastTarget.get(ctx.senderUserId());
+        } else if (ctx.args().length <= 2) {
+            TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
+            if (ctx.args().length != targetResolution.consumedArgs()) {
+                return RouteDecision.sync(PendingMessage.ofString("用法：/ms <谱面集ID 或 快捷查询>"));
+            }
+            target = targetResolution.target();
+            if (target.isError()) {
+                return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+            }
+
+            lastTarget.put(ctx.senderUserId(), target);
+        } else {
+            target = null;
         }
 
-        TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
-        if (ctx.args().length != targetResolution.consumedArgs()) {
+        if (target == null) {
             return RouteDecision.sync(PendingMessage.ofString("用法：/ms <谱面集ID 或 快捷查询>"));
-        }
-        ShortcutTarget target = targetResolution.target();
-        if (target.isError()) {
-            return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
         }
 
         return taskCoordinator.queueImageRequest(
