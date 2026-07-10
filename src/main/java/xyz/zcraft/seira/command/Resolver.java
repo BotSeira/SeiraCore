@@ -133,6 +133,8 @@ final class Resolver {
         }
     }
 
+    private static final ArrayList<String> USER_MACRO_TYPES = new ArrayList<>(List.of("rs", "bo", "rp"));
+
     public ShortcutTarget parseTarget(String arg, String senderUserId, boolean mentionedUser, boolean needResolveBound) {
         Matcher setMatcher = Patterns.SET_MACRO_PATTERN.matcher(arg.trim());
         if (setMatcher.matches()) {
@@ -155,34 +157,35 @@ final class Resolver {
                 type = "bo";
             }
 
-            switch (type) {
-                case "rs", "bo", "rp" -> {
-                    Long index = parsePositiveLong(userMatcher.group(2));
-
-                    if (index == null || index < 1 || index > 100) {
-                        return new ShortcutTarget(null, null, null, null, "快捷指令索引无效，请输入 1-100 之间的数字。例如: rs5");
-                    }
-
-                    Long uid = needResolveBound ? resolveBoundUid(senderUserId) : tryParseLong(senderUserId);
-                    if (uid == null) {
-                        String errorMessage;
-                        if (needResolveBound) {
-                            errorMessage = mentionedUser
-                                    ? "被@的用户还没有绑定玩家ID，无法使用快捷查询。"
-                                    : "你还没有绑定玩家ID，无法使用快捷查询。请先使用 /bind";
-                        } else {
-                            errorMessage = "无法识别指定的玩家ID";
-                        }
-
-                        return new ShortcutTarget(null, null, null, null, errorMessage);
-                    }
-
-                    return new ShortcutTarget(null, uid, type, index, null);
-                }
-                default -> {
-                    return new ShortcutTarget(null, null, null, null, "未知的快捷查询");
-                }
+            if (!USER_MACRO_TYPES.contains(type)) {
+                return new ShortcutTarget(null, null, null, null, "未知的快捷查询");
             }
+
+            Long index = parsePositiveLong(userMatcher.group(2));
+
+            if (index == null) {
+                index = 1L;
+            }
+
+            if (index < 1 || index > 100) {
+                return new ShortcutTarget(null, null, null, null, "快捷指令索引无效，请输入 1-100 之间的数字。例如: rs5");
+            }
+
+            Long uid = needResolveBound ? resolveBoundUid(senderUserId) : tryParseLong(senderUserId);
+            if (uid == null) {
+                String errorMessage;
+                if (needResolveBound) {
+                    errorMessage = mentionedUser
+                            ? "被@的用户还没有绑定玩家ID，无法使用快捷查询。"
+                            : "你还没有绑定玩家ID，无法使用快捷查询。请先使用 /bind";
+                } else {
+                    errorMessage = "无法识别指定的玩家ID";
+                }
+
+                return new ShortcutTarget(null, null, null, null, errorMessage);
+            }
+
+            return new ShortcutTarget(null, uid, type, index, null);
         }
 
         if ("mp".equalsIgnoreCase(arg.trim())) {
@@ -264,7 +267,7 @@ final class Resolver {
     }
 
     private static final class Patterns {
-        private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo|rp|bp)(\\d+)$");
+        private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo|rp|bp)(\\d+)?$");
         private static final Pattern SET_MACRO_PATTERN = Pattern.compile("^(\\d+)#(\\d+)$");
         private static final Pattern BEATMAP_MACRO_PATTERN = Pattern.compile("^m(\\d+)$");
         private static final Pattern CQ_AT_PATTERN = Pattern.compile("^\\[CQ:at,qq=(\\d+)(?:,.*)?]$");
