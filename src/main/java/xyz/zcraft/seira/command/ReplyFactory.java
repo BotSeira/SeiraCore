@@ -125,7 +125,7 @@ public final class ReplyFactory {
     public PendingMessage beatmapsetMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.beatmapsetContent(ctx, response),
-                null
+                buttons.beatmapsetButtons(response.getBeatmapsetId())
         );
     }
 
@@ -531,6 +531,19 @@ public final class ReplyFactory {
     }
 
     private record Buttons(String directUrl) {
+        List<List<Button>> beatmapsetButtons(String beatmapsetId) {
+            if (beatmapsetId == null || beatmapsetId.isBlank()) {
+                return null;
+            }
+
+            return Button.keyboard(
+                    Button.row(
+                            Button.command(1, "预览音频", "/ap " + beatmapsetId),
+                            Button.openUrl(2, "在游戏中查看", directUrl + "/s/" + beatmapsetId)
+                    )
+            );
+        }
+
         List<List<Button>> mpButtons(MultiplayerRoom room) {
             List<List<Button>> rows = new ArrayList<>();
 
@@ -675,7 +688,10 @@ public final class ReplyFactory {
                             Button.command(1, "查询排行榜", "/lb " + beatmapId),
                             Button.openUrl(2, "在游戏中查看", directUrl + "/b/" + beatmapId)
                     ),
-                    Button.row(Button.command(3, "查询自己的分数", "/s m" + beatmapId))
+                    Button.row(
+                            Button.command(3, "预览音频", "/ap m" + beatmapId),
+                            Button.command(4, "查询自己的分数", "/s m" + beatmapId)
+                    )
             );
         }
 
