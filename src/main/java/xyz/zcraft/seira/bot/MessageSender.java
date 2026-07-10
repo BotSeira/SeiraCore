@@ -37,10 +37,6 @@ public class MessageSender {
         }
     }
 
-    public FileInfo uploadPrivateMedia(String userId, int fileType, String url) {
-        return uploadPrivateMedia(userId, fileType, url, true);
-    }
-
     public FileInfo uploadPrivateMedia(String userId, int fileType, String url, boolean uploadCos) {
         LOG.info("Uploading private media for user {}, fileType {}, url {}", userId, fileType, url);
 
@@ -65,10 +61,6 @@ public class MessageSender {
         }
 
         return null;
-    }
-
-    public FileInfo uploadGroupMedia(String groupId, int fileType, String url) {
-        return uploadGroupMedia(groupId, fileType, url, true);
     }
 
     public FileInfo uploadGroupMedia(String groupId, int fileType, String url, boolean uploadCos) {

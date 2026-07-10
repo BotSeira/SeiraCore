@@ -89,6 +89,7 @@ mvn -U clean compile exec:java
 | `/rs`           | `/rs [n] [uid/@user]`                   | 最近n个成绩图，无参时获取最近一个成绩详情               |
 | `/rp`           | `/rp [n] [uid/@user]`                   | 最近n个通过成绩图，无参时获取最近一个通过成绩详情           |
 | `/m`            | `/m <id/rsN/boN> [Mod]`                 | 获取指定谱面信息                            |
+| `/ap`           | `/ap <id/rsN/boN>`                      | 获取指定谱面音频预览                          |
 | `/s`            | `/s <id/rsN/boN>`                       | 获取指定成绩图                             |
 | `/sa`           | `/sa <id/rsN/boN>`                      | 获取指定成绩分析图                           |
 | `/ma`           | `/ma <id/rsN/boN> [n]`                  | 获取指定成绩的Miss分析                       |

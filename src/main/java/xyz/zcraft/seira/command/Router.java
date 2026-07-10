@@ -133,6 +133,7 @@ public class Router {
             case "rs" -> handleRs(ctx, true);
             case "rp" -> handleRs(ctx, false);
             case "m" -> handleM(ctx);
+            case "ap" -> handleAp(ctx);
             case "f" -> handleF(ctx, !ctx.inGroup());
             case "fall" -> handleF(ctx, true);
             case "fclear" -> handleFclear(ctx);
@@ -351,6 +352,31 @@ public class Router {
                     "Beatmap",
                     () -> APIHelper.getBeatmapResponse(target, mod, getAccessTokenFor(ctx.senderUserId())),
                     replyFactory::beatmapMessage
+            );
+        } else {
+            return RouteDecision.sync(PendingMessage.ofString(Usages.M_USAGE));
+        }
+    }
+
+    private RouteDecision handleAp(Context ctx) {
+        if (ctx.args().length >= 1) {
+            TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
+            ShortcutTarget target = targetResolution.target();
+            if (target.isError()) {
+                return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+            }
+
+            if (ctx.args().length > targetResolution.consumedArgs() + 1) {
+                return RouteDecision.sync(PendingMessage.ofString(Usages.AP_USAGE));
+            }
+
+            return taskCoordinator.queueApiRequest(
+                    ctx,
+                    "Audio Preview",
+                    () -> {
+                        final long id = APIHelper.lookupBeatmapset(target, getAccessTokenFor(ctx.senderUserId()));
+                        return PendingMessage.ofVoiceUrl("https://b.ppy.sh/preview/" + id + ".mp3").doUpload(false);
+                    }
             );
         } else {
             return RouteDecision.sync(PendingMessage.ofString(Usages.M_USAGE));
@@ -848,6 +874,7 @@ public class Router {
         public static final String REBIND_TIP = "由于发生了一个技术问题，使用此功能需要重新绑定。请使用 `/unbind` 解除绑定，再使用 `/bind` 重新绑定~";
         public static final String RS_USAGE = "用法：/rs <个数> [玩家ID/@用户]";
         public static final String M_USAGE = "用法：/m <谱面ID 或 快捷查询> [Mod]";
+        public static final String AP_USAGE = "用法：/ap <谱面ID 或 快捷查询>";
         public static final String DL_USAGE = "用法：/dl <谱面集ID 或 快捷查询>";
         public static final String S_USAGE = "用法：/s <成绩ID 或 快捷查询>";
         public static final String SA_USAGE = "用法：/sa <成绩ID 或 快捷查询>";
