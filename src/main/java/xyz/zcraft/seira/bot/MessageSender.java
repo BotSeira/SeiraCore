@@ -4,6 +4,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.bot.data.Message;
+import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.util.CosService;
 import xyz.zcraft.seira.util.TokenManager;
 
@@ -35,6 +36,10 @@ public class MessageSender {
             LOG.error("Failed to send message to group {}", groupId, e);
             return false;
         }
+    }
+
+    public String uploadImageToCos(byte[] imageBytes) {
+        return cos.upload(imageBytes, PendingMessage.FILE_TYPE_IMAGE);
     }
 
     public FileInfo uploadPrivateMedia(String userId, int fileType, String url, boolean uploadCos) {
