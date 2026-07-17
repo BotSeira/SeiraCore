@@ -599,23 +599,30 @@ public class Router {
     }
 
     private RouteDecision handleMa(Context ctx) {
-        // TODO Rewrite the logic
-        if (ctx.args().length < 1 || ctx.args().length > 3) {
+        TargetResolution targetResolution = resolveOptionalTarget(ctx, arg -> arg.startsWith("#"));
+        ShortcutTarget target = targetResolution.target();
+        if (target == null) {
             return RouteDecision.sync(PendingMessage.ofString(Usages.MA_USAGE));
         }
-
-        TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
-
-        ShortcutTarget target = targetResolution.target();
         if (target.isError()) {
             return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
         }
 
-        if (ctx.args().length == targetResolution.consumedArgs() + 1) {
-            Integer index = resolver.parsePositiveInt(ctx.args()[targetResolution.consumedArgs()]);
+        int remainingArgs = ctx.args().length - targetResolution.consumedArgs();
+        if (remainingArgs > 1) {
+            return RouteDecision.sync(PendingMessage.ofString(Usages.MA_USAGE));
+        }
+
+        if (remainingArgs == 1) {
+            Integer index = parseMissIndex(
+                    ctx.args()[targetResolution.consumedArgs()],
+                    targetResolution.consumedArgs() == 0
+            );
             if (index == null) {
                 return RouteDecision.sync(PendingMessage.ofString(Usages.MA_USAGE));
             }
+
+            rememberExplicitTarget(ctx, targetResolution);
 
             return taskCoordinator.queueImageRequest(
                     ctx,
@@ -623,42 +630,42 @@ public class Router {
                     () -> APIHelper.getMissVisualizeResponse(target, index),
                     (_, _) -> null
             );
-        } else if (ctx.args().length == targetResolution.consumedArgs()) {
-            return taskCoordinator.queueApiRequest(
-                    ctx,
-                    "Get Score Misses",
-                    () -> replyFactory.scoreMissesMessage(ctx, APIHelper.getScoreMissesResponse(target))
-            );
-        } else {
-            return RouteDecision.sync(PendingMessage.ofString(Usages.MA_USAGE));
         }
+
+        rememberExplicitTarget(ctx, targetResolution);
+
+        return taskCoordinator.queueApiRequest(
+                ctx,
+                "Get Score Misses",
+                () -> replyFactory.scoreMissesMessage(ctx, APIHelper.getScoreMissesResponse(target))
+        );
     }
 
     private RouteDecision handleR(Context ctx) {
-        // TODO Rewrite the logic
-        if (ctx.args().length < 1 || ctx.args().length > 3) {
-            return RouteDecision.sync(PendingMessage.ofString(Usages.R_USAGE));
-        }
-
-        TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
+        TargetResolution targetResolution = resolveOptionalTarget(ctx, TimeDurationParser::isTimeRange);
         if (ctx.args().length - targetResolution.consumedArgs() > 1) {
             return RouteDecision.sync(PendingMessage.ofString(Usages.R_USAGE));
         }
 
         ShortcutTarget target = targetResolution.target();
+        if (target == null) {
+            return RouteDecision.sync(PendingMessage.ofString(Usages.R_USAGE));
+        }
         if (target.isError()) {
             return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
         }
 
         TimeDurationParser.TimeRange range = null;
 
-        if (ctx.args().length == 2) {
+        if (ctx.args().length > targetResolution.consumedArgs()) {
             try {
-                range = TimeDurationParser.parseRange(ctx.args()[1]);
+                range = TimeDurationParser.parseRange(ctx.args()[targetResolution.consumedArgs()]);
             } catch (IllegalArgumentException e) {
                 return RouteDecision.sync(PendingMessage.ofString("无法解析时间范围"));
             }
         }
+
+        rememberExplicitTarget(ctx, targetResolution);
 
         TimeDurationParser.TimeRange finalRange = range;
         return taskCoordinator.queueReplayTask(
@@ -673,21 +680,18 @@ public class Router {
     }
 
     private RouteDecision handleRsc(Context ctx) {
-        // TODO Rewrite the logic
-        if (ctx.args().length < 1 || ctx.args().length > 3) {
-            return RouteDecision.sync(PendingMessage.ofString(Usages.RSC_USAGE));
-        }
-
         if (ctx.groupId() == null || ctx.groupId().isBlank()) {
             return RouteDecision.sync(PendingMessage.ofString("/rsc 仅支持群聊使用。"));
         }
 
-        TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
-        if (ctx.args().length - targetResolution.consumedArgs() > 2) {
+        TargetResolution targetResolution = resolveOptionalTarget(
+                ctx,
+                arg -> arg.startsWith("+") || TimeDurationParser.isTimeRange(arg)
+        );
+        ShortcutTarget target = targetResolution.target();
+        if (target == null) {
             return RouteDecision.sync(PendingMessage.ofString(Usages.RSC_USAGE));
         }
-
-        ShortcutTarget target = targetResolution.target();
         if (target.isError()) {
             return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
         }
@@ -697,8 +701,14 @@ public class Router {
 
         for (int i = targetResolution.consumedArgs(); i < ctx.args().length; i++) {
             if (ctx.args()[i].startsWith("+")) {
+                if (extraUidArg != null) {
+                    return RouteDecision.sync(PendingMessage.ofString(Usages.RSC_USAGE));
+                }
                 extraUidArg = ctx.args()[i];
             } else if (TimeDurationParser.isTimeRange(ctx.args()[i])) {
+                if (range != null) {
+                    return RouteDecision.sync(PendingMessage.ofString(Usages.RSC_USAGE));
+                }
                 range = TimeDurationParser.parseRange(ctx.args()[i]);
             } else {
                 return RouteDecision.sync(PendingMessage.ofString(Usages.RSC_USAGE));
@@ -714,6 +724,8 @@ public class Router {
 
         TimeDurationParser.TimeRange finalRange = range;
 
+        rememberExplicitTarget(ctx, targetResolution);
+
         return taskCoordinator.queueReplayTask(
                 ctx,
                 "Showcase Render",
@@ -723,6 +735,29 @@ public class Router {
                     return task;
                 },
                 replyFactory::replayMessage);
+    }
+
+    private TargetResolution resolveOptionalTarget(Context ctx, Predicate<String> isOptionalArgument) {
+        if (ctx.args().length == 0 || isOptionalArgument.test(ctx.args()[0])) {
+            return new TargetResolution(lastTarget.get(ctx.senderUserId()), 0);
+        }
+        return resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
+    }
+
+    private void rememberExplicitTarget(Context ctx, TargetResolution targetResolution) {
+        if (targetResolution.consumedArgs() > 0) {
+            lastTarget.put(ctx.senderUserId(), targetResolution.target());
+        }
+    }
+
+    private Integer parseMissIndex(String arg, boolean requirePrefix) {
+        String value = arg;
+        if (arg.startsWith("#")) {
+            value = arg.substring(1);
+        } else if (requirePrefix) {
+            return null;
+        }
+        return resolver.parsePositiveInt(value);
     }
 
     private RouteDecision handleMs(Context ctx) {
@@ -940,8 +975,8 @@ public class Router {
         public static final String DL_USAGE = "用法：/dl <谱面集ID 或 快捷查询>";
         public static final String S_USAGE = "用法：/s <成绩ID 或 快捷查询>";
         public static final String SA_USAGE = "用法：/sa <成绩ID 或 快捷查询>";
-        public static final String MA_USAGE = "用法：/ma <成绩ID 或 快捷查询> [序号]";
-        private static final String R_USAGE = "用法：/r <成绩ID 或 快捷查询>";
-        private static final String RSC_USAGE = "用法：/rsc <谱面ID或快捷查询> [+用户ID列表，逗号分隔]";
+        public static final String MA_USAGE = "用法：/ma [成绩ID 或 快捷查询] [序号]；省略目标并指定序号时请使用 #序号";
+        private static final String R_USAGE = "用法：/r [成绩ID 或 快捷查询] [[mm:ss]-[mm:ss]]";
+        private static final String RSC_USAGE = "用法：/rsc [谱面ID或快捷查询] [+用户ID列表，逗号分隔] [[mm:ss]-[mm:ss]]";
     }
 }
