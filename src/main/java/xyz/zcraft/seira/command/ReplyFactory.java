@@ -68,7 +68,7 @@ public final class ReplyFactory {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "谱面查询完成\n" +
                         "> 谱面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
-                        "> 谱面集: " + cmd("/ms m" + response.getBeatmapId(), response.getBeatmapsetId()),
+                        "> 谱面集: " + cmd("/ms " + response.getBeatmapsetId(), response.getBeatmapsetId()),
                 buttons.beatmapButtons(response.getBeatmapId())
         );
 
@@ -125,7 +125,7 @@ public final class ReplyFactory {
     public PendingMessage beatmapsetMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.beatmapsetContent(ctx, response),
-                null
+                buttons.beatmapsetButtons(response.getBeatmapsetId())
         );
     }
 
@@ -481,7 +481,7 @@ public final class ReplyFactory {
                             > /s <成绩ID或快捷查询> - 获取指定成绩
                             > /m <谱面ID或快捷查询> - 获取谱面
                             > /ms <谱面集ID或快捷查询> - 获取谱面集
-                            > /r <成绩ID或快捷查询> [[mm:ss]-[mm:ss]] - 生成成绩30秒高光视频或指定片段
+                            > /r [成绩ID或快捷查询] [[mm:ss]-[mm:ss]] - 生成成绩高光视频或指定片段
                             > /mp - 获取当前所在的多人房间信息和谱面镜像下载链接
                             > /lb <谱面ID> [玩家ID列表] - 获取指定谱面排行榜
                             > /f - 获取好友列表
@@ -491,10 +491,11 @@ public final class ReplyFactory {
                             > /clearhistory - 清除你在群聊中的记录
                             > /fall - 获取全部好友列表
                             > /fclear - 清除好友记录
+                            > /ap <铺面ID或快捷查询> - 获取指定铺面音频预览
                             > /sa <成绩ID或快捷查询> - 获取指定成绩分析
-                            > /ma <成绩ID或快捷查询> [序号] - 获取指定成绩的Miss分析
+                            > /ma [成绩ID或快捷查询] [序号/#序号] - 获取成绩的Miss分析
                             > /u <玩家ID> - 获取玩家信息
-                            > /rsc <谱面ID或快捷查询> [+用户ID列表] - 生成同屏回放视频
+                            > /rsc [谱面ID或快捷查询] [+用户ID列表] [[mm:ss]-[mm:ss]] - 生成同屏回放视频
                             > /rstat [任务ID] - 查询渲染进度
                             > /dl <ID或快捷查询> - 获取镜像下载链接
                             > /sms [#页数] <关键字> - 搜索谱面集
@@ -530,6 +531,19 @@ public final class ReplyFactory {
     }
 
     private record Buttons(String directUrl) {
+        List<List<Button>> beatmapsetButtons(String beatmapsetId) {
+            if (beatmapsetId == null || beatmapsetId.isBlank()) {
+                return null;
+            }
+
+            return Button.keyboard(
+                    Button.row(
+                            Button.command(1, "预览音频", "/ap " + beatmapsetId),
+                            Button.openUrl(2, "在游戏中查看", directUrl + "/s/" + beatmapsetId)
+                    )
+            );
+        }
+
         List<List<Button>> mpButtons(MultiplayerRoom room) {
             List<List<Button>> rows = new ArrayList<>();
 
@@ -674,7 +688,10 @@ public final class ReplyFactory {
                             Button.command(1, "查询排行榜", "/lb " + beatmapId),
                             Button.openUrl(2, "在游戏中查看", directUrl + "/b/" + beatmapId)
                     ),
-                    Button.row(Button.command(3, "查询自己的分数", "/s m" + beatmapId))
+                    Button.row(
+                            Button.command(3, "预览音频", "/ap m" + beatmapId),
+                            Button.command(4, "查询自己的分数", "/s m" + beatmapId)
+                    )
             );
         }
 

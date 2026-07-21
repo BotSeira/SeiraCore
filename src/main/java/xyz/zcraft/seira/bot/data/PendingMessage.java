@@ -19,12 +19,18 @@ public class PendingMessage {
     private String fileUrl = null;
     private String fileBase64 = null;
     private int fileType = -1;
+    private boolean upload = true;
 
     public static PendingMessage ofString(String content) {
         final PendingMessage message = new PendingMessage();
         message.content = content;
         message.msgType = MSG_TYPE_TEXT;
         return message;
+    }
+
+    public PendingMessage doUpload(boolean upload) {
+        this.upload = upload;
+        return this;
     }
 
     public static PendingMessage ofMarkdownRaw(String content) {
@@ -48,6 +54,14 @@ public class PendingMessage {
         message.fileType = FILE_TYPE_VIDEO;
         message.msgType = MSG_TYPE_MEDIA;
         message.fileUrl = videoUrl;
+        return message;
+    }
+
+    public static PendingMessage ofVoiceUrl(String voiceUrl) {
+        final PendingMessage message = new PendingMessage();
+        message.fileType = FILE_TYPE_VOICE;
+        message.msgType = MSG_TYPE_MEDIA;
+        message.fileUrl = voiceUrl;
         return message;
     }
 

@@ -76,6 +76,28 @@ public class CosService {
         return url;
     }
 
+    public String upload(byte[] content, int fileType) {
+        if (content == null || content.length == 0) {
+            throw new IllegalArgumentException("Cannot upload empty media to COS");
+        }
+
+        String contentType = detectContentType(content, fileType);
+        DownloadedMedia media = DownloadedMedia.create(content, contentType);
+        String objectKey = buildObjectKey(fileType, "", contentType);
+
+        urlCache.entrySet().removeIf(entry -> entry.getValue().uploadedAt() < System.currentTimeMillis() - 24 * 3600 * 1000);
+        if (urlCache.containsKey(media.digest())) {
+            return urlCache.get(media.digest()).url();
+        }
+
+        String url = doUpload(objectKey, media);
+        LOG.info("Uploaded byte media to COS. cosUrl={}", url);
+        if (media.digest() != null) {
+            urlCache.put(media.digest(), new FileUpload(url, System.currentTimeMillis()));
+        }
+        return url;
+    }
+
     @NotNull
     private String doUpload(String objectKey, DownloadedMedia media) {
         ObjectMetadata metadata = new ObjectMetadata();
@@ -154,6 +176,28 @@ public class CosService {
         }
 
         return fileType == PendingMessage.FILE_TYPE_VIDEO ? ".mp4" : ".bin";
+    }
+
+    private String detectContentType(byte[] content, int fileType) {
+        if (content.length >= 8
+                && content[0] == (byte) 0x89 && content[1] == 0x50
+                && content[2] == 0x4e && content[3] == 0x47) {
+            return "image/png";
+        }
+        if (content.length >= 3
+                && content[0] == (byte) 0xff && content[1] == (byte) 0xd8 && content[2] == (byte) 0xff) {
+            return "image/jpeg";
+        }
+        if (content.length >= 6
+                && content[0] == 0x47 && content[1] == 0x49 && content[2] == 0x46) {
+            return "image/gif";
+        }
+        if (content.length >= 12
+                && content[0] == 0x52 && content[1] == 0x49 && content[2] == 0x46 && content[3] == 0x46
+                && content[8] == 0x57 && content[9] == 0x45 && content[10] == 0x42 && content[11] == 0x50) {
+            return "image/webp";
+        }
+        return fileType == PendingMessage.FILE_TYPE_IMAGE ? "image/png" : "application/octet-stream";
     }
 
     private String extensionFromUrl(String sourceUrl) {

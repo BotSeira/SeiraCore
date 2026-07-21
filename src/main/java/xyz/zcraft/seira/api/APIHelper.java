@@ -193,7 +193,7 @@ public class APIHelper {
         return getBase64BytesResponse("/beatmaps/" + beatmapId + (mod != null ? "?mod=" + mod : ""), "获取谱面失败", null);
     }
 
-    private static long lookupBeatmap(ShortcutTarget target, String auth) {
+    public static long lookupBeatmap(ShortcutTarget target, String auth) {
         long beatmapId;
         if (!target.isMacro()) {
             beatmapId = target.explicitId();
@@ -251,7 +251,7 @@ public class APIHelper {
         return getBase64BytesResponse("/beatmapsets/" + beatmapsetId, "获取谱面集失败", null);
     }
 
-    private static long lookupBeatmapset(ShortcutTarget target, String auth) {
+    public static long lookupBeatmapset(ShortcutTarget target, String auth) {
         long beatmapsetId;
         if (!target.isMacro()) {
             beatmapsetId = target.explicitId();
@@ -410,9 +410,6 @@ public class APIHelper {
     }
 
     public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] groupUids, TimeDurationParser.TimeRange timeRange, String auth) {
-        if (!target.isMacro() || target.boundUid() == null) {
-            throw new RuntimeException("同屏回放仅支持玩家快捷查询（如 rs1/bo1）。");
-        }
         if (groupUids == null || groupUids.length == 0) {
             throw new RuntimeException("同屏回放需要至少一个玩家ID。");
         }

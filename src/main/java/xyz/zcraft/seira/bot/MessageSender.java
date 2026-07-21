@@ -4,6 +4,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.bot.data.Message;
+import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.util.CosService;
 import xyz.zcraft.seira.util.TokenManager;
 
@@ -37,8 +38,8 @@ public class MessageSender {
         }
     }
 
-    public FileInfo uploadPrivateMedia(String userId, int fileType, String url) {
-        return uploadPrivateMedia(userId, fileType, url, true);
+    public String uploadImageToCos(byte[] imageBytes) {
+        return cos.upload(imageBytes, PendingMessage.FILE_TYPE_IMAGE);
     }
 
     public FileInfo uploadPrivateMedia(String userId, int fileType, String url, boolean uploadCos) {
@@ -65,10 +66,6 @@ public class MessageSender {
         }
 
         return null;
-    }
-
-    public FileInfo uploadGroupMedia(String groupId, int fileType, String url) {
-        return uploadGroupMedia(groupId, fileType, url, true);
     }
 
     public FileInfo uploadGroupMedia(String groupId, int fileType, String url, boolean uploadCos) {

@@ -17,7 +17,13 @@ import xyz.zcraft.seira.command.iface.*;
 import xyz.zcraft.seira.util.ApiRequestStats;
 import xyz.zcraft.seira.util.BotStat;
 
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -49,19 +55,64 @@ public final class TaskCoordinator {
     }
 
     RouteDecision queueImageRequest(Context ctx, String requestType, ImageResponseCreator creator, ImageResponsePostProcessor postProcessor) {
-        AtomicReference<Response<Base64Bytes>> responseRef = new AtomicReference<>();
         return queueApiRequest(
                 ctx,
                 requestType,
                 () -> {
                     Response<Base64Bytes> response = creator.create();
-                    responseRef.set(response);
-                    return PendingMessage.ofImageBase64(response.getContent().toBase64());
+                    byte[] imageBytes = response.getContent().bytes();
+                    String imageUrl = messageSender.uploadImageToCos(imageBytes);
+                    ImageDimensions dimensions = readImageDimensions(imageBytes);
+                    PendingMessage completionMessage = postProcessor.execute(ctx, response);
+                    return combineImageAndCompletion(imageUrl, dimensions, completionMessage);
                 },
-                () -> postProcessor.execute(ctx, responseRef.get()),
+                () -> null,
                 (_) -> {
                 }
         );
+    }
+
+    private PendingMessage combineImageAndCompletion(String imageUrl, ImageDimensions dimensions, PendingMessage completionMessage) {
+        String imageMarkdown = "![查询结果 #" + dimensions.width() + "px #" + dimensions.height() + "px](" + imageUrl + ")";
+        if (completionMessage instanceof MDMessage md) {
+            return PendingMessage.ofMarkdownRaw(
+                    imageMarkdown + "\n" + md.getMarkdown(),
+                    md.getButtons()
+            );
+        }
+
+        String completionContent = completionMessage == null ? null : completionMessage.getContent();
+        return PendingMessage.ofMarkdownRaw(
+                completionContent == null || completionContent.isBlank()
+                        ? imageMarkdown
+                        : imageMarkdown + "\n" + completionContent
+        );
+    }
+
+    private ImageDimensions readImageDimensions(byte[] imageBytes) {
+        try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(imageBytes))) {
+            if (input == null) {
+                throw new IOException("Failed to create image input stream");
+            }
+
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
+            if (!readers.hasNext()) {
+                throw new IOException("Unsupported image format");
+            }
+
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(input);
+                return new ImageDimensions(reader.getWidth(0), reader.getHeight(0));
+            } finally {
+                reader.dispose();
+            }
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Failed to read image dimensions", e);
+        }
+    }
+
+    private record ImageDimensions(int width, int height) {
     }
 
     RouteDecision queueReplayTask(Context ctx, String requestType, ReplayTaskCreator creator, BiFunction<Context, APIHelper.ReplayTaskInfo, PendingMessage> messageCreator) {
@@ -161,8 +212,8 @@ public final class TaskCoordinator {
         if (pendingMsg.getFileUrl() != null) {
             LOG.info("Uploading media for {}", messageId);
             FileInfo fileInfo = groupMessage
-                    ? messageSender.uploadGroupMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl())
-                    : messageSender.uploadPrivateMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl());
+                    ? messageSender.uploadGroupMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl(), pendingMsg.isUpload())
+                    : messageSender.uploadPrivateMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl(), pendingMsg.isUpload());
             if (fileInfo == null) {
                 LOG.error("Failed to upload media for message {}", messageId);
                 message.setContent("媒体文件上传失败");
