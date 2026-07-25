@@ -1,5 +1,6 @@
 package xyz.zcraft.seira.command;
 
+import org.apache.http.util.ByteArrayBuffer;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.bot.data.Attachment;
@@ -10,6 +11,9 @@ import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -42,12 +46,32 @@ public class AttachmentHandler {
                 Files.createDirectories(path);
 
                 final InputStream inputStream = URI.create(attachment.url()).toURL().openStream();
-                Files.copy(inputStream, path.resolve(attachment.filename()));
 
-                msgSender.accept(attachment.filename() + " 上传成功~");
+                ByteArrayBuffer buffer = new ByteArrayBuffer(1024);
+                byte[] temp = new byte[1024];
+                int bytesRead;
+                while ((bytesRead = inputStream.read(temp)) != -1) {
+                    buffer.append(temp, 0, bytesRead);
+                }
+
+                inputStream.close();
+
+                MessageDigest md5Digest = MessageDigest.getInstance("MD5");
+                byte[] md5Bytes = md5Digest.digest(buffer.toByteArray());
+                StringBuilder sb = new StringBuilder();
+                for (byte b : md5Bytes) {
+                    sb.append(String.format("%02x", b));
+                }
+                String md5Hash = sb.toString();
+
+                Files.write(path.resolve("md-" + md5Hash + ".osr"), buffer.toByteArray(), StandardOpenOption.CREATE_NEW);
+
+                msgSender.accept("## Replay 上传成功~\n" + "原文件名:\n```\n" + attachment.filename() + "\n```\n" + "Hash:\n```\n" + md5Hash + "\n```");
             } catch (IOException e) {
                 LOG.error("Error occurred while downloading attachment: {}", attachment.filename(), e);
                 msgSender.accept(attachment.filename() + " 上传失败:" + e.getMessage());
+            } catch (NoSuchAlgorithmException e) {
+                LOG.error("Error occurred while generating MD5 hash: {}", attachment.filename(), e);
             }
         });
     }

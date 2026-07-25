@@ -135,14 +135,18 @@ public class WSClient extends WebSocketClient {
         }
         attachmentHandler.handleAttachments(
                 attachmentList,
-                (s) -> messageSender.sendPrivateMessage(
-                        openId,
-                        Message.builder()
-                                .msgId(msgId)
-                                .msgType(0)
-                                .content(s)
-                                .build()
-                )
+                (s) -> {
+                    JsonObject obj = new JsonObject();
+                    obj.addProperty("content", s);
+                    messageSender.sendPrivateMessage(
+                            openId,
+                            Message.builder()
+                                    .msgId(msgId)
+                                    .msgType(2)
+                                    .markdown(obj)
+                                    .build()
+                    );
+                }
         );
     }
 
