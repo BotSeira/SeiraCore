@@ -2,9 +2,15 @@ package xyz.zcraft.seira.bot.data;
 
 import com.google.gson.JsonObject;
 import com.google.gson.annotations.SerializedName;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class Message {
     private String content;
 
