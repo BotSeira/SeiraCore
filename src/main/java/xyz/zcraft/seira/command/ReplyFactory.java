@@ -13,14 +13,13 @@ import xyz.zcraft.seira.bot.data.Button;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.BindingConfig;
-import xyz.zcraft.seira.util.BotStat;
+import xyz.zcraft.seira.data.UploadedImage;
+import xyz.zcraft.seira.services.BotStat;
+import xyz.zcraft.seira.services.DailyLuck;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Stream;
 
 public final class ReplyFactory {
@@ -224,6 +223,13 @@ public final class ReplyFactory {
     public PendingMessage bgpMessage(Context context, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.bgpContent(context, response),
+                null
+        );
+    }
+
+    public PendingMessage luckMessage(Context ctx, DailyLuck.Luck luck, Beatmapset mapset, UploadedImage cover) {
+        return PendingMessage.ofMarkdownRaw(
+                Contents.luckContent(ctx, luck, mapset, cover),
                 null
         );
     }
@@ -508,6 +514,7 @@ public final class ReplyFactory {
                             > /dl <ID或快捷查询> - 获取镜像下载链接
                             > /sms [#页数] <关键字> - 搜索谱面集
                             > /daily - 获取每日挑战
+                            > /luck - 今日人品
                             > /stat - 获取状态
                             > /inspect - 获取ID信息
                             > /help - 显示此帮助信息
@@ -539,6 +546,19 @@ public final class ReplyFactory {
 
         public static String bgpContent(Context context, Response<?> response) {
             return at(context) + "\n> 背景预览(" + response.getBeatmapsetId() + ")";
+        }
+
+        public static String luckContent(Context ctx, DailyLuck.Luck luck, Beatmapset mapset, UploadedImage cover) {
+            final List<Double> list = mapset.getBeatmaps().stream().map(Beatmap::getDifficultyRating).sorted().toList();
+            String sb = at(ctx) + "\n" +
+                    "## 今日运势" + "\n" +
+                    "> 人品值: **" + luck.luck() + "**/100\n" +
+                    "> 宜: " + luck.ups() + "\n" +
+                    "> 忌: " + luck.downs() + "\n\n" +
+                    "今日推荐图: " + cmd("/ms " + mapset.getId(), mapset.getId().toString()) + "\n" +
+                    "> %s - %s [★%.2f-★%.2f]".formatted(mapset.getArtist(), mapset.getTitle(), list.getFirst(), list.getLast()) + "\n" +
+                    ">" + cover.toMarkdown();
+            return sb.trim();
         }
     }
 

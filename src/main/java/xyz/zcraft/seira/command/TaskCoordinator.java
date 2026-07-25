@@ -14,16 +14,11 @@ import xyz.zcraft.seira.bot.data.MDMessage;
 import xyz.zcraft.seira.bot.data.Message;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.iface.*;
-import xyz.zcraft.seira.util.ApiRequestStats;
-import xyz.zcraft.seira.util.BotStat;
+import xyz.zcraft.seira.data.UploadedImage;
+import xyz.zcraft.seira.services.ApiRequestStats;
+import xyz.zcraft.seira.services.BotStat;
 
-import javax.imageio.ImageIO;
-import javax.imageio.ImageReader;
-import javax.imageio.stream.ImageInputStream;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -61,10 +56,9 @@ public final class TaskCoordinator {
                 () -> {
                     Response<Base64Bytes> response = creator.create();
                     byte[] imageBytes = response.getContent().bytes();
-                    String imageUrl = messageSender.uploadImageToCos(imageBytes);
-                    ImageDimensions dimensions = readImageDimensions(imageBytes);
+                    final UploadedImage uploadedImage = messageSender.uploadImageToCos(imageBytes);
                     PendingMessage completionMessage = postProcessor.execute(ctx, response);
-                    return combineImageAndCompletion(imageUrl, dimensions, completionMessage);
+                    return combineImageAndCompletion(uploadedImage, completionMessage);
                 },
                 () -> null,
                 (_) -> {
@@ -72,8 +66,8 @@ public final class TaskCoordinator {
         );
     }
 
-    private PendingMessage combineImageAndCompletion(String imageUrl, ImageDimensions dimensions, PendingMessage completionMessage) {
-        String imageMarkdown = "![查询结果 #" + dimensions.width() + "px #" + dimensions.height() + "px](" + imageUrl + ")";
+    private PendingMessage combineImageAndCompletion(UploadedImage image, PendingMessage completionMessage) {
+        String imageMarkdown = image.toMarkdown();
         if (completionMessage instanceof MDMessage md) {
             return PendingMessage.ofMarkdownRaw(
                     imageMarkdown + "\n" + md.getMarkdown(),
@@ -87,32 +81,6 @@ public final class TaskCoordinator {
                         ? imageMarkdown
                         : imageMarkdown + "\n" + completionContent
         );
-    }
-
-    private ImageDimensions readImageDimensions(byte[] imageBytes) {
-        try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(imageBytes))) {
-            if (input == null) {
-                throw new IOException("Failed to create image input stream");
-            }
-
-            Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
-            if (!readers.hasNext()) {
-                throw new IOException("Unsupported image format");
-            }
-
-            ImageReader reader = readers.next();
-            try {
-                reader.setInput(input);
-                return new ImageDimensions(reader.getWidth(0), reader.getHeight(0));
-            } finally {
-                reader.dispose();
-            }
-        } catch (IOException e) {
-            throw new IllegalArgumentException("Failed to read image dimensions", e);
-        }
-    }
-
-    private record ImageDimensions(int width, int height) {
     }
 
     RouteDecision queueReplayTask(Context ctx, String requestType, ReplayTaskCreator creator, BiFunction<Context, APIHelper.ReplayTaskInfo, PendingMessage> messageCreator) {

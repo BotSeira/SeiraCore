@@ -3,6 +3,7 @@ package xyz.zcraft.seira.command;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.osu.model.Beatmapset;
 import xyz.zcraft.osu.model.User;
 import xyz.zcraft.osu.model.UserExtended;
 import xyz.zcraft.seira.api.APIHelper;
@@ -17,10 +18,10 @@ import xyz.zcraft.seira.command.resolution.UidListResolution;
 import xyz.zcraft.seira.command.resolution.UidResolution;
 import xyz.zcraft.seira.command.route.DebugRoutes;
 import xyz.zcraft.seira.config.AppConfig;
-import xyz.zcraft.seira.util.BotStat;
-import xyz.zcraft.seira.util.OsuAuthHelper;
-import xyz.zcraft.seira.util.ThreadHelper;
-import xyz.zcraft.seira.util.TimeDurationParser;
+import xyz.zcraft.seira.data.UploadedImage;
+import xyz.zcraft.seira.services.BotStat;
+import xyz.zcraft.seira.services.DailyLuck;
+import xyz.zcraft.seira.util.*;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -151,6 +152,7 @@ public class Router {
             case "lb" -> handleLb(ctx);
             case "stat" -> handleStat(ctx);
             case "u" -> handleU(ctx);
+            case "luck" -> handleLuck(ctx);
             case "rstat" -> handleRstat(ctx);
             case "inspect" -> handleInspect(ctx);
             case "help" -> handleHelp(ctx);
@@ -927,6 +929,23 @@ public class Router {
         } else {
             return RouteDecision.sync(PendingMessage.ofString("用法：/u <玩家ID>"));
         }
+    }
+
+    private RouteDecision handleLuck(Context ctx) {
+        if (ctx.args().length != 0) {
+            return RouteDecision.sync(PendingMessage.ofString("用法：/luck"));
+        }
+
+        return taskCoordinator.queueApiRequest(
+                ctx,
+                "Luck",
+                () -> {
+                    final DailyLuck.Luck luck = DailyLuck.getLuck(ctx.senderUserId());
+                    final Beatmapset mapset = APIHelper.getBeatmapsetRaw(luck.dailyMapset());
+                    final UploadedImage cover = messageSender.uploadImageToCos(mapset.getCovers().getCover());
+                    return replyFactory.luckMessage(ctx, luck, mapset, cover);
+                }
+        );
     }
 
     private RouteDecision handleRstat(Context ctx) {

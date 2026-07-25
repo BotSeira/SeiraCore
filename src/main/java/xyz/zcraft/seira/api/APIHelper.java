@@ -1,15 +1,9 @@
 package xyz.zcraft.seira.api;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
+import com.google.gson.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import xyz.zcraft.osu.model.BeatmapExtended;
-import xyz.zcraft.osu.model.MultiplayerRoom;
-import xyz.zcraft.osu.model.User;
-import xyz.zcraft.osu.model.UserExtended;
+import xyz.zcraft.osu.model.*;
 import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.command.ResolutionException;
@@ -254,6 +248,28 @@ public class APIHelper {
     public static Response<Base64Bytes> getBeatmapsetResponse(ShortcutTarget target, String auth) {
         final long beatmapsetId = lookupBeatmapset(target, auth);
         return getBase64BytesResponse("/beatmapsets/" + beatmapsetId, "获取谱面集失败", null);
+    }
+
+    public static Beatmapset getBeatmapsetRaw(long id) {
+        try {
+            var builder = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/beatmapsets/" + id))
+                    .header("Accept", "application/json");
+
+            final HttpResponse<String> send = CLIENT.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw parseHttpError(send.body(), send.statusCode(), "获取谱面集失败");
+            }
+
+            final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
+            ensureApiSuccess(r, "获取谱面集失败");
+            final JsonObject data = r.getData().getAsJsonObject();
+
+            return GSON.fromJson(data, Beatmapset.class);
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public static long lookupBeatmapset(ShortcutTarget target, String auth) {

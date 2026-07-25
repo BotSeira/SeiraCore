@@ -4,10 +4,10 @@ import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.config.AppConfig;
-import xyz.zcraft.seira.util.BotStat;
-import xyz.zcraft.seira.util.CosService;
-import xyz.zcraft.seira.util.ThreadHelper;
-import xyz.zcraft.seira.util.TokenManager;
+import xyz.zcraft.seira.services.BotStat;
+import xyz.zcraft.seira.services.CosService;
+import xyz.zcraft.seira.services.DailyLuck;
+import xyz.zcraft.seira.util.*;
 
 import java.net.URI;
 import java.util.concurrent.CountDownLatch;
@@ -44,9 +44,15 @@ public class QQBot {
         LOG.info("Initializing BotStat");
         BotStat.initialize();
 
+        LOG.info("Initializing DailyLuck");
+        DailyLuck.initialize(config.qq().appId());
+
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             LOG.info("Saving bot stat...");
             BotStat.saveToFile();
+
+            LOG.info("Saving daily luck...");
+            DailyLuck.saveToFile();
         }));
     }
 

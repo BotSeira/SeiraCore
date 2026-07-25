@@ -12,7 +12,7 @@ import xyz.zcraft.seira.bot.data.Message;
 import xyz.zcraft.seira.command.AttachmentHandler;
 import xyz.zcraft.seira.command.Router;
 import xyz.zcraft.seira.config.AppConfig;
-import xyz.zcraft.seira.util.AccessToken;
+import xyz.zcraft.seira.bot.data.AccessToken;
 import xyz.zcraft.seira.util.ThreadHelper;
 
 import java.net.URI;

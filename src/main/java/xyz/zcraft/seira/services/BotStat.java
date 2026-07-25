@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.util;
+package xyz.zcraft.seira.services;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;

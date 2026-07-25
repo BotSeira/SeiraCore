@@ -103,6 +103,7 @@ mvn -U clean compile exec:java
 | `/sms`          | `/sms <query>`                                            | 搜索谱面集                                                                      |
 | `/lb`           | `/lb [id] [<uid1>,<uid2>...]`                             | 列出指定谱面排行或表现分排行                                                    |
 | `/daily`        | `/daily`                                                  | 每日挑战信息                                                                    |
+| `/luck`         | `/luck`                                                   | 今日人品                                                                        |
 | `/mp`           | `/mp`                                                     | 多人房间列表                                                                    |
 | `/stat`         | `/stat`                                                   | 服务状态和统计信息文本                                                          |
 | `/inspect`      | `/inspect`                                                | 获取当前上下文信息                                                              |

@@ -8,7 +8,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.bot.data.Message;
-import xyz.zcraft.seira.util.AccessToken;
+import xyz.zcraft.seira.bot.data.AccessToken;
 
 import java.io.IOException;
 import java.net.URI;

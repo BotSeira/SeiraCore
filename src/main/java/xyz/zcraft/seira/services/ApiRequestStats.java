@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.util;
+package xyz.zcraft.seira.services;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
