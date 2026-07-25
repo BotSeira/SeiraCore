@@ -136,6 +136,7 @@ public class Router {
             case "rp" -> handleRs(ctx, false);
             case "m" -> handleM(ctx);
             case "ap" -> handleAp(ctx);
+            case "bgp" -> handleBgp(ctx);
             case "f" -> handleF(ctx, !ctx.inGroup());
             case "fall" -> handleF(ctx, true);
             case "fclear" -> handleFclear(ctx);
@@ -396,6 +397,31 @@ public class Router {
                     final long id = APIHelper.lookupBeatmapset(target, getAccessTokenFor(ctx.senderUserId()));
                     return PendingMessage.ofVoiceUrl("https://b.ppy.sh/preview/" + id + ".mp3").doUpload(false);
                 }
+        );
+    }
+
+    private RouteDecision handleBgp(Context ctx) {
+        ShortcutTarget target;
+
+        if (ctx.args().length >= 1) {
+            TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
+            target = targetResolution.target();
+            if (target.isError()) {
+                return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+            }
+
+            lastTarget.put(ctx.senderUserId(), target);
+        } else {
+            if (lastTarget.get(ctx.senderUserId()) != null) {
+                target = lastTarget.get(ctx.senderUserId());
+            } else return RouteDecision.sync(PendingMessage.ofString(Usages.BGP_USAGE));
+        }
+
+        return taskCoordinator.queueImageRequest(
+                ctx,
+                "Background Preview",
+                () -> APIHelper.getBeatmapBgResponse(target, getAccessTokenFor(ctx.senderUserId())),
+                replyFactory::bgpMessage
         );
     }
 
@@ -972,6 +998,7 @@ public class Router {
         public static final String RS_USAGE = "用法：/rs <个数> [玩家ID/@用户]";
         public static final String M_USAGE = "用法：/m <谱面ID 或 快捷查询> [Mod]";
         public static final String AP_USAGE = "用法：/ap <谱面ID 或 快捷查询>";
+        public static final String BGP_USAGE = "用法：/bgp <谱面ID 或 快捷查询>";
         public static final String DL_USAGE = "用法：/dl <谱面集ID 或 快捷查询>";
         public static final String S_USAGE = "用法：/s <成绩ID 或 快捷查询>";
         public static final String SA_USAGE = "用法：/sa <成绩ID 或 快捷查询>";

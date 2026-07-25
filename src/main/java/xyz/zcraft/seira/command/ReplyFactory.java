@@ -221,6 +221,13 @@ public final class ReplyFactory {
         return PendingMessage.ofMarkdownRaw(Contents.faqContent(ctx));
     }
 
+    public PendingMessage bgpMessage(Context context, Response<?> response) {
+        return PendingMessage.ofMarkdownRaw(
+                Contents.bgpContent(context, response),
+                null
+        );
+    }
+
     private static final class Contents {
         static String replayTaskContent(Context ctx, APIHelper.ReplayTaskInfo taskInfo) {
             StringBuilder sb = new StringBuilder();
@@ -492,6 +499,7 @@ public final class ReplyFactory {
                             > /fall - 获取全部好友列表
                             > /fclear - 清除好友记录
                             > /ap <铺面ID或快捷查询> - 获取指定铺面音频预览
+                            > /bgp <铺面ID或快捷查询> - 获取指定铺面背景预览
                             > /sa <成绩ID或快捷查询> - 获取指定成绩分析
                             > /ma [成绩ID或快捷查询] [序号/#序号] - 获取成绩的Miss分析
                             > /u <玩家ID> - 获取玩家信息
@@ -527,6 +535,10 @@ public final class ReplyFactory {
                     > A: 感谢大家的贡献~不论是Bug反馈还是新功能建议均可在Github仓库提交Issue，链接如下：
                     > `https://github.com/ZayrexDev/Seira/issues`
                     """.trim();
+        }
+
+        public static String bgpContent(Context context, Response<?> response) {
+            return at(context) + "\n> 背景预览(" + response.getBeatmapsetId() + ")";
         }
     }
 
