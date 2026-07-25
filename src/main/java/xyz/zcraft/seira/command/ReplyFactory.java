@@ -19,7 +19,10 @@ import xyz.zcraft.seira.services.DailyLuck;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 public final class ReplyFactory {

@@ -21,7 +21,9 @@ import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.services.DailyLuck;
-import xyz.zcraft.seira.util.*;
+import xyz.zcraft.seira.util.OsuAuthHelper;
+import xyz.zcraft.seira.util.ThreadHelper;
+import xyz.zcraft.seira.util.TimeDurationParser;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -596,7 +598,7 @@ public class Router {
         ShortcutTarget target;
         if (ctx.args().length == 0) {
             target = lastTarget.get(ctx.senderUserId());
-        }  else if (ctx.args().length <= 2) {
+        } else if (ctx.args().length <= 2) {
             TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
 
             if (ctx.args().length != targetResolution.consumedArgs()) {

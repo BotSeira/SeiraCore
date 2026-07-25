@@ -13,6 +13,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 final class Resolver {
+    private static final ArrayList<String> USER_MACRO_TYPES = new ArrayList<>(List.of("rs", "bo", "rp"));
+
     public String preProcess(String rawContent) {
         Matcher matcher = Patterns.USER_MACRO_PATTERN.matcher(rawContent);
         if (matcher.matches()) {
@@ -132,8 +134,6 @@ final class Resolver {
             return null;
         }
     }
-
-    private static final ArrayList<String> USER_MACRO_TYPES = new ArrayList<>(List.of("rs", "bo", "rp"));
 
     public ShortcutTarget parseTarget(String arg, String senderUserId, boolean mentionedUser, boolean needResolveBound) {
         Matcher setMatcher = Patterns.SET_MACRO_PATTERN.matcher(arg.trim());

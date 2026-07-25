@@ -17,7 +17,6 @@ public class DailyLuck {
     private static final Logger LOG = LogManager.getLogger(DailyLuck.class);
     private static final ConcurrentHashMap<String, Luck> luck = new ConcurrentHashMap<>();
     private static final List<Long> ids = new LinkedList<>();
-    private static String salt = "Ciallo～(∠・ω< )⌒★";
     private static final String[] FORTUNE_POOL = {
             "练底力", "练手感", "练读谱", "练爆发", "练耐力", "练速度", "练准度", "练指法", "练切分", "练长条",
             "越级", "打新图", "打旧图", "冲分", "冲FC", "冲SS", "收歌", "收BP", "挖图", "复健", "热手",
@@ -26,6 +25,7 @@ public class DailyLuck {
             "调整灵敏度", "更换皮肤", "观看比赛", "学习打法", "熬夜冲榜", "冲PP", "刷分", "赌FC",
             "打远古图", "随机谱面", "手感复健", "术曲鉴赏"
     };
+    private static String salt = "Ciallo～(∠・ω< )⌒★";
     private static String luckDate;
 
     public static void initialize(String salt) {
@@ -53,7 +53,7 @@ public class DailyLuck {
     private static Luck generateLuck(String id) {
         final String str = LocalDate.now().toString()
                 .concat("@").concat(id)
-                .concat("#").concat(salt);
+                .concat("@").concat(salt);
         final int hash = str.hashCode();
 
         Random r = new Random(hash);

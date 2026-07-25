@@ -7,7 +7,8 @@ import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.services.CosService;
 import xyz.zcraft.seira.services.DailyLuck;
-import xyz.zcraft.seira.util.*;
+import xyz.zcraft.seira.util.ThreadHelper;
+import xyz.zcraft.seira.util.TokenManager;
 
 import java.net.URI;
 import java.util.concurrent.CountDownLatch;
