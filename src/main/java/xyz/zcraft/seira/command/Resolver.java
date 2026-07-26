@@ -2,9 +2,9 @@ package xyz.zcraft.seira.command;
 
 import xyz.zcraft.seira.api.data.SearchQuery;
 import xyz.zcraft.seira.binding.UserDataStore;
+import xyz.zcraft.seira.command.resolution.RscTarget;
 import xyz.zcraft.seira.command.resolution.ShortcutTarget;
 import xyz.zcraft.seira.command.resolution.TargetResolution;
-import xyz.zcraft.seira.command.resolution.UidListResolution;
 import xyz.zcraft.seira.command.resolution.UidResolution;
 
 import java.util.*;
@@ -87,36 +87,34 @@ final class Resolver {
         return new UidResolution(null, null);
     }
 
-    public UidListResolution resolveRscUidList(String groupId, String extraUidArg) {
-        List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(groupId);
-        if (groupBoundUids.isEmpty()) {
-            return new UidListResolution(null, "本群还没有已绑定的玩家，请先使用 /bind <玩家ID>");
-        }
-
+    public RscTarget resolveRscTarget(String groupId, String extraUidArg) {
         Set<String> merged = new LinkedHashSet<>();
-        groupBoundUids.stream().map(String::valueOf).forEach(merged::add);
 
-        if (extraUidArg != null) {
-            String trimmed = extraUidArg.trim();
-            if (!trimmed.startsWith("+")) {
-                return new UidListResolution(null, "追加用户ID列表必须以 + 开头。");
+        if (extraUidArg == null || extraUidArg.trim().startsWith("+")) {
+            List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(groupId);
+            if (groupBoundUids.isEmpty()) {
+                return new RscTarget(null, "本群还没有已绑定的玩家，请先使用 /bind <玩家ID>");
             }
-            String body = trimmed.substring(1).trim();
-            if (body.isEmpty()) {
-                return new UidListResolution(null, "追加用户ID列表不能为空。");
-            }
-
-            String[] extraTokens = body.split(",");
-            for (String token : extraTokens) {
-                Integer uid = parsePositiveInt(token.trim());
-                if (uid == null) {
-                    return new UidListResolution(null, "追加用户ID列表包含非法值。");
-                }
-                merged.add(String.valueOf(uid));
-            }
+            groupBoundUids.stream().map(String::valueOf).forEach(merged::add);
         }
 
-        return new UidListResolution(merged.toArray(String[]::new), null);
+        if (extraUidArg == null) return new RscTarget(merged.toArray(String[]::new), null);
+
+        String trimmed = extraUidArg.trim();
+        String body = trimmed.substring(1).trim();
+        if (body.isEmpty()) {
+            return new RscTarget(null, "追加ID列表不能为空。");
+        }
+
+        String[] extraTokens = body.split(",");
+        for (String token : extraTokens) {
+            if (!Patterns.RSC_TARGET_PATTERN.matcher(token.trim()).matches()) {
+                return new RscTarget(null, "追加ID列表包含非法值。");
+            }
+            merged.add(token.trim());
+        }
+
+        return new RscTarget(merged.toArray(String[]::new), null);
     }
 
     public Long resolveBoundUid(String senderUserId) {
@@ -273,6 +271,7 @@ final class Resolver {
         private static final Pattern CQ_AT_PATTERN = Pattern.compile("^\\[CQ:at,qq=(\\d+)(?:,.*)?]$");
         private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
         private static final Pattern SEARCH_PATTERN = Pattern.compile("^(?:#(\\d+) )?(.+)$");
+        private static final Pattern RSC_TARGET_PATTERN = Pattern.compile("^[us]?\\d+$");
     }
 }
 

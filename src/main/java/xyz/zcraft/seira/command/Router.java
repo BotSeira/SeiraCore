@@ -14,7 +14,7 @@ import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.resolution.ShortcutTarget;
 import xyz.zcraft.seira.command.resolution.TargetResolution;
-import xyz.zcraft.seira.command.resolution.UidListResolution;
+import xyz.zcraft.seira.command.resolution.RscTarget;
 import xyz.zcraft.seira.command.resolution.UidResolution;
 import xyz.zcraft.seira.command.route.DebugRoutes;
 import xyz.zcraft.seira.config.AppConfig;
@@ -727,32 +727,24 @@ public class Router {
         }
 
         String extraUidArg = null;
-        TimeDurationParser.TimeRange range = null;
 
         for (int i = targetResolution.consumedArgs(); i < ctx.args().length; i++) {
-            if (ctx.args()[i].startsWith("+")) {
+            if (ctx.args()[i].startsWith("+") || ctx.args()[i].startsWith("=")) {
                 if (extraUidArg != null) {
                     return RouteDecision.sync(PendingMessage.ofString(Usages.RSC_USAGE));
                 }
                 extraUidArg = ctx.args()[i];
-            } else if (TimeDurationParser.isTimeRange(ctx.args()[i])) {
-                if (range != null) {
-                    return RouteDecision.sync(PendingMessage.ofString(Usages.RSC_USAGE));
-                }
-                range = TimeDurationParser.parseRange(ctx.args()[i]);
             } else {
                 return RouteDecision.sync(PendingMessage.ofString(Usages.RSC_USAGE));
             }
         }
 
-        UidListResolution uidListResolution = resolver.resolveRscUidList(ctx.groupId(), extraUidArg);
-        if (uidListResolution.errorMessage() != null) {
-            return RouteDecision.sync(PendingMessage.ofString(uidListResolution.errorMessage()));
+        RscTarget rscTarget = resolver.resolveRscTarget(ctx.groupId(), extraUidArg);
+        if (rscTarget.errorMessage() != null) {
+            return RouteDecision.sync(PendingMessage.ofString(rscTarget.errorMessage()));
         }
 
-        String[] uidArray = uidListResolution.uids();
-
-        TimeDurationParser.TimeRange finalRange = range;
+        String[] uidArray = rscTarget.uids();
 
         rememberExplicitTarget(ctx, targetResolution);
 
@@ -760,7 +752,7 @@ public class Router {
                 ctx,
                 "Showcase Render",
                 () -> {
-                    var task = APIHelper.createReplayShowcaseTask(target, uidArray, finalRange, getAccessTokenFor(ctx.senderUserId()));
+                    var task = APIHelper.createReplayShowcaseTask(target, uidArray, getAccessTokenFor(ctx.senderUserId()));
                     videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
                     return task;
                 },

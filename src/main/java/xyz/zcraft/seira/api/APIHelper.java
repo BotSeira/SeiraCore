@@ -433,16 +433,16 @@ public class APIHelper {
         return createReplayTask(target, timeRange);
     }
 
-    public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] groupUids, TimeDurationParser.TimeRange timeRange, String auth) {
-        if (groupUids == null || groupUids.length == 0) {
-            throw new RuntimeException("同屏回放需要至少一个玩家ID。");
+    public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] ids, String auth) {
+        if (ids == null || ids.length == 0) {
+            throw new RuntimeException("同屏回放需要至少一个ID。");
         }
 
         final long beatmapId = lookupBeatmap(target, auth);
 
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(ENDPOINT + "/replays/renders/showcase/" + beatmapId + (timeRange != null ? "?" + timeRange.toQueryString() : "")))
-                .POST(HttpRequest.BodyPublishers.ofString(GSON.toJsonTree(Map.of("ids", groupUids)).toString()))
+                .uri(URI.create(ENDPOINT + "/replays/renders/showcase/" + beatmapId))
+                .POST(HttpRequest.BodyPublishers.ofString(GSON.toJsonTree(Map.of("ids", ids)).toString()))
                 .build();
 
         return getReplayTaskInfo(request);
