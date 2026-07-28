@@ -35,6 +35,7 @@ public class WSClient extends WebSocketClient {
     private final Router router;
     private final AttachmentHandler attachmentHandler;
     private final MessageSender messageSender;
+    private final String selfId;
     private volatile boolean heartbeatAcked = true;
     @Setter
     private Runnable onCloseCallback = null;
@@ -43,14 +44,16 @@ public class WSClient extends WebSocketClient {
             URI serverUri,
             AppConfig config,
             Supplier<AccessToken> tokenSupplier,
-            MessageSender messageSender
+            MessageSender messageSender,
+            String selfId
     ) {
         super(serverUri);
         this.config = config;
         this.tokenSupplier = tokenSupplier;
-        this.router = new Router(messageSender, config);
+        this.router = new Router(messageSender, config, selfId);
         this.attachmentHandler = new AttachmentHandler(config);
         this.messageSender = messageSender;
+        this.selfId = selfId;
         LOG.info("QQ Gateway WebSocket Client created");
     }
 

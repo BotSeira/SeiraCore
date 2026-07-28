@@ -3,6 +3,7 @@ package xyz.zcraft.seira.bot;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.seira.bot.data.QQUser;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.services.CosService;
@@ -68,11 +69,16 @@ public class QQBot {
                 String wssEndpoint = QQApi.getWSSEndpoint(tokenManager.getToken());
                 LOG.info("Endpoint: {}", wssEndpoint);
 
+                final QQUser self = QQApi.getSelf(tokenManager.getToken());
+
+                LOG.info("Self info: id={}, nickname={}", self.id(), self.username());
+
                 final WSClient client = new WSClient(
                         URI.create(wssEndpoint),
                         config,
                         tokenManager::getToken,
-                        sender
+                        sender,
+                        self.id()
                 );
 
                 CountDownLatch disconnectLatch = new CountDownLatch(1);

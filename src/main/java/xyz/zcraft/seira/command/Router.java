@@ -47,8 +47,9 @@ public class Router {
     private final DebugRoutes debugRoutes;
 
     private final ConcurrentHashMap<String, ShortcutTarget> lastTarget = new ConcurrentHashMap<>();
+    private final String selfId;
 
-    public Router(MessageSender messageSender, AppConfig config) {
+    public Router(MessageSender messageSender, AppConfig config, String selfId) {
         this.messageSender = messageSender;
         this.config = config;
         this.resolver = new Resolver();
@@ -57,6 +58,8 @@ public class Router {
         this.authHelper = new OsuAuthHelper(config.binding());
 
         this.debugRoutes = new DebugRoutes(this);
+
+        this.selfId = selfId;
     }
 
     public void onPrivateMessageReceived(String userId, String messageId, String rawContent) {
@@ -74,6 +77,13 @@ public class Router {
             final boolean group = groupMessage && groupId != null && !groupId.isBlank();
             if (group && userId != null && !userId.isBlank()) {
                 UserDataStore.upsertGroupMember(groupId, userId);
+            }
+
+            rawContent = rawContent.trim();
+
+            final String selfAt = "<@" + selfId + ">";
+            if (rawContent.startsWith(selfAt)) {
+                rawContent = rawContent.substring(selfAt.length()).trim();
             }
 
             RouteDecision routeDecision = route(rawContent, userId, groupId, messageId);
