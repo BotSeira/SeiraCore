@@ -109,7 +109,7 @@ public class WSClient extends WebSocketClient {
             } else {
                 onC2CMsg(payload);
             }
-        } else if ("GROUP_AT_MESSAGE_CREATE".equals(eventType)) {
+        } else if ("GROUP_AT_MESSAGE_CREATE".equals(eventType) || "GROUP_MESSAGE_CREATE".equals(eventType)) {
             onGroupMsg(payload);
         }
     }
