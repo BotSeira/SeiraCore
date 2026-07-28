@@ -11,6 +11,7 @@ import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.command.resolution.ShortcutTarget;
+import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
 import java.io.IOException;
@@ -94,7 +95,8 @@ public class APIHelper {
         }
     }
 
-    public static Response<Base64Bytes> getBoNResponse(int n, long uid) {
+    public static Response<Base64Bytes> getBoNResponse(int n, UserRef userRef) {
+        long uid = resolveUid(userRef);
         return getBase64BytesResponse("/users/" + uid + "/scores/bestof?" + "n=" + n, "获取最好成绩失败", null);
     }
 
@@ -181,7 +183,8 @@ public class APIHelper {
         }
     }
 
-    public static Response<Base64Bytes> getRecentResponse(int n, long uid, boolean includeFail) {
+    public static Response<Base64Bytes> getRecentResponse(int n, UserRef userRef, boolean includeFail) {
+        long uid = resolveUid(userRef);
         return getBase64BytesResponse("/users/" + uid + "/scores/recent" + "?n=" + n + "&fail=" + includeFail, "获取最近成绩失败", null);
     }
 
@@ -232,7 +235,7 @@ public class APIHelper {
         if (target.isMacro()) {
             switch (target.macroType().toLowerCase()) {
                 case "rs", "bo", "rp" -> {
-                    query += "&of=" + target.macroType() + "&u=" + target.boundUid();
+                    query += "&of=" + target.macroType() + "&u=" + resolveUid(target.userRef());
                     query += "&i=" + target.macroIndex();
                 }
                 case "ms" -> {
@@ -313,7 +316,7 @@ public class APIHelper {
         return switch (target.macroType().toLowerCase()) {
             case "m" -> query + "?m=" + target.explicitId();
             case "rs", "bo", "rp" ->
-                    query + "?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+                    query + "?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + resolveUid(target.userRef());
             case "mp" -> query + "?of=mp";
             case null, default -> throw new ResolutionException("快捷查询格式错误。");
         };
@@ -364,10 +367,10 @@ public class APIHelper {
     private static String getScoreQuery(ShortcutTarget target) {
         return switch (target.macroType().toLowerCase()) {
             case "rs", "bo", "rp" ->
-                    "/scores/lookup?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
-            case "m" -> "/scores/lookup?m=" + target.explicitId() + "&u=" + target.boundUid();
+                    "/scores/lookup?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + resolveUid(target.userRef());
+            case "m" -> "/scores/lookup?m=" + target.explicitId() + "&u=" + resolveUid(target.userRef());
             case "ms" ->
-                    "/scores/lookup?ms=" + target.explicitId() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+                    "/scores/lookup?ms=" + target.explicitId() + "&i=" + target.macroIndex() + "&u=" + resolveUid(target.userRef());
             case null, default -> throw new IllegalArgumentException("Invalid macro type");
         };
     }
@@ -771,6 +774,47 @@ public class APIHelper {
                     .build();
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    public static long resolveUid(UserRef userRef) {
+        if (userRef instanceof UserRef.ByUid byUid) {
+            return byUid.getUid();
+        }
+        if (userRef instanceof UserRef.ByUsername byUsername) {
+            return lookupUser(byUsername.getUsername()).getContent().getId();
+        }
+        throw new ResolutionException("无法识别指定的玩家");
+    }
+
+    public static Response<User> lookupUser(String username) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/users/lookup"))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(
+                            GSON.toJsonTree(Map.of("user_name", username)).toString()
+                    ))
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw parseHttpError(send.body(), send.statusCode(), "查找玩家失败");
+            }
+
+            final RawResponse response = GSON.fromJson(send.body(), RawResponse.class);
+            ensureApiSuccess(response, "查找玩家失败");
+            final JsonObject data = requireDataObject(response, "查找玩家响应缺少用户数据");
+
+            return Response.<User>fromHeaders(send.headers())
+                    .content(GSON.fromJson(data, User.class))
+                    .build();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("查找玩家请求被中断", e);
         }
     }
 

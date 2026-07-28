@@ -5,7 +5,8 @@ import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.command.resolution.RscTarget;
 import xyz.zcraft.seira.command.resolution.ShortcutTarget;
 import xyz.zcraft.seira.command.resolution.TargetResolution;
-import xyz.zcraft.seira.command.resolution.UidResolution;
+import xyz.zcraft.seira.command.resolution.UserRefResolution;
+import xyz.zcraft.seira.data.UserRef;
 
 import java.util.*;
 import java.util.regex.MatchResult;
@@ -46,12 +47,21 @@ final class Resolver {
         if (args.length >= 2 && isUserMacro(args[1])) {
             String mentionedUserId = extractMentionedUserId(args[0]);
             if (mentionedUserId != null) {
-                return new TargetResolution(parseTarget(args[1], mentionedUserId, true, true), 2);
+                Long boundUid = resolveBoundUid(mentionedUserId);
+                if (boundUid == null) {
+                    return new TargetResolution(new ShortcutTarget(null, null, null, null,
+                            "被@的用户还没有绑定玩家ID，无法使用快捷查询。"), 2);
+                }
+                return new TargetResolution(parseTarget(args[1], new UserRef.ByUid(boundUid), true, false), 2);
             }
 
-            Long l = tryParseLong(args[0]);
-            if (l != null) {
-                return new TargetResolution(parseTarget(args[1], String.valueOf(l), true, false), 2);
+            Long uid = parsePositiveLong(args[0]);
+            if (uid != null) {
+                return new TargetResolution(parseTarget(args[1], new UserRef.ByUid(uid), false, false), 2);
+            }
+
+            if (!looksLikeMention(args[0]) && !args[0].isBlank()) {
+                return new TargetResolution(parseTarget(args[1], new UserRef.ByUsername(args[0]), false, false), 2);
             }
 
 //            if (looksLikeMention(args[0])) {
@@ -62,29 +72,32 @@ final class Resolver {
     }
 
     public ShortcutTarget parseTarget(String arg, String senderUserId) {
-        return parseTarget(arg, senderUserId, false, true);
+        Long boundUid = resolveBoundUid(senderUserId);
+        UserRef userRef = boundUid == null ? null : new UserRef.ByUid(boundUid);
+        return parseTarget(arg, userRef, false, true);
     }
 
-    public UidResolution resolveUidArgument(String arg) {
+    public UserRefResolution resolveUserRefArgument(String arg) {
         Long explicitUid = parsePositiveLong(arg);
         if (explicitUid != null) {
-            return new UidResolution(explicitUid, null);
+            return new UserRefResolution(new UserRef.ByUid(explicitUid), null);
         }
 
         String mentionedUserId = extractMentionedUserId(arg);
         if (mentionedUserId != null) {
             Long boundUid = resolveBoundUid(mentionedUserId);
             if (boundUid == null) {
-                return new UidResolution(null, "被@的用户还没有绑定玩家ID，请先让对方使用 /bind <玩家ID>");
+                return new UserRefResolution(null, "被@的用户还没有绑定玩家ID，请先让对方使用 /bind <玩家ID>");
             }
-            return new UidResolution(boundUid, null);
+            return new UserRefResolution(new UserRef.ByUid(boundUid), null);
         }
 
         if (looksLikeMention(arg)) {
-            return new UidResolution(null, "@用户格式无效，请使用 @用户 后再输入指令。示例：/bo 5 @123456");
+            return new UserRefResolution(null, "@用户格式无效，请使用 @用户 后再输入指令。示例：/bo 5 @123456");
         }
 
-        return new UidResolution(null, null);
+        String username = arg == null ? "" : arg.trim();
+        return new UserRefResolution(username.isEmpty() ? null : new UserRef.ByUsername(username), null);
     }
 
     public RscTarget resolveRscTarget(String groupId, String extraUidArg) {
@@ -133,7 +146,7 @@ final class Resolver {
         }
     }
 
-    public ShortcutTarget parseTarget(String arg, String senderUserId, boolean mentionedUser, boolean needResolveBound) {
+    private ShortcutTarget parseTarget(String arg, UserRef userRef, boolean mentionedUser, boolean needResolveBound) {
         Matcher setMatcher = Patterns.SET_MACRO_PATTERN.matcher(arg.trim());
         if (setMatcher.matches()) {
             Long setId = parsePositiveLong(setMatcher.group(1));
@@ -143,8 +156,7 @@ final class Resolver {
                 return new ShortcutTarget(null, null, null, null, "谱面集索引无效。例如: 12345#2");
             }
 
-            Long uid = resolveBoundUid(senderUserId);
-            return new ShortcutTarget(setId, uid, "ms", index, null);
+            return new ShortcutTarget(setId, userRef, "ms", index, null);
         }
 
         Matcher userMatcher = Patterns.USER_MACRO_PATTERN.matcher(arg.trim());
@@ -169,8 +181,7 @@ final class Resolver {
                 return new ShortcutTarget(null, null, null, null, "快捷指令索引无效，请输入 1-100 之间的数字。例如: rs5");
             }
 
-            Long uid = needResolveBound ? resolveBoundUid(senderUserId) : tryParseLong(senderUserId);
-            if (uid == null) {
+            if (userRef == null) {
                 String errorMessage;
                 if (needResolveBound) {
                     errorMessage = mentionedUser
@@ -183,12 +194,11 @@ final class Resolver {
                 return new ShortcutTarget(null, null, null, null, errorMessage);
             }
 
-            return new ShortcutTarget(null, uid, type, index, null);
+            return new ShortcutTarget(null, userRef, type, index, null);
         }
 
         if ("mp".equalsIgnoreCase(arg.trim())) {
-            Long uid = needResolveBound ? resolveBoundUid(senderUserId) : tryParseLong(senderUserId);
-            if (uid == null) {
+            if (userRef == null) {
                 String errorMessage;
                 if (needResolveBound) {
                     errorMessage = mentionedUser
@@ -201,14 +211,13 @@ final class Resolver {
                 return new ShortcutTarget(null, null, null, null, errorMessage);
             }
 
-            return new ShortcutTarget(null, uid, "mp", null, null);
+            return new ShortcutTarget(null, userRef, "mp", null, null);
         }
 
         Matcher beatmapMatcher = Patterns.BEATMAP_MACRO_PATTERN.matcher(arg.trim());
         if (beatmapMatcher.matches()) {
             Long mapId = parsePositiveLong(beatmapMatcher.group(1));
-            Long uid = resolveBoundUid(senderUserId);
-            return new ShortcutTarget(mapId, uid, "m", null, null);
+            return new ShortcutTarget(mapId, userRef, "m", null, null);
         }
 
         Long id = parsePositiveLong(arg);
@@ -226,14 +235,6 @@ final class Resolver {
     private boolean looksLikeMention(String token) {
         String trimmed = token == null ? "" : token.trim();
         return trimmed.startsWith("@") || trimmed.startsWith("[CQ:at,");
-    }
-
-    private Long tryParseLong(String token) {
-        try {
-            return Long.parseLong(token);
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
     }
 
     private String extractMentionedUserId(String token) {

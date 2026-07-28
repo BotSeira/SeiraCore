@@ -15,7 +15,8 @@ import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.resolution.ShortcutTarget;
 import xyz.zcraft.seira.command.resolution.TargetResolution;
 import xyz.zcraft.seira.command.resolution.RscTarget;
-import xyz.zcraft.seira.command.resolution.UidResolution;
+import xyz.zcraft.seira.command.resolution.UserRefResolution;
+import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.command.route.DebugRoutes;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.data.UploadedImage;
@@ -216,19 +217,18 @@ public class Router {
             if (n == null) {
                 return RouteDecision.sync(PendingMessage.ofString(Usages.BO_USAGE));
             }
-            UidResolution uidResolution = resolver.resolveUidArgument(ctx.args()[1]);
-            if (uidResolution.errorMessage() != null) {
-                return RouteDecision.sync(PendingMessage.ofString(uidResolution.errorMessage()));
+            UserRefResolution userRefResolution = resolver.resolveUserRefArgument(ctx.args()[1]);
+            if (userRefResolution.errorMessage() != null) {
+                return RouteDecision.sync(PendingMessage.ofString(userRefResolution.errorMessage()));
             }
-            if (uidResolution.uid() == null) {
+            if (userRefResolution.userRef() == null) {
                 return RouteDecision.sync(PendingMessage.ofString(Usages.BO_USAGE));
             }
-            var uid = uidResolution.uid();
 
             return taskCoordinator.queueImageRequest(
                     ctx,
                     "Best Scores",
-                    () -> APIHelper.getBoNResponse(n, uid),
+                    () -> APIHelper.getBoNResponse(n, userRefResolution.userRef()),
                     replyFactory::boMessage
             );
         } else if (ctx.args().length == 1) {
@@ -244,7 +244,7 @@ public class Router {
             return taskCoordinator.queueImageRequest(
                     ctx,
                     "Best Scores",
-                    () -> APIHelper.getBoNResponse(n, uid),
+                    () -> APIHelper.getBoNResponse(n, new UserRef.ByUid(uid)),
                     replyFactory::boMessage
             );
         } else if (ctx.args().length == 0) {
@@ -290,19 +290,19 @@ public class Router {
                 return RouteDecision.sync(PendingMessage.ofString(Usages.RS_USAGE));
             }
 
-            UidResolution uidResolution = resolver.resolveUidArgument(ctx.args()[1]);
-            if (uidResolution.errorMessage() != null) {
-                return RouteDecision.sync(PendingMessage.ofString(uidResolution.errorMessage()));
+            UserRefResolution userRefResolution = resolver.resolveUserRefArgument(ctx.args()[1]);
+            if (userRefResolution.errorMessage() != null) {
+                return RouteDecision.sync(PendingMessage.ofString(userRefResolution.errorMessage()));
             }
 
-            if (uidResolution.uid() == null) {
+            if (userRefResolution.userRef() == null) {
                 return RouteDecision.sync(PendingMessage.ofString(Usages.RS_USAGE));
             }
 
             return taskCoordinator.queueImageRequest(
                     ctx,
                     "Recent Score",
-                    () -> APIHelper.getRecentResponse(n, uidResolution.uid(), includeFail),
+                    () -> APIHelper.getRecentResponse(n, userRefResolution.userRef(), includeFail),
                     replyFactory::rsMessage
             );
         } else if (ctx.args().length == 1) {
@@ -318,7 +318,7 @@ public class Router {
             return taskCoordinator.queueImageRequest(
                     ctx,
                     "Recent Score",
-                    () -> APIHelper.getRecentResponse(n, uid, includeFail),
+                    () -> APIHelper.getRecentResponse(n, new UserRef.ByUid(uid), includeFail),
                     replyFactory::rsMessage
             );
         } else if (ctx.args().length == 0) {
@@ -921,7 +921,7 @@ public class Router {
         if (ctx.args().length == 1) {
             return route("/bo 8 " + ctx.args()[0], ctx.senderUserId(), ctx.groupId(), ctx.messageId());
         } else {
-            return RouteDecision.sync(PendingMessage.ofString("用法：/u <玩家ID>"));
+            return RouteDecision.sync(PendingMessage.ofString("用法：/u <玩家ID/用户名/@用户>"));
         }
     }
 
@@ -1005,10 +1005,10 @@ public class Router {
     }
 
     private static final class Usages {
-        public static final String BO_USAGE = "用法：/bo <个数> [玩家ID/@用户]";
+        public static final String BO_USAGE = "用法：/bo <个数> [玩家ID/用户名/@用户]";
         public static final String NO_BIND_TIP = "你还没有绑定玩家ID，请先使用 /bind 绑定";
         public static final String REBIND_TIP = "由于发生了一个技术问题，使用此功能需要重新绑定。请使用 `/unbind` 解除绑定，再使用 `/bind` 重新绑定~";
-        public static final String RS_USAGE = "用法：/rs <个数> [玩家ID/@用户]";
+        public static final String RS_USAGE = "用法：/rs <个数> [玩家ID/用户名/@用户]";
         public static final String M_USAGE = "用法：/m <谱面ID 或 快捷查询> [Mod]";
         public static final String AP_USAGE = "用法：/ap <谱面ID 或 快捷查询>";
         public static final String BGP_USAGE = "用法：/bgp <谱面ID 或 快捷查询>";
