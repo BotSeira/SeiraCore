@@ -39,6 +39,8 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/024fe6b2-c10a-4c9e-aefc-9c784826a9b7" />
 
+<img width="400" alt="image" src="https://github.com/user-attachments/assets/dd9ab809-b7aa-44b2-a749-8a841781b30c" />
+
 ### 查询群友的排行榜！
 
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/cbc361a4-61e0-440d-908e-f1d52009373e" />
