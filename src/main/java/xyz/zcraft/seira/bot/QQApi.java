@@ -533,7 +533,7 @@ public class QQApi {
     public static QQUser getSelf(AccessToken accessToken) {
         try {
             final var request = newRequestBuilder(accessToken)
-                    .uri(URI.create(ENDPOINT + "/v2/users/@me"))
+                    .uri(URI.create(ENDPOINT + "/users/@me"))
                     .GET()
                     .build();
 
