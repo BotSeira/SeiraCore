@@ -30,6 +30,8 @@ ostella:
 
 # === QQ机器人 配置 ===
 qq:
+  # 机器人的OpenID
+  selfId: ""
   appId: ""
   appSecret: ""
 

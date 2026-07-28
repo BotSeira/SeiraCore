@@ -77,8 +77,7 @@ public class QQBot {
                         URI.create(wssEndpoint),
                         config,
                         tokenManager::getToken,
-                        sender,
-                        self.id()
+                        sender
                 );
 
                 CountDownLatch disconnectLatch = new CountDownLatch(1);

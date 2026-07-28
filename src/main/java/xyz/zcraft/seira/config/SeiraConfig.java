@@ -8,4 +8,9 @@ public record SeiraConfig(
         boolean debugMode,
         java.util.List<String> adminIds
 ) {
+    public SeiraConfig {
+        if (replayPath == null || replayPath.isBlank()) {
+            replayPath = "./data/replays";
+        }
+    }
 }

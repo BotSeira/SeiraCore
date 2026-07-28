@@ -47,9 +47,8 @@ public class Router {
     private final DebugRoutes debugRoutes;
 
     private final ConcurrentHashMap<String, ShortcutTarget> lastTarget = new ConcurrentHashMap<>();
-    private final String selfId;
 
-    public Router(MessageSender messageSender, AppConfig config, String selfId) {
+    public Router(MessageSender messageSender, AppConfig config) {
         this.messageSender = messageSender;
         this.config = config;
         this.resolver = new Resolver();
@@ -58,8 +57,6 @@ public class Router {
         this.authHelper = new OsuAuthHelper(config.binding());
 
         this.debugRoutes = new DebugRoutes(this);
-
-        this.selfId = selfId;
     }
 
     public void onPrivateMessageReceived(String userId, String messageId, String rawContent) {
@@ -81,7 +78,7 @@ public class Router {
 
             rawContent = rawContent.trim();
 
-            final String selfAt = "<@" + selfId + ">";
+            final String selfAt = "<@" + config.qq().selfId() + ">";
             if (rawContent.startsWith(selfAt)) {
                 rawContent = rawContent.substring(selfAt.length()).trim();
             }
