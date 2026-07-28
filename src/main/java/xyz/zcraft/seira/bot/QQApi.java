@@ -343,7 +343,7 @@ public class QQApi {
     private static void uploadPartWithRetry(AccessToken accessToken, String targetType, String openId,
                                             Path file, UploadPrepare prepare, UploadPart part) throws Exception {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(prepare.retryTimeoutSeconds());
-        Exception lastFailure = null;
+        Exception lastFailure;
         do {
             try {
                 byte[] content = readPart(file, prepare.blockSize(), part);
@@ -371,7 +371,7 @@ public class QQApi {
     }
 
     private static byte[] readPart(Path file, long defaultBlockSize, UploadPart part) throws IOException {
-        long offset = Math.multiplyExact((long) part.index(), defaultBlockSize);
+        long offset = Math.multiplyExact((long) part.index() - 1, defaultBlockSize);
         long fileSize = Files.size(file);
         long requestedSize = part.blockSize() > 0 ? part.blockSize() : defaultBlockSize;
         int size = Math.toIntExact(Math.min(requestedSize, fileSize - offset));
