@@ -39,7 +39,7 @@ public class ApiRequestException extends RuntimeException {
             case FETCH_FAILED -> "数据获取失败，请稍后重试喵";
             case TOKEN_FETCH_FAILED -> "令牌获取失败喵";
 
-            case REPLAY_UNAVAILABLE -> "该成绩回放不可用喵";
+            case REPLAY_UNAVAILABLE -> "该成绩回放不可用喵，可尝试将回放文件私聊发送给机器人手动上传喵";
             case BEATMAP_PARSE_FAILED -> "谱面数据解析失败，请稍后重试喵";
             case SCORE_PARSE_FAILED -> "成绩数据解析失败，请稍后重试喵";
             case REPLAY_PARSE_FAILED -> "回放数据解析失败，请稍后重试喵";
