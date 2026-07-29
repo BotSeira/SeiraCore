@@ -49,7 +49,7 @@ public class AttachmentHandler {
                 msgSender.accept(ReplyFactory.replayUploadMessage(replayUploadInfo));
             } catch (Exception e) {
                 LOG.error("Error occurred while uploading replay: {}", attachment.filename(), e);
-                msgSender.accept(PendingMessage.ofMarkdownRaw(attachment.filename() + " 上传失败:" + e.getMessage()));
+                msgSender.accept(PendingMessage.ofMarkdownRaw(attachment.filename() + " 上传失败:\n > " + e.getMessage()));
             }
         });
     }
