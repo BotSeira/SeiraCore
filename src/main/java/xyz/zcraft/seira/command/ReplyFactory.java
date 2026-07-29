@@ -564,7 +564,11 @@ public final class ReplyFactory {
         }
 
         public static String bgpContent(Context context, Response<?> response) {
-            return at(context) + "\n> 背景预览(" + response.getBeatmapsetId() + ")";
+            return at(context) + "\n> 背景预览("
+                    + cmd("/ms " + response.getBeatmapsetId(), response.getBeatmapsetId())
+                    + " - "
+                    + cmd("/m " + response.getBeatmapId(), response.getBeatmapId())
+                    + ")";
         }
 
         public static String luckContent(Context ctx, DailyLuck.Luck luck, Beatmapset mapset, UploadedImage cover) {

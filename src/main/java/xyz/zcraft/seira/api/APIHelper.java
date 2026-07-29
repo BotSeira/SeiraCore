@@ -193,9 +193,14 @@ public class APIHelper {
         return getBase64BytesResponse("/beatmaps/" + beatmapId + (mod != null ? "?mod=" + mod : ""), "获取谱面失败", null);
     }
 
-    public static Response<Base64Bytes> getBeatmapBgResponse(ShortcutTarget target, String auth) {
+    public static Response<Base64Bytes> getBeatmapsetBgResponse(ShortcutTarget target, String auth) {
         final long beatmapsetId = lookupBeatmapset(target, auth);
         return getBase64BytesResponse("/beatmapsets/" + beatmapsetId + "/background", "获取谱面集失败", null);
+    }
+
+    public static Response<Base64Bytes> getBeatmapBgResponse(ShortcutTarget target, String auth) {
+        final long beatmapId = lookupBeatmap(target, auth);
+        return getBase64BytesResponse("/beatmaps/" + beatmapId + "/background", "获取谱面失败", null);
     }
 
     public static long lookupBeatmap(ShortcutTarget target, String auth) {

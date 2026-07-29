@@ -24,6 +24,7 @@ public class ApiRequestException extends RuntimeException {
             case NO_USER_FOUND -> "未找到对应玩家，请检查玩家ID后重试喵";
             case NO_SCORE_FOUND -> "未找到对应成绩，请检查输入后重试喵";
             case NO_ROOM_FOUND -> "当前没有可用的多人房间信息喵";
+            case NO_BACKGROUND_FOUND -> "未在缓存中找到铺面背景喵";
 
             case ILLEGAL_ARGUMENT -> "请求参数不合法，请检查指令参数格式喵";
             case UNAUTHORIZED -> "缺少用户凭据，请重新绑定喵";
