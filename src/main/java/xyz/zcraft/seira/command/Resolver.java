@@ -243,9 +243,9 @@ final class Resolver {
         }
 
         String trimmed = token.trim();
-        Matcher cqMatcher = Patterns.CQ_AT_PATTERN.matcher(trimmed);
-        if (cqMatcher.matches()) {
-            return cqMatcher.group(1);
+        Matcher qqMatcher = Patterns.QQ_AT_PATTERN.matcher(trimmed);
+        if (qqMatcher.matches()) {
+            return qqMatcher.group(1);
         }
 
         Matcher plainMatcher = Patterns.PLAIN_AT_PATTERN.matcher(trimmed);
@@ -269,7 +269,7 @@ final class Resolver {
         private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo|rp|bp)(\\d+)?$");
         private static final Pattern SET_MACRO_PATTERN = Pattern.compile("^(\\d+)#(\\d+)$");
         private static final Pattern BEATMAP_MACRO_PATTERN = Pattern.compile("^m(\\d+)$");
-        private static final Pattern CQ_AT_PATTERN = Pattern.compile("^\\[CQ:at,qq=(\\d+)(?:,.*)?]$");
+        private static final Pattern QQ_AT_PATTERN = Pattern.compile("^<@([A-Z|0-9]{32})>$");
         private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
         private static final Pattern SEARCH_PATTERN = Pattern.compile("^(?:#(\\d+) )?(.+)$");
         private static final Pattern RSC_TARGET_PATTERN = Pattern.compile("^[us]?\\d+$");
