@@ -869,11 +869,19 @@ public class APIHelper {
 
             final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
 
-            if (send.statusCode() != 200) {
+            if (send.statusCode() != 200 && send.statusCode() != 404) {
                 throw parseHttpError(send.body(), send.statusCode(), "回放上传失败");
             }
 
             final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
+
+            if (send.statusCode() == 404) {
+                final Integer errCode = extractErrorCode(r);
+                if (errCode != null && errCode == ErrorCode.NO_SCORE_FOUND.getCode()) {
+                    throw new ApiRequestException(ErrorCode.NO_SCORE_FOUND.getCode(), "回放上传失败：无法获取对应的成绩");
+                }
+            }
+
             ensureApiSuccess(r, "回放上传失败");
 
             return GSON.fromJson(r.getData().getAsJsonObject(), ReplayUploadInfo.class);
