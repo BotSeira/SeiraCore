@@ -8,7 +8,6 @@ import xyz.zcraft.seira.bot.data.Attachment;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.config.AppConfig;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.List;
@@ -48,7 +47,7 @@ public class AttachmentHandler {
                 final ReplayUploadInfo replayUploadInfo = APIHelper.uploadReplay(bytes);
 
                 msgSender.accept(ReplyFactory.replayUploadMessage(replayUploadInfo));
-            } catch (IOException e) {
+            } catch (Exception e) {
                 LOG.error("Error occurred while uploading replay: {}", attachment.filename(), e);
                 msgSender.accept(PendingMessage.ofMarkdownRaw(attachment.filename() + " 上传失败:" + e.getMessage()));
             }

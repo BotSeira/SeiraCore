@@ -51,7 +51,7 @@ public final class ReplyFactory {
 
     public static PendingMessage replayUploadMessage(ReplayUploadInfo info) {
         return PendingMessage.ofMarkdownRaw("""
-                                ## Replay上传成功~
+                                ### Replay上传成功~
                                 > 成绩: %s
                                 > 铺面: %s
                                 > 用户: %s
