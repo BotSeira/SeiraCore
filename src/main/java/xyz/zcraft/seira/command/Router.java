@@ -1011,6 +1011,10 @@ public class Router {
         return adminIds.contains(openId);
     }
 
+    public void sendAttachmentUploadMessage(String openId, String msgId, PendingMessage s) {
+        taskCoordinator.sendOutboundMessage(openId, msgId, false, s, new AtomicInteger(10));
+    }
+
     private static final class Usages {
         public static final String BO_USAGE = "用法：/bo <个数> [玩家ID/用户名/@用户]";
         public static final String NO_BIND_TIP = "你还没有绑定玩家ID，请先使用 /bind 绑定";

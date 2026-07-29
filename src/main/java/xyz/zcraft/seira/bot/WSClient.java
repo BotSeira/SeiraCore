@@ -9,7 +9,6 @@ import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import xyz.zcraft.seira.bot.data.AccessToken;
 import xyz.zcraft.seira.bot.data.Attachment;
-import xyz.zcraft.seira.bot.data.Message;
 import xyz.zcraft.seira.command.AttachmentHandler;
 import xyz.zcraft.seira.command.Router;
 import xyz.zcraft.seira.config.AppConfig;
@@ -34,7 +33,6 @@ public class WSClient extends WebSocketClient {
     private final AtomicLong sequence = new AtomicLong(-1);
     private final Router router;
     private final AttachmentHandler attachmentHandler;
-    private final MessageSender messageSender;
     private volatile boolean heartbeatAcked = true;
     @Setter
     private Runnable onCloseCallback = null;
@@ -50,7 +48,6 @@ public class WSClient extends WebSocketClient {
         this.tokenSupplier = tokenSupplier;
         this.router = new Router(messageSender, config);
         this.attachmentHandler = new AttachmentHandler(config);
-        this.messageSender = messageSender;
 
         LOG.info("QQ Gateway WebSocket Client created");
     }
@@ -134,20 +131,10 @@ public class WSClient extends WebSocketClient {
             Attachment attachment = gson.fromJson(attachmentObj, Attachment.class);
             attachmentList.add(attachment);
         }
+
         attachmentHandler.handleAttachments(
                 attachmentList,
-                (s) -> {
-                    JsonObject obj = new JsonObject();
-                    obj.addProperty("content", s);
-                    messageSender.sendPrivateMessage(
-                            openId,
-                            Message.builder()
-                                    .msgId(msgId)
-                                    .msgType(2)
-                                    .markdown(obj)
-                                    .build()
-                    );
-                }
+                (s) -> router.sendAttachmentUploadMessage(openId, msgId, s)
         );
     }
 

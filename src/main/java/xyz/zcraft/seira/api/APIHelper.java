@@ -859,4 +859,26 @@ public class APIHelper {
             Double end
     ) {
     }
+
+    public static ReplayUploadInfo uploadReplay(byte[] replayBytes) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/replays/upload"))
+                    .POST(HttpRequest.BodyPublishers.ofByteArray(replayBytes))
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw parseHttpError(send.body(), send.statusCode(), "回放上传失败");
+            }
+
+            final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
+            ensureApiSuccess(r, "回放上传失败");
+
+            return GSON.fromJson(r.getData().getAsJsonObject(), ReplayUploadInfo.class);
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
 }

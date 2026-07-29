@@ -43,6 +43,7 @@ public class ApiRequestException extends RuntimeException {
             case SCORE_PARSE_FAILED -> "成绩数据解析失败，请稍后重试喵";
             case REPLAY_PARSE_FAILED -> "回放数据解析失败，请稍后重试喵";
             case RENDER_QUEUE_FULL -> "回放渲染队列已满，请稍后再试喵";
+            case REPLAY_UPLOAD_FAILED -> "回放上传失败，请稍后再试喵";
         };
     }
 

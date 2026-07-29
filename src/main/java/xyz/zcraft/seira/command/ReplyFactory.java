@@ -49,6 +49,22 @@ public final class ReplyFactory {
         return "[" + text + "](" + url + ")";
     }
 
+    public static PendingMessage replayUploadMessage(ReplayUploadInfo info) {
+        return PendingMessage.ofMarkdownRaw("""
+                                ## Replay上传成功~
+                                > 成绩: %s
+                                > 铺面: %s
+                                > 用户: %s
+                        """
+                        .formatted(
+                                cmd("/s " + info.scoreId(), String.valueOf(info.scoreId())),
+                                cmd("/m " + info.beatmapId(), String.valueOf(info.beatmapId())),
+                                cmd("/u " + info.userId(), info.username())
+                        ),
+                null
+        );
+    }
+
     public PendingMessage boMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "B" + response.getScoreIds().size() + "查询完成\n" +
