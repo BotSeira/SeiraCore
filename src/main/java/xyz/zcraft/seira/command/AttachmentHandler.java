@@ -26,8 +26,8 @@ public class AttachmentHandler {
 
     public void handleAttachments(List<Attachment> attachments, Consumer<PendingMessage> msgSender) {
         attachments.stream()
-                .filter(attachment -> "file".equals(attachment.contentType()))
-                .filter(attachment -> attachment.filename().endsWith(".osr"))
+                .filter(a -> "file".equals(a.contentType()))
+                .filter(a -> a.filename().toLowerCase().endsWith(".osr"))
                 .forEach(a -> handleAttachment(a, msgSender));
     }
 
