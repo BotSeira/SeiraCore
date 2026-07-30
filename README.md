@@ -156,4 +156,4 @@ mvn -U clean compile exec:java
 | `/debug.message <base64>`          | 将指定Base64解码并作为Markdown消息发出 |
 | `/debug.db <sql>`                  | 对后端数据库执行指定的SQL语句          |
 | `/debug.update-user-info`          | 更新数据库中所有玩家的信息             |
-| `debug.active-message`             | 发送一条主动消息                       |
+| `/debug.active-message`            | 发送一条主动消息                       |

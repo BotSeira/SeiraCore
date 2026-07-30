@@ -31,11 +31,11 @@ public final class TaskCoordinator {
 
     private final MessageSender messageSender;
     private final ApiRequestStats apiRequestStats = new ApiRequestStats();
-    private final Router router;
+    private final ReplayResultStore replayResults;
 
-    TaskCoordinator(Router router, MessageSender messageSender) {
-        this.router = router;
+    TaskCoordinator(MessageSender messageSender, ReplayResultStore replayResults) {
         this.messageSender = messageSender;
+        this.replayResults = replayResults;
     }
 
     public RouteDecision queueApiRequest(Context ctx, String requestType, ApiTaskExecutor executor) {
@@ -103,7 +103,7 @@ public final class TaskCoordinator {
                     taskId.set(taskInfo.taskId());
                     APIHelper.ReplayRenderResult result = APIHelper.waitReplayVideo(taskInfo.taskId());
                     if (result != null) {
-                        router.getRenderResults().put(taskInfo.taskId(), result);
+                        replayResults.put(taskInfo.taskId(), result);
                         BotStat.incrementReplays();
                         return PendingMessage.ofVideoUrl(result.videoUrl());
                     }
@@ -111,7 +111,7 @@ public final class TaskCoordinator {
                 },
                 (b) -> {
                     LOG.debug("Running finalizer of {} for request {}", b, taskId.get());
-                    if (b) router.getRenderResults().remove(taskId.get());
+                    if (b) replayResults.remove(taskId.get());
                 }
         );
     }
