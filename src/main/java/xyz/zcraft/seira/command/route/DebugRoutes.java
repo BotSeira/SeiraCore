@@ -10,6 +10,7 @@ import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.Response;
 import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.bot.data.FileInfo;
+import xyz.zcraft.seira.bot.data.Message;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.RouteDecision;
@@ -45,8 +46,20 @@ public class DebugRoutes {
             case "debug.update-user-info" -> handleUpdateUserInfo(ctx);
             case "debug.get-all-friends" -> handleGetAllFriends(ctx);
             case "debug.validate-token" -> handleValidateToken(ctx);
+            case "debug.active-message" -> handleActiveMessage(ctx);
             default -> router.handleUnknown();
         };
+    }
+
+    private RouteDecision handleActiveMessage(Context ctx) {
+        if (ctx.inGroup()) {
+            final Message message = new Message();
+            message.setMsgType(0);
+            message.setContent("111");
+            router.messageSender.sendGroupMessage(ctx.groupId(), message);
+        }
+
+        return null;
     }
 
     public RouteDecision handleUpload(Context ctx) {
