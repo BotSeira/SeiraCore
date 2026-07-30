@@ -517,7 +517,7 @@ public final class ReplyFactory {
                             
                             详细指令列表请在 [这里](https://docs.seira.top/overview/commands) 查看
                             """ + "\n"
-                    + cmd("/faq", "常见问题") + " " + cmd("/stat", "状态信息").trim();
+                    + "[常见问题](https://docs.seira.top/overview/faq)" + " " + cmd("/stat", "状态信息").trim();
         }
 
         public static String faqContent(Context ctx) {
