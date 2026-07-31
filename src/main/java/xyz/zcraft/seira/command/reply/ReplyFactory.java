@@ -517,7 +517,7 @@ public final class ReplyFactory {
                             > /watch add <玩家ID/用户名/@用户> [分钟] - 监视群友的新成绩
                             > /f - 获取好友列表
                             
-                            详细指令列表请在 [这里](https://docs.seira.top/overview/commands) 查看
+                            详细指令列表请在 [这里](https://docs.seira.top) 查看
                             """ + "\n"
                     + "[常见问题](https://docs.seira.top/overview/faq)" + " " + cmd("/stat", "状态信息").trim();
         }

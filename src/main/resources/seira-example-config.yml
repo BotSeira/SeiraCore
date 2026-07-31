@@ -1,7 +1,5 @@
 # === 主程序 配置 ===
 seira:
-  # 回放文件上传路径，若不存在会自动创建
-  replayPath: "./data/replays"
   # SQLite数据库路径，若不存在会自动创建
   sqlitePath: "./data/seira.db"
   # 用于消息卡片中跳转游戏的按钮
