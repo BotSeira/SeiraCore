@@ -13,7 +13,9 @@ import xyz.zcraft.seira.bot.data.Button;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.BindingConfig;
-import xyz.zcraft.seira.util.BotStat;
+import xyz.zcraft.seira.data.UploadedImage;
+import xyz.zcraft.seira.services.BotStat;
+import xyz.zcraft.seira.services.DailyLuck;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
@@ -45,6 +47,22 @@ public final class ReplyFactory {
     @SuppressWarnings("unused")
     static String url(String text, String url) {
         return "[" + text + "](" + url + ")";
+    }
+
+    public static PendingMessage replayUploadMessage(ReplayUploadInfo info) {
+        return PendingMessage.ofMarkdownRaw("""
+                                ### Replay上传成功~
+                                > 成绩: %s
+                                > 铺面: %s
+                                > 用户: %s
+                        """
+                        .formatted(
+                                cmd("/s " + info.scoreId(), String.valueOf(info.scoreId())),
+                                cmd("/m " + info.beatmapId(), String.valueOf(info.beatmapId())),
+                                cmd("/u " + info.userId(), info.username())
+                        ),
+                null
+        );
     }
 
     public PendingMessage boMessage(Context ctx, Response<?> response) {
@@ -219,6 +237,20 @@ public final class ReplyFactory {
 
     public PendingMessage faqMessage(Context ctx) {
         return PendingMessage.ofMarkdownRaw(Contents.faqContent(ctx));
+    }
+
+    public PendingMessage bgpMessage(Context context, Response<?> response) {
+        return PendingMessage.ofMarkdownRaw(
+                Contents.bgpContent(context, response),
+                null
+        );
+    }
+
+    public PendingMessage luckMessage(Context ctx, DailyLuck.Luck luck, Beatmapset mapset, UploadedImage cover) {
+        return PendingMessage.ofMarkdownRaw(
+                Contents.luckContent(ctx, luck, mapset, cover),
+                null
+        );
     }
 
     private static final class Contents {
@@ -474,59 +506,45 @@ public final class ReplyFactory {
                             常用指令：
                             > /bind - 绑定你的玩家ID
                             > /rp - 获取最近通过的一个成绩
-                            > /rs - 获取最近的一个成绩
                             > /bo [个数] [玩家ID] - 获取一个或多个最佳成绩
                             > /rp [个数] [玩家ID] - 获取最近通过一个或多个成绩
-                            > /rs [个数] [玩家ID] - 获取最近一个或多个成绩，包括失败
                             > /s <成绩ID或快捷查询> - 获取指定成绩
                             > /m <谱面ID或快捷查询> - 获取谱面
                             > /ms <谱面集ID或快捷查询> - 获取谱面集
                             > /r [成绩ID或快捷查询] [[mm:ss]-[mm:ss]] - 生成成绩高光视频或指定片段
-                            > /mp - 获取当前所在的多人房间信息和谱面镜像下载链接
                             > /lb <谱面ID> [玩家ID列表] - 获取指定谱面排行榜
                             > /f - 获取好友列表
                             
-                            其他指令：
-                            > /unbind - 解除你的玩家ID绑定
-                            > /clearhistory - 清除你在群聊中的记录
-                            > /fall - 获取全部好友列表
-                            > /fclear - 清除好友记录
-                            > /ap <铺面ID或快捷查询> - 获取指定铺面音频预览
-                            > /sa <成绩ID或快捷查询> - 获取指定成绩分析
-                            > /ma [成绩ID或快捷查询] [序号/#序号] - 获取成绩的Miss分析
-                            > /u <玩家ID> - 获取玩家信息
-                            > /rsc [谱面ID或快捷查询] [+用户ID列表] [[mm:ss]-[mm:ss]] - 生成同屏回放视频
-                            > /rstat [任务ID] - 查询渲染进度
-                            > /dl <ID或快捷查询> - 获取镜像下载链接
-                            > /sms [#页数] <关键字> - 搜索谱面集
-                            > /daily - 获取每日挑战
-                            > /stat - 获取状态
-                            > /inspect - 获取ID信息
-                            > /help - 显示此帮助信息
-                            
-                            快捷查询参考：
-                            > - /m rp2 - 获取最近第二个通过成绩的谱面
-                            > - /ms bo10 - 获取第十个最好成绩的谱面集
-                            > - /r 12345 rs1 - 生成ID为12345的玩家的最近一个成绩的30秒高光
-                            
-                            > 注：由于官机限制，群聊中需要@机器人才可以接收到指令
-                            
-                            详细使用说明请在 GitHub 查看
+                            详细指令列表请在 [这里](https://docs.seira.top/overview/commands) 查看
                             """ + "\n"
-                    + cmd("/faq", "常见问题") + " " + cmd("/stat", "状态信息").trim();
+                    + "[常见问题](https://docs.seira.top/overview/faq)" + " " + cmd("/stat", "状态信息").trim();
         }
 
         public static String faqContent(Context ctx) {
             return at(ctx) + "\n" + """
-                    常见问题
-                    > **Q: 为什么群聊中发送指令没有反应**
-                    > A: 由于QQ机器人能力限制，机器人暂时只能接收到群聊中@机器人的消息，所以在群聊中使用需要在开头加上@机器人的操作。
-                    > **Q: 被误绑定其他玩家的档案了怎么办**
-                    > A: 使用/unbind解绑即可重新绑定。建议在单聊中绑定以防止此类情况的发生。
-                    > **Q: 发现了Bug或者想提出新功能建议怎么办**
-                    > A: 感谢大家的贡献~不论是Bug反馈还是新功能建议均可在Github仓库提交Issue，链接如下：
-                    > `https://github.com/ZayrexDev/Seira/issues`
+                    常见问题请在 [这里](https://docs.seira.top/overview/faq) 查看
                     """.trim();
+        }
+
+        public static String bgpContent(Context context, Response<?> response) {
+            return at(context) + "\n> 背景预览("
+                    + cmd("/ms " + response.getBeatmapsetId(), response.getBeatmapsetId())
+                    + " - "
+                    + cmd("/m " + response.getBeatmapId(), response.getBeatmapId())
+                    + ")";
+        }
+
+        public static String luckContent(Context ctx, DailyLuck.Luck luck, Beatmapset mapset, UploadedImage cover) {
+            final List<Double> list = mapset.getBeatmaps().stream().map(Beatmap::getDifficultyRating).sorted().toList();
+            String sb = at(ctx) + "\n" +
+                    "## 今日运势" + "\n" +
+                    "> 人品值: **" + luck.luck() + "**/100\n" +
+                    "> 宜: " + luck.ups() + "\n" +
+                    "> 忌: " + luck.downs() + "\n\n" +
+                    "今日推荐图: " + cmd("/ms " + mapset.getId(), mapset.getId().toString()) + "\n" +
+                    "> %s - %s [★%.2f-★%.2f]".formatted(mapset.getArtist(), mapset.getTitle(), list.getFirst(), list.getLast()) + "\n" +
+                    ">" + cover.toMarkdown();
+            return sb.trim();
         }
     }
 

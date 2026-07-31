@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.util;
+package xyz.zcraft.seira.services;
 
 import com.qcloud.cos.COSClient;
 import com.qcloud.cos.ClientConfig;
@@ -12,7 +12,11 @@ import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.config.CosConfig;
+import xyz.zcraft.seira.data.UploadedImage;
 
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.URI;
@@ -22,6 +26,7 @@ import java.net.http.HttpResponse;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
@@ -74,6 +79,38 @@ public class CosService {
         }
 
         return url;
+    }
+
+    private ImageDimensions readImageDimensions(byte[] imageBytes) {
+        try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(imageBytes))) {
+            if (input == null) {
+                throw new IOException("Failed to create image input stream");
+            }
+
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
+            if (!readers.hasNext()) {
+                throw new IOException("Unsupported image format");
+            }
+
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(input);
+                return new ImageDimensions(reader.getWidth(0), reader.getHeight(0));
+            } finally {
+                reader.dispose();
+            }
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Failed to read image dimensions", e);
+        }
+    }
+
+    public UploadedImage uploadImage(String url) {
+        return uploadImage(downloadMedia(url).content());
+    }
+
+    public UploadedImage uploadImage(byte[] bytes) {
+        final ImageDimensions imageDimensions = readImageDimensions(bytes);
+        return new UploadedImage(upload(bytes, PendingMessage.FILE_TYPE_IMAGE), imageDimensions.width, imageDimensions.height);
     }
 
     public String upload(byte[] content, int fileType) {
@@ -247,6 +284,9 @@ public class CosService {
         return result;
     }
 
+    private record ImageDimensions(int width, int height) {
+    }
+
     private record DownloadedMedia(byte[] content, String contentType, String digest) {
         public static DownloadedMedia create(byte[] content, String contentType) {
             try {
@@ -278,5 +318,6 @@ public class CosService {
 
     private record FileUpload(String url, long uploadedAt) {
     }
+
 }
 

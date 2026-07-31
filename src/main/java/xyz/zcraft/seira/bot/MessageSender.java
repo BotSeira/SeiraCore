@@ -5,7 +5,8 @@ import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.bot.data.Message;
 import xyz.zcraft.seira.bot.data.PendingMessage;
-import xyz.zcraft.seira.util.CosService;
+import xyz.zcraft.seira.data.UploadedImage;
+import xyz.zcraft.seira.services.CosService;
 import xyz.zcraft.seira.util.TokenManager;
 
 public class MessageSender {
@@ -38,12 +39,25 @@ public class MessageSender {
         }
     }
 
-    public String uploadImageToCos(byte[] imageBytes) {
-        return cos.upload(imageBytes, PendingMessage.FILE_TYPE_IMAGE);
+    public UploadedImage uploadImageToCos(byte[] imageBytes) {
+        return cos.uploadImage(imageBytes);
+    }
+
+    public UploadedImage uploadImageToCos(String imageUrl) {
+        return cos.uploadImage(imageUrl);
     }
 
     public FileInfo uploadPrivateMedia(String userId, int fileType, String url, boolean uploadCos) {
         LOG.info("Uploading private media for user {}, fileType {}, url {}", userId, fileType, url);
+
+        if (uploadCos && fileType == PendingMessage.FILE_TYPE_VIDEO) {
+            try {
+                return QQApi.uploadPrivateVideoByParts(tokenManager.getToken(), userId, url);
+            } catch (RuntimeException e) {
+                LOG.error("Failed to upload private video directly to QQ {}", userId, e);
+                return null;
+            }
+        }
 
         try {
             if (uploadCos) url = cos.uploadFromUrl(url, fileType);
@@ -70,6 +84,15 @@ public class MessageSender {
 
     public FileInfo uploadGroupMedia(String groupId, int fileType, String url, boolean uploadCos) {
         LOG.info("Uploading group media for group {}, fileType {}, url {}", groupId, fileType, url);
+
+        if (uploadCos && fileType == PendingMessage.FILE_TYPE_VIDEO) {
+            try {
+                return QQApi.uploadGroupVideoByParts(tokenManager.getToken(), groupId, url);
+            } catch (RuntimeException e) {
+                LOG.error("Failed to upload group video directly to QQ {}", groupId, e);
+                return null;
+            }
+        }
 
         try {
             if (uploadCos) url = cos.uploadFromUrl(url, fileType);

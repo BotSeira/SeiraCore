@@ -28,11 +28,6 @@ public class PendingMessage {
         return message;
     }
 
-    public PendingMessage doUpload(boolean upload) {
-        this.upload = upload;
-        return this;
-    }
-
     public static PendingMessage ofMarkdownRaw(String content) {
         return MDMessage.ofMarkdown(content, null);
     }
@@ -71,5 +66,10 @@ public class PendingMessage {
         message.msgType = MSG_TYPE_MEDIA;
         message.fileUrl = fileUrl;
         return message;
+    }
+
+    public PendingMessage doUpload(boolean upload) {
+        this.upload = upload;
+        return this;
     }
 }

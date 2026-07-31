@@ -1,21 +1,22 @@
 package xyz.zcraft.seira.bot;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonNull;
-import com.google.gson.JsonObject;
+import com.google.gson.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
+import xyz.zcraft.seira.bot.data.AccessToken;
+import xyz.zcraft.seira.bot.data.Attachment;
+import xyz.zcraft.seira.command.AttachmentHandler;
 import xyz.zcraft.seira.command.Router;
 import xyz.zcraft.seira.config.AppConfig;
-import xyz.zcraft.seira.util.AccessToken;
 import xyz.zcraft.seira.util.ThreadHelper;
 
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -31,6 +32,7 @@ public class WSClient extends WebSocketClient {
     private final ScheduledExecutorService heartbeatExecutor = Executors.newSingleThreadScheduledExecutor();
     private final AtomicLong sequence = new AtomicLong(-1);
     private final Router router;
+    private final AttachmentHandler attachmentHandler;
     private volatile boolean heartbeatAcked = true;
     @Setter
     private Runnable onCloseCallback = null;
@@ -45,6 +47,8 @@ public class WSClient extends WebSocketClient {
         this.config = config;
         this.tokenSupplier = tokenSupplier;
         this.router = new Router(messageSender, config);
+        this.attachmentHandler = new AttachmentHandler(config);
+
         LOG.info("QQ Gateway WebSocket Client created");
     }
 
@@ -98,8 +102,12 @@ public class WSClient extends WebSocketClient {
         String eventType = payload.get("t").getAsString();
 
         if ("C2C_MESSAGE_CREATE".equals(eventType)) {
-            onC2CMsg(payload);
-        } else if ("GROUP_AT_MESSAGE_CREATE".equals(eventType)) {
+            if (payload.get("d").getAsJsonObject().has("attachments")) {
+                onC2CFile(payload);
+            } else {
+                onC2CMsg(payload);
+            }
+        } else if ("GROUP_AT_MESSAGE_CREATE".equals(eventType) || "GROUP_MESSAGE_CREATE".equals(eventType)) {
             onGroupMsg(payload);
         }
     }
@@ -110,6 +118,24 @@ public class WSClient extends WebSocketClient {
         String msgId = data.get("id").getAsString();
         String openId = data.get("author").getAsJsonObject().get("user_openid").getAsString();
         router.onPrivateMessageReceived(openId, msgId, content);
+    }
+
+    private void onC2CFile(JsonObject payload) {
+        JsonObject data = payload.get("d").getAsJsonObject();
+        String msgId = data.get("id").getAsString();
+        String openId = data.get("author").getAsJsonObject().get("user_openid").getAsString();
+        final JsonArray attachments = data.getAsJsonArray("attachments");
+        List<Attachment> attachmentList = new ArrayList<>(attachments.size());
+        for (JsonElement attachmentElem : attachments) {
+            JsonObject attachmentObj = attachmentElem.getAsJsonObject();
+            Attachment attachment = gson.fromJson(attachmentObj, Attachment.class);
+            attachmentList.add(attachment);
+        }
+
+        attachmentHandler.handleAttachments(
+                attachmentList,
+                (s) -> router.sendAttachmentUploadMessage(openId, msgId, s)
+        );
     }
 
     private void onGroupMsg(JsonObject payload) {

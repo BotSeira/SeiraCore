@@ -10,30 +10,56 @@ import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.Response;
 import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.bot.data.FileInfo;
+import xyz.zcraft.seira.bot.data.Message;
 import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.command.Context;
+import xyz.zcraft.seira.command.ReplyFactory;
 import xyz.zcraft.seira.command.RouteDecision;
-import xyz.zcraft.seira.command.Router;
+import xyz.zcraft.seira.command.TaskCoordinator;
+import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 
 import java.io.ByteArrayOutputStream;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 public class DebugRoutes {
     private static final Logger LOG = LogManager.getLogger(DebugRoutes.class);
-    private final Router router;
+    private final AppConfig config;
+    private final MessageSender messageSender;
+    private final ReplyFactory replyFactory;
+    private final TaskCoordinator taskCoordinator;
+    private final OsuAuthHelper authHelper;
+    private final Predicate<String> adminAuthorizer;
+    private final Supplier<RouteDecision> unknownCommand;
 
-    public DebugRoutes(Router router) {
-        this.router = router;
+    public DebugRoutes(
+            AppConfig config,
+            MessageSender messageSender,
+            ReplyFactory replyFactory,
+            TaskCoordinator taskCoordinator,
+            OsuAuthHelper authHelper,
+            Predicate<String> adminAuthorizer,
+            Supplier<RouteDecision> unknownCommand
+    ) {
+        this.config = config;
+        this.messageSender = messageSender;
+        this.replyFactory = replyFactory;
+        this.taskCoordinator = taskCoordinator;
+        this.authHelper = authHelper;
+        this.adminAuthorizer = adminAuthorizer;
+        this.unknownCommand = unknownCommand;
     }
 
     public RouteDecision routeDebug(Context ctx) {
-        if (!router.config.seira().debugMode()) {
+        if (!config.seira().debugMode()) {
             return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
         }
 
-        if (!router.isAdmin(ctx.senderUserId())) {
+        if (!adminAuthorizer.test(ctx.senderUserId())) {
             return RouteDecision.sync(PendingMessage.ofString("你没有权限使用此指令。"));
         }
 
@@ -45,24 +71,36 @@ public class DebugRoutes {
             case "debug.update-user-info" -> handleUpdateUserInfo(ctx);
             case "debug.get-all-friends" -> handleGetAllFriends(ctx);
             case "debug.validate-token" -> handleValidateToken(ctx);
-            default -> router.handleUnknown();
+            case "debug.active-message" -> handleActiveMessage(ctx);
+            default -> unknownCommand.get();
         };
     }
 
+    private RouteDecision handleActiveMessage(Context ctx) {
+        if (ctx.inGroup()) {
+            final Message message = new Message();
+            message.setMsgType(0);
+            message.setContent("111");
+            messageSender.sendGroupMessage(ctx.groupId(), message);
+        }
+
+        return null;
+    }
+
     public RouteDecision handleUpload(Context ctx) {
-        if (ctx.args().length != 3) {
+        if (ctx.argumentCount() != 3) {
             return RouteDecision.sync(PendingMessage.ofString("用法：/debug.upload <type> <cos> <url>"));
         }
 
-        String typeStr = ctx.args()[0];
-        String cosStr = ctx.args()[1];
-        String urlStr = ctx.args()[2];
+        String typeStr = ctx.argument(0);
+        String cosStr = ctx.argument(1);
+        String urlStr = ctx.argument(2);
 
         FileInfo fileInfo;
         if (ctx.groupId() != null && !ctx.groupId().isBlank()) {
-            fileInfo = router.messageSender.uploadGroupMedia(ctx.groupId(), Integer.parseInt(typeStr), urlStr, "true".equals(cosStr));
+            fileInfo = messageSender.uploadGroupMedia(ctx.groupId(), Integer.parseInt(typeStr), urlStr, "true".equals(cosStr));
         } else {
-            fileInfo = router.messageSender.uploadPrivateMedia(ctx.senderUserId(), Integer.parseInt(typeStr), urlStr, "true".equals(cosStr));
+            fileInfo = messageSender.uploadPrivateMedia(ctx.senderUserId(), Integer.parseInt(typeStr), urlStr, "true".equals(cosStr));
         }
 
         return RouteDecision.sync(PendingMessage.ofString(fileInfo != null
@@ -71,7 +109,7 @@ public class DebugRoutes {
     }
 
     public RouteDecision handleTest() {
-        return RouteDecision.sync(router.replyFactory.testMessage());
+        return RouteDecision.sync(replyFactory.testMessage());
     }
 
     public RouteDecision handleMessage(Context ctx) {
@@ -109,7 +147,7 @@ public class DebugRoutes {
     public RouteDecision handleUpdateUserInfo(Context ctx) {
         try {
             final List<Long> allUsers = UserDataStore.findAllUsers();
-            return router.taskCoordinator.queueApiRequest(ctx, "Update All User Info", () -> {
+            return taskCoordinator.queueApiRequest(ctx, "Update All User Info", () -> {
                 APIHelper.getUsers(allUsers).forEach(user -> UserDataStore.storeUserInfo(user.getId(), user.getUsername()));
                 return PendingMessage.ofString("更新完成，共更新了" + allUsers.size() + "个用户的信息");
             });
@@ -119,13 +157,13 @@ public class DebugRoutes {
     }
 
     public RouteDecision handleGetAllFriends(Context ctx) {
-        return router.taskCoordinator.queueApiRequest(ctx, "Get All Friends", () -> {
+        return taskCoordinator.queueApiRequest(ctx, "Get All Friends", () -> {
             try {
                 final List<OsuAuthHelper.TokenStore> allOsuTokens = UserDataStore.getAllOsuTokens();
                 allOsuTokens
                         .stream()
                         .map(OsuAuthHelper.TokenStore::openId)
-                        .map(router.authHelper::updateTokenAndGet)
+                        .map(authHelper::updateTokenAndGet)
                         .map(OsuToken::accessToken)
                         .forEach(accessToken -> {
                             final Response<UserExtended> self = APIHelper.getSelf(accessToken);
@@ -168,13 +206,13 @@ public class DebugRoutes {
     }
 
     public RouteDecision handleValidateToken(Context ctx) {
-        return router.taskCoordinator.queueApiRequest(ctx, "Validate Token", () -> {
+        return taskCoordinator.queueApiRequest(ctx, "Validate Token", () -> {
             int updated = 0, removed = 0;
             try {
                 final List<OsuAuthHelper.TokenStore> allOsuTokens = UserDataStore.getAllOsuTokens();
                 for (var token : allOsuTokens) {
                     if (token.osuToken().isExpired()) {
-                        final OsuToken newToken = router.authHelper.updateTokenAndGet(token.openId());
+                        final OsuToken newToken = authHelper.updateTokenAndGet(token.openId());
                         if (newToken == null) {
                             UserDataStore.removeToken(token.openId());
                             removed++;

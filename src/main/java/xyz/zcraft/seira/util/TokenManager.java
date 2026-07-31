@@ -4,6 +4,7 @@ import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.bot.QQApi;
+import xyz.zcraft.seira.bot.data.AccessToken;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;

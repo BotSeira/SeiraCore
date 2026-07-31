@@ -24,6 +24,7 @@ public class ApiRequestException extends RuntimeException {
             case NO_USER_FOUND -> "未找到对应玩家，请检查玩家ID后重试喵";
             case NO_SCORE_FOUND -> "未找到对应成绩，请检查输入后重试喵";
             case NO_ROOM_FOUND -> "当前没有可用的多人房间信息喵";
+            case NO_BACKGROUND_FOUND -> "未在缓存中找到铺面背景喵";
 
             case ILLEGAL_ARGUMENT -> "请求参数不合法，请检查指令参数格式喵";
             case UNAUTHORIZED -> "缺少用户凭据，请重新绑定喵";
@@ -38,11 +39,12 @@ public class ApiRequestException extends RuntimeException {
             case FETCH_FAILED -> "数据获取失败，请稍后重试喵";
             case TOKEN_FETCH_FAILED -> "令牌获取失败喵";
 
-            case REPLAY_UNAVAILABLE -> "该成绩回放不可用喵";
+            case REPLAY_UNAVAILABLE -> "该成绩回放不可用喵，可尝试将回放文件私聊发送给机器人手动上传喵";
             case BEATMAP_PARSE_FAILED -> "谱面数据解析失败，请稍后重试喵";
             case SCORE_PARSE_FAILED -> "成绩数据解析失败，请稍后重试喵";
             case REPLAY_PARSE_FAILED -> "回放数据解析失败，请稍后重试喵";
             case RENDER_QUEUE_FULL -> "回放渲染队列已满，请稍后再试喵";
+            case REPLAY_UPLOAD_FAILED -> "回放上传失败，请稍后再试喵";
         };
     }
 

@@ -6,14 +6,12 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import xyz.zcraft.osu.model.BeatmapExtended;
-import xyz.zcraft.osu.model.MultiplayerRoom;
-import xyz.zcraft.osu.model.User;
-import xyz.zcraft.osu.model.UserExtended;
+import xyz.zcraft.osu.model.*;
 import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.command.resolution.ShortcutTarget;
+import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
 import java.io.IOException;
@@ -97,7 +95,8 @@ public class APIHelper {
         }
     }
 
-    public static Response<Base64Bytes> getBoNResponse(int n, long uid) {
+    public static Response<Base64Bytes> getBoNResponse(int n, UserRef userRef) {
+        long uid = resolveUid(userRef);
         return getBase64BytesResponse("/users/" + uid + "/scores/bestof?" + "n=" + n, "获取最好成绩失败", null);
     }
 
@@ -184,13 +183,24 @@ public class APIHelper {
         }
     }
 
-    public static Response<Base64Bytes> getRecentResponse(int n, long uid, boolean includeFail) {
+    public static Response<Base64Bytes> getRecentResponse(int n, UserRef userRef, boolean includeFail) {
+        long uid = resolveUid(userRef);
         return getBase64BytesResponse("/users/" + uid + "/scores/recent" + "?n=" + n + "&fail=" + includeFail, "获取最近成绩失败", null);
     }
 
     public static Response<Base64Bytes> getBeatmapResponse(ShortcutTarget target, String mod, String auth) {
         final long beatmapId = lookupBeatmap(target, auth);
         return getBase64BytesResponse("/beatmaps/" + beatmapId + (mod != null ? "?mod=" + mod : ""), "获取谱面失败", null);
+    }
+
+    public static Response<Base64Bytes> getBeatmapsetBgResponse(ShortcutTarget target, String auth) {
+        final long beatmapsetId = lookupBeatmapset(target, auth);
+        return getBase64BytesResponse("/beatmapsets/" + beatmapsetId + "/background", "获取谱面集失败", null);
+    }
+
+    public static Response<Base64Bytes> getBeatmapBgResponse(ShortcutTarget target, String auth) {
+        final long beatmapId = lookupBeatmap(target, auth);
+        return getBase64BytesResponse("/beatmaps/" + beatmapId + "/background", "获取谱面失败", null);
     }
 
     public static long lookupBeatmap(ShortcutTarget target, String auth) {
@@ -230,7 +240,7 @@ public class APIHelper {
         if (target.isMacro()) {
             switch (target.macroType().toLowerCase()) {
                 case "rs", "bo", "rp" -> {
-                    query += "&of=" + target.macroType() + "&u=" + target.boundUid();
+                    query += "&of=" + target.macroType() + "&u=" + resolveUid(target.userRef());
                     query += "&i=" + target.macroIndex();
                 }
                 case "ms" -> {
@@ -249,6 +259,28 @@ public class APIHelper {
     public static Response<Base64Bytes> getBeatmapsetResponse(ShortcutTarget target, String auth) {
         final long beatmapsetId = lookupBeatmapset(target, auth);
         return getBase64BytesResponse("/beatmapsets/" + beatmapsetId, "获取谱面集失败", null);
+    }
+
+    public static Beatmapset getBeatmapsetRaw(long id) {
+        try {
+            var builder = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/beatmapsets/" + id))
+                    .header("Accept", "application/json");
+
+            final HttpResponse<String> send = CLIENT.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw parseHttpError(send.body(), send.statusCode(), "获取谱面集失败");
+            }
+
+            final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
+            ensureApiSuccess(r, "获取谱面集失败");
+            final JsonObject data = r.getData().getAsJsonObject();
+
+            return GSON.fromJson(data, Beatmapset.class);
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public static long lookupBeatmapset(ShortcutTarget target, String auth) {
@@ -289,7 +321,7 @@ public class APIHelper {
         return switch (target.macroType().toLowerCase()) {
             case "m" -> query + "?m=" + target.explicitId();
             case "rs", "bo", "rp" ->
-                    query + "?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+                    query + "?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + resolveUid(target.userRef());
             case "mp" -> query + "?of=mp";
             case null, default -> throw new ResolutionException("快捷查询格式错误。");
         };
@@ -340,10 +372,10 @@ public class APIHelper {
     private static String getScoreQuery(ShortcutTarget target) {
         return switch (target.macroType().toLowerCase()) {
             case "rs", "bo", "rp" ->
-                    "/scores/lookup?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
-            case "m" -> "/scores/lookup?m=" + target.explicitId() + "&u=" + target.boundUid();
+                    "/scores/lookup?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + resolveUid(target.userRef());
+            case "m" -> "/scores/lookup?m=" + target.explicitId() + "&u=" + resolveUid(target.userRef());
             case "ms" ->
-                    "/scores/lookup?ms=" + target.explicitId() + "&i=" + target.macroIndex() + "&u=" + target.boundUid();
+                    "/scores/lookup?ms=" + target.explicitId() + "&i=" + target.macroIndex() + "&u=" + resolveUid(target.userRef());
             case null, default -> throw new IllegalArgumentException("Invalid macro type");
         };
     }
@@ -409,16 +441,16 @@ public class APIHelper {
         return createReplayTask(target, timeRange);
     }
 
-    public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] groupUids, TimeDurationParser.TimeRange timeRange, String auth) {
-        if (groupUids == null || groupUids.length == 0) {
-            throw new RuntimeException("同屏回放需要至少一个玩家ID。");
+    public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] ids, String auth) {
+        if (ids == null || ids.length == 0) {
+            throw new RuntimeException("同屏回放需要至少一个ID。");
         }
 
         final long beatmapId = lookupBeatmap(target, auth);
 
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(ENDPOINT + "/replays/renders/showcase/" + beatmapId + (timeRange != null ? "?" + timeRange.toQueryString() : "")))
-                .POST(HttpRequest.BodyPublishers.ofString(GSON.toJsonTree(Map.of("ids", groupUids)).toString()))
+                .uri(URI.create(ENDPOINT + "/replays/renders/showcase/" + beatmapId))
+                .POST(HttpRequest.BodyPublishers.ofString(GSON.toJsonTree(Map.of("ids", ids)).toString()))
                 .build();
 
         return getReplayTaskInfo(request);
@@ -750,6 +782,47 @@ public class APIHelper {
         }
     }
 
+    public static long resolveUid(UserRef userRef) {
+        if (userRef instanceof UserRef.ByUid byUid) {
+            return byUid.getUid();
+        }
+        if (userRef instanceof UserRef.ByUsername byUsername) {
+            return lookupUser(byUsername.getUsername()).getContent().getId();
+        }
+        throw new ResolutionException("无法识别指定的玩家");
+    }
+
+    public static Response<User> lookupUser(String username) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/users/lookup"))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(
+                            GSON.toJsonTree(Map.of("user_name", username)).toString()
+                    ))
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw parseHttpError(send.body(), send.statusCode(), "查找玩家失败");
+            }
+
+            final RawResponse response = GSON.fromJson(send.body(), RawResponse.class);
+            ensureApiSuccess(response, "查找玩家失败");
+            final JsonObject data = requireDataObject(response, "查找玩家响应缺少用户数据");
+
+            return Response.<User>fromHeaders(send.headers())
+                    .content(GSON.fromJson(data, User.class))
+                    .build();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("查找玩家请求被中断", e);
+        }
+    }
+
     public static List<User> getUsers(List<Long> u) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -790,5 +863,35 @@ public class APIHelper {
             Double start,
             Double end
     ) {
+    }
+
+    public static ReplayUploadInfo uploadReplay(byte[] replayBytes) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/replays/upload"))
+                    .POST(HttpRequest.BodyPublishers.ofByteArray(replayBytes))
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200 && send.statusCode() != 404) {
+                throw parseHttpError(send.body(), send.statusCode(), "回放上传失败");
+            }
+
+            final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
+
+            if (send.statusCode() == 404) {
+                final Integer errCode = extractErrorCode(r);
+                if (errCode != null && errCode == ErrorCode.NO_SCORE_FOUND.getCode()) {
+                    throw new ApiRequestException(ErrorCode.NO_SCORE_FOUND.getCode(), "回放上传失败：无法获取对应的成绩");
+                }
+            }
+
+            ensureApiSuccess(r, "回放上传失败");
+
+            return GSON.fromJson(r.getData().getAsJsonObject(), ReplayUploadInfo.class);
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

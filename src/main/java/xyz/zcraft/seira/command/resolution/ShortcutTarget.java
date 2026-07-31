@@ -1,8 +1,10 @@
 package xyz.zcraft.seira.command.resolution;
 
+import xyz.zcraft.seira.data.UserRef;
+
 public record ShortcutTarget(
         Long explicitId,
-        Long boundUid,
+        UserRef userRef,
         String macroType,
         Long macroIndex,
         String errorMessage
