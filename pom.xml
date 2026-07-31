@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>xyz.zcraft</groupId>
+    <groupId>com.github.BotSeira</groupId>
     <artifactId>SeiraCore</artifactId>
     <version>1.8.0</version>
 
@@ -92,7 +92,7 @@
         </dependency>
 
         <dependency>
-            <groupId>com.github.ZayrexDev</groupId>
+            <groupId>com.github.BotSeira</groupId>
             <artifactId>osuModel</artifactId>
             <version>v1.0.3</version>
         </dependency>
