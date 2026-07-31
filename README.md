@@ -3,7 +3,7 @@
 Seira 是一个提供 osu! 成绩查询的 QQ 机器人。
 支持生成最好成绩图、最近成绩图、排行榜等，持续更新中...
 
-Seira 依赖 [oStella](https://github.com/ZayrexDev/oStella) 作为上游数据服务。
+Seira 依赖 [oStella](https://github.com/BotSeira/oStella) 作为上游数据服务。
 
 ## 添加机器人
 
