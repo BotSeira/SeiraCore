@@ -107,6 +107,7 @@ mvn -U clean compile exec:java
 | `/daily`        | `/daily`                              | 每日挑战信息                                                                    |
 | `/luck`         | `/luck`                               | 今日人品                                                                        |
 | `/mp`           | `/mp`                                 | 多人房间列表                                                                    |
+| `/watch`        | `/watch add/del/list [目标]`          | 添加/删除/列出监视任务                                                          |
 | `/stat`         | `/stat`                               | 服务状态和统计信息文本                                                          |
 | `/inspect`      | `/inspect`                            | 获取当前上下文信息                                                              |
 | `/help`         | `/help`                               | 显示帮助信息                                                                    |

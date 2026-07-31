@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.command;
+package xyz.zcraft.seira.command.reply;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -11,6 +11,7 @@ import xyz.zcraft.seira.binding.BindingHelper;
 import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.bot.data.Button;
 import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.BindingConfig;
 import xyz.zcraft.seira.data.UploadedImage;
@@ -28,7 +29,7 @@ import java.util.stream.Stream;
 public final class ReplyFactory {
     private final Buttons buttons;
 
-    ReplyFactory(AppConfig config) {
+    public ReplyFactory(AppConfig config) {
         this.buttons = new Buttons(config.seira().directUrl());
     }
 
@@ -36,7 +37,7 @@ public final class ReplyFactory {
         return "<qqbot-cmd-input text=\"%s\" show=\"%s\" reference=\"false\" />".formatted(command, text);
     }
 
-    static String at(Context ctx) {
+    public static String at(Context ctx) {
         if (ctx.inGroup()) {
             return "<qqbot-at-user id=\"%s\" /> ".formatted(ctx.senderUserId());
         } else {
@@ -513,6 +514,7 @@ public final class ReplyFactory {
                             > /ms <谱面集ID或快捷查询> - 获取谱面集
                             > /r [成绩ID或快捷查询] [[mm:ss]-[mm:ss]] - 生成成绩高光视频或指定片段
                             > /lb <谱面ID> [玩家ID列表] - 获取指定谱面排行榜
+                            > /watch add <玩家ID/用户名/@用户> [分钟] - 监视群友的新成绩
                             > /f - 获取好友列表
                             
                             详细指令列表请在 [这里](https://docs.seira.top/overview/commands) 查看

@@ -6,18 +6,18 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-final class ReplayResultStore {
+public final class ReplayResultStore {
     private final ConcurrentMap<String, APIHelper.ReplayRenderResult> results = new ConcurrentHashMap<>();
 
     void put(String taskId, APIHelper.ReplayRenderResult result) {
         results.put(requireTaskId(taskId), Objects.requireNonNull(result));
     }
 
-    APIHelper.ReplayRenderResult get(String taskId) {
+    public APIHelper.ReplayRenderResult get(String taskId) {
         return results.get(requireTaskId(taskId));
     }
 
-    void remove(String taskId) {
+    public void remove(String taskId) {
         if (taskId != null && !taskId.isBlank()) {
             results.remove(taskId);
         }

@@ -6,6 +6,7 @@ import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.data.ReplayUploadInfo;
 import xyz.zcraft.seira.bot.data.Attachment;
 import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.config.AppConfig;
 
 import java.io.InputStream;

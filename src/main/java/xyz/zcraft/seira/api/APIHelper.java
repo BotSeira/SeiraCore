@@ -10,7 +10,7 @@ import xyz.zcraft.osu.model.*;
 import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.command.ResolutionException;
-import xyz.zcraft.seira.command.resolution.ShortcutTarget;
+import xyz.zcraft.seira.command.parse.ShortcutTarget;
 import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.util.TimeDurationParser;
 

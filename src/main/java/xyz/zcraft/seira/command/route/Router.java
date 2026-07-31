@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.command;
+package xyz.zcraft.seira.command.route;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -8,11 +8,17 @@ import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.PendingMessage;
-import xyz.zcraft.seira.command.route.DebugRoutes;
+import xyz.zcraft.seira.command.*;
+import xyz.zcraft.seira.command.handler.*;
+import xyz.zcraft.seira.command.iface.CommandMetrics;
+import xyz.zcraft.seira.command.parse.CommandParser;
+import xyz.zcraft.seira.command.parse.Resolver;
+import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 import xyz.zcraft.seira.util.ThreadHelper;
+import xyz.zcraft.seira.watch.ScoreWatchService;
 
 import java.util.List;
 import java.util.Optional;
@@ -33,10 +39,18 @@ public class Router {
     private final Supplier<RouteDecision> unknownCommand;
 
     public Router(MessageSender messageSender, AppConfig config) {
-        this(messageSender, config, BotStat::incrementCommands);
+        this(messageSender, config, BotStat::incrementCommands, null);
     }
 
-    Router(MessageSender messageSender, AppConfig config, CommandMetrics metrics) {
+    public Router(MessageSender messageSender, AppConfig config, CommandMetrics metrics) {
+        this(messageSender, config, metrics, null);
+    }
+
+    public Router(MessageSender messageSender, AppConfig config, ScoreWatchService watchService) {
+        this(messageSender, config, BotStat::incrementCommands, watchService);
+    }
+
+    public Router(MessageSender messageSender, AppConfig config, CommandMetrics metrics, ScoreWatchService watchService) {
         this.config = config;
         this.metrics = metrics;
         ReplyFactory replyFactory = new ReplyFactory(config);
@@ -67,6 +81,7 @@ public class Router {
         GeneralCommandHandler generalCommands = new GeneralCommandHandler(
                 messageSender, taskCoordinator, replyFactory, scoreCommands, this::isAdmin, metrics
         );
+        WatchCommandHandler watchCommands = new WatchCommandHandler(resolver, taskCoordinator, watchService, this::isAdmin);
         this.unknownCommand = generalCommands::handleUnknown;
         this.commandParser = new CommandParser(resolver::preProcess);
         this.commandRegistry = createCommandRegistry(
@@ -75,7 +90,8 @@ public class Router {
                 beatmapCommands,
                 socialCommands,
                 replayCommands,
-                generalCommands
+                generalCommands,
+                watchCommands
         );
         this.debugRoutes = new DebugRoutes(
                 config,
@@ -140,7 +156,7 @@ public class Router {
         }
     }
 
-    protected RouteDecision route(String rawContent, String senderUserId, String groupId, String messageId) {
+    public RouteDecision route(String rawContent, String senderUserId, String groupId, String messageId) {
         CommandParser.ParseResult result = commandParser.parse(
                 rawContent, senderUserId, groupId, messageId
         );
@@ -166,7 +182,8 @@ public class Router {
             BeatmapCommandHandler beatmapCommands,
             SocialCommandHandler socialCommands,
             ReplayCommandHandler replayCommands,
-            GeneralCommandHandler generalCommands
+            GeneralCommandHandler generalCommands,
+            WatchCommandHandler watchCommands
     ) {
         return CommandRegistry.builder()
                 .register(bindingCommands::handleBind, "bind")
@@ -199,10 +216,11 @@ public class Router {
                 .register(generalCommands::handleInspect, "inspect")
                 .register(generalCommands::handleHelp, "help")
                 .register(generalCommands::handleFaq, "faq")
+                .register(watchCommands::handleWatch, "watch")
                 .build();
     }
 
-    Set<String> registeredCommands() {
+    public Set<String> registeredCommands() {
         return commandRegistry.registeredCommands();
     }
 

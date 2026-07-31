@@ -1,16 +1,21 @@
-package xyz.zcraft.seira.command;
+package xyz.zcraft.seira.command.handler;
 
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.data.PendingMessage;
-import xyz.zcraft.seira.command.resolution.RscTarget;
-import xyz.zcraft.seira.command.resolution.ShortcutTarget;
-import xyz.zcraft.seira.command.resolution.TargetResolution;
+import xyz.zcraft.seira.command.*;
+import xyz.zcraft.seira.command.parse.Resolver;
+import xyz.zcraft.seira.command.reply.CommandUsage;
+import xyz.zcraft.seira.command.reply.ReplyFactory;
+import xyz.zcraft.seira.command.parse.RscTarget;
+import xyz.zcraft.seira.command.parse.ShortcutTarget;
+import xyz.zcraft.seira.command.parse.TargetResolution;
+import xyz.zcraft.seira.command.route.RouteDecision;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
 import java.util.function.Function;
 
-final class ReplayCommandHandler {
+public final class ReplayCommandHandler {
     private final Resolver resolver;
     private final TargetHistory targetHistory;
     private final TaskCoordinator taskCoordinator;
@@ -19,7 +24,7 @@ final class ReplayCommandHandler {
     private final ReplayResultStore replayResults;
     private final Function<String, String> accessTokenProvider;
 
-    ReplayCommandHandler(
+    public ReplayCommandHandler(
             Resolver resolver,
             TargetHistory targetHistory,
             TaskCoordinator taskCoordinator,
@@ -37,7 +42,7 @@ final class ReplayCommandHandler {
         this.accessTokenProvider = accessTokenProvider;
     }
 
-    RouteDecision handleR(Context ctx) {
+    public RouteDecision handleR(Context ctx) {
         TargetResolution targetResolution = targetHistory.resolveOptionalTarget(ctx, resolver, TimeDurationParser::isTimeRange);
         if (ctx.args().length - targetResolution.consumedArgs() > 1) {
             return RouteDecision.sync(PendingMessage.ofString(CommandUsage.R));
@@ -75,7 +80,7 @@ final class ReplayCommandHandler {
                 replyFactory::replayMessage);
     }
 
-    RouteDecision handleRsc(Context ctx) {
+    public RouteDecision handleRsc(Context ctx) {
         if (ctx.groupId() == null || ctx.groupId().isBlank()) {
             return RouteDecision.sync(PendingMessage.ofString("/rsc 仅支持群聊使用。"));
         }
@@ -126,7 +131,7 @@ final class ReplayCommandHandler {
                 replyFactory::replayMessage);
     }
 
-    RouteDecision handleRstat(Context ctx) {
+    public RouteDecision handleRstat(Context ctx) {
         if (ctx.args().length != 1 && ctx.args().length != 0) {
             return RouteDecision.sync(PendingMessage.ofString("用法：/rstat [任务ID]"));
         }

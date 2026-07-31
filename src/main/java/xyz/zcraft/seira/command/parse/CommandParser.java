@@ -1,20 +1,22 @@
-package xyz.zcraft.seira.command;
+package xyz.zcraft.seira.command.parse;
+
+import xyz.zcraft.seira.command.Context;
 
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.function.UnaryOperator;
 
-final class CommandParser {
+public final class CommandParser {
     private static final String PREFIX = "/";
 
     private final UnaryOperator<String> preProcessor;
 
-    CommandParser(UnaryOperator<String> preProcessor) {
+    public CommandParser(UnaryOperator<String> preProcessor) {
         this.preProcessor = Objects.requireNonNull(preProcessor);
     }
 
-    ParseResult parse(String rawContent, String senderUserId, String groupId, String messageId) {
+    public ParseResult parse(String rawContent, String senderUserId, String groupId, String messageId) {
         if (rawContent == null) {
             return ParseResult.ignored();
         }
@@ -42,14 +44,14 @@ final class CommandParser {
         return ParseResult.parsed(new Context(senderUserId, groupId, messageId, command, args, query));
     }
 
-    record ParseResult(Status status, Context context) {
-        enum Status {
+    public record ParseResult(Status status, Context context) {
+        public enum Status {
             IGNORED,
             EMPTY_COMMAND,
             PARSED
         }
 
-        ParseResult {
+        public ParseResult {
             if ((status == Status.PARSED) == (context == null)) {
                 throw new IllegalArgumentException("Only parsed results may contain a context");
             }

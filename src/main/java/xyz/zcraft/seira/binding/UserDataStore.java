@@ -379,6 +379,47 @@ public final class UserDataStore {
         return uids;
     }
 
+    public static boolean isGroupMember(String groupId, String openId) {
+        ensureInitialized();
+        String sql = "SELECT 1 FROM group_members WHERE group_id = ? AND open_id = ?";
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, groupId);
+            statement.setString(2, openId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next();
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to query group member", e);
+        }
+    }
+
+    public static Optional<String> findGroupOpenIdByUid(String groupId, long osuUid) {
+        ensureInitialized();
+        String sql = """
+                SELECT gm.open_id
+                FROM group_members gm
+                JOIN user_bindings ub
+                  ON ub.open_id = gm.open_id
+                WHERE gm.group_id = ?
+                  AND ub.osu_uid = ?
+                ORDER BY gm.updated_at DESC
+                LIMIT 1
+                """;
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, groupId);
+            statement.setLong(2, osuUid);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next()
+                        ? Optional.of(resultSet.getString("open_id"))
+                        : Optional.empty();
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to query group binding", e);
+        }
+    }
+
     public static int countBoundUser() {
         ensureInitialized();
 

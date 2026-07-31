@@ -1,15 +1,19 @@
-package xyz.zcraft.seira.command;
+package xyz.zcraft.seira.command.handler;
 
 import xyz.zcraft.osu.model.Beatmapset;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.command.*;
+import xyz.zcraft.seira.command.iface.CommandMetrics;
+import xyz.zcraft.seira.command.reply.ReplyFactory;
+import xyz.zcraft.seira.command.route.RouteDecision;
 import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.services.DailyLuck;
 
 import java.util.function.Predicate;
 
-final class GeneralCommandHandler {
+public final class GeneralCommandHandler {
     private final MessageSender messageSender;
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
@@ -17,7 +21,7 @@ final class GeneralCommandHandler {
     private final Predicate<String> adminAuthorizer;
     private final CommandMetrics metrics;
 
-    GeneralCommandHandler(
+    public GeneralCommandHandler(
             MessageSender messageSender,
             TaskCoordinator taskCoordinator,
             ReplyFactory replyFactory,
@@ -33,7 +37,7 @@ final class GeneralCommandHandler {
         this.metrics = metrics;
     }
 
-    RouteDecision handleU(Context context) {
+    public RouteDecision handleU(Context context) {
         if (context.argumentCount() != 1) {
             return RouteDecision.sync(PendingMessage.ofString("用法：/u <玩家ID/用户名/@用户>"));
         }
@@ -49,7 +53,7 @@ final class GeneralCommandHandler {
         return scoreCommands.handleBo(bestScoreContext);
     }
 
-    RouteDecision handleLuck(Context context) {
+    public RouteDecision handleLuck(Context context) {
         if (context.argumentCount() != 0) {
             return RouteDecision.sync(PendingMessage.ofString("用法：/luck"));
         }
@@ -62,26 +66,26 @@ final class GeneralCommandHandler {
         });
     }
 
-    RouteDecision handleInspect(Context context) {
+    public RouteDecision handleInspect(Context context) {
         return RouteDecision.sync(replyFactory.inspectMessage(
                 context, context.senderUserId(), adminAuthorizer.test(context.senderUserId()),
                 context.groupId(), context.messageId()
         ));
     }
 
-    RouteDecision handleHelp(Context context) {
+    public RouteDecision handleHelp(Context context) {
         return RouteDecision.sync(replyFactory.helpMessage(context));
     }
 
-    RouteDecision handleFaq(Context context) {
+    public RouteDecision handleFaq(Context context) {
         return RouteDecision.sync(replyFactory.faqMessage(context));
     }
 
-    RouteDecision handleStat(Context context) {
+    public RouteDecision handleStat(Context context) {
         return RouteDecision.sync(replyFactory.statusMessage(context, APIHelper.getServerStatus()));
     }
 
-    RouteDecision handleUnknown() {
+    public RouteDecision handleUnknown() {
         return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
     }
 }

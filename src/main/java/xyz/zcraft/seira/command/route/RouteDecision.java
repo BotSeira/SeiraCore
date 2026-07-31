@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.command;
+package xyz.zcraft.seira.command.route;
 
 import xyz.zcraft.seira.api.data.ApiTask;
 import xyz.zcraft.seira.bot.data.PendingMessage;
@@ -14,7 +14,7 @@ public record RouteDecision(
         return new RouteDecision(message, null, false, null);
     }
 
-    static RouteDecision sync(PendingMessage message, Consumer<Boolean> onSent) {
+    public static RouteDecision sync(PendingMessage message, Consumer<Boolean> onSent) {
         return new RouteDecision(message, null, false, onSent);
     }
 

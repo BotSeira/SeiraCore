@@ -1,19 +1,24 @@
-package xyz.zcraft.seira.command;
+package xyz.zcraft.seira.command.handler;
 
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.bot.data.PendingMessage;
-import xyz.zcraft.seira.command.resolution.ShortcutTarget;
-import xyz.zcraft.seira.command.resolution.TargetResolution;
-import xyz.zcraft.seira.command.resolution.UserRefResolution;
+import xyz.zcraft.seira.command.*;
+import xyz.zcraft.seira.command.parse.Resolver;
+import xyz.zcraft.seira.command.reply.CommandUsage;
+import xyz.zcraft.seira.command.reply.ReplyFactory;
+import xyz.zcraft.seira.command.parse.ShortcutTarget;
+import xyz.zcraft.seira.command.parse.TargetResolution;
+import xyz.zcraft.seira.command.parse.UserRefResolution;
+import xyz.zcraft.seira.command.route.RouteDecision;
 import xyz.zcraft.seira.data.UserRef;
 
-final class ScoreCommandHandler {
+public final class ScoreCommandHandler {
     private final Resolver resolver;
     private final TargetHistory targetHistory;
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
 
-    ScoreCommandHandler(
+    public ScoreCommandHandler(
             Resolver resolver,
             TargetHistory targetHistory,
             TaskCoordinator taskCoordinator,
@@ -25,7 +30,7 @@ final class ScoreCommandHandler {
         this.replyFactory = replyFactory;
     }
 
-    RouteDecision handleBo(Context ctx) {
+    public RouteDecision handleBo(Context ctx) {
         if (ctx.args().length == 2) {
             Integer n = resolver.parsePositiveInt(ctx.args()[0]);
             if (n == null) {
@@ -78,7 +83,7 @@ final class ScoreCommandHandler {
         }
     }
 
-    RouteDecision handleRs(Context ctx, boolean includeFail) {
+    public RouteDecision handleRs(Context ctx, boolean includeFail) {
         if (ctx.args().length == 2) {
             Integer n = resolver.parsePositiveInt(ctx.args()[0]);
             if (n == null) {
@@ -133,7 +138,7 @@ final class ScoreCommandHandler {
         }
     }
 
-    RouteDecision handleS(Context ctx) {
+    public RouteDecision handleS(Context ctx) {
         ShortcutTarget target;
         if (ctx.args().length == 0) {
             target = targetHistory.get(ctx.senderUserId());
@@ -167,7 +172,7 @@ final class ScoreCommandHandler {
         );
     }
 
-    RouteDecision handleSa(Context ctx) {
+    public RouteDecision handleSa(Context ctx) {
         ShortcutTarget target;
         if (ctx.args().length == 0) {
             target = targetHistory.get(ctx.senderUserId());
@@ -201,7 +206,7 @@ final class ScoreCommandHandler {
         );
     }
 
-    RouteDecision handleMa(Context ctx) {
+    public RouteDecision handleMa(Context ctx) {
         TargetResolution targetResolution = targetHistory.resolveOptionalTarget(ctx, resolver, arg -> arg.startsWith("#"));
         ShortcutTarget target = targetResolution.target();
         if (target == null) {

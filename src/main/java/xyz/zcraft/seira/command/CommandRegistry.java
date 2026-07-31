@@ -1,5 +1,7 @@
 package xyz.zcraft.seira.command;
 
+import xyz.zcraft.seira.command.route.RouteDecision;
+
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -8,30 +10,30 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-final class CommandRegistry {
+public final class CommandRegistry {
     private final Map<String, Function<Context, RouteDecision>> handlers;
 
     private CommandRegistry(Map<String, Function<Context, RouteDecision>> handlers) {
         this.handlers = Map.copyOf(handlers);
     }
 
-    static Builder builder() {
+    public static Builder builder() {
         return new Builder();
     }
 
-    RouteDecision dispatch(Context context, Supplier<RouteDecision> fallback) {
+    public RouteDecision dispatch(Context context, Supplier<RouteDecision> fallback) {
         Function<Context, RouteDecision> handler = handlers.get(normalize(context.command()));
         return handler == null ? fallback.get() : handler.apply(context);
     }
 
-    Set<String> registeredCommands() {
+    public Set<String> registeredCommands() {
         return handlers.keySet();
     }
 
-    static final class Builder {
+    public static final class Builder {
         private final Map<String, Function<Context, RouteDecision>> handlers = new LinkedHashMap<>();
 
-        Builder register(Function<Context, RouteDecision> handler, String... commands) {
+        public Builder register(Function<Context, RouteDecision> handler, String... commands) {
             Objects.requireNonNull(handler, "handler");
             if (commands == null || commands.length == 0) {
                 throw new IllegalArgumentException("At least one command is required");
@@ -49,7 +51,7 @@ final class CommandRegistry {
             return this;
         }
 
-        CommandRegistry build() {
+        public CommandRegistry build() {
             return new CommandRegistry(handlers);
         }
     }

@@ -1,11 +1,7 @@
-package xyz.zcraft.seira.command;
+package xyz.zcraft.seira.command.parse;
 
 import xyz.zcraft.seira.api.data.SearchQuery;
 import xyz.zcraft.seira.binding.UserDataStore;
-import xyz.zcraft.seira.command.resolution.RscTarget;
-import xyz.zcraft.seira.command.resolution.ShortcutTarget;
-import xyz.zcraft.seira.command.resolution.TargetResolution;
-import xyz.zcraft.seira.command.resolution.UserRefResolution;
 import xyz.zcraft.seira.data.UserRef;
 
 import java.util.*;
@@ -13,7 +9,7 @@ import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-final class Resolver {
+public final class Resolver {
     private static final ArrayList<String> USER_MACRO_TYPES = new ArrayList<>(List.of("rs", "bo", "rp"));
 
     public String preProcess(String rawContent) {
@@ -237,7 +233,7 @@ final class Resolver {
         return trimmed.startsWith("@") || trimmed.startsWith("[CQ:at,");
     }
 
-    private String extractMentionedUserId(String token) {
+    public String extractMentionedUserId(String token) {
         if (token == null) {
             return null;
         }

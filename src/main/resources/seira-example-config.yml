@@ -12,6 +12,8 @@ seira:
   debugMode: false
   # 管理员用户ID列表，逗号分隔
   adminIds: [ ]
+  # 新成绩监视的批量轮询间隔（分钟）
+  watchIntervalMinutes: 5
 
 # === 用户绑定配置 ===
 binding:

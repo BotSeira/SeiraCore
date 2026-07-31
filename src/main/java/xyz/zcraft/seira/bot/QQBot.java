@@ -10,8 +10,12 @@ import xyz.zcraft.seira.services.CosService;
 import xyz.zcraft.seira.services.DailyLuck;
 import xyz.zcraft.seira.util.ThreadHelper;
 import xyz.zcraft.seira.util.TokenManager;
+import xyz.zcraft.seira.watch.OstellaWatchApi;
+import xyz.zcraft.seira.watch.QqWatchScoreNotifier;
+import xyz.zcraft.seira.watch.ScoreWatchService;
 
 import java.net.URI;
+import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 
 public class QQBot {
@@ -23,6 +27,7 @@ public class QQBot {
     private final CosService cos;
     @Getter
     private final MessageSender sender;
+    private final ScoreWatchService watchService;
     private final AppConfig config;
 
     public QQBot(AppConfig config) {
@@ -37,7 +42,18 @@ public class QQBot {
 
         this.sender = new MessageSender(tokenManager, cos);
 
-        Runtime.getRuntime().addShutdownHook(new Thread(ThreadHelper::close));
+        LOG.info("Initializing score watch service");
+        this.watchService = new ScoreWatchService(
+                new OstellaWatchApi(config.ostella().endpoint()),
+                new QqWatchScoreNotifier(sender),
+                Duration.ofMinutes(config.seira().effectiveWatchIntervalMinutes())
+        );
+        this.watchService.start();
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            watchService.close();
+            ThreadHelper.close();
+        }));
 
         initializeBotStat();
     }
@@ -77,7 +93,8 @@ public class QQBot {
                         URI.create(wssEndpoint),
                         config,
                         tokenManager::getToken,
-                        sender
+                        sender,
+                        watchService
                 );
 
                 CountDownLatch disconnectLatch = new CountDownLatch(1);

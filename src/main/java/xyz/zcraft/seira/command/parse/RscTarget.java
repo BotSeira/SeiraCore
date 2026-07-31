@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.command.resolution;
+package xyz.zcraft.seira.command.parse;
 
 public record RscTarget(String[] uids, String errorMessage) {
 }

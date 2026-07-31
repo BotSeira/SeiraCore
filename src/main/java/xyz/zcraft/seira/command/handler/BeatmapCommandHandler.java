@@ -1,24 +1,29 @@
-package xyz.zcraft.seira.command;
+package xyz.zcraft.seira.command.handler;
 
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.data.Response;
 import xyz.zcraft.seira.api.data.SearchQuery;
 import xyz.zcraft.seira.api.data.SearchResultItem;
 import xyz.zcraft.seira.bot.data.PendingMessage;
-import xyz.zcraft.seira.command.resolution.ShortcutTarget;
-import xyz.zcraft.seira.command.resolution.TargetResolution;
+import xyz.zcraft.seira.command.*;
+import xyz.zcraft.seira.command.parse.Resolver;
+import xyz.zcraft.seira.command.reply.CommandUsage;
+import xyz.zcraft.seira.command.reply.ReplyFactory;
+import xyz.zcraft.seira.command.parse.ShortcutTarget;
+import xyz.zcraft.seira.command.parse.TargetResolution;
+import xyz.zcraft.seira.command.route.RouteDecision;
 
 import java.util.List;
 import java.util.function.Function;
 
-final class BeatmapCommandHandler {
+public final class BeatmapCommandHandler {
     private final Resolver resolver;
     private final TargetHistory lastTarget;
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
     private final Function<String, String> accessTokenProvider;
 
-    BeatmapCommandHandler(
+    public BeatmapCommandHandler(
             Resolver resolver,
             TargetHistory targetHistory,
             TaskCoordinator taskCoordinator,
@@ -32,11 +37,11 @@ final class BeatmapCommandHandler {
         this.accessTokenProvider = accessTokenProvider;
     }
 
-    RouteDecision handleDaily(Context ctx) {
+    public RouteDecision handleDaily(Context ctx) {
         return taskCoordinator.queueApiRequest(ctx, "Daily Challenge", () -> PendingMessage.ofMarkdownRaw(APIHelper.getDaily()));
     }
 
-    RouteDecision handleM(Context ctx) {
+    public RouteDecision handleM(Context ctx) {
         if (ctx.args().length >= 1) {
             TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
             ShortcutTarget target = targetResolution.target();
@@ -75,7 +80,7 @@ final class BeatmapCommandHandler {
         }
     }
 
-    RouteDecision handleAp(Context ctx) {
+    public RouteDecision handleAp(Context ctx) {
         ShortcutTarget target;
 
         if (ctx.args().length >= 1) {
@@ -102,7 +107,7 @@ final class BeatmapCommandHandler {
         );
     }
 
-    RouteDecision handleBgp(Context ctx) {
+    public RouteDecision handleBgp(Context ctx) {
         ShortcutTarget target;
 
         if (ctx.args().length >= 1) {
@@ -127,7 +132,7 @@ final class BeatmapCommandHandler {
         );
     }
 
-    RouteDecision handleDl(Context ctx) {
+    public RouteDecision handleDl(Context ctx) {
         ShortcutTarget target;
 
         if (ctx.args().length == 0) {
@@ -162,7 +167,7 @@ final class BeatmapCommandHandler {
         );
     }
 
-    RouteDecision handleMs(Context ctx) {
+    public RouteDecision handleMs(Context ctx) {
         ShortcutTarget target;
         if (ctx.args().length == 0) {
             target = lastTarget.get(ctx.senderUserId());
@@ -193,7 +198,7 @@ final class BeatmapCommandHandler {
         );
     }
 
-    RouteDecision handleSms(Context ctx) {
+    public RouteDecision handleSms(Context ctx) {
         final SearchQuery searchQuery = resolver.resolveSearchQuery(ctx.query());
         if (searchQuery == null) {
             return RouteDecision.sync(PendingMessage.ofString("用法：/sms [#页数] <搜索关键字>"));

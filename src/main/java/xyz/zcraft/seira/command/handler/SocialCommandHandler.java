@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.command;
+package xyz.zcraft.seira.command.handler;
 
 import xyz.zcraft.osu.model.User;
 import xyz.zcraft.osu.model.UserExtended;
@@ -8,22 +8,27 @@ import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.Response;
 import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.bot.data.PendingMessage;
-import xyz.zcraft.seira.command.resolution.ShortcutTarget;
-import xyz.zcraft.seira.command.resolution.TargetResolution;
+import xyz.zcraft.seira.command.*;
+import xyz.zcraft.seira.command.parse.Resolver;
+import xyz.zcraft.seira.command.reply.CommandUsage;
+import xyz.zcraft.seira.command.reply.ReplyFactory;
+import xyz.zcraft.seira.command.parse.ShortcutTarget;
+import xyz.zcraft.seira.command.parse.TargetResolution;
+import xyz.zcraft.seira.command.route.RouteDecision;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
-final class SocialCommandHandler {
+public final class SocialCommandHandler {
     private final Resolver resolver;
     private final OsuAuthHelper authHelper;
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
     private final Function<String, String> accessTokenProvider;
 
-    SocialCommandHandler(
+    public SocialCommandHandler(
             Resolver resolver,
             OsuAuthHelper authHelper,
             TaskCoordinator taskCoordinator,
@@ -37,7 +42,7 @@ final class SocialCommandHandler {
         this.accessTokenProvider = accessTokenProvider;
     }
 
-    RouteDecision handleMp(Context ctx) {
+    public RouteDecision handleMp(Context ctx) {
         if (resolver.resolveBoundUid(ctx.senderUserId()) == null) {
             return RouteDecision.sync(PendingMessage.ofString(CommandUsage.NO_BIND));
         }
@@ -52,7 +57,7 @@ final class SocialCommandHandler {
                 () -> replyFactory.mpMessage(ctx, APIHelper.getMultiplayerRoom(token.accessToken())));
     }
 
-    RouteDecision handleF(Context ctx, boolean all) {
+    public RouteDecision handleF(Context ctx, boolean all) {
         final Long uid = resolver.resolveBoundUid(ctx.senderUserId());
         if (uid == null) {
             return RouteDecision.sync(PendingMessage.ofString(CommandUsage.NO_BIND));
@@ -137,7 +142,7 @@ final class SocialCommandHandler {
         });
     }
 
-    RouteDecision handleFclear(Context ctx) {
+    public RouteDecision handleFclear(Context ctx) {
         Long uid = resolver.resolveBoundUid(ctx.senderUserId());
         if (uid == null) {
             return RouteDecision.sync(PendingMessage.ofString(CommandUsage.NO_BIND));
@@ -148,7 +153,7 @@ final class SocialCommandHandler {
         ));
     }
 
-    RouteDecision handleLb(Context ctx) {
+    public RouteDecision handleLb(Context ctx) {
         if (ctx.args().length == 0) {
             if (ctx.groupId() != null && !ctx.groupId().isBlank()) {
                 List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(ctx.groupId());

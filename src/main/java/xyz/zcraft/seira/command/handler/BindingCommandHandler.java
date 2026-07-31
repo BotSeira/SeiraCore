@@ -1,20 +1,23 @@
-package xyz.zcraft.seira.command;
+package xyz.zcraft.seira.command.handler;
 
 import xyz.zcraft.seira.binding.BindingHelper;
 import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.command.Context;
+import xyz.zcraft.seira.command.reply.ReplyFactory;
+import xyz.zcraft.seira.command.route.RouteDecision;
 import xyz.zcraft.seira.config.AppConfig;
 
-final class BindingCommandHandler {
+public final class BindingCommandHandler {
     private final AppConfig config;
     private final ReplyFactory replyFactory;
 
-    BindingCommandHandler(AppConfig config, ReplyFactory replyFactory) {
+    public BindingCommandHandler(AppConfig config, ReplyFactory replyFactory) {
         this.config = config;
         this.replyFactory = replyFactory;
     }
 
-    RouteDecision handleBind(Context ctx) {
+    public RouteDecision handleBind(Context ctx) {
         if (ctx.senderUserId() == null || ctx.senderUserId().isBlank()) {
             return RouteDecision.sync(PendingMessage.ofString("无法识别你的用户ID，暂时无法绑定。请稍后重试。"));
         }
@@ -37,7 +40,7 @@ final class BindingCommandHandler {
                 ctx.groupId() == null || ctx.groupId().isBlank()));
     }
 
-    RouteDecision handleUnbind(Context ctx) {
+    public RouteDecision handleUnbind(Context ctx) {
         if (ctx.senderUserId() == null || ctx.senderUserId().isBlank()) {
             return RouteDecision.sync(PendingMessage.ofString("无法识别你的用户ID，暂时无法解绑。请稍后重试。"));
         }
@@ -50,7 +53,7 @@ final class BindingCommandHandler {
                 : "你当前还没有绑定玩家ID，无需解绑。"));
     }
 
-    RouteDecision handleClearHistory(Context ctx) {
+    public RouteDecision handleClearHistory(Context ctx) {
         if (ctx.senderUserId() == null || ctx.senderUserId().isBlank()) {
             return RouteDecision.sync(PendingMessage.ofString("无法识别你的用户ID，无法清除历史记录。请稍后重试。"));
         }

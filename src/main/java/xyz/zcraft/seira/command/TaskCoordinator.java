@@ -14,6 +14,7 @@ import xyz.zcraft.seira.bot.data.MDMessage;
 import xyz.zcraft.seira.bot.data.Message;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.iface.*;
+import xyz.zcraft.seira.command.route.RouteDecision;
 import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.services.ApiRequestStats;
 import xyz.zcraft.seira.services.BotStat;
@@ -24,7 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 
-import static xyz.zcraft.seira.command.ReplyFactory.at;
+import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class TaskCoordinator {
     private static final Logger LOG = LogManager.getLogger(TaskCoordinator.class);
@@ -33,7 +34,7 @@ public final class TaskCoordinator {
     private final ApiRequestStats apiRequestStats = new ApiRequestStats();
     private final ReplayResultStore replayResults;
 
-    TaskCoordinator(MessageSender messageSender, ReplayResultStore replayResults) {
+    public TaskCoordinator(MessageSender messageSender, ReplayResultStore replayResults) {
         this.messageSender = messageSender;
         this.replayResults = replayResults;
     }
@@ -49,7 +50,7 @@ public final class TaskCoordinator {
         return RouteDecision.async(queuedNotice, new ApiTask(requestType, executor, postProcessor, finalizer, true));
     }
 
-    RouteDecision queueImageRequest(Context ctx, String requestType, ImageResponseCreator creator, ImageResponsePostProcessor postProcessor) {
+    public RouteDecision queueImageRequest(Context ctx, String requestType, ImageResponseCreator creator, ImageResponsePostProcessor postProcessor) {
         return queueApiRequest(
                 ctx,
                 requestType,
@@ -83,7 +84,7 @@ public final class TaskCoordinator {
         );
     }
 
-    RouteDecision queueReplayTask(Context ctx, String requestType, ReplayTaskCreator creator, BiFunction<Context, APIHelper.ReplayTaskInfo, PendingMessage> messageCreator) {
+    public RouteDecision queueReplayTask(Context ctx, String requestType, ReplayTaskCreator creator, BiFunction<Context, APIHelper.ReplayTaskInfo, PendingMessage> messageCreator) {
         AtomicReference<APIHelper.ReplayTaskInfo> taskInfoRef = new AtomicReference<>();
         AtomicReference<String> taskId = new AtomicReference<>();
         return queueApiRequestUntilSubmit(
@@ -116,7 +117,7 @@ public final class TaskCoordinator {
         );
     }
 
-    void processApiTask(String targetId, String messageId, boolean groupMessage, ApiTask apiTask, AtomicInteger messageSeqCounter) {
+    public void processApiTask(String targetId, String messageId, boolean groupMessage, ApiTask apiTask, AtomicInteger messageSeqCounter) {
         long startedAt = System.nanoTime();
         boolean statsCompleted = false;
         boolean responseSent = false;
@@ -158,7 +159,7 @@ public final class TaskCoordinator {
         }
     }
 
-    boolean sendOutboundMessage(String targetId, String messageId, boolean groupMessage, PendingMessage pendingMsg, AtomicInteger messageSeqCounter) {
+    public boolean sendOutboundMessage(String targetId, String messageId, boolean groupMessage, PendingMessage pendingMsg, AtomicInteger messageSeqCounter) {
         Message message = new Message();
         message.setMsgType(pendingMsg.getMsgType());
         message.setMsgId(messageId);

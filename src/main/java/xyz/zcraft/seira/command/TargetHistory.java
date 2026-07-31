@@ -1,24 +1,25 @@
 package xyz.zcraft.seira.command;
 
-import xyz.zcraft.seira.command.resolution.ShortcutTarget;
-import xyz.zcraft.seira.command.resolution.TargetResolution;
+import xyz.zcraft.seira.command.parse.Resolver;
+import xyz.zcraft.seira.command.parse.ShortcutTarget;
+import xyz.zcraft.seira.command.parse.TargetResolution;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Predicate;
 
-final class TargetHistory {
+public final class TargetHistory {
     private final ConcurrentMap<String, ShortcutTarget> targets = new ConcurrentHashMap<>();
 
-    ShortcutTarget get(String userId) {
+    public ShortcutTarget get(String userId) {
         return targets.get(userId);
     }
 
-    void put(String userId, ShortcutTarget target) {
+    public void put(String userId, ShortcutTarget target) {
         targets.put(userId, target);
     }
 
-    TargetResolution resolveOptionalTarget(
+    public TargetResolution resolveOptionalTarget(
             Context context,
             Resolver resolver,
             Predicate<String> isOptionalArgument
@@ -29,7 +30,7 @@ final class TargetHistory {
         return resolver.resolveTargetWithOptionalMention(context.args(), context.senderUserId());
     }
 
-    void rememberExplicitTarget(Context context, TargetResolution resolution) {
+    public void rememberExplicitTarget(Context context, TargetResolution resolution) {
         if (resolution.consumedArgs() > 0) {
             put(context.senderUserId(), resolution.target());
         }

@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.command.resolution;
+package xyz.zcraft.seira.command.parse;
 
 public record TargetResolution(ShortcutTarget target, int consumedArgs) {
 }
