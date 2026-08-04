@@ -22,11 +22,7 @@ import xyz.zcraft.seira.services.DailyLuck;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Stream;
 
 public final class ReplyFactory {
@@ -42,57 +38,14 @@ public final class ReplyFactory {
 
     public static String at(Context ctx) {
         if (ctx.inGroup()) {
-            return "<qqbot-at-user id=\"%s\" /> ".formatted(ctx.senderUserId());
+            return at(ctx.senderUserId());
         } else {
             return "";
         }
     }
 
-    public PendingMessage rankGuessResultMessage(RankGuessGameService.FinishedRound result) {
-        RankGuessGameService.Round round = result.round();
-        String rank = String.format(Locale.US, "%,d", round.actualRank());
-        String pp = round.pp() == null
-                ? "未知"
-                : BigDecimal.valueOf(round.pp()).stripTrailingZeros().toPlainString() + "pp";
-
-        StringBuilder content = new StringBuilder()
-                .append("本轮猜测结束~\n")
-                .append("该用户实际Rank为：`#")
-                .append(rank)
-                .append("` (")
-                .append(cmd("/u " + round.userId(), String.valueOf(round.userId())))
-                .append(")")
-                .append("\n")
-                .append("该成绩PP为：`")
-                .append(pp)
-                .append("` (")
-                .append(cmd("/s " + round.scoreId(), String.valueOf(round.scoreId())))
-                .append(")")
-                .append("\n")
-                .append("猜测排行榜：\n");
-
-        if (result.standings().isEmpty()) {
-            content.append("（暂无猜测）");
-        } else {
-            for (int i = 0; i < result.standings().size(); i++) {
-                RankGuessGameService.Standing standing = result.standings().get(i);
-                content.append(i + 1)
-                        .append(". **<qqbot-at-user id=\"")
-                        .append(standing.senderUserId())
-                        .append("\" />**: ")
-                        .append(String.format(Locale.US, "%,d", Math.round(standing.points())))
-                        .append("pts, #")
-                        .append(String.format(Locale.US, "%,d", standing.guess()))
-                        .append("(")
-                        .append(String.format(Locale.US, "%+,d", standing.delta()))
-                        .append(")");
-                if (i + 1 < result.standings().size()) {
-                    content.append("\n");
-                }
-            }
-        }
-
-        return PendingMessage.ofMarkdownRaw(content.toString());
+    public static String at(String openId) {
+        return "<qqbot-at-user id=\"%s\" /> ".formatted(openId);
     }
 
     @SuppressWarnings("unused")
@@ -114,6 +67,40 @@ public final class ReplyFactory {
                         ),
                 null
         );
+    }
+
+    public PendingMessage rankGuessResultMessage(RankGuessGameService.FinishedRound result) {
+        RankGuessGameService.Round round = result.round();
+        String rank = String.format(Locale.US, "%,d", round.actualRank());
+        String pp = round.pp() == null
+                ? "未知"
+                : BigDecimal.valueOf(round.pp()).stripTrailingZeros().toPlainString() + "pp";
+
+        StringBuilder content = new StringBuilder()
+                .append("> 本轮猜测结束~\n")
+                .append("> 该用户实际Rank为：`#%s` (%s)\n".formatted(rank, cmd("/u " + round.userId(), String.valueOf(round.userId()))))
+                .append("> 该成绩PP为：`%s` (%s)\n".formatted(pp, cmd("/s " + round.scoreId(), String.valueOf(round.scoreId()))))
+                .append("\n猜测排行榜：\n");
+
+        if (result.standings().isEmpty()) {
+            content.append("> （暂无猜测）");
+        } else {
+            for (int i = 0; i < result.standings().size(); i++) {
+                RankGuessGameService.Standing standing = result.standings().get(i);
+                content.append(
+                        "> %d. **%s**: %,dpts #%,d(%+,d)\n"
+                                .formatted(
+                                        i + 1,
+                                        at(standing.senderUserId()),
+                                        Math.round(standing.points()),
+                                        standing.guess(),
+                                        standing.delta()
+                                )
+                );
+            }
+        }
+
+        return PendingMessage.ofMarkdownRaw(content.toString().trim());
     }
 
     public PendingMessage boMessage(Context ctx, Response<?> response) {
