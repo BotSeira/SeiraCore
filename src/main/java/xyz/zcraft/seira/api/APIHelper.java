@@ -446,7 +446,7 @@ public class APIHelper {
             throw new IllegalArgumentException("成绩ID必须为正整数");
         }
 
-        TimeDurationParser.TimeRange timeRange = getScoreHighlight(scoreId);
+        TimeDurationParser.TimeRange timeRange = getScoreHighlight(scoreId, 10);
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(ENDPOINT + "/replays/renders/score/" + scoreId
                         + "?obscured=true" + timeRange.toQueryString()))
@@ -516,7 +516,7 @@ public class APIHelper {
         long scoreId = lookupScoreId(target);
 
         if (timeRange == null) {
-            timeRange = getScoreHighlight(scoreId);
+            timeRange = getScoreHighlight(scoreId, 5);
         }
 
         HttpRequest request = HttpRequest.newBuilder()
@@ -527,7 +527,7 @@ public class APIHelper {
         return getReplayTaskInfo(request);
     }
 
-    private static TimeDurationParser.TimeRange getScoreHighlight(long scoreId) {
+    private static TimeDurationParser.TimeRange getScoreHighlight(long scoreId, int extend) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/scores/" + scoreId + "/highlight"))
@@ -545,8 +545,8 @@ public class APIHelper {
             final JsonObject data = rawResponse.getData().getAsJsonObject();
 
             return new TimeDurationParser.TimeRange(
-                    Math.max(0, (int) (data.get("start").getAsLong() / 1000)) - 10,
-                    (int) (data.get("end").getAsLong() / 1000) + 10
+                    Math.max(0, (int) (data.get("start").getAsLong() / 1000)) - extend,
+                    (int) (data.get("end").getAsLong() / 1000) + extend
             );
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
