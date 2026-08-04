@@ -84,7 +84,7 @@ public class Router {
         );
         WatchCommandHandler watchCommands = new WatchCommandHandler(resolver, taskCoordinator, watchService, this::isAdmin);
         RankGuessCommandHandler rankGuessCommands = new RankGuessCommandHandler(
-                taskCoordinator, replyFactory, new RankGuessGameService()
+                taskCoordinator, replyFactory, new RankGuessGameService(), this::isAdmin
         );
         this.unknownCommand = generalCommands::handleUnknown;
         this.commandParser = new CommandParser(resolver::preProcess);

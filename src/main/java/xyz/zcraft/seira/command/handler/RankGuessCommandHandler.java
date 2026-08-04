@@ -10,6 +10,7 @@ import xyz.zcraft.seira.game.RankGuessGameService;
 
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
@@ -19,15 +20,18 @@ public final class RankGuessCommandHandler {
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
     private final RankGuessGameService games;
+    private final Predicate<String> adminAuthorizer;
 
     public RankGuessCommandHandler(
             TaskCoordinator taskCoordinator,
             ReplyFactory replyFactory,
-            RankGuessGameService games
+            RankGuessGameService games,
+            Predicate<String> adminAuthorizer
     ) {
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
         this.games = games;
+        this.adminAuthorizer = adminAuthorizer;
     }
 
     public RouteDecision handleRankGuess(Context ctx) {
@@ -54,7 +58,7 @@ public final class RankGuessCommandHandler {
     }
 
     private RouteDecision start(Context ctx) {
-        RankGuessGameService.Reservation reservation = games.reserve(ctx.groupId());
+        RankGuessGameService.Reservation reservation = games.reserve(ctx.groupId(), ctx.senderUserId());
         if (reservation == null) {
             return RouteDecision.sync(PendingMessage.ofString("本群已有一轮 Rank Guess 正在进行。"));
         }
@@ -97,10 +101,15 @@ public final class RankGuessCommandHandler {
     }
 
     private RouteDecision end(Context ctx) {
-        RankGuessGameService.EndResult result = games.end(ctx.groupId());
+        RankGuessGameService.EndResult result = games.end(
+                ctx.groupId(), ctx.senderUserId(), adminAuthorizer.test(ctx.senderUserId())
+        );
         return switch (result.status()) {
             case NO_GAME -> RouteDecision.sync(PendingMessage.ofString("本群当前没有进行中的 Rank Guess 喵"));
             case STARTING -> RouteDecision.sync(PendingMessage.ofString("高光仍在渲染，请等待视频发送后再结束游戏喵"));
+            case FORBIDDEN -> RouteDecision.sync(PendingMessage.ofString(
+                    "开始猜测后的3分钟内，仅发起者和机器人管理员可以结束游戏喵"
+            ));
             case FINISHED -> RouteDecision.sync(replyFactory.rankGuessResultMessage(result.round()));
         };
     }

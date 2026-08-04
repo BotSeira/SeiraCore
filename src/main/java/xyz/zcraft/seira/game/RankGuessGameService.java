@@ -2,24 +2,39 @@ package xyz.zcraft.seira.game;
 
 import xyz.zcraft.seira.api.data.RandomScore;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 public final class RankGuessGameService {
-    private final Map<String, Game> games = new HashMap<>();
+    private static final Duration END_PROTECTION_DURATION = Duration.ofMinutes(3);
 
-    public synchronized Reservation reserve(String groupId) {
+    private final Map<String, Game> games = new HashMap<>();
+    private final Clock clock;
+
+    public RankGuessGameService() {
+        this(Clock.systemUTC());
+    }
+
+    RankGuessGameService(Clock clock) {
+        this.clock = clock;
+    }
+
+    public synchronized Reservation reserve(String groupId, String starterUserId) {
         if (games.containsKey(groupId)) {
             return null;
         }
 
         Reservation reservation = new Reservation(groupId, UUID.randomUUID());
-        games.put(groupId, new Game(reservation.token()));
+        games.put(groupId, new Game(reservation.token(), starterUserId));
         return reservation;
     }
 
@@ -33,6 +48,7 @@ public final class RankGuessGameService {
         }
 
         game.round = round;
+        game.guessingStartedAt = clock.instant();
         return true;
     }
 
@@ -60,13 +76,18 @@ public final class RankGuessGameService {
         return new GuessResult(previous == null ? GuessStatus.RECORDED : GuessStatus.UPDATED, rank);
     }
 
-    public synchronized EndResult end(String groupId) {
+    public synchronized EndResult end(String groupId, String senderUserId, boolean admin) {
         Game game = games.get(groupId);
         if (game == null) {
             return new EndResult(EndStatus.NO_GAME, null);
         }
         if (game.round == null) {
             return new EndResult(EndStatus.STARTING, null);
+        }
+        if (clock.instant().isBefore(game.guessingStartedAt.plus(END_PROTECTION_DURATION))
+                && !Objects.equals(game.starterUserId, senderUserId)
+                && !admin) {
+            return new EndResult(EndStatus.FORBIDDEN, null);
         }
 
         games.remove(groupId);
@@ -114,6 +135,7 @@ public final class RankGuessGameService {
     public enum EndStatus {
         NO_GAME,
         STARTING,
+        FORBIDDEN,
         FINISHED
     }
 
@@ -167,12 +189,15 @@ public final class RankGuessGameService {
 
     private static final class Game {
         private final UUID token;
+        private final String starterUserId;
         private final Map<String, Guess> guesses = new LinkedHashMap<>();
         private Round round;
+        private Instant guessingStartedAt;
         private long nextSequence;
 
-        private Game(UUID token) {
+        private Game(UUID token, String starterUserId) {
             this.token = token;
+            this.starterUserId = starterUserId;
         }
     }
 
