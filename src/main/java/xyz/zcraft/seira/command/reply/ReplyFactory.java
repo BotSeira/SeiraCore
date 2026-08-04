@@ -77,9 +77,9 @@ public final class ReplyFactory {
                 : BigDecimal.valueOf(round.pp()).stripTrailingZeros().toPlainString() + "pp";
 
         StringBuilder content = new StringBuilder()
-                .append("> 本轮猜测结束~\n")
-                .append("> 该用户实际Rank为：`#%s` (%s)\n".formatted(rank, cmd("/u " + round.userId(), String.valueOf(round.userId()))))
-                .append("> 该成绩PP为：`%s` (%s)\n".formatted(pp, cmd("/s " + round.scoreId(), String.valueOf(round.scoreId()))))
+                .append("本轮猜测结束~\n")
+                .append("> 实际Rank：`#%s` (%s)\n".formatted(rank, cmd("/u " + round.userId(), String.valueOf(round.userId()))))
+                .append("> 成绩PP：`%s` (%s)\n".formatted(pp, cmd("/s " + round.scoreId(), String.valueOf(round.scoreId()))))
                 .append("\n猜测排行榜：\n");
 
         if (result.standings().isEmpty()) {
@@ -88,7 +88,7 @@ public final class ReplyFactory {
             for (int i = 0; i < result.standings().size(); i++) {
                 RankGuessGameService.Standing standing = result.standings().get(i);
                 content.append(
-                        "> %d. **%s**: %,dpts #%,d(%+,d)\n"
+                        "> %d. %s: %,dpts #%,d(%+,d)\n"
                                 .formatted(
                                         i + 1,
                                         at(standing.senderUserId()),
