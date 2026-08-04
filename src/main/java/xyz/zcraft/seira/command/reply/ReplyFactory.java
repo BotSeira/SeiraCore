@@ -15,13 +15,16 @@ import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.BindingConfig;
 import xyz.zcraft.seira.data.UploadedImage;
+import xyz.zcraft.seira.game.RankGuessGameService;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.services.DailyLuck;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -43,6 +46,53 @@ public final class ReplyFactory {
         } else {
             return "";
         }
+    }
+
+    public PendingMessage rankGuessResultMessage(RankGuessGameService.FinishedRound result) {
+        RankGuessGameService.Round round = result.round();
+        String rank = String.format(Locale.US, "%,d", round.actualRank());
+        String pp = round.pp() == null
+                ? "未知"
+                : BigDecimal.valueOf(round.pp()).stripTrailingZeros().toPlainString() + "pp";
+
+        StringBuilder content = new StringBuilder()
+                .append("本轮猜测结束~\n")
+                .append("该用户实际Rank为：`#")
+                .append(rank)
+                .append("` (")
+                .append(url(String.valueOf(round.userId()), "https://osu.ppy.sh/users/" + round.userId()))
+                .append(")")
+                .append("\n")
+                .append("该成绩PP为：`")
+                .append(pp)
+                .append("` (")
+                .append(url(String.valueOf(round.scoreId()), "https://osu.ppy.sh/scores/" + round.scoreId()))
+                .append(")")
+                .append("\n")
+                .append("猜测排行榜：\n");
+
+        if (result.standings().isEmpty()) {
+            content.append("（暂无猜测）");
+        } else {
+            for (int i = 0; i < result.standings().size(); i++) {
+                RankGuessGameService.Standing standing = result.standings().get(i);
+                content.append(i + 1)
+                        .append(". **<qqbot-at-user id=\"")
+                        .append(standing.senderUserId())
+                        .append("\" />**: ")
+                        .append(String.format(Locale.US, "%,d", Math.round(standing.points())))
+                        .append("pts, #")
+                        .append(String.format(Locale.US, "%,d", standing.guess()))
+                        .append("(")
+                        .append(String.format(Locale.US, "%+,d", standing.delta()))
+                        .append(")");
+                if (i + 1 < result.standings().size()) {
+                    content.append("\n");
+                }
+            }
+        }
+
+        return PendingMessage.ofMarkdownRaw(content.toString());
     }
 
     @SuppressWarnings("unused")
@@ -513,6 +563,7 @@ public final class ReplyFactory {
                             > /m <谱面ID或快捷查询> - 获取谱面
                             > /ms <谱面集ID或快捷查询> - 获取谱面集
                             > /r [成绩ID或快捷查询] [[mm:ss]-[mm:ss]] - 生成成绩高光视频或指定片段
+                            > /rg <start/#Rank/end> - 在群聊中进行猜 Rank 游戏
                             > /lb <谱面ID> [玩家ID列表] - 获取指定谱面排行榜
                             > /watch add <玩家ID/用户名/@用户> [分钟] - 监视群友的新成绩
                             > /f - 获取好友列表

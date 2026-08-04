@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
@@ -85,8 +86,20 @@ public final class TaskCoordinator {
     }
 
     public RouteDecision queueReplayTask(Context ctx, String requestType, ReplayTaskCreator creator, BiFunction<Context, APIHelper.ReplayTaskInfo, PendingMessage> messageCreator) {
+        return queueReplayTask(ctx, requestType, creator, messageCreator, (_) -> {
+        });
+    }
+
+    public RouteDecision queueReplayTask(
+            Context ctx,
+            String requestType,
+            ReplayTaskCreator creator,
+            BiFunction<Context, APIHelper.ReplayTaskInfo, PendingMessage> messageCreator,
+            Consumer<Boolean> completion
+    ) {
         AtomicReference<APIHelper.ReplayTaskInfo> taskInfoRef = new AtomicReference<>();
         AtomicReference<String> taskId = new AtomicReference<>();
+        AtomicReference<APIHelper.ReplayRenderResult> renderResultRef = new AtomicReference<>();
         return queueApiRequestUntilSubmit(
                 requestType,
                 () -> {
@@ -104,6 +117,7 @@ public final class TaskCoordinator {
                     taskId.set(taskInfo.taskId());
                     APIHelper.ReplayRenderResult result = APIHelper.waitReplayVideo(taskInfo.taskId());
                     if (result != null) {
+                        renderResultRef.set(result);
                         replayResults.put(taskInfo.taskId(), result);
                         BotStat.incrementReplays();
                         return PendingMessage.ofVideoUrl(result.videoUrl());
@@ -113,6 +127,7 @@ public final class TaskCoordinator {
                 (b) -> {
                     LOG.debug("Running finalizer of {} for request {}", b, taskId.get());
                     if (b) replayResults.remove(taskId.get());
+                    completion.accept(b && renderResultRef.get() != null);
                 }
         );
     }

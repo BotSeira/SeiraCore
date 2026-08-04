@@ -98,6 +98,7 @@ mvn -U clean compile exec:java
 | `/ma`           | `/ma [id/rsN/boN] [n/#n]`             | 获取指定或最近目标成绩的Miss分析；省略目标时用`#n`指定Miss                      |
 | `/u`            | `/u <uid/username/@user>`             | 获取指定用户信息                                                                |
 | `/r`            | `/r [id/rsN/boN] [[mm:ss]-[mm:ss]]`   | 生成并发送指定或最近目标的回放视频。省略范围时自动识别高光，使用`-`渲染整个回放 |
+| `/rg`           | `/rg <start/#Rank/end>`               | 在群聊中开始、参与或结束猜 Rank 游戏                                            |
 | `/rsc`          | `/rsc [id/rsN/boN] [+<id1>,<id2>...]` | 生成并发送指定或最近目标的成绩同屏回放视频；追加用户和范围顺序不限              |
 | `/rstat`        | `/rstat [id]`                         | 获取视频生成进度                                                                |
 | `/ms`           | `/ms <id/rsN/boN>`                    | 获取指定谱面集信息                                                              |

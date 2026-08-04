@@ -15,6 +15,7 @@ import xyz.zcraft.seira.command.parse.CommandParser;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.config.AppConfig;
+import xyz.zcraft.seira.game.RankGuessGameService;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 import xyz.zcraft.seira.util.ThreadHelper;
@@ -82,6 +83,9 @@ public class Router {
                 messageSender, taskCoordinator, replyFactory, scoreCommands, this::isAdmin, metrics
         );
         WatchCommandHandler watchCommands = new WatchCommandHandler(resolver, taskCoordinator, watchService, this::isAdmin);
+        RankGuessCommandHandler rankGuessCommands = new RankGuessCommandHandler(
+                taskCoordinator, replyFactory, new RankGuessGameService()
+        );
         this.unknownCommand = generalCommands::handleUnknown;
         this.commandParser = new CommandParser(resolver::preProcess);
         this.commandRegistry = createCommandRegistry(
@@ -91,7 +95,8 @@ public class Router {
                 socialCommands,
                 replayCommands,
                 generalCommands,
-                watchCommands
+                watchCommands,
+                rankGuessCommands
         );
         this.debugRoutes = new DebugRoutes(
                 config,
@@ -183,7 +188,8 @@ public class Router {
             SocialCommandHandler socialCommands,
             ReplayCommandHandler replayCommands,
             GeneralCommandHandler generalCommands,
-            WatchCommandHandler watchCommands
+            WatchCommandHandler watchCommands,
+            RankGuessCommandHandler rankGuessCommands
     ) {
         return CommandRegistry.builder()
                 .register(bindingCommands::handleBind, "bind")
@@ -217,6 +223,7 @@ public class Router {
                 .register(generalCommands::handleHelp, "help")
                 .register(generalCommands::handleFaq, "faq")
                 .register(watchCommands::handleWatch, "watch")
+                .register(rankGuessCommands::handleRankGuess, "rg")
                 .build();
     }
 

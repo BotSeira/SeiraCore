@@ -441,6 +441,53 @@ public class APIHelper {
         return createReplayTask(target, timeRange);
     }
 
+    public static ReplayTaskInfo createObscuredReplayRenderTask(long scoreId) {
+        if (scoreId <= 0) {
+            throw new IllegalArgumentException("成绩ID必须为正整数");
+        }
+
+        TimeDurationParser.TimeRange timeRange = getScoreHighlight(scoreId);
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(ENDPOINT + "/replays/renders/score/" + scoreId
+                        + "?obscured=true" + timeRange.toQueryString()))
+                .POST(HttpRequest.BodyPublishers.noBody())
+                .build();
+
+        return getReplayTaskInfo(request);
+    }
+
+    public static RandomScore getRandomScore() {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/scores/random"))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            if (codeNotOk(response.statusCode())) {
+                throw parseHttpError(response.body(), response.statusCode(), "获取随机成绩失败");
+            }
+
+            RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
+            ensureApiSuccess(payload, "获取随机成绩失败");
+            JsonObject data = requireDataObject(payload, "随机成绩响应缺少data");
+            if (!data.has("user") || !data.get("user").isJsonObject()
+                    || !data.has("score") || !data.get("score").isJsonObject()) {
+                throw new RuntimeException("随机成绩响应缺少用户或成绩数据");
+            }
+
+            return new RandomScore(
+                    GSON.fromJson(data.getAsJsonObject("user"), UserExtended.class),
+                    GSON.fromJson(data.getAsJsonObject("score"), Score.class)
+            );
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("随机成绩请求被中断", e);
+        }
+    }
+
     public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] ids, String auth) {
         if (ids == null || ids.length == 0) {
             throw new RuntimeException("同屏回放需要至少一个ID。");
