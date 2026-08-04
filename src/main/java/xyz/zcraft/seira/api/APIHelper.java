@@ -783,10 +783,11 @@ public class APIHelper {
 
                 final JsonElement rawResponseData = rawResponse.getData();
                 if (rawResponseData != null && rawResponseData.isJsonObject()) {
-                    oStellaVersion = rawResponseData.getAsJsonObject().get("ostella-version").getAsString();
                     JsonObject data = rawResponseData.getAsJsonObject();
-                    if (data.has("osu-api") && !data.get("osu-api").isJsonNull()) {
-                        osu = data.get("osu-api").getAsBoolean();
+
+                    oStellaVersion = data.get("ostella_version").getAsString();
+                    if (data.has("osu_api") && !data.get("osu_api").isJsonNull()) {
+                        osu = data.get("osu_api").getAsBoolean();
                     }
                 }
             }
