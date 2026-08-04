@@ -70,7 +70,7 @@ public final class RankGuessCommandHandler {
                     return APIHelper.createObscuredReplayRenderTask(round.scoreId());
                 },
                 (context, _) -> PendingMessage.ofMarkdownRaw(
-                        at(context) + "随机成绩已选定，高光正在匿名渲染；视频发送后即可开始猜测。"
+                        at(context) + "随机用户与成绩已选定，正在渲染回放片段，视频发送后即可开始猜测~"
                 ),
                 successful -> {
                     if (successful) {
@@ -85,8 +85,8 @@ public final class RankGuessCommandHandler {
     private RouteDecision guess(Context ctx, long rank) {
         RankGuessGameService.GuessResult result = games.guess(ctx.groupId(), ctx.senderUserId(), rank);
         return switch (result.status()) {
-            case NO_GAME -> RouteDecision.sync(PendingMessage.ofString("本群当前没有进行中的 Rank Guess。"));
-            case STARTING -> RouteDecision.sync(PendingMessage.ofString("高光仍在渲染，请等待视频发送后再猜测。"));
+            case NO_GAME -> RouteDecision.sync(PendingMessage.ofString("本群当前没有进行中的 Rank Guess 喵"));
+            case STARTING -> RouteDecision.sync(PendingMessage.ofString("高光仍在渲染，请等待视频发送后再猜测喵"));
             case RECORDED -> RouteDecision.sync(PendingMessage.ofMarkdownRaw(
                     at(ctx) + "已记录你的猜测：`#" + String.format(Locale.US, "%,d", rank) + "`"
             ));
@@ -99,8 +99,8 @@ public final class RankGuessCommandHandler {
     private RouteDecision end(Context ctx) {
         RankGuessGameService.EndResult result = games.end(ctx.groupId());
         return switch (result.status()) {
-            case NO_GAME -> RouteDecision.sync(PendingMessage.ofString("本群当前没有进行中的 Rank Guess。"));
-            case STARTING -> RouteDecision.sync(PendingMessage.ofString("高光仍在渲染，请等待视频发送后再结束游戏。"));
+            case NO_GAME -> RouteDecision.sync(PendingMessage.ofString("本群当前没有进行中的 Rank Guess 喵"));
+            case STARTING -> RouteDecision.sync(PendingMessage.ofString("高光仍在渲染，请等待视频发送后再结束游戏喵"));
             case FINISHED -> RouteDecision.sync(replyFactory.rankGuessResultMessage(result.round()));
         };
     }
