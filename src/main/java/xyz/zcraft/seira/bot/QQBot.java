@@ -5,6 +5,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.bot.data.QQUser;
 import xyz.zcraft.seira.config.AppConfig;
+import xyz.zcraft.seira.game.RankGuessGameService;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.services.CosService;
 import xyz.zcraft.seira.services.DailyLuck;
@@ -29,6 +30,7 @@ public class QQBot {
     private final MessageSender sender;
     private final ScoreWatchService watchService;
     private final AppConfig config;
+    private final RankGuessGameService  rankGuessGameService;
 
     public QQBot(AppConfig config) {
         LOG.info("Initializing QQBot");
@@ -49,6 +51,9 @@ public class QQBot {
                 Duration.ofMinutes(config.seira().effectiveWatchIntervalMinutes())
         );
         this.watchService.start();
+
+        LOG.info("Initializing rank guess service");
+        this.rankGuessGameService = new RankGuessGameService();
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             watchService.close();
@@ -94,7 +99,8 @@ public class QQBot {
                         config,
                         tokenManager::getToken,
                         sender,
-                        watchService
+                        watchService,
+                        rankGuessGameService
                 );
 
                 CountDownLatch disconnectLatch = new CountDownLatch(1);

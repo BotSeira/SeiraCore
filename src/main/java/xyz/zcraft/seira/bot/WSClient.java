@@ -12,6 +12,7 @@ import xyz.zcraft.seira.bot.data.Attachment;
 import xyz.zcraft.seira.command.AttachmentHandler;
 import xyz.zcraft.seira.command.route.Router;
 import xyz.zcraft.seira.config.AppConfig;
+import xyz.zcraft.seira.game.RankGuessGameService;
 import xyz.zcraft.seira.util.ThreadHelper;
 import xyz.zcraft.seira.watch.ScoreWatchService;
 
@@ -43,12 +44,13 @@ public class WSClient extends WebSocketClient {
             AppConfig config,
             Supplier<AccessToken> tokenSupplier,
             MessageSender messageSender,
-            ScoreWatchService watchService
+            ScoreWatchService watchService,
+            RankGuessGameService rankGuessGameService
     ) {
         super(serverUri);
         this.config = config;
         this.tokenSupplier = tokenSupplier;
-        this.router = new Router(messageSender, config, watchService);
+        this.router = new Router(messageSender, config, watchService, rankGuessGameService);
         this.attachmentHandler = new AttachmentHandler(config);
 
         LOG.info("QQ Gateway WebSocket Client created");

@@ -39,21 +39,9 @@ public class Router {
     private final CommandMetrics metrics;
     private final Supplier<RouteDecision> unknownCommand;
 
-    public Router(MessageSender messageSender, AppConfig config) {
-        this(messageSender, config, BotStat::incrementCommands, null);
-    }
-
-    public Router(MessageSender messageSender, AppConfig config, CommandMetrics metrics) {
-        this(messageSender, config, metrics, null);
-    }
-
-    public Router(MessageSender messageSender, AppConfig config, ScoreWatchService watchService) {
-        this(messageSender, config, BotStat::incrementCommands, watchService);
-    }
-
-    public Router(MessageSender messageSender, AppConfig config, CommandMetrics metrics, ScoreWatchService watchService) {
+    public Router(MessageSender messageSender, AppConfig config, ScoreWatchService watchService, RankGuessGameService rankGuessGameService) {
         this.config = config;
-        this.metrics = metrics;
+        this.metrics = BotStat::incrementCommands;
         ReplyFactory replyFactory = new ReplyFactory(config);
         Resolver resolver = new Resolver();
         TargetHistory targetHistory = new TargetHistory();
@@ -84,7 +72,7 @@ public class Router {
         );
         WatchCommandHandler watchCommands = new WatchCommandHandler(resolver, taskCoordinator, watchService, this::isAdmin);
         RankGuessCommandHandler rankGuessCommands = new RankGuessCommandHandler(
-                taskCoordinator, replyFactory, new RankGuessGameService(), this::isAdmin
+                taskCoordinator, replyFactory, rankGuessGameService, this::isAdmin
         );
         this.unknownCommand = generalCommands::handleUnknown;
         this.commandParser = new CommandParser(resolver::preProcess);
