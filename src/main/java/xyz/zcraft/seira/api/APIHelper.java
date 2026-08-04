@@ -763,9 +763,10 @@ public class APIHelper {
         }
     }
 
-    public static boolean[] getServerStatus() {
+    public static ServerStatus getServerStatus() {
         boolean oStella = false;
         boolean osu = false;
+        String oStellaVersion = null;
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/health"))
@@ -780,8 +781,10 @@ public class APIHelper {
                     && rawResponse.isSuccess()) {
                 oStella = true;
 
-                if (rawResponse.getData() != null && rawResponse.getData().isJsonObject()) {
-                    JsonObject data = rawResponse.getData().getAsJsonObject();
+                final JsonElement rawResponseData = rawResponse.getData();
+                if (rawResponseData != null && rawResponseData.isJsonObject()) {
+                    oStellaVersion = rawResponseData.getAsJsonObject().get("ostella-version").getAsString();
+                    JsonObject data = rawResponseData.getAsJsonObject();
                     if (data.has("osu-api") && !data.get("osu-api").isJsonNull()) {
                         osu = data.get("osu-api").getAsBoolean();
                     }
@@ -790,7 +793,7 @@ public class APIHelper {
         } catch (Exception _) {
         }
 
-        return new boolean[]{true, oStella, osu};
+        return new ServerStatus(true, oStella, oStellaVersion, osu);
     }
 
     public static Response<List<MissData>> getScoreMissesResponse(ShortcutTarget target) {
@@ -898,20 +901,6 @@ public class APIHelper {
         }
     }
 
-    public record ReplayRenderResult(String videoUrl, String taskId) {
-    }
-
-    public record ReplayTaskInfo(
-            String taskId,
-            String status,
-            Integer position,
-            BeatmapExtended beatmap,
-            JsonArray scores,
-            Double start,
-            Double end
-    ) {
-    }
-
     public static ReplayUploadInfo uploadReplay(byte[] replayBytes) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -940,5 +929,22 @@ public class APIHelper {
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public record ServerStatus(boolean gateway, boolean oStella, String oStellaVersion, boolean osu) {
+    }
+
+    public record ReplayRenderResult(String videoUrl, String taskId) {
+    }
+
+    public record ReplayTaskInfo(
+            String taskId,
+            String status,
+            Integer position,
+            BeatmapExtended beatmap,
+            JsonArray scores,
+            Double start,
+            Double end
+    ) {
     }
 }

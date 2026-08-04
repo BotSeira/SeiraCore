@@ -18,6 +18,7 @@ import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.game.RankGuessGameService;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.services.DailyLuck;
+import xyz.zcraft.seira.util.VersionInfo;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -263,7 +264,7 @@ public final class ReplyFactory {
         );
     }
 
-    public PendingMessage statusMessage(Context ctx, boolean[] status) {
+    public PendingMessage statusMessage(Context ctx, APIHelper.ServerStatus status) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.statContent(ctx, status), null
         );
@@ -517,14 +518,21 @@ public final class ReplyFactory {
             return sb.toString().trim();
         }
 
-        public static String statContent(Context ctx, boolean[] status) {
+        public static String statContent(Context ctx, APIHelper.ServerStatus status) {
             String stat = at(ctx) + "\n" +
                     "## 服务器状态: \n" +
                     "> 消息网关: ✅ 正常\n" +
-                    "> oStella API: " + (status[1] ? "✅ 正常" : "❌ 无法访问") + "\n";
+                    "> oStella API: " + (status.oStella() ? "✅ 正常" : "❌ 无法访问") + "\n";
 
-            if (status[1]) {
-                stat += "> osu! API: " + (status[2] ? "✅ 正常" : "❌ 无法访问") + "\n";
+            if (status.oStella()) {
+                stat += "> osu! API: " + (status.osu() ? "✅ 正常" : "❌ 无法访问") + "\n";
+            }
+
+            String version = "## 版本信息" + "\n"
+                    + "> SeiraCore: " + VersionInfo.getVersion() + "\n";
+
+            if (status.oStella() && status.oStellaVersion() != null) {
+                version += "> oStella: " + status.oStellaVersion() + "\n";
             }
 
 
@@ -535,7 +543,7 @@ public final class ReplyFactory {
                     "> - 总共处理了 `" + BotStat.getTotalCommands() + "` 条指令" + "(近30分钟 `" + BotStat.getCommandCountFor(30) + "` )\n" +
                     "> - 总共渲染了 `" + BotStat.getTotalReplays() + "` 条回放" + "\n" +
                     "> - 并正在为 `" + UserDataStore.countGroups() + "` 个群聊和 `" + UserDataStore.countBoundUser() + "` 位用户提供服务~" + "\n";
-            return (stat + res).trim();
+            return (stat + version + res).trim();
         }
 
         public static String helpContent(Context ctx) {
