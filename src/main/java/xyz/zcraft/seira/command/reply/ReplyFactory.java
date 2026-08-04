@@ -520,7 +520,7 @@ public final class ReplyFactory {
 
         public static String statContent(Context ctx, APIHelper.ServerStatus status) {
             String stat = at(ctx) + "\n" +
-                    "## 服务器状态: \n" +
+                    "## 服务器状态\n" +
                     "> 消息网关: ✅ 正常\n" +
                     "> oStella API: " + (status.oStella() ? "✅ 正常" : "❌ 无法访问") + "\n";
 
@@ -565,6 +565,7 @@ public final class ReplyFactory {
                             
                             详细指令列表请在 [这里](https://docs.seira.top/overview/commands.html) 查看
                             """ + "\n"
+                    + "当前版本: " + VersionInfo.getVersion() + " [更新日志](https://docs.seira.top/overview/changelog.html)" + "\n"
                     + "[常见问题](https://docs.seira.top/overview/faq.html)" + " " + cmd("/stat", "状态信息").trim();
         }
 
