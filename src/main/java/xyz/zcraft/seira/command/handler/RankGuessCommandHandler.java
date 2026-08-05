@@ -11,6 +11,8 @@ import xyz.zcraft.seira.game.RankGuessGameService;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
@@ -91,11 +93,11 @@ public final class RankGuessCommandHandler {
         return switch (result.status()) {
             case NO_GAME -> RouteDecision.sync(PendingMessage.ofString("本群当前没有进行中的 Rank Guess 喵"));
             case STARTING -> RouteDecision.sync(PendingMessage.ofString("高光仍在渲染，请等待视频发送后再猜测喵"));
-            case RECORDED -> RouteDecision.sync(PendingMessage.ofMarkdownRaw(
-                    at(ctx) + "已记录你的猜测：`#" + String.format(Locale.US, "%,d", rank) + "`"
-            ));
-            case UPDATED -> RouteDecision.sync(PendingMessage.ofMarkdownRaw(
-                    at(ctx) + "已更新你的猜测：`#" + String.format(Locale.US, "%,d", rank) + "`"
+            case UPDATED, RECORDED -> RouteDecision.sync(PendingMessage.ofMarkdownRaw(
+                    at(ctx)
+                            + "已" + (result.status() == RankGuessGameService.GuessStatus.UPDATED ? "更新" : "记录") + "你的猜测："
+                            + "`#" + String.format(Locale.US, "%,d", rank) + "`"
+                            + " " + result.getMultipliersString()
             ));
         };
     }
@@ -114,12 +116,23 @@ public final class RankGuessCommandHandler {
         };
     }
 
+    private static final Pattern RANK_PATTERN = Pattern.compile("^#(\\d+)[wk]?$");
+
     private static Long parseRank(String argument) {
-        if (!argument.matches("^#(?:[1-9]\\d*|[1-9]\\d{0,2}(?:,\\d{3})+)$")) {
+        final Matcher matcher = RANK_PATTERN.matcher(argument);
+        if (matcher.matches()) {
             return null;
         }
         try {
-            return Long.parseLong(argument.substring(1).replace(",", ""));
+            long base = Long.parseLong(matcher.group(1));
+            long multiplier = 1;
+
+            if (argument.endsWith("w")) {
+                multiplier = 10000;
+            } else if (argument.endsWith("k")) {
+                multiplier = 1000;
+            }
+            return base * multiplier;
         } catch (NumberFormatException _) {
             return null;
         }

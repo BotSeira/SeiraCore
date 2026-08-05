@@ -8,10 +8,12 @@ import xyz.zcraft.seira.binding.BindingService;
 import xyz.zcraft.seira.command.AttachmentHandler;
 import xyz.zcraft.seira.command.route.Router;
 import xyz.zcraft.seira.config.AppConfig;
+import xyz.zcraft.seira.config.RuntimeConfig;
 import xyz.zcraft.seira.game.RankGuessGameService;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.services.CosService;
 import xyz.zcraft.seira.runtime.ApplicationExecutors;
+import xyz.zcraft.seira.security.AdminRegistry;
 import xyz.zcraft.seira.util.TokenManager;
 import xyz.zcraft.seira.watch.OstellaWatchApi;
 import xyz.zcraft.seira.watch.QqWatchScoreNotifier;
@@ -33,7 +35,7 @@ public class QQBot implements AutoCloseable {
     @Getter
     private final MessageSender sender;
     private final ScoreWatchService watchService;
-    private final AppConfig config;
+    private final AppConfig startupConfig;
     private final Router router;
     private final AttachmentHandler attachmentHandler;
     private final ApplicationExecutors executors;
@@ -42,9 +44,15 @@ public class QQBot implements AutoCloseable {
     private final AtomicReference<WSClient> activeClient = new AtomicReference<>();
     private volatile Thread runnerThread;
 
-    public QQBot(AppConfig config, BindingService bindingService, ApplicationExecutors executors) {
+    public QQBot(
+            RuntimeConfig runtimeConfig,
+            AdminRegistry admins,
+            BindingService bindingService,
+            ApplicationExecutors executors
+    ) {
         LOG.info("Initializing QQBot");
-        this.config = config;
+        AppConfig config = runtimeConfig.current();
+        this.startupConfig = config;
         this.executors = executors;
 
         LOG.info("Authorizing QQ API");
@@ -67,7 +75,8 @@ public class QQBot implements AutoCloseable {
         this.attachmentHandler = new AttachmentHandler(executors.attachmentDownloads());
         this.router = new Router(
                 sender,
-                config,
+                runtimeConfig::current,
+                admins,
                 bindingService,
                 watchService,
                 rankGuessGameService,
@@ -105,7 +114,7 @@ public class QQBot implements AutoCloseable {
 
                 WSClient client = new WSClient(
                         URI.create(wssEndpoint),
-                        config,
+                        startupConfig,
                         tokenManager::getToken,
                         router,
                         attachmentHandler,

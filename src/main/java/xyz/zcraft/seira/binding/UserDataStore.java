@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Locale;
 
 public final class UserDataStore {
     private static final Logger LOG = LogManager.getLogger(UserDataStore.class);
@@ -498,6 +499,78 @@ public final class UserDataStore {
         }
     }
 
+    public static QueryResult queryReadOnly(String sql, int maxRows) {
+        ensureInitialized();
+        if (sql == null || sql.isBlank()) {
+            throw new IllegalArgumentException("SQL query must not be blank");
+        }
+        if (maxRows < 1 || maxRows > 200) {
+            throw new IllegalArgumentException("maxRows must be between 1 and 200");
+        }
+
+        String statementSql = sql.strip();
+        if (statementSql.endsWith(";")) {
+            statementSql = statementSql.substring(0, statementSql.length() - 1).stripTrailing();
+        }
+        if (statementSql.contains(";")) {
+            throw new IllegalArgumentException("Multiple SQL statements are not allowed");
+        }
+        String normalized = statementSql.toLowerCase(Locale.ROOT);
+        String keyword = normalized.split("\\s+", 2)[0];
+        if (!List.of("select", "with", "pragma", "explain").contains(keyword)) {
+            throw new IllegalArgumentException("Only SELECT, WITH, PRAGMA and EXPLAIN queries are allowed");
+        }
+        if ("pragma".equals(keyword) && !isAllowedReadOnlyPragma(normalized)) {
+            throw new IllegalArgumentException("This PRAGMA is not allowed in the read-only console");
+        }
+
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             Statement queryOnly = connection.createStatement();
+             Statement statement = connection.createStatement()) {
+            queryOnly.execute("PRAGMA query_only = ON");
+            statement.setMaxRows(maxRows + 1);
+            statement.setQueryTimeout(10);
+            // SQL is intentionally accepted from the trusted local console. The
+            // SQLite connection is query-only and the result size is bounded.
+            //noinspection SqlSourceToSinkFlow
+            try (ResultSet resultSet = statement.executeQuery(statementSql)) {
+                ResultSetMetaData metadata = resultSet.getMetaData();
+                int columnCount = metadata.getColumnCount();
+                List<String> columns = new ArrayList<>(columnCount);
+                for (int index = 1; index <= columnCount; index++) {
+                    columns.add(metadata.getColumnLabel(index));
+                }
+
+                List<List<String>> rows = new ArrayList<>();
+                boolean truncated = false;
+                while (resultSet.next()) {
+                    if (rows.size() == maxRows) {
+                        truncated = true;
+                        break;
+                    }
+                    List<String> row = new ArrayList<>(columnCount);
+                    for (int index = 1; index <= columnCount; index++) {
+                        row.add(resultSet.getString(index));
+                    }
+                    rows.add(List.copyOf(row));
+                }
+                return new QueryResult(List.copyOf(columns), List.copyOf(rows), truncated);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to execute read-only SQL query", e);
+        }
+    }
+
+    private static boolean isAllowedReadOnlyPragma(String normalizedSql) {
+        String pragma = normalizedSql.substring("pragma".length()).stripLeading();
+        int separator = pragma.indexOf('(');
+        String name = (separator >= 0 ? pragma.substring(0, separator) : pragma).strip();
+        return List.of(
+                "table_info", "table_xinfo", "table_list", "index_list", "index_info",
+                "index_xinfo", "foreign_key_list", "database_list", "compile_options"
+        ).contains(name);
+    }
+
     public static List<Long> findAllUsers() {
         ensureInitialized();
 
@@ -590,6 +663,9 @@ public final class UserDataStore {
         if (jdbcUrl == null) {
             throw new IllegalStateException("UserBindingStore is not initialized");
         }
+    }
+
+    public record QueryResult(List<String> columns, List<List<String>> rows, boolean truncated) {
     }
 }
 

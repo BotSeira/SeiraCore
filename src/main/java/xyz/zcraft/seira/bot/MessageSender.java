@@ -11,7 +11,7 @@ import xyz.zcraft.seira.util.TokenManager;
 
 import java.util.function.Supplier;
 
-public class MessageSender {
+public class MessageSender implements ProactiveMessenger {
     private static final int MAX_UPLOAD_ATTEMPTS = 10;
     private final Logger LOG = LogManager.getLogger(MessageSender.class);
     private final TokenManager tokenManager;
@@ -120,6 +120,22 @@ public class MessageSender {
             LOG.error("Failed to upload group media {}", groupId, e);
             return null;
         }
+    }
+
+    @Override
+    public boolean sendPrivateText(String userId, String content) {
+        Message message = new Message();
+        message.setMsgType(PendingMessage.MSG_TYPE_TEXT);
+        message.setContent(content);
+        return sendPrivateMessage(userId, message);
+    }
+
+    @Override
+    public boolean sendGroupText(String groupId, String content) {
+        Message message = new Message();
+        message.setMsgType(PendingMessage.MSG_TYPE_TEXT);
+        message.setContent(content);
+        return sendGroupMessage(groupId, message);
     }
 
     private FileInfo retryUpload(Supplier<FileInfo> operation, long baseDelayMillis, String description) {

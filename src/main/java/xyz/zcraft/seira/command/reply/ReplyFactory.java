@@ -24,13 +24,22 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 public final class ReplyFactory {
-    private final Buttons buttons;
+    private final Supplier<AppConfig> configSupplier;
 
     public ReplyFactory(AppConfig config) {
-        this.buttons = new Buttons(config.seira().directUrl());
+        this(() -> config);
+    }
+
+    public ReplyFactory(Supplier<AppConfig> configSupplier) {
+        this.configSupplier = Objects.requireNonNull(configSupplier);
+    }
+
+    private Buttons buttons() {
+        return new Buttons(configSupplier.get().seira().directUrl());
     }
 
     static String cmd(String command, String text) {
@@ -108,7 +117,7 @@ public final class ReplyFactory {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "B" + response.getScoreIds().size() + "查询完成\n" +
                         "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()),
-                buttons.boButtons(response.getUserId())
+                buttons().boButtons(response.getUserId())
         );
     }
 
@@ -117,7 +126,7 @@ public final class ReplyFactory {
                 at(ctx) + "最近成绩查询完成\n" +
                         "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()) + "\n" +
                         "> 数量: " + response.getScoreIds().size(),
-                buttons.rsButtons()
+                buttons().rsButtons()
         );
     }
 
@@ -126,7 +135,7 @@ public final class ReplyFactory {
                 at(ctx) + "谱面查询完成\n" +
                         "> 谱面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
                         "> 谱面集: " + cmd("/ms " + response.getBeatmapsetId(), response.getBeatmapsetId()),
-                buttons.beatmapButtons(response.getBeatmapId())
+                buttons().beatmapButtons(response.getBeatmapId())
         );
 
     }
@@ -136,7 +145,7 @@ public final class ReplyFactory {
                 at(ctx) + "成绩查询完成\n" +
                         "> 谱面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
                         "> 成绩: " + cmd("/s " + response.getScoreId(), response.getScoreId()),
-                buttons.sButtons(response.getBeatmapId(), response.getScoreId())
+                buttons().sButtons(response.getBeatmapId(), response.getScoreId())
         );
     }
 
@@ -145,7 +154,7 @@ public final class ReplyFactory {
                 at(ctx) + "成绩分析完成\n" +
                         "> 谱面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
                         "> 成绩: " + cmd("/s " + response.getScoreId(), response.getScoreId()),
-                buttons.saButtons(response.getBeatmapId(), response.getScoreId())
+                buttons().saButtons(response.getBeatmapId(), response.getScoreId())
         );
     }
 
@@ -153,21 +162,21 @@ public final class ReplyFactory {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "排行榜查询完成" +
                         (response.getBeatmapId() == null ? "" : "\n> 谱面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId())),
-                buttons.lbButtons(response.getBeatmapId())
+                buttons().lbButtons(response.getBeatmapId())
         );
     }
 
     public PendingMessage replayMessage(Context ctx, APIHelper.ReplayTaskInfo taskInfo) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.replayTaskContent(ctx, taskInfo),
-                buttons.replayProgressButtons(taskInfo.taskId())
+                buttons().replayProgressButtons(taskInfo.taskId())
         );
     }
 
     public PendingMessage replayStatMessage(Context ctx, String jobId, RenderStat renderStat) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.replayStatContent(ctx, renderStat, jobId),
-                buttons.replayProgressButtons(jobId)
+                buttons().replayProgressButtons(jobId)
         );
     }
 
@@ -175,14 +184,14 @@ public final class ReplyFactory {
         int SEARCH_ITEMS_PER_PAGE = 10;
         return PendingMessage.ofMarkdownRaw(
                 Contents.searchContent(ctx, response, searchQuery, SEARCH_ITEMS_PER_PAGE),
-                buttons.searchButtons(response, searchQuery, SEARCH_ITEMS_PER_PAGE)
+                buttons().searchButtons(response, searchQuery, SEARCH_ITEMS_PER_PAGE)
         );
     }
 
     public PendingMessage beatmapsetMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.beatmapsetContent(ctx, response),
-                buttons.beatmapsetButtons(response.getBeatmapsetId())
+                buttons().beatmapsetButtons(response.getBeatmapsetId())
         );
     }
 
@@ -191,7 +200,7 @@ public final class ReplyFactory {
                 at(ctx) + "\n" +
                         "> 谱面集: " + response.getBeatmapsetId() + "\n" +
                         "> 选择下载镜像: ",
-                buttons.dlButton(response.getBeatmapsetId())
+                buttons().dlButton(response.getBeatmapsetId())
         );
     }
 
@@ -200,14 +209,14 @@ public final class ReplyFactory {
                 .formatted(config.clientId(), task.taskId());
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "点击下方按钮绑定账号,或者在浏览器打开以下链接: \n```\n%s\n```\n> 绑定请求20分钟内有效。".formatted(url),
-                buttons.bindButtons(task.openId(), url, !isC2C)
+                buttons().bindButtons(task.openId(), url, !isC2C)
         );
     }
 
     public PendingMessage mpMessage(Context ctx, Response<MultiplayerRoom> response) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.mpContent(ctx, response.getContent()),
-                buttons.mpButtons(response.getContent())
+                buttons().mpButtons(response.getContent())
         );
     }
 

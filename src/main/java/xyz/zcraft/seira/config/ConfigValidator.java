@@ -24,6 +24,10 @@ public final class ConfigValidator {
         if (seira != null) {
             requireText(seira.sqlitePath(), "seira.sqlitePath", errors);
             requireHttpUri(seira.directUrl(), "seira.directUrl", errors);
+            if (seira.adminIds() != null && seira.adminIds().stream()
+                    .anyMatch(value -> value == null || value.isBlank())) {
+                errors.add("seira.adminIds must not contain blank values");
+            }
         }
         if (ostella != null) {
             requireHttpUri(ostella.endpoint(), "ostella.endpoint", errors);

@@ -5,14 +5,8 @@ import xyz.zcraft.seira.api.data.RandomScore;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class RankGuessGameService {
     private static final Duration END_PROTECTION_DURATION = Duration.ofMinutes(3);
@@ -59,21 +53,60 @@ public final class RankGuessGameService {
         }
     }
 
-    public synchronized GuessResult guess(String groupId, String senderUserId, long rank) {
-        if (rank <= 0) {
+    public synchronized GuessResult guess(String groupId, String senderUserId, long guess) {
+        if (guess <= 0) {
             throw new IllegalArgumentException("Rank must be positive");
         }
 
         Game game = games.get(groupId);
         if (game == null) {
-            return new GuessResult(GuessStatus.NO_GAME, rank);
+            return new GuessResult(GuessStatus.NO_GAME, guess, null);
         }
         if (game.round == null) {
-            return new GuessResult(GuessStatus.STARTING, rank);
+            return new GuessResult(GuessStatus.STARTING, guess, null);
         }
 
-        Guess previous = game.guesses.put(senderUserId, new Guess(rank, game.nextSequence++));
-        return new GuessResult(previous == null ? GuessStatus.RECORDED : GuessStatus.UPDATED, rank);
+        Guess previousGuess = game.guesses.put(senderUserId, new Guess(guess, game.nextSequence++));
+
+        final int guessNumber = game.guessCount.incrementAndGet();
+
+        LinkedList<ScoreMultiplier> multipliers = new LinkedList<>();
+
+        double orderMultiplier = Math.max(
+                -0.10,
+                0.05 - (guessNumber - 1) * 0.01
+        );
+
+        multipliers.add(new ScoreMultiplier(
+                orderMultiplier,
+                guessNumber == 1 ? "首猜加成" : "第" + guessNumber + "猜"
+        ));
+
+        long closestGuess = Arrays.stream(
+                        game.guesses.values().stream()
+                                .mapToLong(Guess::rank)
+                                .toArray()
+                ).boxed()
+                .min(Comparator.comparingLong(previous ->
+                        Math.abs(previous - guess)
+                ))
+                .orElse(-1L);
+
+        if (closestGuess != -1) {
+            boolean copied =
+                    Math.abs(closestGuess - guess) <= 100 ||
+                            Math.abs(Math.log10(closestGuess)
+                                    - Math.log10(guess)) < 0.005;
+
+            if (copied) {
+                multipliers.add(new ScoreMultiplier(
+                        -0.05,
+                        "抄袭惩罚"
+                ));
+            }
+        }
+
+        return new GuessResult(previousGuess == null ? GuessStatus.RECORDED : GuessStatus.UPDATED, guess, multipliers);
     }
 
     public synchronized EndResult end(String groupId, String senderUserId, boolean admin) {
@@ -129,7 +162,38 @@ public final class RankGuessGameService {
         UPDATED
     }
 
-    public record GuessResult(GuessStatus status, long rank) {
+    public record ScoreMultiplier(double multiplier, String reason){}
+
+    public record GuessResult(GuessStatus status, long rank, List<ScoreMultiplier> multipliers) {
+        public String getMultipliersString() {
+            if (multipliers == null || multipliers.isEmpty()) {
+                return "倍率: `x1.00`\n";
+            }
+
+            StringBuilder builder = new StringBuilder();
+
+            double sum = multipliers.stream()
+                    .mapToDouble(ScoreMultiplier::multiplier)
+                    .sum();
+
+            builder.append("倍率: `x")
+                    .append(String.format(Locale.US, "%.2f", 1 + sum))
+                    .append("`\n");
+
+            for (ScoreMultiplier multiplier : multipliers) {
+                builder.append("> ")
+                        .append(multiplier.reason())
+                        .append(": ")
+                        .append(String.format(
+                                Locale.US,
+                                "%+.0f%%",
+                                multiplier.multiplier() * 100
+                        ))
+                        .append("\n");
+            }
+
+            return builder.toString();
+        }
     }
 
     public enum EndStatus {
@@ -191,6 +255,7 @@ public final class RankGuessGameService {
         private final UUID token;
         private final String starterUserId;
         private final Map<String, Guess> guesses = new LinkedHashMap<>();
+        private final AtomicInteger guessCount = new AtomicInteger(0);
         private Round round;
         private Instant guessingStartedAt;
         private long nextSequence;

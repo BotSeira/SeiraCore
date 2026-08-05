@@ -17,10 +17,10 @@ import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.game.RankGuessGameService;
+import xyz.zcraft.seira.security.AdminRegistry;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 import xyz.zcraft.seira.watch.ScoreWatchService;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
@@ -30,7 +30,7 @@ import java.util.function.Supplier;
 public class Router {
     private static final Logger LOG = LogManager.getLogger(Router.class);
 
-    private final AppConfig config;
+    private final Supplier<AppConfig> configSupplier;
     private final TaskCoordinator taskCoordinator;
     private final OsuAuthHelper authHelper;
     private final CommandParser commandParser;
@@ -42,23 +42,25 @@ public class Router {
 
     public Router(
             MessageSender messageSender,
-            AppConfig config,
+            Supplier<AppConfig> configSupplier,
+            AdminRegistry admins,
             BindingService bindingService,
             ScoreWatchService watchService,
             RankGuessGameService rankGuessGameService,
             Executor commandExecutor,
             CommandMetrics metrics
     ) {
-        this.config = config;
+        this.configSupplier = java.util.Objects.requireNonNull(configSupplier);
         this.commandExecutor = commandExecutor;
         this.metrics = java.util.Objects.requireNonNull(metrics);
-        ReplyFactory replyFactory = new ReplyFactory(config);
+        AppConfig startupConfig = configSupplier.get();
+        ReplyFactory replyFactory = new ReplyFactory(configSupplier);
         Resolver resolver = new Resolver();
         TargetHistory targetHistory = new TargetHistory();
         ReplayResultStore replayResults = new ReplayResultStore();
         this.taskCoordinator = new TaskCoordinator(messageSender, replayResults);
-        this.authHelper = new OsuAuthHelper(config.binding());
-        BindingCommandHandler bindingCommands = new BindingCommandHandler(config, replyFactory, bindingService);
+        this.authHelper = new OsuAuthHelper(startupConfig.binding());
+        BindingCommandHandler bindingCommands = new BindingCommandHandler(startupConfig, replyFactory, bindingService);
         ScoreCommandHandler scoreCommands = new ScoreCommandHandler(
                 resolver, targetHistory, taskCoordinator, replyFactory
         );
@@ -78,11 +80,11 @@ public class Router {
                 this::getAccessTokenFor
         );
         GeneralCommandHandler generalCommands = new GeneralCommandHandler(
-                messageSender, taskCoordinator, replyFactory, scoreCommands, this::isAdmin, metrics
+                messageSender, taskCoordinator, replyFactory, scoreCommands, admins::isAdmin, metrics
         );
-        WatchCommandHandler watchCommands = new WatchCommandHandler(resolver, taskCoordinator, watchService, this::isAdmin);
+        WatchCommandHandler watchCommands = new WatchCommandHandler(resolver, taskCoordinator, watchService, admins::isAdmin);
         RankGuessCommandHandler rankGuessCommands = new RankGuessCommandHandler(
-                taskCoordinator, replyFactory, rankGuessGameService, this::isAdmin
+                taskCoordinator, replyFactory, rankGuessGameService, admins::isAdmin
         );
         this.unknownCommand = generalCommands::handleUnknown;
         this.commandParser = new CommandParser(resolver::preProcess);
@@ -97,12 +99,12 @@ public class Router {
                 rankGuessCommands
         );
         this.debugRoutes = new DebugRoutes(
-                config,
+                configSupplier,
                 messageSender,
                 replyFactory,
                 taskCoordinator,
                 authHelper,
-                this::isAdmin,
+                admins::isAdmin,
                 unknownCommand
         );
     }
@@ -126,6 +128,7 @@ public class Router {
 
             rawContent = rawContent.trim();
 
+            AppConfig config = configSupplier.get();
             final String selfAt = "<@" + config.qq().selfId() + ">";
             if (rawContent.startsWith(selfAt)) {
                 rawContent = rawContent.substring(selfAt.length()).trim();
@@ -235,14 +238,6 @@ public class Router {
         return Optional.ofNullable(authHelper.updateTokenAndGet(openId))
                 .map(OsuToken::accessToken)
                 .orElse(null);
-    }
-
-    private boolean isAdmin(String openId) {
-        final List<String> adminIds = config.seira().adminIds();
-        if (adminIds == null || adminIds.isEmpty()) {
-            return false;
-        }
-        return adminIds.contains(openId);
     }
 
     public void sendAttachmentUploadMessage(String openId, String msgId, PendingMessage s) {

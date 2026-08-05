@@ -27,7 +27,7 @@ import java.util.function.Supplier;
 
 public class DebugRoutes {
     private static final Logger LOG = LogManager.getLogger(DebugRoutes.class);
-    private final AppConfig config;
+    private final Supplier<AppConfig> configSupplier;
     private final MessageSender messageSender;
     private final ReplyFactory replyFactory;
     private final TaskCoordinator taskCoordinator;
@@ -36,7 +36,7 @@ public class DebugRoutes {
     private final Supplier<RouteDecision> unknownCommand;
 
     public DebugRoutes(
-            AppConfig config,
+            Supplier<AppConfig> configSupplier,
             MessageSender messageSender,
             ReplyFactory replyFactory,
             TaskCoordinator taskCoordinator,
@@ -44,7 +44,7 @@ public class DebugRoutes {
             Predicate<String> adminAuthorizer,
             Supplier<RouteDecision> unknownCommand
     ) {
-        this.config = config;
+        this.configSupplier = configSupplier;
         this.messageSender = messageSender;
         this.replyFactory = replyFactory;
         this.taskCoordinator = taskCoordinator;
@@ -54,7 +54,7 @@ public class DebugRoutes {
     }
 
     public RouteDecision routeDebug(Context ctx) {
-        if (!config.seira().debugMode()) {
+        if (!configSupplier.get().seira().debugMode()) {
             return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
         }
 
