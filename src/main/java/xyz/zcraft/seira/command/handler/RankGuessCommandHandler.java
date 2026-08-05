@@ -120,7 +120,7 @@ public final class RankGuessCommandHandler {
 
     private static Long parseRank(String argument) {
         final Matcher matcher = RANK_PATTERN.matcher(argument);
-        if (matcher.matches()) {
+        if (!matcher.matches()) {
             return null;
         }
         try {
