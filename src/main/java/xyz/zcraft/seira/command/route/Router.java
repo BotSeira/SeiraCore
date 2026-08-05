@@ -6,6 +6,7 @@ import xyz.zcraft.seira.api.data.ApiTask;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.binding.UserDataStore;
+import xyz.zcraft.seira.binding.BindingService;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.*;
@@ -16,14 +17,13 @@ import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.game.RankGuessGameService;
-import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.util.OsuAuthHelper;
-import xyz.zcraft.seira.util.ThreadHelper;
 import xyz.zcraft.seira.watch.ScoreWatchService;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
@@ -38,17 +38,27 @@ public class Router {
     private final DebugRoutes debugRoutes;
     private final CommandMetrics metrics;
     private final Supplier<RouteDecision> unknownCommand;
+    private final Executor commandExecutor;
 
-    public Router(MessageSender messageSender, AppConfig config, ScoreWatchService watchService, RankGuessGameService rankGuessGameService) {
+    public Router(
+            MessageSender messageSender,
+            AppConfig config,
+            BindingService bindingService,
+            ScoreWatchService watchService,
+            RankGuessGameService rankGuessGameService,
+            Executor commandExecutor,
+            CommandMetrics metrics
+    ) {
         this.config = config;
-        this.metrics = BotStat::incrementCommands;
+        this.commandExecutor = commandExecutor;
+        this.metrics = java.util.Objects.requireNonNull(metrics);
         ReplyFactory replyFactory = new ReplyFactory(config);
         Resolver resolver = new Resolver();
         TargetHistory targetHistory = new TargetHistory();
         ReplayResultStore replayResults = new ReplayResultStore();
         this.taskCoordinator = new TaskCoordinator(messageSender, replayResults);
         this.authHelper = new OsuAuthHelper(config.binding());
-        BindingCommandHandler bindingCommands = new BindingCommandHandler(config, replyFactory);
+        BindingCommandHandler bindingCommands = new BindingCommandHandler(config, replyFactory, bindingService);
         ScoreCommandHandler scoreCommands = new ScoreCommandHandler(
                 resolver, targetHistory, taskCoordinator, replyFactory
         );
@@ -141,7 +151,9 @@ public class Router {
 
             ApiTask apiTask = routeDecision.apiTask();
             if (apiTask != null) {
-                ThreadHelper.run(() -> taskCoordinator.processApiTask(targetId, messageId, groupMessage, apiTask, messageSeqCounter));
+                commandExecutor.execute(() -> taskCoordinator.processApiTask(
+                        targetId, messageId, groupMessage, apiTask, messageSeqCounter
+                ));
             }
         } catch (Exception e) {
             taskCoordinator.sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString("处理指令时发生错误，请稍后再试。"), messageSeqCounter);

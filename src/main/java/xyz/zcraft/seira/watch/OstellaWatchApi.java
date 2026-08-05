@@ -18,7 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-public class OstellaWatchApi {
+public class OstellaWatchApi implements WatchApi {
     private static final Type SCORE_MAP_TYPE = new TypeToken<Map<String, List<RecentScore>>>() {
     }.getType();
 
@@ -36,6 +36,7 @@ public class OstellaWatchApi {
         this.gson = gson;
     }
 
+    @Override
     public Map<Long, List<RecentScore>> getRecentScores(Collection<Long> userIds, int limit) {
         JsonObject body = new JsonObject();
         body.add("user_ids", gson.toJsonTree(userIds));
@@ -68,6 +69,7 @@ public class OstellaWatchApi {
         return Map.copyOf(scores);
     }
 
+    @Override
     public byte[] renderScore(long userId, long scoreId) {
         JsonObject body = new JsonObject();
         body.addProperty("name", Long.toString(userId));

@@ -12,13 +12,11 @@ import xyz.zcraft.seira.bot.data.Attachment;
 import xyz.zcraft.seira.command.AttachmentHandler;
 import xyz.zcraft.seira.command.route.Router;
 import xyz.zcraft.seira.config.AppConfig;
-import xyz.zcraft.seira.game.RankGuessGameService;
-import xyz.zcraft.seira.util.ThreadHelper;
-import xyz.zcraft.seira.watch.ScoreWatchService;
 
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -31,7 +29,10 @@ public class WSClient extends WebSocketClient {
     @Getter
     private final AppConfig config;
     private final Supplier<AccessToken> tokenSupplier;
-    private final ScheduledExecutorService heartbeatExecutor = Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService heartbeatExecutor = Executors.newSingleThreadScheduledExecutor(
+            Thread.ofPlatform().daemon().name("seira-gateway-heartbeat").factory()
+    );
+    private final Executor eventExecutor;
     private final AtomicLong sequence = new AtomicLong(-1);
     private final Router router;
     private final AttachmentHandler attachmentHandler;
@@ -43,15 +44,16 @@ public class WSClient extends WebSocketClient {
             URI serverUri,
             AppConfig config,
             Supplier<AccessToken> tokenSupplier,
-            MessageSender messageSender,
-            ScoreWatchService watchService,
-            RankGuessGameService rankGuessGameService
+            Router router,
+            AttachmentHandler attachmentHandler,
+            Executor eventExecutor
     ) {
         super(serverUri);
         this.config = config;
         this.tokenSupplier = tokenSupplier;
-        this.router = new Router(messageSender, config, watchService, rankGuessGameService);
-        this.attachmentHandler = new AttachmentHandler(config);
+        this.router = java.util.Objects.requireNonNull(router);
+        this.attachmentHandler = java.util.Objects.requireNonNull(attachmentHandler);
+        this.eventExecutor = java.util.Objects.requireNonNull(eventExecutor);
 
         LOG.info("QQ Gateway WebSocket Client created");
     }
@@ -63,22 +65,30 @@ public class WSClient extends WebSocketClient {
 
     @Override
     public void onMessage(String message) {
-        ThreadHelper.run(() -> {
-            JsonObject payload = gson.fromJson(message, JsonObject.class);
-            updateSequence(payload.get("s"));
-
-            int op = payload.get("op").getAsInt();
-            switch (op) {
-                case 10 -> onHello(payload.getAsJsonObject("d"));
-                case 11 -> heartbeatAcked = true;
-                case 0 -> onDispatch(payload);
-                case 7, 9 -> {
-                    LOG.warn("Gateway requested reconnect/invalid session. closing current connection");
-                    close();
-                }
-                default -> LOG.debug("Ignored opcode {}", op);
+        eventExecutor.execute(() -> {
+            try {
+                processMessage(message);
+            } catch (RuntimeException e) {
+                LOG.error("Failed to process gateway payload", e);
             }
         });
+    }
+
+    private void processMessage(String message) {
+        JsonObject payload = gson.fromJson(message, JsonObject.class);
+        updateSequence(payload.get("s"));
+
+        int op = payload.get("op").getAsInt();
+        switch (op) {
+            case 10 -> onHello(payload.getAsJsonObject("d"));
+            case 11 -> heartbeatAcked = true;
+            case 0 -> onDispatch(payload);
+            case 7, 9 -> {
+                LOG.warn("Gateway requested reconnect/invalid session. closing current connection");
+                close();
+            }
+            default -> LOG.debug("Ignored opcode {}", op);
+        }
     }
 
     @Override

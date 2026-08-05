@@ -7,7 +7,7 @@ import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.osu.model.*;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.data.*;
-import xyz.zcraft.seira.binding.BindingHelper;
+import xyz.zcraft.seira.binding.BindingService;
 import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.bot.data.Button;
 import xyz.zcraft.seira.bot.data.PendingMessage;
@@ -195,7 +195,7 @@ public final class ReplyFactory {
         );
     }
 
-    public PendingMessage bindMessage(Context ctx, BindingConfig config, BindingHelper.BindingTask task, boolean isC2C) {
+    public PendingMessage bindMessage(Context ctx, BindingConfig config, BindingService.BindingTask task, boolean isC2C) {
         final String url = "https://osu.ppy.sh/oauth/authorize?client_id=%d&response_type=code&scope=public+identify+friends.read&state=%s"
                 .formatted(config.clientId(), task.taskId());
         return PendingMessage.ofMarkdownRaw(

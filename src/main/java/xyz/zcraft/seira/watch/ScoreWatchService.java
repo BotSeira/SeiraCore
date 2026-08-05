@@ -26,18 +26,19 @@ public final class ScoreWatchService implements AutoCloseable {
 
     private final Object lock = new Object();
     private final Map<String, Map<Long, WatchEntry>> watchesByGroup = new LinkedHashMap<>();
-    private final OstellaWatchApi api;
+    private final WatchApi api;
     private final WatchScoreNotifier notifier;
     private final Duration pollInterval;
     private final Clock clock;
     private final ScheduledExecutorService scheduler;
     private final AtomicBoolean started = new AtomicBoolean();
+    private final AtomicBoolean closed = new AtomicBoolean();
 
-    public ScoreWatchService(OstellaWatchApi api, WatchScoreNotifier notifier, Duration pollInterval) {
+    public ScoreWatchService(WatchApi api, WatchScoreNotifier notifier, Duration pollInterval) {
         this(api, notifier, pollInterval, Clock.systemUTC());
     }
 
-    ScoreWatchService(OstellaWatchApi api, WatchScoreNotifier notifier, Duration pollInterval, Clock clock) {
+    ScoreWatchService(WatchApi api, WatchScoreNotifier notifier, Duration pollInterval, Clock clock) {
         this.api = Objects.requireNonNull(api);
         this.notifier = Objects.requireNonNull(notifier);
         this.pollInterval = requirePositive(pollInterval, "pollInterval");
@@ -50,6 +51,9 @@ public final class ScoreWatchService implements AutoCloseable {
     }
 
     public void start() {
+        if (closed.get()) {
+            throw new IllegalStateException("Score watch service has been closed");
+        }
         if (!started.compareAndSet(false, true)) {
             return;
         }
@@ -262,7 +266,9 @@ public final class ScoreWatchService implements AutoCloseable {
 
     @Override
     public void close() {
-        scheduler.shutdownNow();
+        if (closed.compareAndSet(false, true)) {
+            scheduler.shutdownNow();
+        }
     }
 
     private static final class WatchEntry {

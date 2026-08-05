@@ -9,15 +9,17 @@ import xyz.zcraft.seira.bot.data.AccessToken;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-public class TokenManager {
+public class TokenManager implements AutoCloseable {
     private static final Logger LOG = LogManager.getLogger(TokenManager.class);
 
-    private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread thread = new Thread(r, "access-token-poller");
         thread.setDaemon(true);
         return thread;
     });
+    private final AtomicBoolean started = new AtomicBoolean();
 
     private final String clientId;
     private final String clientSecret;
@@ -28,11 +30,12 @@ public class TokenManager {
     public TokenManager(String clientId, String clientSecret) {
         this.clientId = clientId;
         this.clientSecret = clientSecret;
-
-        startPolling();
     }
 
-    private void startPolling() {
+    public void start() {
+        if (!started.compareAndSet(false, true)) {
+            return;
+        }
         scheduler.scheduleAtFixedRate(() -> {
             try {
                 if (!isValid()) {
@@ -96,5 +99,10 @@ public class TokenManager {
                 }
             }
         }
+    }
+
+    @Override
+    public void close() {
+        scheduler.shutdownNow();
     }
 }

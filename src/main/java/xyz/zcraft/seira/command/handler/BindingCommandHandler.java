@@ -1,6 +1,6 @@
 package xyz.zcraft.seira.command.handler;
 
-import xyz.zcraft.seira.binding.BindingHelper;
+import xyz.zcraft.seira.binding.BindingService;
 import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
@@ -11,10 +11,12 @@ import xyz.zcraft.seira.config.AppConfig;
 public final class BindingCommandHandler {
     private final AppConfig config;
     private final ReplyFactory replyFactory;
+    private final BindingService bindingService;
 
-    public BindingCommandHandler(AppConfig config, ReplyFactory replyFactory) {
+    public BindingCommandHandler(AppConfig config, ReplyFactory replyFactory, BindingService bindingService) {
         this.config = config;
         this.replyFactory = replyFactory;
+        this.bindingService = bindingService;
     }
 
     public RouteDecision handleBind(Context ctx) {
@@ -30,7 +32,7 @@ public final class BindingCommandHandler {
             return RouteDecision.sync(PendingMessage.ofString("用法：/bind"));
         }
 
-        final var bindingTask = BindingHelper.createBindingTask(ctx.senderUserId(), ctx.messageId(), (user, token) -> {
+        final var bindingTask = bindingService.createBindingTask(ctx.senderUserId(), ctx.messageId(), (user, token) -> {
             UserDataStore.bind(ctx.senderUserId(), user.getId());
             UserDataStore.storeToken(ctx.senderUserId(), token);
             UserDataStore.storeUserInfo(user.getId(), user.getUsername());

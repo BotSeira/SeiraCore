@@ -31,12 +31,16 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
-public class CosService {
+public class CosService implements AutoCloseable {
     private static final Logger LOG = LogManager.getLogger(CosService.class);
     private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
+    private static final long CACHE_TTL_MILLIS = 24 * 60 * 60 * 1000L;
+    private static final long CACHE_CLEANUP_INTERVAL_MILLIS = 60 * 60 * 1000L;
 
     private final ConcurrentHashMap<String, FileUpload> urlCache = new ConcurrentHashMap<>();
+    private final AtomicLong nextCacheCleanupAt = new AtomicLong();
 
     private final CosConfig config;
     private final COSClient client;
@@ -47,7 +51,6 @@ public class CosService {
         ClientConfig clientConfig = new ClientConfig(new Region(config.region()));
         client = new COSClient(credentials, clientConfig);
 
-        Runtime.getRuntime().addShutdownHook(new Thread(client::shutdown));
     }
 
     public String uploadFromUrl(String sourceUrl, int fileType) {
@@ -64,20 +67,8 @@ public class CosService {
 
         final String finalObjectKey = objectKey;
 
-        urlCache.entrySet().removeIf(entry -> entry.getValue().uploadedAt() < System.currentTimeMillis() - 24 * 3600 * 1000);
-
-        if (urlCache.containsKey(media.digest())) {
-            return urlCache.get(media.digest()).url();
-        }
-
-        String url = doUpload(finalObjectKey, media);
-        LOG.info("Uploaded media to COS. sourceUrl={}, cosUrl={}", sourceUrl, url);
-
-        if (media.digest() != null) {
-            final FileUpload fileUpload = new FileUpload(url, System.currentTimeMillis());
-            urlCache.put(media.digest(), fileUpload);
-        }
-
+        String url = uploadCached(finalObjectKey, media);
+        LOG.info("Media available in COS. sourceUrl={}, cosUrl={}", sourceUrl, url);
         return url;
     }
 
@@ -122,17 +113,33 @@ public class CosService {
         DownloadedMedia media = DownloadedMedia.create(content, contentType);
         String objectKey = buildObjectKey(fileType, "", contentType);
 
-        urlCache.entrySet().removeIf(entry -> entry.getValue().uploadedAt() < System.currentTimeMillis() - 24 * 3600 * 1000);
-        if (urlCache.containsKey(media.digest())) {
-            return urlCache.get(media.digest()).url();
+        String url = uploadCached(objectKey, media);
+        LOG.info("Byte media available in COS. cosUrl={}", url);
+        return url;
+    }
+
+    private String uploadCached(String objectKey, DownloadedMedia media) {
+        cleanupExpiredCache();
+        if (media.digest() == null) {
+            return doUpload(objectKey, media);
         }
 
-        String url = doUpload(objectKey, media);
-        LOG.info("Uploaded byte media to COS. cosUrl={}", url);
-        if (media.digest() != null) {
-            urlCache.put(media.digest(), new FileUpload(url, System.currentTimeMillis()));
+        long now = System.currentTimeMillis();
+        return urlCache.compute(media.digest(), (digest, existing) -> {
+            if (existing != null && !existing.isExpired(now)) {
+                return existing;
+            }
+            return new FileUpload(doUpload(objectKey, media), now);
+        }).url();
+    }
+
+    private void cleanupExpiredCache() {
+        long now = System.currentTimeMillis();
+        long scheduled = nextCacheCleanupAt.get();
+        if (now < scheduled || !nextCacheCleanupAt.compareAndSet(scheduled, now + CACHE_CLEANUP_INTERVAL_MILLIS)) {
+            return;
         }
-        return url;
+        urlCache.entrySet().removeIf(entry -> entry.getValue().isExpired(now));
     }
 
     @NotNull
@@ -317,6 +324,14 @@ public class CosService {
     }
 
     private record FileUpload(String url, long uploadedAt) {
+        private boolean isExpired(long now) {
+            return uploadedAt < now - CACHE_TTL_MILLIS;
+        }
+    }
+
+    @Override
+    public void close() {
+        client.shutdown();
     }
 
 }

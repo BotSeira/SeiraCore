@@ -9,7 +9,10 @@ import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.services.CosService;
 import xyz.zcraft.seira.util.TokenManager;
 
+import java.util.function.Supplier;
+
 public class MessageSender {
+    private static final int MAX_UPLOAD_ATTEMPTS = 10;
     private final Logger LOG = LogManager.getLogger(MessageSender.class);
     private final TokenManager tokenManager;
     private final CosService cos;
@@ -62,24 +65,16 @@ public class MessageSender {
         try {
             if (uploadCos) url = cos.uploadFromUrl(url, fileType);
         } catch (Exception e) {
-            LOG.error("Failed to upload private media to COS");
+            LOG.error("Failed to upload private media to COS", e);
             return null;
         }
 
-        for (int i = 1; i <= 10; i++) {
-            try {
-                return QQApi.uploadPrivateMedia(tokenManager.getToken(), userId, fileType, url);
-            } catch (RuntimeException e) {
-                LOG.error("Failed to upload private media ({}/10) {}", i, userId, e);
-            }
-
-            try {
-                Thread.sleep(i * 1000);
-            } catch (Exception _) {
-            }
-        }
-
-        return null;
+        String uploadUrl = url;
+        return retryUpload(
+                () -> QQApi.uploadPrivateMedia(tokenManager.getToken(), userId, fileType, uploadUrl),
+                1_000L,
+                "private media for " + userId
+        );
     }
 
     public FileInfo uploadGroupMedia(String groupId, int fileType, String url, boolean uploadCos) {
@@ -97,24 +92,16 @@ public class MessageSender {
         try {
             if (uploadCos) url = cos.uploadFromUrl(url, fileType);
         } catch (Exception e) {
-            LOG.error("Failed to upload group media to COS");
+            LOG.error("Failed to upload group media to COS", e);
             return null;
         }
 
-        for (int i = 1; i <= 10; i++) {
-            try {
-                return QQApi.uploadGroupMedia(tokenManager.getToken(), groupId, fileType, url);
-            } catch (RuntimeException e) {
-                LOG.error("Failed to upload group media ({}/10) {}", i, groupId, e);
-            }
-
-            try {
-                Thread.sleep(i * 2000);
-            } catch (Exception _) {
-            }
-        }
-
-        return null;
+        String uploadUrl = url;
+        return retryUpload(
+                () -> QQApi.uploadGroupMedia(tokenManager.getToken(), groupId, fileType, uploadUrl),
+                2_000L,
+                "group media for " + groupId
+        );
     }
 
     public FileInfo uploadPrivateMediaBase64(String userId, int fileType, String base64Str) {
@@ -133,5 +120,27 @@ public class MessageSender {
             LOG.error("Failed to upload group media {}", groupId, e);
             return null;
         }
+    }
+
+    private FileInfo retryUpload(Supplier<FileInfo> operation, long baseDelayMillis, String description) {
+        for (int attempt = 1; attempt <= MAX_UPLOAD_ATTEMPTS; attempt++) {
+            try {
+                return operation.get();
+            } catch (RuntimeException e) {
+                LOG.error("Failed to upload {} ({}/{})", description, attempt, MAX_UPLOAD_ATTEMPTS, e);
+            }
+
+            if (attempt == MAX_UPLOAD_ATTEMPTS) {
+                break;
+            }
+            try {
+                Thread.sleep(Math.multiplyExact(baseDelayMillis, attempt));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                LOG.warn("Interrupted while retrying upload of {}", description);
+                return null;
+            }
+        }
+        return null;
     }
 }

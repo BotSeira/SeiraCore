@@ -13,26 +13,30 @@ import java.util.LinkedList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class BotStat {
     private static final Path STAT_FILE = Path.of("data", "bot-stat.json");
     private static final Logger LOG = LogManager.getLogger(BotStat.class);
     private static final LinkedList<Long> commandCountHistory = new LinkedList<>();
-    private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-        Thread thread = new Thread(r, "bot-stat-tracker");
-        thread.setDaemon(true);
-        return thread;
-    });
-    private static AtomicLong totalCommands;
-    private static AtomicLong totalReplays;
-    private static AtomicLong totalUptime;
+    private static final AtomicBoolean initialized = new AtomicBoolean();
+    private static final AtomicLong totalCommands = new AtomicLong();
+    private static final AtomicLong totalReplays = new AtomicLong();
+    private static final AtomicLong totalUptime = new AtomicLong();
+    private static ScheduledExecutorService scheduler;
     private static long startTime;
 
     public static void initialize() {
+        if (!initialized.compareAndSet(false, true)) {
+            return;
+        }
         startTime = System.currentTimeMillis();
-
         loadStatFromFile();
-
+        scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread thread = new Thread(r, "bot-stat-tracker");
+            thread.setDaemon(true);
+            return thread;
+        });
         setupTracker();
     }
 
@@ -46,16 +50,16 @@ public class BotStat {
             }
 
             if (obj != null) {
-                totalCommands = new AtomicLong(getNum(obj, "total-commands"));
-                totalReplays = new AtomicLong(getNum(obj, "total-replays"));
-                totalUptime = new AtomicLong(getNum(obj, "total-uptime"));
+                totalCommands.set(getNum(obj, "total-commands"));
+                totalReplays.set(getNum(obj, "total-replays"));
+                totalUptime.set(getNum(obj, "total-uptime"));
                 return;
             }
         }
 
-        totalCommands = new AtomicLong(0);
-        totalReplays = new AtomicLong(0);
-        totalUptime = new AtomicLong(0);
+        totalCommands.set(0);
+        totalReplays.set(0);
+        totalUptime.set(0);
     }
 
     private static void setupTracker() {
@@ -69,17 +73,23 @@ public class BotStat {
                     commandCountHistory.removeFirst();
                 }
             }
-        }, 0, 1, java.util.concurrent.TimeUnit.MINUTES);
+        }, 1, 1, java.util.concurrent.TimeUnit.MINUTES);
     }
 
     public static long getCommandCountFor(int min) {
         synchronized (commandCountHistory) {
-            return totalCommands.get() - commandCountHistory.get(Math.max(0, commandCountHistory.size() - 1 - min));
+            if (commandCountHistory.isEmpty()) {
+                return 0;
+            }
+            int minutes = Math.max(0, min);
+            return totalCommands.get() - commandCountHistory.get(
+                    Math.max(0, commandCountHistory.size() - 1 - minutes)
+            );
         }
     }
 
     private static long getNum(JsonObject obj, String key) {
-        if (obj == null) {
+        if (obj == null || !obj.has(key)) {
             return 0;
         }
         final JsonElement element = obj.get(key);
@@ -115,7 +125,7 @@ public class BotStat {
     }
 
     public static long getCurrentUptime() {
-        return System.currentTimeMillis() - startTime;
+        return initialized.get() ? System.currentTimeMillis() - startTime : 0;
     }
 
     public static void saveToFile() {
@@ -129,6 +139,21 @@ public class BotStat {
             Files.writeString(STAT_FILE, obj.toString());
         } catch (IOException e) {
             LOG.error("Failed to write bot stat to file", e);
+        }
+    }
+
+    public static void shutdown() {
+        if (!initialized.compareAndSet(true, false)) {
+            return;
+        }
+        saveToFile();
+        ScheduledExecutorService currentScheduler = scheduler;
+        scheduler = null;
+        if (currentScheduler != null) {
+            currentScheduler.shutdownNow();
+        }
+        synchronized (commandCountHistory) {
+            commandCountHistory.clear();
         }
     }
 }

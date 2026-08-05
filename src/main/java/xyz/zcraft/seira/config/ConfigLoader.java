@@ -10,10 +10,10 @@ import java.nio.file.StandardCopyOption;
 
 public class ConfigLoader {
     public static final Path CONFIG_PATH = Path.of("config.yml");
+    private static final ObjectMapper MAPPER = new ObjectMapper(new YAMLFactory());
 
     public static AppConfig loadConfig() {
-        ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-        return mapper.readValue(CONFIG_PATH, AppConfig.class);
+        return ConfigValidator.validate(MAPPER.readValue(CONFIG_PATH, AppConfig.class));
     }
 
     public static boolean configExists() {
