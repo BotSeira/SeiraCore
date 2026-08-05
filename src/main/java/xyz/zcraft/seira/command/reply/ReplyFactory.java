@@ -84,7 +84,7 @@ public final class ReplyFactory {
         String rank = String.format(Locale.US, "%,d", round.actualRank());
         String pp = round.pp() == null
                 ? "未知"
-                : BigDecimal.valueOf(round.pp()).stripTrailingZeros().toPlainString() + "pp";
+                : "%.1f".formatted(round.pp()) + "pp";
 
         StringBuilder content = new StringBuilder()
                 .append("本轮猜测结束~\n")

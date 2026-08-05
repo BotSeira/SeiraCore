@@ -34,6 +34,7 @@ public final class JLineConsole implements AutoCloseable {
     );
     private final AtomicBoolean running = new AtomicBoolean();
     private volatile Terminal terminal;
+    private volatile JLineLogBridge logBridge;
 
     public JLineConsole(ConsoleCommandProcessor processor) {
         this.processor = processor;
@@ -58,18 +59,25 @@ public final class JLineConsole implements AutoCloseable {
                     .variable(LineReader.HISTORY_SIZE, 500)
                     .option(LineReader.Option.DISABLE_EVENT_EXPANSION, true)
                     .build();
+            JLineLogBridge createdLogBridge = JLineLogBridge.install(reader);
+            logBridge = createdLogBridge;
 
-            while (running.get()) {
-                try {
-                    String line = reader.readLine(PROMPT);
-                    ConsoleCommandProcessor.ConsoleResult result = processor.execute(line);
-                    if (!result.message().isBlank()) {
-                        reader.printAbove((result.success() ? "" : "错误：") + result.message());
+            try {
+                while (running.get()) {
+                    try {
+                        String line = reader.readLine(PROMPT);
+                        ConsoleCommandProcessor.ConsoleResult result = processor.execute(line);
+                        if (!result.message().isBlank()) {
+                            reader.printAbove((result.success() ? "" : "错误：") + result.message());
+                        }
+                    } catch (UserInterruptException ignored) {
+                    } catch (EndOfFileException e) {
+                        break;
                     }
-                } catch (UserInterruptException ignored) {
-                } catch (EndOfFileException e) {
-                    break;
                 }
+            } finally {
+                logBridge = null;
+                createdLogBridge.close();
             }
         } catch (IOException | RuntimeException e) {
             if (running.get()) {
@@ -84,6 +92,11 @@ public final class JLineConsole implements AutoCloseable {
     @Override
     public void close() {
         running.set(false);
+        JLineLogBridge currentBridge = logBridge;
+        if (currentBridge != null) {
+            currentBridge.close();
+            logBridge = null;
+        }
         Terminal current = terminal;
         if (current != null) {
             try {
