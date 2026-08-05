@@ -60,9 +60,9 @@ public final class JLineConsole implements AutoCloseable {
                     .option(LineReader.Option.DISABLE_EVENT_EXPANSION, true)
                     .build();
             JLineLogBridge createdLogBridge = JLineLogBridge.install(reader);
-            logBridge = createdLogBridge;
 
-            try {
+            try (createdLogBridge) {
+                logBridge = createdLogBridge;
                 while (running.get()) {
                     try {
                         String line = reader.readLine(PROMPT);
@@ -77,7 +77,6 @@ public final class JLineConsole implements AutoCloseable {
                 }
             } finally {
                 logBridge = null;
-                createdLogBridge.close();
             }
         } catch (IOException | RuntimeException e) {
             if (running.get()) {

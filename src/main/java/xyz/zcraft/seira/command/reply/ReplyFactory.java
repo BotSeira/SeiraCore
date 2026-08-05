@@ -20,7 +20,6 @@ import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.services.DailyLuck;
 import xyz.zcraft.seira.util.VersionInfo;
 
-import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.*;

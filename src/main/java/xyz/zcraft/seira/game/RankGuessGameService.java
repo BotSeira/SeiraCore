@@ -32,18 +32,17 @@ public final class RankGuessGameService {
         return reservation;
     }
 
-    public synchronized boolean activate(Reservation reservation, Round round) {
+    public synchronized void activate(Reservation reservation, Round round) {
         if (round == null) {
             throw new IllegalArgumentException("Round must not be null");
         }
         Game game = games.get(reservation.groupId());
         if (game == null || !game.token.equals(reservation.token())) {
-            return false;
+            return;
         }
 
         game.round = round;
         game.guessingStartedAt = clock.instant();
-        return true;
     }
 
     public synchronized void cancel(Reservation reservation) {
@@ -70,31 +69,40 @@ public final class RankGuessGameService {
 
         LinkedList<ScoreMultiplier> multipliers = new LinkedList<>();
 
-        double orderMultiplier = Math.max(
-                -0.10,
-                0.05 - (guessNumber - 1) * 0.01
-        );
+        if (guessNumber == 1) {
+            multipliers.add(new ScoreMultiplier(0.05, "首猜加成"));
+        } else {
+            double orderMultiplier = Math.max(
+                    -0.10,
+                    0.00 - (guessNumber - 1) * 0.01
+            );
 
-        multipliers.add(new ScoreMultiplier(
-                orderMultiplier,
-                guessNumber == 1 ? "首猜加成" : "第" + guessNumber + "猜"
-        ));
+            multipliers.add(new ScoreMultiplier(
+                    orderMultiplier,
+                    "第" + guessNumber + "猜"
+            ));
+        }
+
 
         long closestGuess = Arrays.stream(
                         game.guesses.values().stream()
                                 .mapToLong(Guess::rank)
                                 .toArray()
                 ).boxed()
-                .min(Comparator.comparingLong(previous ->
-                        Math.abs(previous - guess)
-                ))
+                .min(Comparator.comparingLong(previous -> Math.abs(previous - guess)))
                 .orElse(-1L);
 
         if (closestGuess != -1) {
+            double absoluteDifference = Math.abs(closestGuess - guess);
+            double relativeDifference = absoluteDifference
+                    / (double) Math.max(closestGuess, guess);
+
             boolean copied =
-                    Math.abs(closestGuess - guess) <= 100 ||
-                            Math.abs(Math.log10(closestGuess)
-                                    - Math.log10(guess)) < 0.005;
+                    (absoluteDifference <= 100 && relativeDifference <= 0.01)
+                            || Math.abs(
+                            Math.log10(closestGuess)
+                                    - Math.log10(guess)
+                    ) < 0.005;
 
             if (copied) {
                 multipliers.add(new ScoreMultiplier(
