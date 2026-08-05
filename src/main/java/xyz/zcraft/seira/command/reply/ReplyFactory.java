@@ -98,11 +98,12 @@ public final class ReplyFactory {
             for (int i = 0; i < result.standings().size(); i++) {
                 RankGuessGameService.Standing standing = result.standings().get(i);
                 content.append(
-                        "> %d. %s: %,dpts #%,d(%+,d)\n"
+                        "> %d. %s: %,dpts(x%.2f) #%,d(%+,d)\n"
                                 .formatted(
                                         i + 1,
                                         at(standing.senderUserId()),
                                         Math.round(standing.points()),
+                                        standing.multiplier(),
                                         standing.guess(),
                                         standing.delta()
                                 )

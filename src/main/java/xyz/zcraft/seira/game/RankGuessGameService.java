@@ -66,8 +66,6 @@ public final class RankGuessGameService {
             return new GuessResult(GuessStatus.STARTING, guess, null);
         }
 
-        Guess previousGuess = game.guesses.put(senderUserId, new Guess(guess, game.nextSequence++));
-
         final int guessNumber = game.guessCount.incrementAndGet();
 
         LinkedList<ScoreMultiplier> multipliers = new LinkedList<>();
@@ -106,6 +104,10 @@ public final class RankGuessGameService {
             }
         }
 
+        final double sum = multipliers.stream().mapToDouble(ScoreMultiplier::multiplier).sum();
+
+        Guess previousGuess = game.guesses.put(senderUserId, new Guess(guess, game.nextSequence++, 1 + sum));
+
         return new GuessResult(previousGuess == null ? GuessStatus.RECORDED : GuessStatus.UPDATED, guess, multipliers);
     }
 
@@ -128,17 +130,21 @@ public final class RankGuessGameService {
         for (Map.Entry<String, Guess> entry : game.guesses.entrySet()) {
             Guess guess = entry.getValue();
             double error = logarithmicError(guess.rank(), game.round.actualRank());
+
+            final double pointsRaw = Math.max(0, 1000 * (1 - error));
             standings.add(new Standing(
                     entry.getKey(),
                     guess.rank(),
-                    Math.max(0, 1000 * (1 - error)),
+                    pointsRaw,
+                    guess.multiplier,
+                    pointsRaw * guess.multiplier,
                     game.round.actualRank() - guess.rank(),
                     error,
                     guess.sequence()
             ));
         }
         standings.sort(Comparator
-                .comparingDouble(Standing::points).reversed()
+                .comparingDouble(Standing::pointsRaw).reversed()
                 .thenComparingDouble(Standing::error)
                 .thenComparingLong(Standing::sequence));
 
@@ -241,6 +247,8 @@ public final class RankGuessGameService {
     public record Standing(
             String senderUserId,
             long guess,
+            double pointsRaw,
+            double multiplier,
             double points,
             long delta,
             double error,
@@ -266,6 +274,6 @@ public final class RankGuessGameService {
         }
     }
 
-    private record Guess(long rank, long sequence) {
+    private record Guess(long rank, long sequence, double multiplier) {
     }
 }
