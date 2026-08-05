@@ -46,6 +46,7 @@ public final class ConsoleCommandProcessor {
                 case "admin" -> admin(input);
                 case "data" -> data(input);
                 case "send" -> send(input);
+                case "stop" -> stop();
                 default -> ConsoleResult.failure("未知控制台指令。输入 help 查看帮助。");
             };
         } catch (IllegalArgumentException e) {
@@ -96,6 +97,11 @@ public final class ConsoleCommandProcessor {
                 ? "无"
                 : String.join(", ", result.restartRequired());
         return ConsoleResult.success("配置已重新读取。\n已在线生效：" + applied + "\n需重启生效：" + restart);
+    }
+
+    private ConsoleResult stop() {
+        Runtime.getRuntime().exit(0);
+        return ConsoleResult.success("正在关闭");
     }
 
     private ConsoleResult admin(ConsoleInputParser.ParsedInput input) {
