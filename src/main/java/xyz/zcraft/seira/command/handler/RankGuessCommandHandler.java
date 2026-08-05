@@ -81,8 +81,10 @@ public final class RankGuessCommandHandler {
                 successful -> {
                     if (successful) {
                         games.activate(reservation, roundRef.get());
+                        return PendingMessage.ofMarkdownRaw("回放渲染完成，游戏已开始！请在群内发送 `/rg #Rank` 猜测排名~");
                     } else {
                         games.cancel(reservation);
+                        return PendingMessage.ofMarkdownRaw("由于回放渲染失败，本轮游戏已取消~");
                     }
                 }
         );
@@ -92,7 +94,7 @@ public final class RankGuessCommandHandler {
         RankGuessGameService.GuessResult result = games.guess(ctx.groupId(), ctx.senderUserId(), rank);
         return switch (result.status()) {
             case NO_GAME -> RouteDecision.sync(PendingMessage.ofString("本群当前没有进行中的 Rank Guess 喵"));
-            case STARTING -> RouteDecision.sync(PendingMessage.ofString("高光仍在渲染，请等待视频发送后再猜测喵"));
+            case STARTING -> RouteDecision.sync(PendingMessage.ofString("回放仍在渲染，请等待视频发送后再猜测喵"));
             case UPDATED, RECORDED -> RouteDecision.sync(PendingMessage.ofMarkdownRaw(
                     at(ctx)
                             + "已" + (result.status() == RankGuessGameService.GuessStatus.UPDATED ? "更新" : "记录") + "你的猜测："

@@ -1,7 +1,9 @@
 package xyz.zcraft.seira.command.iface;
 
+import xyz.zcraft.seira.bot.data.PendingMessage;
+
 @FunctionalInterface
 public interface ApiTaskFinalizer {
-    void execute(boolean result);
+    PendingMessage execute(boolean result);
 }
 

@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
-import java.util.function.Consumer;
+import java.util.function.Function;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
@@ -41,8 +41,7 @@ public final class TaskCoordinator {
     }
 
     public RouteDecision queueApiRequest(Context ctx, String requestType, ApiTaskExecutor executor) {
-        return queueApiRequest(ctx, requestType, executor, () -> null, (_) -> {
-        });
+        return queueApiRequest(ctx, requestType, executor, () -> null, (_) -> null);
     }
 
     RouteDecision queueApiRequestUntilSubmit(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer) {
@@ -63,8 +62,7 @@ public final class TaskCoordinator {
                     return combineImageAndCompletion(uploadedImage, completionMessage);
                 },
                 () -> null,
-                (_) -> {
-                }
+                (_) -> null
         );
     }
 
@@ -86,8 +84,7 @@ public final class TaskCoordinator {
     }
 
     public RouteDecision queueReplayTask(Context ctx, String requestType, ReplayTaskCreator creator, BiFunction<Context, APIHelper.ReplayTaskInfo, PendingMessage> messageCreator) {
-        return queueReplayTask(ctx, requestType, creator, messageCreator, (_) -> {
-        });
+        return queueReplayTask(ctx, requestType, creator, messageCreator, (_) -> null);
     }
 
     public RouteDecision queueReplayTask(
@@ -95,7 +92,7 @@ public final class TaskCoordinator {
             String requestType,
             ReplayTaskCreator creator,
             BiFunction<Context, APIHelper.ReplayTaskInfo, PendingMessage> messageCreator,
-            Consumer<Boolean> completion
+            Function<Boolean, PendingMessage> completion
     ) {
         AtomicReference<APIHelper.ReplayTaskInfo> taskInfoRef = new AtomicReference<>();
         AtomicReference<String> taskId = new AtomicReference<>();
@@ -127,7 +124,7 @@ public final class TaskCoordinator {
                 (b) -> {
                     LOG.debug("Running finalizer of {} for request {}", b, taskId.get());
                     if (b) replayResults.remove(taskId.get());
-                    completion.accept(b && renderResultRef.get() != null);
+                    return completion.apply(b && renderResultRef.get() != null);
                 }
         );
     }
@@ -163,7 +160,10 @@ public final class TaskCoordinator {
             LOG.error("Failed to execute API task: {}", msg, e);
         } finally {
             try {
-                apiTask.finalizer().execute(responseSent);
+                final PendingMessage execute = apiTask.finalizer().execute(responseSent);
+                if (execute != null) {
+                    sendOutboundMessage(targetId, messageId, groupMessage, execute, messageSeqCounter);
+                }
             } catch (Exception e) {
                 LOG.warn("Failed to run finalizer: {}", e.getMessage(), e);
             }
