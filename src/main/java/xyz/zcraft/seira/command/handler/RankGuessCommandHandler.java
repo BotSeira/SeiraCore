@@ -106,19 +106,17 @@ public final class RankGuessCommandHandler {
                     var renderTask = APIHelper.createObscuredReplayRenderTask(
                             round.scoreId(), taskCoordinator.createVideoUploadRequest(ctx)
                     );
-                    ctx.sendReply(replyFactory.replayMessage(ctx, renderTask));
 
                     var replay = taskCoordinator.waitForReplay(renderTask);
                     if (replay == null) {
-                        ctx.sendMessage(PendingMessage.ofMarkdownRaw("由于回放渲染失败，本轮游戏已取消~"));
+                        ctx.sendReply(PendingMessage.ofMarkdownRaw("由于回放渲染失败，本轮游戏已取消~"));
                         return;
                     }
 
-                    // Rendering may outlive QQ's passive-reply window, so completion uses active messages.
-                    boolean videoSent = ctx.sendMessage(taskCoordinator.replayVideoMessage(replay));
+                    boolean videoSent = ctx.sendReply(taskCoordinator.replayVideoMessage(replay));
                     if (!videoSent) {
                         taskCoordinator.removeReplayResult(renderTask.taskId());
-                        ctx.sendMessage(PendingMessage.ofMarkdownRaw("由于回放发送失败，本轮游戏已取消~"));
+                        ctx.sendReply(PendingMessage.ofMarkdownRaw("由于回放发送失败，本轮游戏已取消~"));
                         return;
                     }
 
@@ -126,7 +124,7 @@ public final class RankGuessCommandHandler {
                     games.activate(reservation, round);
                     activated.set(true);
                     String range = getRange(round.actualRank());
-                    ctx.sendMessage(PendingMessage.ofMarkdownRaw(
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(
                             "回放渲染完成，游戏已开始！请在群内发送 `/rg #Rank` 猜测排名~\n"
                                     + "> 提示: 这是一名 `" + range + "` 玩家的`BP" + round.bestIndex() + "`~"
                     ));

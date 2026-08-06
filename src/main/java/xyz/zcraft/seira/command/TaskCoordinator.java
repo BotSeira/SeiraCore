@@ -133,11 +133,11 @@ public final class TaskCoordinator {
 
             APIHelper.ReplayRenderResult result = waitForReplay(taskInfo);
             if (result == null) {
-                ctx.sendMessage(PendingMessage.ofString("回放视频生成失败，请稍后重试。"));
+                ctx.sendReply(PendingMessage.ofString("回放视频生成失败，请稍后重试。"));
                 return;
             }
 
-            if (ctx.sendMessage(replayVideoMessage(result))) {
+            if (ctx.sendReply(replayVideoMessage(result))) {
                 removeReplayResult(taskInfo.taskId());
             }
         });
