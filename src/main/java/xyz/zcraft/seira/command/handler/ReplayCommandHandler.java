@@ -72,8 +72,8 @@ public final class ReplayCommandHandler {
         return taskCoordinator.queueReplayTask(
                 ctx,
                 "Score Render",
-                () -> {
-                    APIHelper.ReplayTaskInfo task = APIHelper.createReplayRenderTask(target, finalRange);
+                qqUpload -> {
+                    APIHelper.ReplayTaskInfo task = APIHelper.createReplayRenderTask(target, finalRange, qqUpload);
                     videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
                     return task;
                 },
@@ -123,8 +123,9 @@ public final class ReplayCommandHandler {
         return taskCoordinator.queueReplayTask(
                 ctx,
                 "Showcase Render",
-                () -> {
-                    var task = APIHelper.createReplayShowcaseTask(target, uidArray, accessTokenProvider.apply(ctx.senderUserId()));
+                qqUpload -> {
+                    var task = APIHelper.createReplayShowcaseTask(
+                            target, uidArray, accessTokenProvider.apply(ctx.senderUserId()), qqUpload);
                     videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
                     return task;
                 },
@@ -149,7 +150,10 @@ public final class ReplayCommandHandler {
 
         APIHelper.ReplayRenderResult replayResult = replayResults.get(jobId);
         if (replayResult != null) {
-            return RouteDecision.sync(PendingMessage.ofVideoUrl(replayResult.videoUrl()), b -> {
+            PendingMessage video = replayResult.qqFile() != null
+                    ? PendingMessage.ofUploadedVideo(replayResult.qqFile())
+                    : PendingMessage.ofVideoUrl(replayResult.videoUrl());
+            return RouteDecision.sync(video, b -> {
                 if (b) {
                     replayResults.remove(jobId);
                 }

@@ -220,7 +220,7 @@ public final class RankGuessGameService {
     public record EndResult(EndStatus status, FinishedRound round) {
     }
 
-    public record Round(long userId, long scoreId, long actualRank, Double pp) {
+    public record Round(long userId, long scoreId, int bestIndex, long actualRank, Double pp) {
         public Round {
             if (userId <= 0 || scoreId <= 0 || actualRank <= 0) {
                 throw new IllegalArgumentException("Rank Guess 数据必须包含有效的用户、成绩和排名");
@@ -246,6 +246,7 @@ public final class RankGuessGameService {
             return new Round(
                     randomScore.user().getId(),
                     randomScore.score().getId(),
+                    randomScore.bestIndex(),
                     randomScore.user().getStatistics().getGlobalRank(),
                     randomScore.score().getPp()
             );

@@ -5,6 +5,7 @@ import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.bot.data.Message;
 import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.api.data.QqUploadRequest;
 import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.services.CosService;
 import xyz.zcraft.seira.util.TokenManager;
@@ -48,6 +49,14 @@ public class MessageSender implements ProactiveMessenger {
 
     public UploadedImage uploadImageToCos(String imageUrl) {
         return cos.uploadImage(imageUrl);
+    }
+
+    public QqUploadRequest createVideoUploadRequest(String targetId, boolean groupMessage) {
+        var token = tokenManager.getToken();
+        if (token == null || token.token() == null || token.token().isBlank()) {
+            return null;
+        }
+        return new QqUploadRequest(token.token(), groupMessage ? "groups" : "users", targetId);
     }
 
     public FileInfo uploadPrivateMedia(String userId, int fileType, String url, boolean uploadCos) {

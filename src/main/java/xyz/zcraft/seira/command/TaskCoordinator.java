@@ -100,7 +100,9 @@ public final class TaskCoordinator {
         return queueApiRequestUntilSubmit(
                 requestType,
                 () -> {
-                    APIHelper.ReplayTaskInfo taskInfo = creator.create();
+                    String targetId = ctx.inGroup() ? ctx.groupId() : ctx.senderUserId();
+                    var qqUpload = messageSender.createVideoUploadRequest(targetId, ctx.inGroup());
+                    APIHelper.ReplayTaskInfo taskInfo = creator.create(qqUpload);
                     taskInfoRef.set(taskInfo);
 
                     return messageCreator.apply(ctx, taskInfo);
@@ -117,7 +119,9 @@ public final class TaskCoordinator {
                         renderResultRef.set(result);
                         replayResults.put(taskInfo.taskId(), result);
                         BotStat.incrementReplays();
-                        return PendingMessage.ofVideoUrl(result.videoUrl());
+                        return result.qqFile() != null
+                                ? PendingMessage.ofUploadedVideo(result.qqFile())
+                                : PendingMessage.ofVideoUrl(result.videoUrl());
                     }
                     return PendingMessage.ofString("回放视频生成失败，请稍后重试。");
                 },
@@ -193,7 +197,9 @@ public final class TaskCoordinator {
         }
 
         boolean uploadResult = true;
-        if (pendingMsg.getFileUrl() != null) {
+        if (pendingMsg.getUploadedMedia() != null) {
+            message.setMedia(pendingMsg.getUploadedMedia());
+        } else if (pendingMsg.getFileUrl() != null) {
             LOG.info("Uploading media for {}", messageId);
             FileInfo fileInfo = groupMessage
                     ? messageSender.uploadGroupMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl(), pendingMsg.isUpload())

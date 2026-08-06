@@ -11,6 +11,7 @@ import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.command.parse.ShortcutTarget;
+import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
@@ -438,10 +439,20 @@ public class APIHelper {
     }
 
     public static ReplayTaskInfo createReplayRenderTask(ShortcutTarget target, TimeDurationParser.TimeRange timeRange) {
-        return createReplayTask(target, timeRange);
+        return createReplayTask(target, timeRange, null);
+    }
+
+    public static ReplayTaskInfo createReplayRenderTask(ShortcutTarget target,
+                                                         TimeDurationParser.TimeRange timeRange,
+                                                         QqUploadRequest qqUpload) {
+        return createReplayTask(target, timeRange, qqUpload);
     }
 
     public static ReplayTaskInfo createObscuredReplayRenderTask(long scoreId) {
+        return createObscuredReplayRenderTask(scoreId, null);
+    }
+
+    public static ReplayTaskInfo createObscuredReplayRenderTask(long scoreId, QqUploadRequest qqUpload) {
         if (scoreId <= 0) {
             throw new IllegalArgumentException("成绩ID必须为正整数");
         }
@@ -450,7 +461,8 @@ public class APIHelper {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(ENDPOINT + "/replays/renders/score/" + scoreId
                         + "?obscured=true" + timeRange.toQueryString()))
-                .POST(HttpRequest.BodyPublishers.noBody())
+                .header("Content-Type", "application/json")
+                .POST(renderRequestBody(qqUpload))
                 .build();
 
         return getReplayTaskInfo(request);
@@ -478,7 +490,8 @@ public class APIHelper {
 
             return new RandomScore(
                     GSON.fromJson(data.getAsJsonObject("user"), UserExtended.class),
-                    GSON.fromJson(data.getAsJsonObject("score"), Score.class)
+                    GSON.fromJson(data.getAsJsonObject("score"), Score.class),
+                    data.get("best_index").getAsInt()
             );
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -489,15 +502,25 @@ public class APIHelper {
     }
 
     public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] ids, String auth) {
+        return createReplayShowcaseTask(target, ids, auth, null);
+    }
+
+    public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] ids, String auth,
+                                                           QqUploadRequest qqUpload) {
         if (ids == null || ids.length == 0) {
             throw new RuntimeException("同屏回放需要至少一个ID。");
         }
 
         final long beatmapId = lookupBeatmap(target, auth);
 
+        JsonObject body = GSON.toJsonTree(Map.of("ids", ids)).getAsJsonObject();
+        if (qqUpload != null) {
+            body.add("qqUpload", GSON.toJsonTree(qqUpload));
+        }
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(ENDPOINT + "/replays/renders/showcase/" + beatmapId))
-                .POST(HttpRequest.BodyPublishers.ofString(GSON.toJsonTree(Map.of("ids", ids)).toString()))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                 .build();
 
         return getReplayTaskInfo(request);
@@ -505,14 +528,17 @@ public class APIHelper {
 
     public static ReplayRenderResult waitReplayVideo(String taskId) {
         try {
-            waitReplayDone(taskId);
-            return new ReplayRenderResult(ENDPOINT + "/replays/" + taskId + "/video/replay.mp4", taskId);
+            FileInfo qqFile = waitReplayDone(taskId);
+            return new ReplayRenderResult(
+                    ENDPOINT + "/replays/" + taskId + "/video/replay.mp4", taskId, qqFile);
         } catch (RuntimeException _) {
             return null;
         }
     }
 
-    private static ReplayTaskInfo createReplayTask(ShortcutTarget target, TimeDurationParser.TimeRange timeRange) {
+    private static ReplayTaskInfo createReplayTask(ShortcutTarget target,
+                                                    TimeDurationParser.TimeRange timeRange,
+                                                    QqUploadRequest qqUpload) {
         long scoreId = lookupScoreId(target);
 
         if (timeRange == null) {
@@ -521,7 +547,8 @@ public class APIHelper {
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(ENDPOINT + "/replays/renders/score/" + scoreId + "?" + timeRange.toQueryString()))
-                .POST(HttpRequest.BodyPublishers.noBody())
+                .header("Content-Type", "application/json")
+                .POST(renderRequestBody(qqUpload))
                 .build();
 
         return getReplayTaskInfo(request);
@@ -625,11 +652,14 @@ public class APIHelper {
         }
     }
 
-    private static void waitReplayDone(String taskId) {
+    private static FileInfo waitReplayDone(String taskId) {
         for (int attempt = 1; attempt <= REPLAY_MAX_POLL_ATTEMPTS; attempt++) {
-            String status = getReplayStatus(taskId);
+            JsonObject statusData = getReplayStatus(taskId);
+            String status = statusData.get("status").getAsString();
             if ("done".equalsIgnoreCase(status)) {
-                return;
+                return statusData.has("qqFile") && statusData.get("qqFile").isJsonObject()
+                        ? GSON.fromJson(statusData.getAsJsonObject("qqFile"), FileInfo.class)
+                        : null;
             }
             if ("failed".equalsIgnoreCase(status) || "canceled".equalsIgnoreCase(status)) {
                 throw new RuntimeException("回放渲染失败，状态：" + status);
@@ -645,7 +675,7 @@ public class APIHelper {
         throw new RuntimeException("回放渲染超时，请稍后重试。");
     }
 
-    private static String getReplayStatus(String taskId) {
+    private static JsonObject getReplayStatus(String taskId) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/replays/" + taskId + "/status"))
@@ -661,13 +691,22 @@ public class APIHelper {
             if (!data.has("status") || data.get("status").isJsonNull()) {
                 throw new RuntimeException("回放渲染状态响应缺少status");
             }
-            return data.get("status").getAsString();
+            return data;
         } catch (IOException e) {
             throw new RuntimeException(e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Replay status request interrupted", e);
         }
+    }
+
+    private static HttpRequest.BodyPublisher renderRequestBody(QqUploadRequest qqUpload) {
+        if (qqUpload == null) {
+            return HttpRequest.BodyPublishers.noBody();
+        }
+        JsonObject body = new JsonObject();
+        body.add("qqUpload", GSON.toJsonTree(qqUpload));
+        return HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8);
     }
 
     private static void ensureApiSuccess(RawResponse payload, String fallbackMessage) {
@@ -935,7 +974,10 @@ public class APIHelper {
     public record ServerStatus(boolean gateway, boolean oStella, String oStellaVersion, boolean osu) {
     }
 
-    public record ReplayRenderResult(String videoUrl, String taskId) {
+    public record ReplayRenderResult(String videoUrl, String taskId, FileInfo qqFile) {
+        public ReplayRenderResult(String videoUrl, String taskId) {
+            this(videoUrl, taskId, null);
+        }
     }
 
     public record ReplayTaskInfo(
