@@ -10,7 +10,6 @@ import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.command.parse.RscTarget;
 import xyz.zcraft.seira.command.parse.ShortcutTarget;
 import xyz.zcraft.seira.command.parse.TargetResolution;
-import xyz.zcraft.seira.command.route.RouteDecision;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
 import java.util.function.Function;
@@ -42,18 +41,21 @@ public final class ReplayCommandHandler {
         this.accessTokenProvider = accessTokenProvider;
     }
 
-    public RouteDecision handleR(Context ctx) {
+    public void handleR(Context ctx) {
         TargetResolution targetResolution = targetHistory.resolveOptionalTarget(ctx, resolver, TimeDurationParser::isTimeRange);
         if (ctx.args().length - targetResolution.consumedArgs() > 1) {
-            return RouteDecision.sync(PendingMessage.ofString(CommandUsage.R));
+            ctx.sendReply(PendingMessage.ofString(CommandUsage.R));
+            return;
         }
 
         ShortcutTarget target = targetResolution.target();
         if (target == null) {
-            return RouteDecision.sync(PendingMessage.ofString(CommandUsage.R));
+            ctx.sendReply(PendingMessage.ofString(CommandUsage.R));
+            return;
         }
         if (target.isError()) {
-            return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+            ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+            return;
         }
 
         TimeDurationParser.TimeRange range = null;
@@ -62,14 +64,15 @@ public final class ReplayCommandHandler {
             try {
                 range = TimeDurationParser.parseRange(ctx.args()[targetResolution.consumedArgs()]);
             } catch (IllegalArgumentException e) {
-                return RouteDecision.sync(PendingMessage.ofString("无法解析时间范围"));
+                ctx.sendReply(PendingMessage.ofString("无法解析时间范围"));
+                return;
             }
         }
 
         targetHistory.rememberExplicitTarget(ctx, targetResolution);
 
         TimeDurationParser.TimeRange finalRange = range;
-        return taskCoordinator.queueReplayTask(
+        taskCoordinator.runReplayRequest(
                 ctx,
                 "Score Render",
                 qqUpload -> {
@@ -80,9 +83,10 @@ public final class ReplayCommandHandler {
                 replyFactory::replayMessage);
     }
 
-    public RouteDecision handleRsc(Context ctx) {
+    public void handleRsc(Context ctx) {
         if (ctx.groupId() == null || ctx.groupId().isBlank()) {
-            return RouteDecision.sync(PendingMessage.ofString("/rsc 仅支持群聊使用。"));
+            ctx.sendReply(PendingMessage.ofString("/rsc 仅支持群聊使用。"));
+            return;
         }
 
         TargetResolution targetResolution = targetHistory.resolveOptionalTarget(
@@ -92,10 +96,12 @@ public final class ReplayCommandHandler {
         );
         ShortcutTarget target = targetResolution.target();
         if (target == null) {
-            return RouteDecision.sync(PendingMessage.ofString(CommandUsage.RSC));
+            ctx.sendReply(PendingMessage.ofString(CommandUsage.RSC));
+            return;
         }
         if (target.isError()) {
-            return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+            ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+            return;
         }
 
         String extraUidArg = null;
@@ -103,24 +109,27 @@ public final class ReplayCommandHandler {
         for (int i = targetResolution.consumedArgs(); i < ctx.args().length; i++) {
             if (ctx.args()[i].startsWith("+") || ctx.args()[i].startsWith("=")) {
                 if (extraUidArg != null) {
-                    return RouteDecision.sync(PendingMessage.ofString(CommandUsage.RSC));
+                    ctx.sendReply(PendingMessage.ofString(CommandUsage.RSC));
+                    return;
                 }
                 extraUidArg = ctx.args()[i];
             } else {
-                return RouteDecision.sync(PendingMessage.ofString(CommandUsage.RSC));
+                ctx.sendReply(PendingMessage.ofString(CommandUsage.RSC));
+                return;
             }
         }
 
         RscTarget rscTarget = resolver.resolveRscTarget(ctx.groupId(), extraUidArg);
         if (rscTarget.errorMessage() != null) {
-            return RouteDecision.sync(PendingMessage.ofString(rscTarget.errorMessage()));
+            ctx.sendReply(PendingMessage.ofString(rscTarget.errorMessage()));
+            return;
         }
 
         String[] uidArray = rscTarget.uids();
 
         targetHistory.rememberExplicitTarget(ctx, targetResolution);
 
-        return taskCoordinator.queueReplayTask(
+        taskCoordinator.runReplayRequest(
                 ctx,
                 "Showcase Render",
                 qqUpload -> {
@@ -132,9 +141,10 @@ public final class ReplayCommandHandler {
                 replyFactory::replayMessage);
     }
 
-    public RouteDecision handleRstat(Context ctx) {
+    public void handleRstat(Context ctx) {
         if (ctx.args().length != 1 && ctx.args().length != 0) {
-            return RouteDecision.sync(PendingMessage.ofString("用法：/rstat [任务ID]"));
+            ctx.sendReply(PendingMessage.ofString("用法：/rstat [任务ID]"));
+            return;
         }
 
         String jobId;
@@ -142,7 +152,8 @@ public final class ReplayCommandHandler {
             if (videoRenderRecord.hasRenderTask(ctx.senderUserId())) {
                 jobId = videoRenderRecord.getRenderTask(ctx.senderUserId());
             } else {
-                return RouteDecision.sync(PendingMessage.ofString("未找到渲染请求"));
+                ctx.sendReply(PendingMessage.ofString("未找到渲染请求"));
+                return;
             }
         } else {
             jobId = ctx.args()[0];
@@ -153,14 +164,13 @@ public final class ReplayCommandHandler {
             PendingMessage video = replayResult.qqFile() != null
                     ? PendingMessage.ofUploadedVideo(replayResult.qqFile())
                     : PendingMessage.ofVideoUrl(replayResult.videoUrl());
-            return RouteDecision.sync(video, b -> {
-                if (b) {
-                    replayResults.remove(jobId);
-                }
-            });
+            if (ctx.sendReply(video)) {
+                replayResults.remove(jobId);
+            }
+            return;
         }
 
-        return RouteDecision.sync(replyFactory.replayStatMessage(ctx, jobId, APIHelper.getRenderStat(jobId)));
+        ctx.sendReply(replyFactory.replayStatMessage(ctx, jobId, APIHelper.getRenderStat(jobId)));
     }
 
 }

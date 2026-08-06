@@ -10,10 +10,10 @@ import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.Response;
 import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.bot.data.FileInfo;
-import xyz.zcraft.seira.bot.data.Message;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.command.Context;
+import xyz.zcraft.seira.command.CommandHandler;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.config.AppConfig;
@@ -33,7 +33,7 @@ public class DebugRoutes {
     private final TaskCoordinator taskCoordinator;
     private final OsuAuthHelper authHelper;
     private final Predicate<String> adminAuthorizer;
-    private final Supplier<RouteDecision> unknownCommand;
+    private final CommandHandler unknownCommand;
 
     public DebugRoutes(
             Supplier<AppConfig> configSupplier,
@@ -42,7 +42,7 @@ public class DebugRoutes {
             TaskCoordinator taskCoordinator,
             OsuAuthHelper authHelper,
             Predicate<String> adminAuthorizer,
-            Supplier<RouteDecision> unknownCommand
+            CommandHandler unknownCommand
     ) {
         this.configSupplier = configSupplier;
         this.messageSender = messageSender;
@@ -53,42 +53,40 @@ public class DebugRoutes {
         this.unknownCommand = unknownCommand;
     }
 
-    public RouteDecision routeDebug(Context ctx) {
+    public void routeDebug(Context ctx) {
         if (!configSupplier.get().seira().debugMode()) {
-            return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
+            ctx.sendReply(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
+            return;
         }
 
         if (!adminAuthorizer.test(ctx.senderUserId())) {
-            return RouteDecision.sync(PendingMessage.ofString("你没有权限使用此指令。"));
+            ctx.sendReply(PendingMessage.ofString("你没有权限使用此指令。"));
+            return;
         }
 
-        return switch (ctx.command()) {
+        switch (ctx.command()) {
             case "debug.upload" -> handleUpload(ctx);
-            case "debug.test" -> handleTest();
+            case "debug.test" -> handleTest(ctx);
             case "debug.message" -> handleMessage(ctx);
             case "debug.db" -> handleDb(ctx);
             case "debug.update-user-info" -> handleUpdateUserInfo(ctx);
             case "debug.get-all-friends" -> handleGetAllFriends(ctx);
             case "debug.validate-token" -> handleValidateToken(ctx);
             case "debug.active-message" -> handleActiveMessage(ctx);
-            default -> unknownCommand.get();
-        };
-    }
-
-    private RouteDecision handleActiveMessage(Context ctx) {
-        if (ctx.inGroup()) {
-            final Message message = new Message();
-            message.setMsgType(0);
-            message.setContent("111");
-            messageSender.sendGroupMessage(ctx.groupId(), message);
+            default -> unknownCommand.handle(ctx);
         }
-
-        return null;
     }
 
-    public RouteDecision handleUpload(Context ctx) {
+    private void handleActiveMessage(Context ctx) {
+        if (ctx.inGroup()) {
+            ctx.sendMessage(PendingMessage.ofString("111"));
+        }
+    }
+
+    public void handleUpload(Context ctx) {
         if (ctx.argumentCount() != 3) {
-            return RouteDecision.sync(PendingMessage.ofString("用法：/debug.upload <type> <cos> <url>"));
+            ctx.sendReply(PendingMessage.ofString("用法：/debug.upload <type> <cos> <url>"));
+            return;
         }
 
         String typeStr = ctx.argument(0);
@@ -102,28 +100,28 @@ public class DebugRoutes {
             fileInfo = messageSender.uploadPrivateMedia(ctx.senderUserId(), Integer.parseInt(typeStr), urlStr, "true".equals(cosStr));
         }
 
-        return RouteDecision.sync(PendingMessage.ofString(fileInfo != null
+        ctx.sendReply(PendingMessage.ofString(fileInfo != null
                 ? "上传成功，fileId: " + fileInfo
                 : "上传失败，请检查日志获取详情"));
     }
 
-    public RouteDecision handleTest() {
-        return RouteDecision.sync(replyFactory.testMessage());
+    public void handleTest(Context ctx) {
+        ctx.sendReply(replyFactory.testMessage());
     }
 
-    public RouteDecision handleMessage(Context ctx) {
+    public void handleMessage(Context ctx) {
         try {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             new Base64Encoder().decode(ctx.query(), out);
-            return RouteDecision.sync(PendingMessage.ofMarkdownRaw(out.toString()));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(out.toString()));
         } catch (Exception e) {
-            return RouteDecision.sync(PendingMessage.ofString("解码失败"));
+            ctx.sendReply(PendingMessage.ofString("解码失败"));
         }
     }
 
-    public RouteDecision handleDb(Context ctx) {
+    public void handleDb(Context ctx) {
         try {
-            return RouteDecision.sync(PendingMessage.ofMarkdownRaw(UserDataStore.executeQueryOrEdit(ctx.query())));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(UserDataStore.executeQueryOrEdit(ctx.query())));
         } catch (Exception e) {
             Throwable cause = e;
 
@@ -132,31 +130,28 @@ public class DebugRoutes {
             }
 
             if (cause != null) {
-                return RouteDecision.sync(
-                        PendingMessage.ofString("执行失败: " + cause.getMessage())
-                );
+                ctx.sendReply(PendingMessage.ofString("执行失败: " + cause.getMessage()));
+                return;
             }
 
-            return RouteDecision.sync(
-                    PendingMessage.ofString("执行失败")
-            );
+            ctx.sendReply(PendingMessage.ofString("执行失败"));
         }
     }
 
-    public RouteDecision handleUpdateUserInfo(Context ctx) {
+    public void handleUpdateUserInfo(Context ctx) {
         try {
             final List<Long> allUsers = UserDataStore.findAllUsers();
-            return taskCoordinator.queueApiRequest(ctx, "Update All User Info", () -> {
+            taskCoordinator.runApiRequest(ctx, "Update All User Info", () -> {
                 APIHelper.getUsers(allUsers).forEach(user -> UserDataStore.storeUserInfo(user.getId(), user.getUsername()));
-                return PendingMessage.ofString("更新完成，共更新了" + allUsers.size() + "个用户的信息");
+                ctx.sendReply(PendingMessage.ofString("更新完成，共更新了" + allUsers.size() + "个用户的信息"));
             });
         } catch (Exception e) {
-            return RouteDecision.sync(PendingMessage.ofString("用户信息更新失败"));
+            ctx.sendReply(PendingMessage.ofString("用户信息更新失败"));
         }
     }
 
-    public RouteDecision handleGetAllFriends(Context ctx) {
-        return taskCoordinator.queueApiRequest(ctx, "Get All Friends", () -> {
+    public void handleGetAllFriends(Context ctx) {
+        taskCoordinator.runApiRequest(ctx, "Get All Friends", () -> {
             try {
                 final List<OsuAuthHelper.TokenStore> allOsuTokens = UserDataStore.getAllOsuTokens();
                 allOsuTokens
@@ -196,16 +191,16 @@ public class DebugRoutes {
                             }
                         });
 
-                return PendingMessage.ofString("获取完成，共获取了" + allOsuTokens.size() + "个用户的好友列表");
+                ctx.sendReply(PendingMessage.ofString("获取完成，共获取了" + allOsuTokens.size() + "个用户的好友列表"));
             } catch (Exception e) {
                 LOG.error("Failed to get friends", e);
-                return PendingMessage.ofString("用户信息更新失败");
+                ctx.sendReply(PendingMessage.ofString("用户信息更新失败"));
             }
         });
     }
 
-    public RouteDecision handleValidateToken(Context ctx) {
-        return taskCoordinator.queueApiRequest(ctx, "Validate Token", () -> {
+    public void handleValidateToken(Context ctx) {
+        taskCoordinator.runApiRequest(ctx, "Validate Token", () -> {
             int updated = 0, removed = 0;
             try {
                 final List<OsuAuthHelper.TokenStore> allOsuTokens = UserDataStore.getAllOsuTokens();
@@ -221,10 +216,10 @@ public class DebugRoutes {
                     }
                 }
 
-                return PendingMessage.ofString("Token验证完成，共更新了" + updated + "，移除了" + removed);
+                ctx.sendReply(PendingMessage.ofString("Token验证完成，共更新了" + updated + "，移除了" + removed));
             } catch (Exception e) {
                 LOG.error("Failed to get friends", e);
-                return PendingMessage.ofString("用户信息更新失败");
+                ctx.sendReply(PendingMessage.ofString("用户信息更新失败"));
             }
         });
     }

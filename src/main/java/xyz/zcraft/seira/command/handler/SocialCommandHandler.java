@@ -14,7 +14,6 @@ import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.command.parse.ShortcutTarget;
 import xyz.zcraft.seira.command.parse.TargetResolution;
-import xyz.zcraft.seira.command.route.RouteDecision;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 
 import java.util.*;
@@ -42,34 +41,38 @@ public final class SocialCommandHandler {
         this.accessTokenProvider = accessTokenProvider;
     }
 
-    public RouteDecision handleMp(Context ctx) {
+    public void handleMp(Context ctx) {
         if (resolver.resolveBoundUid(ctx.senderUserId()) == null) {
-            return RouteDecision.sync(PendingMessage.ofString(CommandUsage.NO_BIND));
+            ctx.sendReply(PendingMessage.ofString(CommandUsage.NO_BIND));
+            return;
         }
 
         OsuToken token = authHelper.updateTokenAndGet(ctx.senderUserId());
 
         if (token == null) {
-            return RouteDecision.sync(PendingMessage.ofMarkdownRaw(CommandUsage.REBIND));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(CommandUsage.REBIND));
+            return;
         }
 
-        return taskCoordinator.queueApiRequest(ctx, "Multiplayer Room",
-                () -> replyFactory.mpMessage(ctx, APIHelper.getMultiplayerRoom(token.accessToken())));
+        taskCoordinator.runApiRequest(ctx, "Multiplayer Room", () ->
+                ctx.sendReply(replyFactory.mpMessage(ctx, APIHelper.getMultiplayerRoom(token.accessToken()))));
     }
 
-    public RouteDecision handleF(Context ctx, boolean all) {
+    public void handleF(Context ctx, boolean all) {
         final Long uid = resolver.resolveBoundUid(ctx.senderUserId());
         if (uid == null) {
-            return RouteDecision.sync(PendingMessage.ofString(CommandUsage.NO_BIND));
+            ctx.sendReply(PendingMessage.ofString(CommandUsage.NO_BIND));
+            return;
         }
 
         OsuToken token = authHelper.updateTokenAndGet(ctx.senderUserId());
 
         if (token == null) {
-            return RouteDecision.sync(PendingMessage.ofMarkdownRaw(CommandUsage.REBIND));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(CommandUsage.REBIND));
+            return;
         }
 
-        return taskCoordinator.queueApiRequest(ctx, "Friend List", () -> {
+        taskCoordinator.runApiRequest(ctx, "Friend List", () -> {
             final Response<UserExtended> self = APIHelper.getSelf(token.accessToken());
             final Response<List<FriendEntry>> response = APIHelper.getFollowed(token.accessToken());
             final List<FriendEntry> content = response.getContent();
@@ -138,42 +141,49 @@ public final class SocialCommandHandler {
             onlyFollower.sort(userComparator);
             onlyFollowed.sort(userComparator);
 
-            return replyFactory.friendMessage(ctx, all, self.getContent(), content.size(), allMutualCount, mutual, onlyFollowed, onlyFollower);
+            ctx.sendReply(replyFactory.friendMessage(
+                    ctx, all, self.getContent(), content.size(), allMutualCount,
+                    mutual, onlyFollowed, onlyFollower
+            ));
         });
     }
 
-    public RouteDecision handleFclear(Context ctx) {
+    public void handleFclear(Context ctx) {
         Long uid = resolver.resolveBoundUid(ctx.senderUserId());
         if (uid == null) {
-            return RouteDecision.sync(PendingMessage.ofString(CommandUsage.NO_BIND));
+            ctx.sendReply(PendingMessage.ofString(CommandUsage.NO_BIND));
+            return;
         }
 
-        return RouteDecision.sync(PendingMessage.ofString(
+        ctx.sendReply(PendingMessage.ofString(
                 "已清除 " + UserDataStore.clearFollowed(uid) + " 条好友记录。"
         ));
     }
 
-    public RouteDecision handleLb(Context ctx) {
+    public void handleLb(Context ctx) {
         if (ctx.args().length == 0) {
             if (ctx.groupId() != null && !ctx.groupId().isBlank()) {
                 List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(ctx.groupId());
                 if (groupBoundUids.isEmpty()) {
-                    return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind"));
+                    ctx.sendReply(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind"));
+                    return;
                 }
 
-                return taskCoordinator.queueImageRequest(
+                taskCoordinator.runImageRequest(
                         ctx,
                         "Leaderboard",
                         () -> APIHelper.getLeaderboardResponse(groupBoundUids),
                         replyFactory::lbMessage
                 );
+                return;
             }
             Long uid = resolver.resolveBoundUid(ctx.senderUserId());
             if (uid == null) {
-                return RouteDecision.sync(PendingMessage.ofString(CommandUsage.NO_BIND));
+                ctx.sendReply(PendingMessage.ofString(CommandUsage.NO_BIND));
+                return;
             }
 
-            return taskCoordinator.queueImageRequest(
+            taskCoordinator.runImageRequest(
                     ctx,
                     "Leaderboard",
                     () -> APIHelper.getLeaderboardResponse(List.of(uid)),
@@ -183,7 +193,8 @@ public final class SocialCommandHandler {
             TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
             ShortcutTarget target = targetResolution.target();
             if (target.isError()) {
-                return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+                ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+                return;
             }
 
             int remainingArgs = ctx.args().length - targetResolution.consumedArgs();
@@ -191,54 +202,61 @@ public final class SocialCommandHandler {
                 if (ctx.groupId() != null && !ctx.groupId().isBlank()) {
                     List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(ctx.groupId());
                     if (groupBoundUids.isEmpty()) {
-                        return RouteDecision.sync(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind"));
+                        ctx.sendReply(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind"));
+                        return;
                     }
-                    return taskCoordinator.queueImageRequest(
+                    taskCoordinator.runImageRequest(
                             ctx,
                             "Map Leaderboard",
                             () -> APIHelper.getGroupLeaderboardResponse(target, groupBoundUids, accessTokenProvider.apply(ctx.senderUserId())),
                             replyFactory::lbMessage
                     );
+                    return;
                 }
                 Long uid = resolver.resolveBoundUid(ctx.senderUserId());
                 if (uid == null) {
-                    return RouteDecision.sync(PendingMessage.ofString(CommandUsage.NO_BIND));
+                    ctx.sendReply(PendingMessage.ofString(CommandUsage.NO_BIND));
+                    return;
                 }
 
-                return taskCoordinator.queueImageRequest(
+                taskCoordinator.runImageRequest(
                         ctx,
                         "Map Leaderboard",
                         () -> APIHelper.getGroupLeaderboardResponse(target, List.of(uid), accessTokenProvider.apply(ctx.senderUserId())),
                         replyFactory::lbMessage
                 );
+                return;
             }
 
             if (remainingArgs != 1) {
-                return RouteDecision.sync(PendingMessage.ofString("用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
+                ctx.sendReply(PendingMessage.ofString("用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
+                return;
             }
 
             String[] uidTokens = ctx.args()[targetResolution.consumedArgs()].split(",");
             if (uidTokens.length == 0) {
-                return RouteDecision.sync(PendingMessage.ofString("玩家ID列表不能为空。用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
+                ctx.sendReply(PendingMessage.ofString("玩家ID列表不能为空。用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
+                return;
             }
 
             List<Long> uids = new LinkedList<>();
             for (String uidToken : uidTokens) {
                 Long uid = resolver.parsePositiveLong(uidToken.trim());
                 if (uid == null) {
-                    return RouteDecision.sync(PendingMessage.ofString("玩家ID列表包含非法值。用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
+                    ctx.sendReply(PendingMessage.ofString("玩家ID列表包含非法值。用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
+                    return;
                 }
                 uids.add(uid);
             }
 
-            return taskCoordinator.queueImageRequest(
+            taskCoordinator.runImageRequest(
                     ctx,
                     "Map Leaderboard",
                     () -> APIHelper.getGroupLeaderboardResponse(target, uids, accessTokenProvider.apply(ctx.senderUserId())),
                     replyFactory::lbMessage
             );
         } else {
-            return RouteDecision.sync(PendingMessage.ofString("用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
+            ctx.sendReply(PendingMessage.ofString("用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
         }
     }
 

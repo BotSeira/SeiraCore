@@ -1,19 +1,15 @@
 package xyz.zcraft.seira.command;
 
-import xyz.zcraft.seira.command.route.RouteDecision;
-
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.function.Supplier;
 
 public final class CommandRegistry {
-    private final Map<String, Function<Context, RouteDecision>> handlers;
+    private final Map<String, CommandHandler> handlers;
 
-    private CommandRegistry(Map<String, Function<Context, RouteDecision>> handlers) {
+    private CommandRegistry(Map<String, CommandHandler> handlers) {
         this.handlers = Map.copyOf(handlers);
     }
 
@@ -21,9 +17,9 @@ public final class CommandRegistry {
         return new Builder();
     }
 
-    public RouteDecision dispatch(Context context, Supplier<RouteDecision> fallback) {
-        Function<Context, RouteDecision> handler = handlers.get(normalize(context.command()));
-        return handler == null ? fallback.get() : handler.apply(context);
+    public void dispatch(Context context, CommandHandler fallback) {
+        CommandHandler handler = handlers.get(normalize(context.command()));
+        (handler == null ? fallback : handler).handle(context);
     }
 
     public Set<String> registeredCommands() {
@@ -31,9 +27,13 @@ public final class CommandRegistry {
     }
 
     public static final class Builder {
-        private final Map<String, Function<Context, RouteDecision>> handlers = new LinkedHashMap<>();
+        private final Map<String, CommandHandler> handlers = new LinkedHashMap<>();
 
-        public Builder register(Function<Context, RouteDecision> handler, String... commands) {
+        public Builder register(CommandHandler handler, String... commands) {
+            return registerInternal(handler, commands);
+        }
+
+        private Builder registerInternal(CommandHandler handler, String... commands) {
             Objects.requireNonNull(handler, "handler");
             if (commands == null || commands.length == 0) {
                 throw new IllegalArgumentException("At least one command is required");

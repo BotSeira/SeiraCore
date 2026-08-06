@@ -5,7 +5,6 @@ import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
-import xyz.zcraft.seira.command.route.RouteDecision;
 import xyz.zcraft.seira.config.AppConfig;
 
 public final class BindingCommandHandler {
@@ -19,17 +18,20 @@ public final class BindingCommandHandler {
         this.bindingService = bindingService;
     }
 
-    public RouteDecision handleBind(Context ctx) {
+    public void handleBind(Context ctx) {
         if (ctx.senderUserId() == null || ctx.senderUserId().isBlank()) {
-            return RouteDecision.sync(PendingMessage.ofString("无法识别你的用户ID，暂时无法绑定。请稍后重试。"));
+            ctx.sendReply(PendingMessage.ofString("无法识别你的用户ID，暂时无法绑定。请稍后重试。"));
+            return;
         }
 
         if (UserDataStore.findBoundUid(ctx.senderUserId()) != null) {
-            return RouteDecision.sync(PendingMessage.ofString("你已经绑定了玩家ID，如果要更换绑定请先使用 /unbind 解绑当前玩家ID。"));
+            ctx.sendReply(PendingMessage.ofString("你已经绑定了玩家ID，如果要更换绑定请先使用 /unbind 解绑当前玩家ID。"));
+            return;
         }
 
         if (ctx.args().length != 0) {
-            return RouteDecision.sync(PendingMessage.ofString("用法：/bind"));
+            ctx.sendReply(PendingMessage.ofString("用法：/bind"));
+            return;
         }
 
         final var bindingTask = bindingService.createBindingTask(ctx.senderUserId(), ctx.messageId(), (user, token) -> {
@@ -38,32 +40,36 @@ public final class BindingCommandHandler {
             UserDataStore.storeUserInfo(user.getId(), user.getUsername());
         });
 
-        return RouteDecision.sync(replyFactory.bindMessage(ctx, config.binding(), bindingTask,
+        ctx.sendReply(replyFactory.bindMessage(ctx, config.binding(), bindingTask,
                 ctx.groupId() == null || ctx.groupId().isBlank()));
     }
 
-    public RouteDecision handleUnbind(Context ctx) {
+    public void handleUnbind(Context ctx) {
         if (ctx.senderUserId() == null || ctx.senderUserId().isBlank()) {
-            return RouteDecision.sync(PendingMessage.ofString("无法识别你的用户ID，暂时无法解绑。请稍后重试。"));
+            ctx.sendReply(PendingMessage.ofString("无法识别你的用户ID，暂时无法解绑。请稍后重试。"));
+            return;
         }
         if (ctx.args().length != 0) {
-            return RouteDecision.sync(PendingMessage.ofString("用法：/unbind"));
+            ctx.sendReply(PendingMessage.ofString("用法：/unbind"));
+            return;
         }
         boolean removed = UserDataStore.unbind(ctx.senderUserId());
-        return RouteDecision.sync(PendingMessage.ofString(removed
+        ctx.sendReply(PendingMessage.ofString(removed
                 ? "解绑成功。"
                 : "你当前还没有绑定玩家ID，无需解绑。"));
     }
 
-    public RouteDecision handleClearHistory(Context ctx) {
+    public void handleClearHistory(Context ctx) {
         if (ctx.senderUserId() == null || ctx.senderUserId().isBlank()) {
-            return RouteDecision.sync(PendingMessage.ofString("无法识别你的用户ID，无法清除历史记录。请稍后重试。"));
+            ctx.sendReply(PendingMessage.ofString("无法识别你的用户ID，无法清除历史记录。请稍后重试。"));
+            return;
         }
         if (ctx.args().length != 0) {
-            return RouteDecision.sync(PendingMessage.ofString("用法：/clearhistory"));
+            ctx.sendReply(PendingMessage.ofString("用法：/clearhistory"));
+            return;
         }
         int removed = UserDataStore.clearGroupMember(ctx.senderUserId());
-        return RouteDecision.sync(PendingMessage.ofString("清除了 " + removed + " 条群聊记录。"));
+        ctx.sendReply(PendingMessage.ofString("清除了 " + removed + " 条群聊记录。"));
     }
 
 }

@@ -5,9 +5,7 @@ import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.*;
-import xyz.zcraft.seira.command.iface.CommandMetrics;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
-import xyz.zcraft.seira.command.route.RouteDecision;
 import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.services.DailyLuck;
 
@@ -19,7 +17,7 @@ public final class GeneralCommandHandler {
     private final ReplyFactory replyFactory;
     private final ScoreCommandHandler scoreCommands;
     private final Predicate<String> adminAuthorizer;
-    private final CommandMetrics metrics;
+    private final Runnable commandMetric;
 
     public GeneralCommandHandler(
             MessageSender messageSender,
@@ -27,65 +25,64 @@ public final class GeneralCommandHandler {
             ReplyFactory replyFactory,
             ScoreCommandHandler scoreCommands,
             Predicate<String> adminAuthorizer,
-            CommandMetrics metrics
+            Runnable commandMetric
     ) {
         this.messageSender = messageSender;
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
         this.scoreCommands = scoreCommands;
         this.adminAuthorizer = adminAuthorizer;
-        this.metrics = metrics;
+        this.commandMetric = commandMetric;
     }
 
-    public RouteDecision handleU(Context context) {
+    public void handleU(Context context) {
         if (context.argumentCount() != 1) {
-            return RouteDecision.sync(PendingMessage.ofString("用法：/u <玩家ID/用户名/@用户>"));
+            context.sendReply(PendingMessage.ofString("用法：/u <玩家ID/用户名/@用户>"));
+            return;
         }
 
         String target = context.argument(0);
-        Context bestScoreContext = new Context(
-                context.senderUserId(), context.groupId(), context.messageId(), "bo",
-                new String[]{"8", target}, "8 " + target
-        );
+        Context bestScoreContext = context.asCommand("bo", new String[]{"8", target}, "8 " + target);
 
         // /u historically routed through /bo and therefore counted both commands.
-        metrics.commandReceived();
-        return scoreCommands.handleBo(bestScoreContext);
+        commandMetric.run();
+        scoreCommands.handleBo(bestScoreContext);
     }
 
-    public RouteDecision handleLuck(Context context) {
+    public void handleLuck(Context context) {
         if (context.argumentCount() != 0) {
-            return RouteDecision.sync(PendingMessage.ofString("用法：/luck"));
+            context.sendReply(PendingMessage.ofString("用法：/luck"));
+            return;
         }
 
-        return taskCoordinator.queueApiRequest(context, "Luck", () -> {
+        taskCoordinator.runApiRequest(context, "Luck", () -> {
             DailyLuck.Luck luck = DailyLuck.getLuck(context.senderUserId());
             Beatmapset mapset = APIHelper.getBeatmapsetRaw(luck.dailyMapset());
             UploadedImage cover = messageSender.uploadImageToCos(mapset.getCovers().getCover());
-            return replyFactory.luckMessage(context, luck, mapset, cover);
+            context.sendReply(replyFactory.luckMessage(context, luck, mapset, cover));
         });
     }
 
-    public RouteDecision handleInspect(Context context) {
-        return RouteDecision.sync(replyFactory.inspectMessage(
+    public void handleInspect(Context context) {
+        context.sendReply(replyFactory.inspectMessage(
                 context, context.senderUserId(), adminAuthorizer.test(context.senderUserId()),
                 context.groupId(), context.messageId()
         ));
     }
 
-    public RouteDecision handleHelp(Context context) {
-        return RouteDecision.sync(replyFactory.helpMessage(context));
+    public void handleHelp(Context context) {
+        context.sendReply(replyFactory.helpMessage(context));
     }
 
-    public RouteDecision handleFaq(Context context) {
-        return RouteDecision.sync(replyFactory.faqMessage(context));
+    public void handleFaq(Context context) {
+        context.sendReply(replyFactory.faqMessage(context));
     }
 
-    public RouteDecision handleStat(Context context) {
-        return RouteDecision.sync(replyFactory.statusMessage(context, APIHelper.getServerStatus()));
+    public void handleStat(Context context) {
+        context.sendReply(replyFactory.statusMessage(context, APIHelper.getServerStatus()));
     }
 
-    public RouteDecision handleUnknown() {
-        return RouteDecision.sync(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
+    public void handleUnknown(Context context) {
+        context.sendReply(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
     }
 }

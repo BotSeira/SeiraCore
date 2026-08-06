@@ -2,7 +2,6 @@ package xyz.zcraft.seira.command.route;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.seira.api.data.ApiTask;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.binding.UserDataStore;
@@ -11,7 +10,6 @@ import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.*;
 import xyz.zcraft.seira.command.handler.*;
-import xyz.zcraft.seira.command.iface.CommandMetrics;
 import xyz.zcraft.seira.command.parse.CommandParser;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
@@ -36,8 +34,8 @@ public class Router {
     private final CommandParser commandParser;
     private final CommandRegistry commandRegistry;
     private final DebugRoutes debugRoutes;
-    private final CommandMetrics metrics;
-    private final Supplier<RouteDecision> unknownCommand;
+    private final Runnable commandMetric;
+    private final CommandHandler unknownCommand;
     private final Executor commandExecutor;
 
     public Router(
@@ -48,11 +46,11 @@ public class Router {
             ScoreWatchService watchService,
             RankGuessGameService rankGuessGameService,
             Executor commandExecutor,
-            CommandMetrics metrics
+            Runnable commandMetric
     ) {
         this.configSupplier = java.util.Objects.requireNonNull(configSupplier);
         this.commandExecutor = commandExecutor;
-        this.metrics = java.util.Objects.requireNonNull(metrics);
+        this.commandMetric = java.util.Objects.requireNonNull(commandMetric);
         AppConfig startupConfig = configSupplier.get();
         ReplyFactory replyFactory = new ReplyFactory(configSupplier);
         Resolver resolver = new Resolver();
@@ -80,7 +78,7 @@ public class Router {
                 this::getAccessTokenFor
         );
         GeneralCommandHandler generalCommands = new GeneralCommandHandler(
-                messageSender, taskCoordinator, replyFactory, scoreCommands, admins::isAdmin, metrics
+                messageSender, taskCoordinator, replyFactory, scoreCommands, admins::isAdmin, commandMetric
         );
         WatchCommandHandler watchCommands = new WatchCommandHandler(resolver, taskCoordinator, watchService, admins::isAdmin);
         RankGuessCommandHandler rankGuessCommands = new RankGuessCommandHandler(
@@ -134,54 +132,46 @@ public class Router {
                 rawContent = rawContent.substring(selfAt.length()).trim();
             }
 
-            RouteDecision routeDecision = route(rawContent, userId, groupId, messageId);
-            if (routeDecision == null) {
+            CommandParser.ParseResult parseResult = commandParser.parse(
+                    rawContent, userId, groupId, messageId
+            );
+            if (parseResult.status() == CommandParser.ParseResult.Status.IGNORED) {
                 return;
             }
 
-            if (routeDecision.initialMessage() != null) {
-                if (!routeDecision.enqueueMessage() || !group || config.seira().queueMessageInGroup()) {
-                    boolean res = taskCoordinator.sendOutboundMessage(
-                            targetId, messageId, groupMessage,
-                            routeDecision.initialMessage(), messageSeqCounter
-                    );
+            CommandReplyChannel replies = taskCoordinator.openReplyChannel(
+                    targetId,
+                    messageId,
+                    groupMessage,
+                    config.seira().queueMessageInGroup()
+            );
+            if (parseResult.status() == CommandParser.ParseResult.Status.EMPTY_COMMAND) {
+                replies.sendReply(PendingMessage.ofString("请输入指令。使用/help获取帮助。"));
+                return;
+            }
 
-                    if (routeDecision.onSent() != null) {
-                        routeDecision.onSent().accept(res);
-                    }
+            Context context = parseResult.context().withReplies(replies);
+            commandExecutor.execute(() -> {
+                try {
+                    dispatch(context);
+                } catch (Exception e) {
+                    context.sendReply(PendingMessage.ofString("处理指令时发生错误，请稍后再试。"));
+                    LOG.error("Failed to process inbound message {}", messageId, e);
                 }
-            }
-
-            ApiTask apiTask = routeDecision.apiTask();
-            if (apiTask != null) {
-                commandExecutor.execute(() -> taskCoordinator.processApiTask(
-                        targetId, messageId, groupMessage, apiTask, messageSeqCounter
-                ));
-            }
+            });
         } catch (Exception e) {
             taskCoordinator.sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString("处理指令时发生错误，请稍后再试。"), messageSeqCounter);
             LOG.error("Failed to process inbound message {}", messageId, e);
         }
     }
 
-    public RouteDecision route(String rawContent, String senderUserId, String groupId, String messageId) {
-        CommandParser.ParseResult result = commandParser.parse(
-                rawContent, senderUserId, groupId, messageId
-        );
-
-        return switch (result.status()) {
-            case IGNORED -> null;
-            case EMPTY_COMMAND -> RouteDecision.sync(PendingMessage.ofString("请输入指令。使用/help获取帮助。"));
-            case PARSED -> dispatch(result.context());
-        };
-    }
-
-    private RouteDecision dispatch(Context ctx) {
-        metrics.commandReceived();
+    private void dispatch(Context ctx) {
+        commandMetric.run();
         if (ctx.command().startsWith("debug.")) {
-            return debugRoutes.routeDebug(ctx);
+            debugRoutes.routeDebug(ctx);
+            return;
         }
-        return commandRegistry.dispatch(ctx, unknownCommand);
+        commandRegistry.dispatch(ctx, unknownCommand);
     }
 
     private static CommandRegistry createCommandRegistry(

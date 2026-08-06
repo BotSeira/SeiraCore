@@ -9,7 +9,6 @@ import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.command.parse.ShortcutTarget;
 import xyz.zcraft.seira.command.parse.TargetResolution;
 import xyz.zcraft.seira.command.parse.UserRefResolution;
-import xyz.zcraft.seira.command.route.RouteDecision;
 import xyz.zcraft.seira.data.UserRef;
 
 public final class ScoreCommandHandler {
@@ -30,21 +29,24 @@ public final class ScoreCommandHandler {
         this.replyFactory = replyFactory;
     }
 
-    public RouteDecision handleBo(Context ctx) {
+    public void handleBo(Context ctx) {
         if (ctx.args().length == 2) {
             Integer n = resolver.parsePositiveInt(ctx.args()[0]);
             if (n == null) {
-                return RouteDecision.sync(PendingMessage.ofString(CommandUsage.BO));
+                ctx.sendReply(PendingMessage.ofString(CommandUsage.BO));
+                return;
             }
             UserRefResolution userRefResolution = resolver.resolveUserRefArgument(ctx.args()[1]);
             if (userRefResolution.errorMessage() != null) {
-                return RouteDecision.sync(PendingMessage.ofString(userRefResolution.errorMessage()));
+                ctx.sendReply(PendingMessage.ofString(userRefResolution.errorMessage()));
+                return;
             }
             if (userRefResolution.userRef() == null) {
-                return RouteDecision.sync(PendingMessage.ofString(CommandUsage.BO));
+                ctx.sendReply(PendingMessage.ofString(CommandUsage.BO));
+                return;
             }
 
-            return taskCoordinator.queueImageRequest(
+            taskCoordinator.runImageRequest(
                     ctx,
                     "Best Scores",
                     () -> APIHelper.getBoNResponse(n, userRefResolution.userRef()),
@@ -53,14 +55,16 @@ public final class ScoreCommandHandler {
         } else if (ctx.args().length == 1) {
             Integer n = resolver.parsePositiveInt(ctx.args()[0]);
             if (n == null) {
-                return RouteDecision.sync(PendingMessage.ofString(CommandUsage.BO));
+                ctx.sendReply(PendingMessage.ofString(CommandUsage.BO));
+                return;
             }
             Long uid = resolver.resolveBoundUid(ctx.senderUserId());
             if (uid == null) {
-                return RouteDecision.sync(PendingMessage.ofString(CommandUsage.NO_BIND));
+                ctx.sendReply(PendingMessage.ofString(CommandUsage.NO_BIND));
+                return;
             }
 
-            return taskCoordinator.queueImageRequest(
+            taskCoordinator.runImageRequest(
                     ctx,
                     "Best Scores",
                     () -> APIHelper.getBoNResponse(n, new UserRef.ByUid(uid)),
@@ -69,37 +73,41 @@ public final class ScoreCommandHandler {
         } else if (ctx.args().length == 0) {
             ShortcutTarget target = resolver.parseTarget("bo1", ctx.senderUserId());
             if (target.isError()) {
-                return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+                ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+                return;
             }
 
-            return taskCoordinator.queueImageRequest(
+            taskCoordinator.runImageRequest(
                     ctx,
                     "Score",
                     () -> APIHelper.getScoreResponse(target),
                     replyFactory::scoreMessage
             );
         } else {
-            return RouteDecision.sync(PendingMessage.ofString(CommandUsage.BO));
+            ctx.sendReply(PendingMessage.ofString(CommandUsage.BO));
         }
     }
 
-    public RouteDecision handleRs(Context ctx, boolean includeFail) {
+    public void handleRs(Context ctx, boolean includeFail) {
         if (ctx.args().length == 2) {
             Integer n = resolver.parsePositiveInt(ctx.args()[0]);
             if (n == null) {
-                return RouteDecision.sync(PendingMessage.ofString(CommandUsage.RS));
+                ctx.sendReply(PendingMessage.ofString(CommandUsage.RS));
+                return;
             }
 
             UserRefResolution userRefResolution = resolver.resolveUserRefArgument(ctx.args()[1]);
             if (userRefResolution.errorMessage() != null) {
-                return RouteDecision.sync(PendingMessage.ofString(userRefResolution.errorMessage()));
+                ctx.sendReply(PendingMessage.ofString(userRefResolution.errorMessage()));
+                return;
             }
 
             if (userRefResolution.userRef() == null) {
-                return RouteDecision.sync(PendingMessage.ofString(CommandUsage.RS));
+                ctx.sendReply(PendingMessage.ofString(CommandUsage.RS));
+                return;
             }
 
-            return taskCoordinator.queueImageRequest(
+            taskCoordinator.runImageRequest(
                     ctx,
                     "Recent Score",
                     () -> APIHelper.getRecentResponse(n, userRefResolution.userRef(), includeFail),
@@ -108,14 +116,16 @@ public final class ScoreCommandHandler {
         } else if (ctx.args().length == 1) {
             Integer n = resolver.parsePositiveInt(ctx.args()[0]);
             if (n == null) {
-                return RouteDecision.sync(PendingMessage.ofString(CommandUsage.RS));
+                ctx.sendReply(PendingMessage.ofString(CommandUsage.RS));
+                return;
             }
             Long uid = resolver.resolveBoundUid(ctx.senderUserId());
             if (uid == null) {
-                return RouteDecision.sync(PendingMessage.ofString(CommandUsage.NO_BIND));
+                ctx.sendReply(PendingMessage.ofString(CommandUsage.NO_BIND));
+                return;
             }
 
-            return taskCoordinator.queueImageRequest(
+            taskCoordinator.runImageRequest(
                     ctx,
                     "Recent Score",
                     () -> APIHelper.getRecentResponse(n, new UserRef.ByUid(uid), includeFail),
@@ -124,21 +134,22 @@ public final class ScoreCommandHandler {
         } else if (ctx.args().length == 0) {
             ShortcutTarget target = resolver.parseTarget(ctx.command() + "1", ctx.senderUserId());
             if (target.isError()) {
-                return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+                ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+                return;
             }
 
-            return taskCoordinator.queueImageRequest(
+            taskCoordinator.runImageRequest(
                     ctx,
                     "Score",
                     () -> APIHelper.getScoreResponse(target),
                     replyFactory::scoreMessage
             );
         } else {
-            return RouteDecision.sync(PendingMessage.ofString(CommandUsage.RS));
+            ctx.sendReply(PendingMessage.ofString(CommandUsage.RS));
         }
     }
 
-    public RouteDecision handleS(Context ctx) {
+    public void handleS(Context ctx) {
         ShortcutTarget target;
         if (ctx.args().length == 0) {
             target = targetHistory.get(ctx.senderUserId());
@@ -146,13 +157,15 @@ public final class ScoreCommandHandler {
             TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
 
             if (ctx.args().length != targetResolution.consumedArgs()) {
-                return RouteDecision.sync(PendingMessage.ofString(CommandUsage.S));
+                ctx.sendReply(PendingMessage.ofString(CommandUsage.S));
+                return;
             }
 
             target = targetResolution.target();
 
             if (target.isError()) {
-                return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+                ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+                return;
             }
 
             targetHistory.put(ctx.senderUserId(), target);
@@ -161,10 +174,11 @@ public final class ScoreCommandHandler {
         }
 
         if (target == null) {
-            return RouteDecision.sync(PendingMessage.ofString(CommandUsage.S));
+            ctx.sendReply(PendingMessage.ofString(CommandUsage.S));
+            return;
         }
 
-        return taskCoordinator.queueImageRequest(
+        taskCoordinator.runImageRequest(
                 ctx,
                 "Score",
                 () -> APIHelper.getScoreResponse(target),
@@ -172,7 +186,7 @@ public final class ScoreCommandHandler {
         );
     }
 
-    public RouteDecision handleSa(Context ctx) {
+    public void handleSa(Context ctx) {
         ShortcutTarget target;
         if (ctx.args().length == 0) {
             target = targetHistory.get(ctx.senderUserId());
@@ -180,13 +194,15 @@ public final class ScoreCommandHandler {
             TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
 
             if (ctx.args().length != targetResolution.consumedArgs()) {
-                return RouteDecision.sync(PendingMessage.ofString(CommandUsage.SA));
+                ctx.sendReply(PendingMessage.ofString(CommandUsage.SA));
+                return;
             }
 
             target = targetResolution.target();
 
             if (target.isError()) {
-                return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+                ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+                return;
             }
 
             targetHistory.put(ctx.senderUserId(), target);
@@ -195,10 +211,11 @@ public final class ScoreCommandHandler {
         }
 
         if (target == null) {
-            return RouteDecision.sync(PendingMessage.ofString(CommandUsage.SA));
+            ctx.sendReply(PendingMessage.ofString(CommandUsage.SA));
+            return;
         }
 
-        return taskCoordinator.queueImageRequest(
+        taskCoordinator.runImageRequest(
                 ctx,
                 "Score Analysis",
                 () -> APIHelper.getScoreAnalyzeResponse(target),
@@ -206,19 +223,22 @@ public final class ScoreCommandHandler {
         );
     }
 
-    public RouteDecision handleMa(Context ctx) {
+    public void handleMa(Context ctx) {
         TargetResolution targetResolution = targetHistory.resolveOptionalTarget(ctx, resolver, arg -> arg.startsWith("#"));
         ShortcutTarget target = targetResolution.target();
         if (target == null) {
-            return RouteDecision.sync(PendingMessage.ofString(CommandUsage.MA));
+            ctx.sendReply(PendingMessage.ofString(CommandUsage.MA));
+            return;
         }
         if (target.isError()) {
-            return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+            ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+            return;
         }
 
         int remainingArgs = ctx.args().length - targetResolution.consumedArgs();
         if (remainingArgs > 1) {
-            return RouteDecision.sync(PendingMessage.ofString(CommandUsage.MA));
+            ctx.sendReply(PendingMessage.ofString(CommandUsage.MA));
+            return;
         }
 
         if (remainingArgs == 1) {
@@ -227,25 +247,25 @@ public final class ScoreCommandHandler {
                     targetResolution.consumedArgs() == 0
             );
             if (index == null) {
-                return RouteDecision.sync(PendingMessage.ofString(CommandUsage.MA));
+                ctx.sendReply(PendingMessage.ofString(CommandUsage.MA));
+                return;
             }
 
             targetHistory.rememberExplicitTarget(ctx, targetResolution);
 
-            return taskCoordinator.queueImageRequest(
+            taskCoordinator.runImageRequest(
                     ctx,
                     "Miss Visualize",
                     () -> APIHelper.getMissVisualizeResponse(target, index),
                     (_, _) -> null
             );
+            return;
         }
 
         targetHistory.rememberExplicitTarget(ctx, targetResolution);
 
-        return taskCoordinator.queueApiRequest(
-                ctx,
-                "Get Score Misses",
-                () -> replyFactory.scoreMissesMessage(ctx, APIHelper.getScoreMissesResponse(target))
+        taskCoordinator.runApiRequest(ctx, "Get Score Misses", () ->
+                ctx.sendReply(replyFactory.scoreMissesMessage(ctx, APIHelper.getScoreMissesResponse(target)))
         );
     }
 

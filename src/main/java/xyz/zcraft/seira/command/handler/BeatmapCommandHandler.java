@@ -11,7 +11,6 @@ import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.command.parse.ShortcutTarget;
 import xyz.zcraft.seira.command.parse.TargetResolution;
-import xyz.zcraft.seira.command.route.RouteDecision;
 
 import java.util.List;
 import java.util.function.Function;
@@ -37,29 +36,33 @@ public final class BeatmapCommandHandler {
         this.accessTokenProvider = accessTokenProvider;
     }
 
-    public RouteDecision handleDaily(Context ctx) {
-        return taskCoordinator.queueApiRequest(ctx, "Daily Challenge", () -> PendingMessage.ofMarkdownRaw(APIHelper.getDaily()));
+    public void handleDaily(Context ctx) {
+        taskCoordinator.runApiRequest(ctx, "Daily Challenge", () ->
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(APIHelper.getDaily()))
+        );
     }
 
-    public RouteDecision handleM(Context ctx) {
+    public void handleM(Context ctx) {
         if (ctx.args().length >= 1) {
             TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
             ShortcutTarget target = targetResolution.target();
             if (target.isError()) {
-                return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+                ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+                return;
             }
 
             lastTarget.put(ctx.senderUserId(), target);
 
             if (ctx.args().length > targetResolution.consumedArgs() + 1) {
-                return RouteDecision.sync(PendingMessage.ofString(CommandUsage.M));
+                ctx.sendReply(PendingMessage.ofString(CommandUsage.M));
+                return;
             }
 
             String mod = ctx.args().length == targetResolution.consumedArgs() + 1
                     ? ctx.args()[targetResolution.consumedArgs()]
                     : null;
 
-            return taskCoordinator.queueImageRequest(
+            taskCoordinator.runImageRequest(
                     ctx,
                     "Beatmap",
                     () -> APIHelper.getBeatmapResponse(target, mod, accessTokenProvider.apply(ctx.senderUserId())),
@@ -68,63 +71,69 @@ public final class BeatmapCommandHandler {
         } else {
             if (lastTarget.get(ctx.senderUserId()) != null) {
                 ShortcutTarget target = lastTarget.get(ctx.senderUserId());
-                return taskCoordinator.queueImageRequest(
+                taskCoordinator.runImageRequest(
                         ctx,
                         "Beatmap",
                         () -> APIHelper.getBeatmapResponse(target, null, accessTokenProvider.apply(ctx.senderUserId())),
                         replyFactory::beatmapMessage
                 );
+                return;
             }
 
-            return RouteDecision.sync(PendingMessage.ofString(CommandUsage.M));
+            ctx.sendReply(PendingMessage.ofString(CommandUsage.M));
         }
     }
 
-    public RouteDecision handleAp(Context ctx) {
+    public void handleAp(Context ctx) {
         ShortcutTarget target;
 
         if (ctx.args().length >= 1) {
             TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
             target = targetResolution.target();
             if (target.isError()) {
-                return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+                ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+                return;
             }
 
             lastTarget.put(ctx.senderUserId(), target);
         } else {
             if (lastTarget.get(ctx.senderUserId()) != null) {
                 target = lastTarget.get(ctx.senderUserId());
-            } else return RouteDecision.sync(PendingMessage.ofString(CommandUsage.AP));
+            } else {
+                ctx.sendReply(PendingMessage.ofString(CommandUsage.AP));
+                return;
+            }
         }
 
-        return taskCoordinator.queueApiRequest(
-                ctx,
-                "Audio Preview",
-                () -> {
+        taskCoordinator.runApiRequest(ctx, "Audio Preview", () -> {
                     final long id = APIHelper.lookupBeatmapset(target, accessTokenProvider.apply(ctx.senderUserId()));
-                    return PendingMessage.ofVoiceUrl("https://b.ppy.sh/preview/" + id + ".mp3").doUpload(false);
+                    ctx.sendReply(PendingMessage.ofVoiceUrl("https://b.ppy.sh/preview/" + id + ".mp3").doUpload(false));
                 }
         );
     }
 
-    public RouteDecision handleBgp(Context ctx) {
+    public void handleBgp(Context ctx) {
         ShortcutTarget target;
 
         if (ctx.args().length >= 1) {
             TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
             target = targetResolution.target();
             if (target.isError()) {
-                return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+                ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+                return;
             }
 
             lastTarget.put(ctx.senderUserId(), target);
         } else {
             if (lastTarget.get(ctx.senderUserId()) != null) {
                 target = lastTarget.get(ctx.senderUserId());
-            } else return RouteDecision.sync(PendingMessage.ofString(CommandUsage.BGP));
+            } else {
+                ctx.sendReply(PendingMessage.ofString(CommandUsage.BGP));
+                return;
+            }
         }
 
-        return taskCoordinator.queueImageRequest(
+        taskCoordinator.runImageRequest(
                 ctx,
                 "Background Preview",
                 () -> APIHelper.getBeatmapBgResponse(target, accessTokenProvider.apply(ctx.senderUserId())),
@@ -132,7 +141,7 @@ public final class BeatmapCommandHandler {
         );
     }
 
-    public RouteDecision handleDl(Context ctx) {
+    public void handleDl(Context ctx) {
         ShortcutTarget target;
 
         if (ctx.args().length == 0) {
@@ -140,12 +149,14 @@ public final class BeatmapCommandHandler {
         } else if (ctx.args().length <= 2) {
             TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
             if (ctx.args().length != targetResolution.consumedArgs()) {
-                return RouteDecision.sync(PendingMessage.ofString(CommandUsage.DL));
+                ctx.sendReply(PendingMessage.ofString(CommandUsage.DL));
+                return;
             }
 
             target = targetResolution.target();
             if (target.isError()) {
-                return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+                ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+                return;
             }
 
             lastTarget.put(ctx.senderUserId(), target);
@@ -154,31 +165,32 @@ public final class BeatmapCommandHandler {
         }
 
         if (target == null) {
-            return RouteDecision.sync(PendingMessage.ofString(CommandUsage.DL));
+            ctx.sendReply(PendingMessage.ofString(CommandUsage.DL));
+            return;
         }
 
-        return taskCoordinator.queueApiRequest(
-                ctx,
-                "Download Beatmap",
-                () -> replyFactory.dlMessage(
+        taskCoordinator.runApiRequest(ctx, "Download Beatmap", () ->
+                ctx.sendReply(replyFactory.dlMessage(
                         ctx,
                         APIHelper.getLookupBeatmapsetResponse(target, accessTokenProvider.apply(ctx.senderUserId()))
-                )
+                ))
         );
     }
 
-    public RouteDecision handleMs(Context ctx) {
+    public void handleMs(Context ctx) {
         ShortcutTarget target;
         if (ctx.args().length == 0) {
             target = lastTarget.get(ctx.senderUserId());
         } else if (ctx.args().length <= 2) {
             TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
             if (ctx.args().length != targetResolution.consumedArgs()) {
-                return RouteDecision.sync(PendingMessage.ofString("用法：/ms <谱面集ID 或 快捷查询>"));
+                ctx.sendReply(PendingMessage.ofString("用法：/ms <谱面集ID 或 快捷查询>"));
+                return;
             }
             target = targetResolution.target();
             if (target.isError()) {
-                return RouteDecision.sync(PendingMessage.ofString(target.errorMessage()));
+                ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+                return;
             }
 
             lastTarget.put(ctx.senderUserId(), target);
@@ -187,10 +199,11 @@ public final class BeatmapCommandHandler {
         }
 
         if (target == null) {
-            return RouteDecision.sync(PendingMessage.ofString("用法：/ms <谱面集ID 或 快捷查询>"));
+            ctx.sendReply(PendingMessage.ofString("用法：/ms <谱面集ID 或 快捷查询>"));
+            return;
         }
 
-        return taskCoordinator.queueImageRequest(
+        taskCoordinator.runImageRequest(
                 ctx,
                 "Beatmapset",
                 () -> APIHelper.getBeatmapsetResponse(target, accessTokenProvider.apply(ctx.senderUserId())),
@@ -198,17 +211,15 @@ public final class BeatmapCommandHandler {
         );
     }
 
-    public RouteDecision handleSms(Context ctx) {
+    public void handleSms(Context ctx) {
         final SearchQuery searchQuery = resolver.resolveSearchQuery(ctx.query());
         if (searchQuery == null) {
-            return RouteDecision.sync(PendingMessage.ofString("用法：/sms [#页数] <搜索关键字>"));
+            ctx.sendReply(PendingMessage.ofString("用法：/sms [#页数] <搜索关键字>"));
+            return;
         }
-        return taskCoordinator.queueApiRequest(
-                ctx,
-                "Search Beatmapset",
-                () -> {
+        taskCoordinator.runApiRequest(ctx, "Search Beatmapset", () -> {
                     Response<List<SearchResultItem>> searchResponse = APIHelper.searchBeatmapSetResponse(searchQuery);
-                    return replyFactory.searchMessage(ctx, searchResponse, searchQuery);
+                    ctx.sendReply(replyFactory.searchMessage(ctx, searchResponse, searchQuery));
                 });
     }
 

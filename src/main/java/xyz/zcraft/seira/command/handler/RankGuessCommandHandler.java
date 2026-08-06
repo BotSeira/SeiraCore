@@ -6,11 +6,10 @@ import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
-import xyz.zcraft.seira.command.route.RouteDecision;
 import xyz.zcraft.seira.game.RankGuessGameService;
 
 import java.util.Locale;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -57,63 +56,85 @@ public final class RankGuessCommandHandler {
         }
     }
 
-    public RouteDecision handleRankGuess(Context ctx) {
+    public void handleRankGuess(Context ctx) {
         if (!ctx.inGroup()) {
-            return RouteDecision.sync(PendingMessage.ofString("/rg 仅支持群聊使用。"));
+            ctx.sendReply(PendingMessage.ofString("/rg 仅支持群聊使用。"));
+            return;
         }
         if (ctx.argumentCount() != 1) {
-            return RouteDecision.sync(PendingMessage.ofString(USAGE));
+            ctx.sendReply(PendingMessage.ofString(USAGE));
+            return;
         }
 
         String argument = ctx.argument(0);
         if ("start".equalsIgnoreCase(argument)) {
-            return start(ctx);
+            start(ctx);
+            return;
         }
         if ("end".equalsIgnoreCase(argument)) {
-            return end(ctx);
+            end(ctx);
+            return;
         }
 
         Long rank = parseRank(argument);
         if (rank == null) {
-            return RouteDecision.sync(PendingMessage.ofString(USAGE));
+            ctx.sendReply(PendingMessage.ofString(USAGE));
+            return;
         }
-        return guess(ctx, rank);
+        guess(ctx, rank);
     }
 
-    private RouteDecision start(Context ctx) {
+    private void start(Context ctx) {
         RankGuessGameService.Reservation reservation = games.reserve(ctx.groupId(), ctx.senderUserId());
         if (reservation == null) {
-            return RouteDecision.sync(PendingMessage.ofString("本群已有一轮 Rank Guess 正在进行。"));
+            ctx.sendReply(PendingMessage.ofString("本群已有一轮 Rank Guess 正在进行。"));
+            return;
         }
 
-        AtomicReference<RankGuessGameService.Round> roundRef = new AtomicReference<>();
-        return taskCoordinator.queueReplayTask(
+        AtomicBoolean activated = new AtomicBoolean();
+        taskCoordinator.runApiRequest(
                 ctx,
                 "Rank Guess Render",
-                qqUpload -> {
+                () -> {
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "正在选定随机成绩..."));
                     var randomScore = APIHelper.getRandomScore();
                     RankGuessGameService.Round round = RankGuessGameService.Round.from(randomScore);
-                    roundRef.set(round);
-                    return APIHelper.createObscuredReplayRenderTask(round.scoreId(), qqUpload);
-                },
-                (context, _) -> PendingMessage.ofMarkdownRaw(
-                        at(context) + "随机用户与成绩已选定，正在渲染回放片段，视频发送后即可开始猜测~"
-                ),
-                successful -> {
-                    if (successful) {
-                        games.activate(reservation, roundRef.get());
-                        final long l = roundRef.get().actualRank();
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(
+                            at(ctx) + "随机用户与成绩已选定，正在渲染回放片段..."
+                    ));
 
-                        String range = getRange(l);
+                    var renderTask = APIHelper.createObscuredReplayRenderTask(
+                            round.scoreId(), taskCoordinator.createVideoUploadRequest(ctx)
+                    );
+                    ctx.sendReply(replyFactory.replayMessage(ctx, renderTask));
 
-                        return PendingMessage.ofMarkdownRaw("回放渲染完成，游戏已开始！请在群内发送 `/rg #Rank` 猜测排名~\n" +
-                                "> 提示: 这是一名 `" + range + "` 玩家的`BP" + roundRef.get().bestIndex() + "`~");
-                    } else {
-                        games.cancel(reservation);
-                        return PendingMessage.ofMarkdownRaw("由于回放渲染失败，本轮游戏已取消~");
+                    var replay = taskCoordinator.waitForReplay(renderTask);
+                    if (replay == null) {
+                        ctx.sendMessage(PendingMessage.ofMarkdownRaw("由于回放渲染失败，本轮游戏已取消~"));
+                        return;
                     }
+
+                    // Rendering may outlive QQ's passive-reply window, so completion uses active messages.
+                    boolean videoSent = ctx.sendMessage(taskCoordinator.replayVideoMessage(replay));
+                    if (!videoSent) {
+                        taskCoordinator.removeReplayResult(renderTask.taskId());
+                        ctx.sendMessage(PendingMessage.ofMarkdownRaw("由于回放发送失败，本轮游戏已取消~"));
+                        return;
+                    }
+
+                    taskCoordinator.removeReplayResult(renderTask.taskId());
+                    games.activate(reservation, round);
+                    activated.set(true);
+                    String range = getRange(round.actualRank());
+                    ctx.sendMessage(PendingMessage.ofMarkdownRaw(
+                            "回放渲染完成，游戏已开始！请在群内发送 `/rg #Rank` 猜测排名~\n"
+                                    + "> 提示: 这是一名 `" + range + "` 玩家的`BP" + round.bestIndex() + "`~"
+                    ));
                 }
         );
+        if (!activated.get()) {
+            games.cancel(reservation);
+        }
     }
 
     @NotNull
@@ -135,31 +156,33 @@ public final class RankGuessCommandHandler {
         return range;
     }
 
-    private RouteDecision guess(Context ctx, long rank) {
+    private void guess(Context ctx, long rank) {
         RankGuessGameService.GuessResult result = games.guess(ctx.groupId(), ctx.senderUserId(), rank);
-        return switch (result.status()) {
-            case NO_GAME -> RouteDecision.sync(PendingMessage.ofString("本群当前没有进行中的 Rank Guess 喵"));
-            case STARTING -> RouteDecision.sync(PendingMessage.ofString("回放仍在渲染，请等待视频发送后再猜测喵"));
-            case UPDATED, RECORDED -> RouteDecision.sync(PendingMessage.ofMarkdownRaw(
+        PendingMessage message = switch (result.status()) {
+            case NO_GAME -> PendingMessage.ofString("本群当前没有进行中的 Rank Guess 喵");
+            case STARTING -> PendingMessage.ofString("回放仍在渲染，请等待视频发送后再猜测喵");
+            case UPDATED, RECORDED -> PendingMessage.ofMarkdownRaw(
                     at(ctx)
                             + "已" + (result.status() == RankGuessGameService.GuessStatus.UPDATED ? "更新" : "记录") + "你的猜测："
                             + "`#" + String.format(Locale.US, "%,d", rank) + "`"
                             + " " + result.getMultipliersString()
-            ));
+            );
         };
+        ctx.sendReply(message);
     }
 
-    private RouteDecision end(Context ctx) {
+    private void end(Context ctx) {
         RankGuessGameService.EndResult result = games.end(
                 ctx.groupId(), ctx.senderUserId(), adminAuthorizer.test(ctx.senderUserId())
         );
-        return switch (result.status()) {
-            case NO_GAME -> RouteDecision.sync(PendingMessage.ofString("本群当前没有进行中的 Rank Guess 喵"));
-            case STARTING -> RouteDecision.sync(PendingMessage.ofString("高光仍在渲染，请等待视频发送后再结束游戏喵"));
-            case FORBIDDEN -> RouteDecision.sync(PendingMessage.ofString(
+        PendingMessage message = switch (result.status()) {
+            case NO_GAME -> PendingMessage.ofString("本群当前没有进行中的 Rank Guess 喵");
+            case STARTING -> PendingMessage.ofString("高光仍在渲染，请等待视频发送后再结束游戏喵");
+            case FORBIDDEN -> PendingMessage.ofString(
                     "开始猜测后的3分钟内，仅发起者和机器人管理员可以结束游戏喵"
-            ));
-            case FINISHED -> RouteDecision.sync(replyFactory.rankGuessResultMessage(result.round()));
+            );
+            case FINISHED -> replyFactory.rankGuessResultMessage(result.round());
         };
+        ctx.sendReply(message);
     }
 }

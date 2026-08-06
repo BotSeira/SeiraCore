@@ -5,16 +5,14 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.ApiRequestException;
-import xyz.zcraft.seira.api.data.ApiTask;
 import xyz.zcraft.seira.api.data.Base64Bytes;
+import xyz.zcraft.seira.api.data.QqUploadRequest;
 import xyz.zcraft.seira.api.data.Response;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.bot.data.MDMessage;
 import xyz.zcraft.seira.bot.data.Message;
 import xyz.zcraft.seira.bot.data.PendingMessage;
-import xyz.zcraft.seira.command.iface.*;
-import xyz.zcraft.seira.command.route.RouteDecision;
 import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.services.ApiRequestStats;
 import xyz.zcraft.seira.services.BotStat;
@@ -22,9 +20,9 @@ import xyz.zcraft.seira.services.BotStat;
 import java.nio.channels.ClosedChannelException;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
@@ -40,30 +38,122 @@ public final class TaskCoordinator {
         this.replayResults = replayResults;
     }
 
-    public RouteDecision queueApiRequest(Context ctx, String requestType, ApiTaskExecutor executor) {
-        return queueApiRequest(ctx, requestType, executor, () -> null, (_) -> null);
+    public CommandReplyChannel openReplyChannel(
+            String targetId,
+            String messageId,
+            boolean groupMessage,
+            boolean queueMessageInGroup
+    ) {
+        return new OutboundReplyChannel(targetId, messageId, groupMessage, queueMessageInGroup);
     }
 
-    RouteDecision queueApiRequestUntilSubmit(String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer) {
+    /**
+     * Runs a reusable queued API flow while leaving the number, type and timing
+     * of its replies entirely under the command handler's control.
+     *
+     * @return whether the action completed without throwing
+     */
+    public boolean runApiRequest(Context ctx, String requestType, Runnable action) {
         long estimatedSeconds = apiRequestStats.estimateAndEnqueue(requestType);
-        PendingMessage queuedNotice = PendingMessage.ofString("请求已加入队列，预计等待时间" + estimatedSeconds + "秒。");
-        return RouteDecision.async(queuedNotice, new ApiTask(requestType, executor, postProcessor, finalizer, true));
+        ctx.sendQueueNotice(PendingMessage.ofMarkdownRaw(
+                at(ctx) + "请求已加入队列，预计等待时间" + estimatedSeconds + "秒。"
+        ));
+
+        long startedAt = System.nanoTime();
+        try {
+            action.run();
+            return true;
+        } catch (Exception e) {
+            ctx.sendReply(PendingMessage.ofString(resolveErrorMessage(e)));
+            String message = e.getMessage();
+            if (e instanceof ApiRequestException apiException) {
+                message += " - " + apiException.getDefaultMessage();
+            }
+            LOG.error("Failed to execute command flow {}: {}", requestType, message, e);
+            return false;
+        } finally {
+            long elapsedMillis = Math.max(1L, (System.nanoTime() - startedAt) / 1_000_000L);
+            apiRequestStats.complete(requestType, elapsedMillis);
+        }
     }
 
-    public RouteDecision queueImageRequest(Context ctx, String requestType, ImageResponseCreator creator, ImageResponsePostProcessor postProcessor) {
-        return queueApiRequest(
-                ctx,
-                requestType,
-                () -> {
-                    Response<Base64Bytes> response = creator.create();
-                    byte[] imageBytes = response.getContent().bytes();
-                    final UploadedImage uploadedImage = messageSender.uploadImageToCos(imageBytes);
-                    PendingMessage completionMessage = postProcessor.execute(ctx, response);
-                    return combineImageAndCompletion(uploadedImage, completionMessage);
-                },
-                () -> null,
-                (_) -> null
+    public QqUploadRequest createVideoUploadRequest(Context ctx) {
+        String targetId = ctx.inGroup() ? ctx.groupId() : ctx.senderUserId();
+        return messageSender.createVideoUploadRequest(targetId, ctx.inGroup());
+    }
+
+    public APIHelper.ReplayRenderResult waitForReplay(APIHelper.ReplayTaskInfo taskInfo) {
+        if (taskInfo == null || taskInfo.taskId() == null || taskInfo.taskId().isBlank()) {
+            throw new IllegalArgumentException("回放任务未返回有效请求ID，无法获取视频结果。");
+        }
+
+        APIHelper.ReplayRenderResult result = APIHelper.waitReplayVideo(taskInfo.taskId());
+        if (result != null) {
+            replayResults.put(taskInfo.taskId(), result);
+            BotStat.incrementReplays();
+        }
+        return result;
+    }
+
+    public PendingMessage replayVideoMessage(APIHelper.ReplayRenderResult result) {
+        if (result == null) {
+            return PendingMessage.ofString("回放视频生成失败，请稍后重试。");
+        }
+        return result.qqFile() != null
+                ? PendingMessage.ofUploadedVideo(result.qqFile())
+                : PendingMessage.ofVideoUrl(result.videoUrl());
+    }
+
+    public void removeReplayResult(String taskId) {
+        if (taskId != null) {
+            replayResults.remove(taskId);
+        }
+    }
+
+    public void runImageRequest(
+            Context ctx,
+            String requestType,
+            Supplier<Response<Base64Bytes>> creator,
+            BiFunction<Context, Response<?>, PendingMessage> postProcessor
+    ) {
+        runApiRequest(ctx, requestType, () ->
+                ctx.sendReply(waitForImage(ctx, creator, postProcessor))
         );
+    }
+
+    public void runReplayRequest(
+            Context ctx,
+            String requestType,
+            Function<QqUploadRequest, APIHelper.ReplayTaskInfo> creator,
+            BiFunction<Context, APIHelper.ReplayTaskInfo, PendingMessage> taskMessageCreator
+    ) {
+        runApiRequest(ctx, requestType, () -> {
+            APIHelper.ReplayTaskInfo taskInfo = creator.apply(createVideoUploadRequest(ctx));
+            ctx.sendReply(taskMessageCreator.apply(ctx, taskInfo));
+
+            APIHelper.ReplayRenderResult result = waitForReplay(taskInfo);
+            if (result == null) {
+                ctx.sendMessage(PendingMessage.ofString("回放视频生成失败，请稍后重试。"));
+                return;
+            }
+
+            if (ctx.sendMessage(replayVideoMessage(result))) {
+                removeReplayResult(taskInfo.taskId());
+            }
+        });
+    }
+
+    /** Waits for an image renderer and returns a sendable message without sending it. */
+    private PendingMessage waitForImage(
+            Context ctx,
+            Supplier<Response<Base64Bytes>> creator,
+            BiFunction<Context, Response<?>, PendingMessage> postProcessor
+    ) {
+        Response<Base64Bytes> response = creator.get();
+        byte[] imageBytes = response.getContent().bytes();
+        UploadedImage uploadedImage = messageSender.uploadImageToCos(imageBytes);
+        PendingMessage completionMessage = postProcessor.apply(ctx, response);
+        return combineImageAndCompletion(uploadedImage, completionMessage);
     }
 
     private PendingMessage combineImageAndCompletion(UploadedImage image, PendingMessage completionMessage) {
@@ -83,106 +173,13 @@ public final class TaskCoordinator {
         );
     }
 
-    public RouteDecision queueReplayTask(Context ctx, String requestType, ReplayTaskCreator creator, BiFunction<Context, APIHelper.ReplayTaskInfo, PendingMessage> messageCreator) {
-        return queueReplayTask(ctx, requestType, creator, messageCreator, (_) -> null);
-    }
-
-    public RouteDecision queueReplayTask(
-            Context ctx,
-            String requestType,
-            ReplayTaskCreator creator,
-            BiFunction<Context, APIHelper.ReplayTaskInfo, PendingMessage> messageCreator,
-            Function<Boolean, PendingMessage> completion
-    ) {
-        AtomicReference<APIHelper.ReplayTaskInfo> taskInfoRef = new AtomicReference<>();
-        AtomicReference<String> taskId = new AtomicReference<>();
-        AtomicReference<APIHelper.ReplayRenderResult> renderResultRef = new AtomicReference<>();
-        return queueApiRequestUntilSubmit(
-                requestType,
-                () -> {
-                    String targetId = ctx.inGroup() ? ctx.groupId() : ctx.senderUserId();
-                    var qqUpload = messageSender.createVideoUploadRequest(targetId, ctx.inGroup());
-                    APIHelper.ReplayTaskInfo taskInfo = creator.create(qqUpload);
-                    taskInfoRef.set(taskInfo);
-
-                    return messageCreator.apply(ctx, taskInfo);
-                },
-                () -> {
-                    APIHelper.ReplayTaskInfo taskInfo = taskInfoRef.get();
-                    if (taskInfo == null || taskInfo.taskId() == null || taskInfo.taskId().isBlank()) {
-                        return PendingMessage.ofString("回放任务未返回有效请求ID，无法获取视频结果。请稍后重试。");
-                    }
-
-                    taskId.set(taskInfo.taskId());
-                    APIHelper.ReplayRenderResult result = APIHelper.waitReplayVideo(taskInfo.taskId());
-                    if (result != null) {
-                        renderResultRef.set(result);
-                        replayResults.put(taskInfo.taskId(), result);
-                        BotStat.incrementReplays();
-                        return result.qqFile() != null
-                                ? PendingMessage.ofUploadedVideo(result.qqFile())
-                                : PendingMessage.ofVideoUrl(result.videoUrl());
-                    }
-                    return PendingMessage.ofString("回放视频生成失败，请稍后重试。");
-                },
-                (b) -> {
-                    LOG.debug("Running finalizer of {} for request {}", b, taskId.get());
-                    if (b) replayResults.remove(taskId.get());
-                    return completion.apply(b && renderResultRef.get() != null);
-                }
-        );
-    }
-
-    public void processApiTask(String targetId, String messageId, boolean groupMessage, ApiTask apiTask, AtomicInteger messageSeqCounter) {
-        long startedAt = System.nanoTime();
-        boolean statsCompleted = false;
-        boolean responseSent = false;
-        try {
-            PendingMessage response = apiTask.executor().execute();
-            if (response != null) {
-                responseSent = sendOutboundMessage(targetId, messageId, groupMessage, response, messageSeqCounter);
-            }
-
-            if (apiTask.completeStatsAfterExecutor()) {
-                long elapsedMillis = Math.max(1L, (System.nanoTime() - startedAt) / 1_000_000L);
-                apiRequestStats.complete(apiTask.requestType(), elapsedMillis);
-                statsCompleted = true;
-            }
-
-            if (apiTask.postProcessor() != null) {
-                PendingMessage postResponse = apiTask.postProcessor().execute();
-                if (postResponse != null) {
-                    responseSent &= sendOutboundMessage(targetId, messageId, groupMessage, postResponse, messageSeqCounter);
-                }
-            }
-        } catch (Exception e) {
-            sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString(resolveErrorMessage(e)), messageSeqCounter);
-            String msg = e.getMessage();
-            if (e instanceof ApiRequestException ex) {
-                msg += " - " + ex.getDefaultMessage();
-            }
-            LOG.error("Failed to execute API task: {}", msg, e);
-        } finally {
-            try {
-                final PendingMessage execute = apiTask.finalizer().execute(responseSent);
-                if (execute != null) {
-                    sendOutboundMessage(targetId, messageId, groupMessage, execute, messageSeqCounter);
-                }
-            } catch (Exception e) {
-                LOG.warn("Failed to run finalizer: {}", e.getMessage(), e);
-            }
-            if (!statsCompleted) {
-                long elapsedMillis = Math.max(1L, (System.nanoTime() - startedAt) / 1_000_000L);
-                apiRequestStats.complete(apiTask.requestType(), elapsedMillis);
-            }
-        }
-    }
-
     public boolean sendOutboundMessage(String targetId, String messageId, boolean groupMessage, PendingMessage pendingMsg, AtomicInteger messageSeqCounter) {
         Message message = new Message();
         message.setMsgType(pendingMsg.getMsgType());
         message.setMsgId(messageId);
-        message.setMsgSeq(messageSeqCounter.getAndIncrement());
+        if (messageSeqCounter != null) {
+            message.setMsgSeq(messageSeqCounter.getAndIncrement());
+        }
 
         if (pendingMsg instanceof MDMessage md) {
             message.setMsgType(PendingMessage.MSG_TYPE_MARKDOWN);
@@ -238,10 +235,43 @@ public final class TaskCoordinator {
         return uploadResult && sendResult;
     }
 
-    private RouteDecision queueApiRequest(Context ctx, String requestType, ApiTaskExecutor executor, ApiTaskPostProcessor postProcessor, ApiTaskFinalizer finalizer) {
-        long estimatedSeconds = apiRequestStats.estimateAndEnqueue(requestType);
-        PendingMessage queuedNotice = PendingMessage.ofMarkdownRaw(at(ctx) + "请求已加入队列，预计等待时间" + estimatedSeconds + "秒。");
-        return RouteDecision.async(queuedNotice, new ApiTask(requestType, executor, postProcessor, finalizer, false));
+    private final class OutboundReplyChannel implements CommandReplyChannel {
+        private final String targetId;
+        private final String messageId;
+        private final boolean groupMessage;
+        private final boolean queueMessageInGroup;
+        private final AtomicInteger passiveSequence = new AtomicInteger(1);
+
+        private OutboundReplyChannel(
+                String targetId,
+                String messageId,
+                boolean groupMessage,
+                boolean queueMessageInGroup
+        ) {
+            this.targetId = targetId;
+            this.messageId = messageId;
+            this.groupMessage = groupMessage;
+            this.queueMessageInGroup = queueMessageInGroup;
+        }
+
+        @Override
+        public synchronized boolean sendReply(PendingMessage message) {
+            return sendOutboundMessage(targetId, messageId, groupMessage, message, passiveSequence);
+        }
+
+        @Override
+        public synchronized boolean sendProactive(PendingMessage message) {
+            return sendOutboundMessage(targetId, null, groupMessage, message, null);
+        }
+
+        @Override
+        public synchronized boolean sendQueueNotice(PendingMessage message) {
+            if (groupMessage && !queueMessageInGroup) {
+                return true;
+            }
+            return sendReply(message);
+        }
+
     }
 
     private String resolveErrorMessage(Exception exception) {
