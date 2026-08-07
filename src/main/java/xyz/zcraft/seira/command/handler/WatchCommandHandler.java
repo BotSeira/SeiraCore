@@ -18,6 +18,8 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Predicate;
 
+import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
+
 public final class WatchCommandHandler {
     private static final int DEFAULT_DURATION_MINUTES = 10;
     private static final int MAX_DURATION_MINUTES = 120;
@@ -72,17 +74,22 @@ public final class WatchCommandHandler {
             usage(ctx);
             return;
         }
-        Integer minutes = ctx.argumentCount() == 3
+        int minutes = ctx.argumentCount() == 3
                 ? parseDurationMinutes(ctx.argument(2))
                 : DEFAULT_DURATION_MINUTES;
-        if (minutes == null) {
-            usage(ctx);
-            return;
-        }
 
         String targetArgument = ctx.argument(1);
         taskCoordinator.runApiRequest(ctx, "Add Score Watch", () -> {
+            final boolean b = ctx.sendMessage(PendingMessage.ofMarkdownRaw(
+                    at(ctx) + "正在尝试添加监视..."
+            ));
+            if (!b) {
+                ctx.sendReply(PendingMessage.ofString("由于缺少主动消息权限，无法添加监视！权限配置请见[这里](https://docs.seira.top/overview/use.html#extra-permission)~"));
+                return;
+            }
+
             WatchTarget target = resolveTarget(ctx.groupId(), targetArgument);
+
             watchService.add(ctx.groupId(), target, Duration.ofMinutes(minutes));
             ctx.sendReply(PendingMessage.ofMarkdownRaw(
                     displayTarget(target) + " 添加监视成功！有效期：" + minutes + "分钟"
