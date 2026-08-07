@@ -1,5 +1,6 @@
 package xyz.zcraft.seira.command.route;
 
+import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.api.data.OsuToken;
@@ -165,7 +166,11 @@ public class Router {
         }
     }
 
+    @Getter
+    private static Context lastContext = null;
+
     private void dispatch(Context ctx) {
+        lastContext = ctx;
         commandMetric.run();
         if (ctx.command().startsWith("debug.")) {
             debugRoutes.routeDebug(ctx);

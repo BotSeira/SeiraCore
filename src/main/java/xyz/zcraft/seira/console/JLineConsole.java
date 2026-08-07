@@ -114,7 +114,7 @@ public final class JLineConsole implements AutoCloseable {
                 "data", List.of("stats", "query"),
                 "send", List.of("group", "private")
         );
-        private static final List<String> ROOT_COMMANDS = List.of("help", "config", "admin", "data", "send", "stop");
+        private static final List<String> ROOT_COMMANDS = List.of("help", "config", "admin", "data", "send", "stop", "inspect");
 
         @Override
         public void complete(LineReader reader, ParsedLine line, List<Candidate> candidates) {

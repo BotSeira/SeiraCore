@@ -4,6 +4,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.bot.ProactiveMessenger;
+import xyz.zcraft.seira.command.Context;
+import xyz.zcraft.seira.command.route.Router;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.RuntimeConfig;
 import xyz.zcraft.seira.security.AdminRegistry;
@@ -47,6 +49,7 @@ public final class ConsoleCommandProcessor {
                 case "data" -> data(input);
                 case "send" -> send(input);
                 case "stop" -> stop();
+                case "inspect" -> inspect();
                 default -> ConsoleResult.failure("未知控制台指令。输入 help 查看帮助。");
             };
         } catch (IllegalArgumentException e) {
@@ -56,6 +59,17 @@ public final class ConsoleCommandProcessor {
             String detail = rootMessage(e);
             return ConsoleResult.failure("执行失败：" + detail);
         }
+    }
+
+    private ConsoleResult inspect() {
+        final Context lastContext = Router.getLastContext();
+        String result =
+                "=== Last Context ===\n" +
+                "Sender: " + lastContext.senderUserId() + "\n" +
+                "Group: " + lastContext.groupId() + "\n" +
+                "Message: " + lastContext.messageId() + "\n" +
+                "====================";
+        return ConsoleResult.success(result);
     }
 
     private ConsoleResult config(ConsoleInputParser.ParsedInput input) {
