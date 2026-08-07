@@ -18,7 +18,7 @@ import java.util.function.Consumer;
 
 public class AttachmentHandler {
     private static final Logger LOG = LogManager.getLogger(AttachmentHandler.class);
-    private static final int MAX_REPLAY_SIZE = 128 * 1024;
+    private static final int MAX_REPLAY_SIZE = 512 * 1024;
     private static final Duration DOWNLOAD_TIMEOUT = Duration.ofSeconds(30);
 
     private final Executor filePullExecutor;
