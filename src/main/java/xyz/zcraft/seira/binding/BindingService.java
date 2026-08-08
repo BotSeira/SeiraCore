@@ -34,6 +34,7 @@ public final class BindingService implements AutoCloseable {
             Thread.ofPlatform().daemon().name("binding-task-cleaner").factory()
     );
     private final AtomicBoolean started = new AtomicBoolean();
+    private final AtomicBoolean closed = new AtomicBoolean();
     private volatile Javalin server;
 
     public BindingService(BindingConfig config, Executor callbackExecutor) {
@@ -41,8 +42,9 @@ public final class BindingService implements AutoCloseable {
         this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
     }
 
-    public void start() {
-        if (!started.compareAndSet(false, true)) {
+    public synchronized void start() {
+        ensureOpen();
+        if (started.get()) {
             return;
         }
 
@@ -51,9 +53,9 @@ public final class BindingService implements AutoCloseable {
                             .get(config.listenPath(), this::handleCallback))
                     .start(config.listenPort());
             taskCleaner.scheduleAtFixedRate(this::removeExpiredTasks, 1, 1, TimeUnit.MINUTES);
+            started.set(true);
             LOG.info("Binding callback listener started on port {}", config.listenPort());
         } catch (RuntimeException e) {
-            started.set(false);
             Javalin currentServer = server;
             server = null;
             if (currentServer != null) {
@@ -68,11 +70,13 @@ public final class BindingService implements AutoCloseable {
             String messageId,
             BiConsumer<User, OsuToken> onFinish
     ) {
-        ensureStarted();
-        String taskId = UUID.randomUUID().toString();
-        BindingTask task = new BindingTask(taskId, openId, messageId, onFinish);
-        bindingTasks.put(taskId, task);
-        return task;
+        synchronized (this) {
+            ensureStarted();
+            String taskId = UUID.randomUUID().toString();
+            BindingTask task = new BindingTask(taskId, openId, messageId, onFinish);
+            bindingTasks.put(taskId, task);
+            return task;
+        }
     }
 
     int pendingTaskCount() {
@@ -145,8 +149,17 @@ public final class BindingService implements AutoCloseable {
         }
     }
 
+    private void ensureOpen() {
+        if (closed.get()) {
+            throw new IllegalStateException("Binding service has been closed");
+        }
+    }
+
     @Override
-    public void close() {
+    public synchronized void close() {
+        if (!closed.compareAndSet(false, true)) {
+            return;
+        }
         started.set(false);
         taskCleaner.shutdownNow();
         Javalin currentServer = server;

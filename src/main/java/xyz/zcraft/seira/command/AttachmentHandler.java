@@ -13,6 +13,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
@@ -34,13 +36,16 @@ public class AttachmentHandler {
     }
 
     public void handleAttachments(List<Attachment> attachments, Consumer<PendingMessage> msgSender) {
-        attachments.stream()
+        Objects.requireNonNull(attachments, "attachments").stream()
+                .filter(Objects::nonNull)
                 .filter(a -> "file".equals(a.contentType()))
-                .filter(a -> a.filename().toLowerCase().endsWith(".osr"))
+                .filter(a -> a.filename() != null && a.filename().toLowerCase(Locale.ROOT).endsWith(".osr"))
                 .forEach(a -> handleAttachment(a, msgSender));
     }
 
     public void handleAttachment(Attachment attachment, Consumer<PendingMessage> msgSender) {
+        Objects.requireNonNull(attachment, "attachment");
+        Objects.requireNonNull(msgSender, "msgSender");
         if (attachment.size() > MAX_REPLAY_SIZE) {
             msgSender.accept(PendingMessage.ofMarkdownRaw(attachment.filename() + " 文件过大，无法上传!"));
             return;
@@ -65,7 +70,7 @@ public class AttachmentHandler {
                     bytes = inputStream.readNBytes(MAX_REPLAY_SIZE + 1);
                 }
                 if (bytes.length > MAX_REPLAY_SIZE) {
-                    throw new IllegalArgumentException("Replay file exceeds the 128 KiB limit");
+                    throw new IllegalArgumentException("Replay file exceeds the 512 KiB limit");
                 }
 
                 final ReplayUploadInfo replayUploadInfo = APIHelper.uploadReplay(bytes);

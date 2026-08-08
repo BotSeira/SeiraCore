@@ -64,7 +64,7 @@ public class QQApi {
                     .get("url")
                     .getAsString();
         } catch (IOException | InterruptedException | URISyntaxException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -100,7 +100,7 @@ public class QQApi {
                 throw new RuntimeException("Failed to send private message to " + openId + " " + send.body());
             }
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -116,7 +116,7 @@ public class QQApi {
                 throw new RuntimeException("Failed to send group message to " + groupId + " " + send.body());
             }
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -143,7 +143,7 @@ public class QQApi {
             LOG.debug("Upload private media response: status={}", response.statusCode());
             return parseUploadedFileInfo(response, "upload private media");
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -170,7 +170,7 @@ public class QQApi {
 
             return parseUploadedFileInfo(response, "upload private media");
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -473,7 +473,7 @@ public class QQApi {
             final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             return parseUploadedFileInfo(response, "upload private media(base64)");
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -492,7 +492,7 @@ public class QQApi {
             final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             return parseUploadedFileInfo(response, "upload private media(base64)");
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -540,7 +540,14 @@ public class QQApi {
             final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             return gson.fromJson(parseResponseData(response, "get self info"), QQUser.class);
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
+    }
+
+    private static RuntimeException requestFailure(Exception exception) {
+        if (exception instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+        }
+        return new RuntimeException(exception);
     }
 }

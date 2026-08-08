@@ -20,6 +20,7 @@ public class TokenManager implements AutoCloseable {
         return thread;
     });
     private final AtomicBoolean started = new AtomicBoolean();
+    private final AtomicBoolean closed = new AtomicBoolean();
 
     private final String clientId;
     private final String clientSecret;
@@ -32,8 +33,9 @@ public class TokenManager implements AutoCloseable {
         this.clientSecret = clientSecret;
     }
 
-    public void start() {
-        if (!started.compareAndSet(false, true)) {
+    public synchronized void start() {
+        ensureOpen();
+        if (started.get()) {
             return;
         }
         scheduler.scheduleAtFixedRate(() -> {
@@ -46,6 +48,7 @@ public class TokenManager implements AutoCloseable {
                 LOG.error("Background token check encountered an error", e);
             }
         }, 0, 60, TimeUnit.SECONDS);
+        started.set(true);
     }
 
     public boolean isValid() {
@@ -71,6 +74,7 @@ public class TokenManager implements AutoCloseable {
     }
 
     public void blockUntilValid() {
+        ensureOpen();
         if (isValid()) {
             return;
         }
@@ -78,7 +82,9 @@ public class TokenManager implements AutoCloseable {
         LOG.info("Startup paused: Waiting for a valid QQ API access token...");
 
         while (!isValid()) {
+            ensureOpen();
             synchronized (this) {
+                ensureOpen();
                 if (isValid()) {
                     break;
                 }
@@ -101,8 +107,17 @@ public class TokenManager implements AutoCloseable {
         }
     }
 
+    private void ensureOpen() {
+        if (closed.get()) {
+            throw new IllegalStateException("Token manager has been closed");
+        }
+    }
+
     @Override
-    public void close() {
-        scheduler.shutdownNow();
+    public synchronized void close() {
+        if (closed.compareAndSet(false, true)) {
+            started.set(false);
+            scheduler.shutdownNow();
+        }
     }
 }

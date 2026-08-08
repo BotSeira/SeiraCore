@@ -125,7 +125,7 @@ public class Router {
                 UserDataStore.upsertGroupMember(groupId, userId);
             }
 
-            rawContent = rawContent.trim();
+            rawContent = rawContent == null ? "" : rawContent.trim();
 
             AppConfig config = configSupplier.get();
             final String selfAt = "<@" + config.qq().selfId() + ">";
@@ -167,7 +167,7 @@ public class Router {
     }
 
     @Getter
-    private static Context lastContext = null;
+    private static volatile Context lastContext = null;
 
     private void dispatch(Context ctx) {
         lastContext = ctx;
@@ -225,6 +225,7 @@ public class Router {
                 .build();
     }
 
+    @SuppressWarnings("unused")
     public Set<String> registeredCommands() {
         return commandRegistry.registeredCommands();
     }

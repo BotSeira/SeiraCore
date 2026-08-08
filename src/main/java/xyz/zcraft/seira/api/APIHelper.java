@@ -66,7 +66,7 @@ public class APIHelper {
                     .content(followed)
                     .build();
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -92,7 +92,7 @@ public class APIHelper {
                     .content(GSON.fromJson(data, UserExtended.class))
                     .build();
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -154,7 +154,7 @@ public class APIHelper {
                     mods == null || mods.isBlank() ? "NM" : mods
             );
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -180,7 +180,7 @@ public class APIHelper {
                     .content(GSON.fromJson(data, MultiplayerRoom.class))
                     .build();
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -230,7 +230,7 @@ public class APIHelper {
 
                 beatmapId = rawResponse.getData().getAsJsonObject().get("beatmap_id").getAsLong();
             } catch (IOException | InterruptedException e) {
-                throw new RuntimeException(e);
+                throw requestFailure(e);
             }
         }
         return beatmapId;
@@ -280,7 +280,7 @@ public class APIHelper {
 
             return GSON.fromJson(data, Beatmapset.class);
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -310,7 +310,7 @@ public class APIHelper {
 
                 beatmapsetId = rawResponse.getData().getAsJsonObject().get("beatmapset_id").getAsLong();
             } catch (IOException | InterruptedException e) {
-                throw new RuntimeException(e);
+                throw requestFailure(e);
             }
         }
         return beatmapsetId;
@@ -366,7 +366,7 @@ public class APIHelper {
                     .content(new Base64Bytes(imageBytes))
                     .build();
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -405,7 +405,7 @@ public class APIHelper {
                     .beatmapsetId(data.get("beatmapset_id").getAsString())
                     .build();
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -434,7 +434,7 @@ public class APIHelper {
                     .content(items)
                     .build();
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -494,7 +494,7 @@ public class APIHelper {
                     data.get("best_index").getAsInt()
             );
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("随机成绩请求被中断", e);
@@ -576,7 +576,7 @@ public class APIHelper {
                     (int) (data.get("end").getAsLong() / 1000) + extend
             );
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -605,7 +605,7 @@ public class APIHelper {
 
                 scoreId = rawResponse.getData().getAsJsonObject().get("score_id").getAsLong();
             } catch (IOException | InterruptedException e) {
-                throw new RuntimeException(e);
+                throw requestFailure(e);
             }
         }
         return scoreId;
@@ -645,7 +645,7 @@ public class APIHelper {
 
             return new ReplayTaskInfo(taskId, status, position, beatmap, data.getAsJsonArray("scores"), start, end);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Replay render request interrupted", e);
@@ -693,7 +693,7 @@ public class APIHelper {
             }
             return data;
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Replay status request interrupted", e);
@@ -798,7 +798,7 @@ public class APIHelper {
 
             return GSON.fromJson(data, RenderStat.class);
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -868,7 +868,7 @@ public class APIHelper {
                     .content(misses)
                     .build();
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -906,7 +906,7 @@ public class APIHelper {
                     .content(GSON.fromJson(data, User.class))
                     .build();
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("查找玩家请求被中断", e);
@@ -937,7 +937,7 @@ public class APIHelper {
 
             return users;
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -967,8 +967,15 @@ public class APIHelper {
 
             return GSON.fromJson(r.getData().getAsJsonObject(), ReplayUploadInfo.class);
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
+    }
+
+    private static RuntimeException requestFailure(Exception exception) {
+        if (exception instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+        }
+        return new RuntimeException(exception);
     }
 
     public record ServerStatus(boolean gateway, boolean oStella, String oStellaVersion, boolean osu) {

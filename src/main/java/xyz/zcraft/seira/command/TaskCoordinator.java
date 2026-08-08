@@ -53,6 +53,7 @@ public final class TaskCoordinator {
      *
      * @return whether the action completed without throwing
      */
+    @SuppressWarnings("UnusedReturnValue")
     public boolean runApiRequest(Context ctx, String requestType, Runnable action) {
         long estimatedSeconds = apiRequestStats.estimateAndEnqueue(requestType);
         ctx.sendQueueNotice(PendingMessage.ofMarkdownRaw(

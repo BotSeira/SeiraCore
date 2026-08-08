@@ -16,6 +16,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.function.BiFunction;
 import java.util.function.Predicate;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
@@ -29,12 +30,28 @@ public final class WatchCommandHandler {
     private final TaskCoordinator taskCoordinator;
     private final ScoreWatchService watchService;
     private final Predicate<String> adminAuthorizer;
+    private final BiFunction<String, String, WatchTarget> targetResolver;
 
     public WatchCommandHandler(Resolver resolver, TaskCoordinator taskCoordinator, ScoreWatchService watchService, Predicate<String> adminAuthorizer) {
         this.resolver = Objects.requireNonNull(resolver);
         this.taskCoordinator = Objects.requireNonNull(taskCoordinator);
         this.watchService = watchService;
         this.adminAuthorizer = Objects.requireNonNull(adminAuthorizer);
+        this.targetResolver = this::resolveTarget;
+    }
+
+    WatchCommandHandler(
+            Resolver resolver,
+            TaskCoordinator taskCoordinator,
+            ScoreWatchService watchService,
+            Predicate<String> adminAuthorizer,
+            BiFunction<String, String, WatchTarget> targetResolver
+    ) {
+        this.resolver = Objects.requireNonNull(resolver);
+        this.taskCoordinator = Objects.requireNonNull(taskCoordinator);
+        this.watchService = watchService;
+        this.adminAuthorizer = Objects.requireNonNull(adminAuthorizer);
+        this.targetResolver = Objects.requireNonNull(targetResolver);
     }
 
     public void handleWatch(Context ctx) {
@@ -74,12 +91,17 @@ public final class WatchCommandHandler {
             usage(ctx);
             return;
         }
-        int minutes = ctx.argumentCount() == 3
+        Integer minutes = ctx.argumentCount() == 3
                 ? parseDurationMinutes(ctx.argument(2))
-                : DEFAULT_DURATION_MINUTES;
+                : Integer.valueOf(DEFAULT_DURATION_MINUTES);
+        if (minutes == null) {
+            usage(ctx);
+            return;
+        }
 
         String targetArgument = ctx.argument(1);
         taskCoordinator.runApiRequest(ctx, "Add Score Watch", () -> {
+            WatchTarget target = targetResolver.apply(ctx.groupId(), targetArgument);
             final boolean b = ctx.sendMessage(PendingMessage.ofMarkdownRaw(
                     at(ctx) + "正在尝试添加监视..."
             ));
@@ -87,8 +109,6 @@ public final class WatchCommandHandler {
                 ctx.sendReply(PendingMessage.ofString("由于缺少主动消息权限，无法添加监视！权限配置请见[这里](https://docs.seira.top/overview/use.html#extra-permission)~"));
                 return;
             }
-
-            WatchTarget target = resolveTarget(ctx.groupId(), targetArgument);
 
             watchService.add(ctx.groupId(), target, Duration.ofMinutes(minutes));
             ctx.sendReply(PendingMessage.ofMarkdownRaw(
