@@ -68,7 +68,8 @@ public final class SeiraApplication implements AutoCloseable {
                 createdRuntimeConfig,
                 createdAdmins,
                 new UserDataConsoleAccess(),
-                createdBot.getSender()
+                createdBot.getSender(),
+                createdBot
         ));
     }
 

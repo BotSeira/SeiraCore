@@ -47,6 +47,11 @@ public final class RuntimeConfig {
         listeners.add(Objects.requireNonNull(listener));
     }
 
+    /** Reads and validates the source configuration without applying it. */
+    public AppConfig validateSource() {
+        return loader.get();
+    }
+
     public synchronized ReloadResult reload() {
         AppConfig previous = current.get();
         AppConfig loaded = loader.get();

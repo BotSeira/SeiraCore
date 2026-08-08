@@ -7,6 +7,8 @@ import xyz.zcraft.seira.bot.data.QQUser;
 import xyz.zcraft.seira.binding.BindingService;
 import xyz.zcraft.seira.command.AttachmentHandler;
 import xyz.zcraft.seira.command.route.Router;
+import xyz.zcraft.seira.console.ConsoleRuntimeControl;
+import xyz.zcraft.seira.console.OstellaCacheControlClient;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.RuntimeConfig;
 import xyz.zcraft.seira.game.RankGuessGameService;
@@ -18,14 +20,17 @@ import xyz.zcraft.seira.util.TokenManager;
 import xyz.zcraft.seira.watch.OstellaWatchApi;
 import xyz.zcraft.seira.watch.QqWatchScoreNotifier;
 import xyz.zcraft.seira.watch.ScoreWatchService;
+import xyz.zcraft.seira.watch.WatchView;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-public class QQBot implements AutoCloseable {
+public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
     private static final Logger LOG = LogManager.getLogger(QQBot.class);
 
     @Getter
@@ -39,6 +44,7 @@ public class QQBot implements AutoCloseable {
     private final Router router;
     private final AttachmentHandler attachmentHandler;
     private final ApplicationExecutors executors;
+    private final OstellaCacheControlClient cacheControlClient;
     private final AtomicBoolean running = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicReference<WSClient> activeClient = new AtomicReference<>();
@@ -54,6 +60,7 @@ public class QQBot implements AutoCloseable {
         AppConfig config = runtimeConfig.current();
         this.startupConfig = config;
         this.executors = executors;
+        this.cacheControlClient = new OstellaCacheControlClient(config.ostella().endpoint());
 
         LOG.info("Authorizing QQ API");
         this.tokenManager = new TokenManager(config.qq().appId(), config.qq().appSecret());
@@ -189,5 +196,71 @@ public class QQBot implements AutoCloseable {
         }
         watchService.close();
         tokenManager.close();
+    }
+
+    @Override
+    public RuntimeStatus status() {
+        WSClient client = activeClient.get();
+        ScoreWatchService.Status watchStatus = watchService.status();
+        return new RuntimeStatus(
+                running.get() && !closed.get(),
+                client != null && client.isOpen(),
+                tokenManager.isValid(),
+                watchStatus.running(),
+                watchStatus.groupCount(),
+                watchStatus.taskCount(),
+                watchStatus.pollInterval()
+        );
+    }
+
+    @Override
+    public boolean reconnectGateway() {
+        if (!running.get() || closed.get()) {
+            return false;
+        }
+        WSClient client = activeClient.get();
+        if (client == null) {
+            return false;
+        }
+        client.close();
+        return true;
+    }
+
+    @Override
+    public boolean requestWatchPoll() {
+        return watchService.requestPoll();
+    }
+
+    @Override
+    public List<GroupWatches> listWatches() {
+        return watchService.listAll().entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> new GroupWatches(entry.getKey(), entry.getValue()))
+                .toList();
+    }
+
+    @Override
+    public List<WatchView> listWatches(String groupId) {
+        return watchService.list(groupId);
+    }
+
+    @Override
+    public WatchView removeWatch(String groupId, long osuUserId) {
+        return watchService.remove(groupId, osuUserId);
+    }
+
+    @Override
+    public int clearWatches(String groupId) {
+        return watchService.removeAll(groupId);
+    }
+
+    @Override
+    public CacheControlResult controlCache(String operation, String type, long id) {
+        return cacheControlClient.control(operation, type, id);
+    }
+
+    @Override
+    public void requestStop() {
+        stop();
     }
 }

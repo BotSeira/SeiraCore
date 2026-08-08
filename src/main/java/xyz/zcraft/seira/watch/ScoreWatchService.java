@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -143,6 +144,45 @@ public final class ScoreWatchService implements AutoCloseable {
                     .map(entry -> view(entry, now))
                     .sorted(Comparator.comparing(view -> view.target().username(), String.CASE_INSENSITIVE_ORDER))
                     .toList();
+        }
+    }
+
+    public Map<String, List<WatchView>> listAll() {
+        Instant now = clock.instant();
+        synchronized (lock) {
+            removeExpiredLocked(now);
+            Map<String, List<WatchView>> result = new LinkedHashMap<>();
+            watchesByGroup.forEach((groupId, entries) -> result.put(
+                    groupId,
+                    entries.values().stream()
+                            .map(entry -> view(entry, now))
+                            .sorted(Comparator.comparing(
+                                    watch -> watch.target().username(),
+                                    String.CASE_INSENSITIVE_ORDER
+                            ))
+                            .toList()
+            ));
+            return Map.copyOf(result);
+        }
+    }
+
+    public Status status() {
+        synchronized (lock) {
+            removeExpiredLocked(clock.instant());
+            int taskCount = watchesByGroup.values().stream().mapToInt(Map::size).sum();
+            return new Status(started.get() && !closed.get(), watchesByGroup.size(), taskCount, pollInterval);
+        }
+    }
+
+    public boolean requestPoll() {
+        if (!started.get() || closed.get()) {
+            return false;
+        }
+        try {
+            scheduler.execute(this::pollSafely);
+            return true;
+        } catch (RejectedExecutionException ignored) {
+            return false;
         }
     }
 
@@ -284,5 +324,8 @@ public final class ScoreWatchService implements AutoCloseable {
     }
 
     private record WatchRef(String groupId, WatchEntry entry) {
+    }
+
+    public record Status(boolean running, int groupCount, int taskCount, Duration pollInterval) {
     }
 }

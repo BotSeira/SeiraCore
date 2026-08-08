@@ -17,8 +17,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -68,7 +66,7 @@ public final class JLineConsole implements AutoCloseable {
                         String line = reader.readLine(PROMPT);
                         ConsoleCommandProcessor.ConsoleResult result = processor.execute(line);
                         if (!result.message().isBlank()) {
-                            reader.printAbove((result.success() ? "" : "错误：") + result.message());
+                            reader.printAbove((result.success() ? "" : "Error: ") + result.message());
                         }
                     } catch (UserInterruptException ignored) {
                     } catch (EndOfFileException e) {
@@ -108,21 +106,13 @@ public final class JLineConsole implements AutoCloseable {
     }
 
     private static final class CommandCompleter implements Completer {
-        private static final Map<String, List<String>> SUBCOMMANDS = Map.of(
-                "config", List.of("show", "reload"),
-                "admin", List.of("list", "add", "remove"),
-                "data", List.of("stats", "query"),
-                "send", List.of("group", "private")
-        );
-        private static final List<String> ROOT_COMMANDS = List.of("help", "config", "admin", "data", "send", "stop", "inspect");
-
         @Override
         public void complete(LineReader reader, ParsedLine line, List<Candidate> candidates) {
             List<String> values;
             if (line.wordIndex() == 0) {
-                values = ROOT_COMMANDS;
+                values = ConsoleCommandProcessor.rootCommands();
             } else if (line.wordIndex() == 1 && !line.words().isEmpty()) {
-                values = SUBCOMMANDS.getOrDefault(line.words().getFirst().toLowerCase(Locale.ROOT), List.of());
+                values = ConsoleCommandProcessor.subcommands(line.words().getFirst());
             } else {
                 values = List.of();
             }
