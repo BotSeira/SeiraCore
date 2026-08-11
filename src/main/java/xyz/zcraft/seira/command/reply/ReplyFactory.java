@@ -37,10 +37,6 @@ public final class ReplyFactory {
         this.configSupplier = Objects.requireNonNull(configSupplier);
     }
 
-    private Buttons buttons() {
-        return new Buttons(configSupplier.get().seira().directUrl());
-    }
-
     public static String cmd(String command, String text) {
         return "<qqbot-cmd-input text=\"%s\" show=\"%s\" reference=\"false\" />".formatted(command, text);
     }
@@ -63,19 +59,17 @@ public final class ReplyFactory {
     }
 
     public static PendingMessage replayUploadMessage(ReplayUploadInfo info) {
-        return PendingMessage.ofMarkdownRaw("""
-                                Replay上传成功~
-                                成绩: %s
-                                铺面: %s
-                                用户: %s
-                        """
-                        .formatted(
-                                cmd("/s " + info.scoreId(), String.valueOf(info.scoreId())),
-                                cmd("/m " + info.beatmapId(), String.valueOf(info.beatmapId())),
-                                cmd("/u " + info.userId(), info.username())
-                        ),
+        return PendingMessage.ofMarkdownRaw(
+                ("\n" + "## Replay上传成功~" + "\n" +
+                        "> 成绩: " + cmd("/s " + info.scoreId(), String.valueOf(info.scoreId())) + "\n" +
+                        "> 铺面: " + cmd("/m " + info.beatmapId(), String.valueOf(info.beatmapId())) + "\n" +
+                        "> 用户: " + cmd("/u " + info.userId(), info.username()) + "\n").trim(),
                 null
         );
+    }
+
+    private Buttons buttons() {
+        return new Buttons(configSupplier.get().seira().directUrl());
     }
 
     public PendingMessage rankGuessResultMessage(RankGuessGameService.FinishedRound result) {
@@ -105,7 +99,7 @@ public final class ReplyFactory {
                                         standing.multiplier(),
                                         standing.guess(),
                                         standing.delta(),
-                                        (standing.delta() / (double)round.actualRank()) * 100.00
+                                        (standing.delta() / (double) round.actualRank()) * 100.00
                                 )
                 );
             }
