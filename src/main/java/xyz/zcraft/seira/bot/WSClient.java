@@ -12,6 +12,8 @@ import xyz.zcraft.seira.bot.data.Attachment;
 import xyz.zcraft.seira.command.AttachmentHandler;
 import xyz.zcraft.seira.command.route.Router;
 import xyz.zcraft.seira.config.AppConfig;
+import xyz.zcraft.seira.discord.DiscordBridgeService;
+import xyz.zcraft.seira.discord.QqIncomingMessage;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -36,6 +38,7 @@ public class WSClient extends WebSocketClient {
     private final AtomicLong sequence = new AtomicLong(-1);
     private final Router router;
     private final AttachmentHandler attachmentHandler;
+    private final DiscordBridgeService discordBridgeService;
     private volatile boolean heartbeatAcked = true;
     @Setter
     private Runnable onCloseCallback = null;
@@ -46,6 +49,7 @@ public class WSClient extends WebSocketClient {
             Supplier<AccessToken> tokenSupplier,
             Router router,
             AttachmentHandler attachmentHandler,
+            DiscordBridgeService discordBridgeService,
             Executor eventExecutor
     ) {
         super(serverUri);
@@ -53,6 +57,7 @@ public class WSClient extends WebSocketClient {
         this.tokenSupplier = tokenSupplier;
         this.router = java.util.Objects.requireNonNull(router);
         this.attachmentHandler = java.util.Objects.requireNonNull(attachmentHandler);
+        this.discordBridgeService = java.util.Objects.requireNonNull(discordBridgeService);
         this.eventExecutor = java.util.Objects.requireNonNull(eventExecutor);
 
         LOG.info("QQ Gateway WebSocket Client created");
@@ -154,11 +159,54 @@ public class WSClient extends WebSocketClient {
 
     private void onGroupMsg(JsonObject payload) {
         JsonObject data = payload.get("d").getAsJsonObject();
-        String content = data.get("content").getAsString();
+        String content = data.has("content") && !data.get("content").isJsonNull()
+                ? data.get("content").getAsString()
+                : "";
         String msgId = data.get("id").getAsString();
-        String openId = data.get("author").getAsJsonObject().get("member_openid").getAsString();
+        JsonObject author = data.get("author").getAsJsonObject();
+        String openId = author.get("member_openid").getAsString();
         String groupId = data.get("group_openid").getAsString();
+        List<Attachment> attachments = parseAttachments(data);
+        if (!openId.equals(config.qq().selfId())) {
+            discordBridgeService.acceptQqMessage(new QqIncomingMessage(
+                    groupId,
+                    openId,
+                    firstText(author, "nickname", "username", "member_name", "member_openid"),
+                    msgId,
+                    stripSelfMention(content),
+                    attachments
+            ));
+        }
         router.onGroupMessageReceived(groupId, openId, msgId, content);
+    }
+
+    private List<Attachment> parseAttachments(JsonObject data) {
+        if (!data.has("attachments") || !data.get("attachments").isJsonArray()) return List.of();
+        JsonArray attachments = data.getAsJsonArray("attachments");
+        List<Attachment> result = new ArrayList<>(attachments.size());
+        for (JsonElement element : attachments) {
+            result.add(gson.fromJson(element, Attachment.class));
+        }
+        return List.copyOf(result);
+    }
+
+    private String stripSelfMention(String content) {
+        if (content == null) return "";
+        String selfAt = "<@" + config.qq().selfId() + ">";
+        String normalized = content.stripLeading();
+        return normalized.startsWith(selfAt)
+                ? normalized.substring(selfAt.length()).stripLeading()
+                : normalized;
+    }
+
+    private static String firstText(JsonObject object, String... names) {
+        for (String name : names) {
+            if (object.has(name) && !object.get(name).isJsonNull()) {
+                String value = object.get(name).getAsString();
+                if (!value.isBlank()) return value;
+            }
+        }
+        return "QQ用户";
     }
 
     private void sendIdentify() {

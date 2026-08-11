@@ -11,6 +11,7 @@ import xyz.zcraft.seira.console.ConsoleRuntimeControl;
 import xyz.zcraft.seira.console.OstellaCacheControlClient;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.RuntimeConfig;
+import xyz.zcraft.seira.discord.DiscordBridgeService;
 import xyz.zcraft.seira.game.RankGuessGameService;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.services.CosService;
@@ -40,6 +41,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
     @Getter
     private final MessageSender sender;
     private final ScoreWatchService watchService;
+    private final DiscordBridgeService discordBridgeService;
     private final AppConfig startupConfig;
     private final Router router;
     private final AttachmentHandler attachmentHandler;
@@ -70,6 +72,9 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
 
         this.sender = new MessageSender(tokenManager, cos);
 
+        LOG.info("Initializing Discord bridge service");
+        this.discordBridgeService = new DiscordBridgeService(config.discord(), config.bridge(), sender);
+
         LOG.info("Initializing score watch service");
         this.watchService = new ScoreWatchService(
                 new OstellaWatchApi(config.ostella().endpoint()),
@@ -86,6 +91,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                 admins,
                 bindingService,
                 watchService,
+                discordBridgeService,
                 rankGuessGameService,
                 executors.commandTasks(),
                 BotStat::incrementCommands
@@ -102,6 +108,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         runnerThread = Thread.currentThread();
         tokenManager.start();
         watchService.start();
+        discordBridgeService.start();
         LOG.info("Starting bot connection loop...");
 
         while (running.get()) {
@@ -125,6 +132,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                         tokenManager::getToken,
                         router,
                         attachmentHandler,
+                        discordBridgeService,
                         executors.gatewayEvents()
                 );
                 activeClient.set(client);
@@ -195,6 +203,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
             thread.interrupt();
         }
         watchService.close();
+        discordBridgeService.close();
         tokenManager.close();
     }
 

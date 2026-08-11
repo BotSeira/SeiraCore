@@ -3,6 +3,7 @@ package xyz.zcraft.seira.binding;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.api.data.OsuToken;
+import xyz.zcraft.seira.discord.DiscordBridgeMapping;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 
 import java.nio.file.Files;
@@ -421,6 +422,60 @@ public final class UserDataStore {
         }
     }
 
+    public static void upsertDiscordBridge(DiscordBridgeMapping mapping) {
+        ensureInitialized();
+        String sql = """
+                INSERT INTO discord_bridges(group_id, guild_id, channel_id, updated_at)
+                VALUES(?, ?, ?, ?)
+                ON CONFLICT(group_id) DO UPDATE SET
+                    guild_id = excluded.guild_id,
+                    channel_id = excluded.channel_id,
+                    updated_at = excluded.updated_at
+                """;
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, mapping.groupId());
+            statement.setString(2, mapping.guildId());
+            statement.setString(3, mapping.channelId());
+            statement.setLong(4, System.currentTimeMillis());
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to persist Discord bridge", e);
+        }
+    }
+
+    public static boolean removeDiscordBridge(String groupId) {
+        ensureInitialized();
+        String sql = "DELETE FROM discord_bridges WHERE group_id = ?";
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, groupId);
+            return statement.executeUpdate() > 0;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to remove Discord bridge", e);
+        }
+    }
+
+    public static List<DiscordBridgeMapping> findAllDiscordBridges() {
+        ensureInitialized();
+        String sql = "SELECT group_id, guild_id, channel_id FROM discord_bridges ORDER BY group_id";
+        List<DiscordBridgeMapping> mappings = new ArrayList<>();
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+            while (resultSet.next()) {
+                mappings.add(new DiscordBridgeMapping(
+                        resultSet.getString("group_id"),
+                        resultSet.getString("guild_id"),
+                        resultSet.getString("channel_id")
+                ));
+            }
+            return List.copyOf(mappings);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to load Discord bridges", e);
+        }
+    }
+
     public static int countBoundUser() {
         ensureInitialized();
 
@@ -648,6 +703,18 @@ public final class UserDataStore {
                     PRIMARY KEY(uid)
                 )
                 """;
+        String discordBridgeSql = """
+                CREATE TABLE IF NOT EXISTS discord_bridges (
+                    group_id TEXT NOT NULL PRIMARY KEY,
+                    guild_id TEXT NOT NULL,
+                    channel_id TEXT NOT NULL,
+                    updated_at BIGINT NOT NULL
+                )
+                """;
+        String discordBridgeTargetIndexSql = """
+                CREATE INDEX IF NOT EXISTS idx_discord_bridges_target
+                ON discord_bridges(guild_id, channel_id)
+                """;
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
              Statement statement = connection.createStatement()) {
             statement.execute(bindingSql);
@@ -656,6 +723,8 @@ public final class UserDataStore {
             statement.execute(followSql);
             statement.execute(followIndexSql);
             statement.execute(userInfoSql);
+            statement.execute(discordBridgeSql);
+            statement.execute(discordBridgeTargetIndexSql);
         }
     }
 

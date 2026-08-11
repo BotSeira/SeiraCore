@@ -5,7 +5,23 @@ public record AppConfig(
         OstellaConfig ostella,
         BindingConfig binding,
         QqConfig qq,
-        CosConfig cos
+        CosConfig cos,
+        DiscordConfig discord,
+        BridgeConfig bridge
 ) {
+    public AppConfig {
+        discord = discord == null ? DiscordConfig.disabled() : discord;
+        bridge = bridge == null ? BridgeConfig.defaults() : bridge;
+    }
+
+    public AppConfig(
+            SeiraConfig seira,
+            OstellaConfig ostella,
+            BindingConfig binding,
+            QqConfig qq,
+            CosConfig cos
+    ) {
+        this(seira, ostella, binding, qq, cos, null, null);
+    }
 }
 

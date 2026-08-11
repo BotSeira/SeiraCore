@@ -20,6 +20,8 @@ public final class ConfigValidator {
         BindingConfig binding = requireSection(config.binding(), "binding", errors);
         QqConfig qq = requireSection(config.qq(), "qq", errors);
         CosConfig cos = requireSection(config.cos(), "cos", errors);
+        DiscordConfig discord = config.discord();
+        BridgeConfig bridge = config.bridge();
 
         if (seira != null) {
             requireText(seira.sqlitePath(), "seira.sqlitePath", errors);
@@ -58,11 +60,47 @@ public final class ConfigValidator {
                 requireHttpUri(cos.baseUrl(), "cos.baseUrl", errors);
             }
         }
+        if (discord.enabled()) {
+            DiscordProxyConfig proxy = discord.proxy();
+            if (proxy.enabled()) {
+                requireText(proxy.host(), "discord.proxy.host", errors);
+                if (proxy.port() < 1 || proxy.port() > 65_535) {
+                    errors.add("discord.proxy.port must be between 1 and 65535");
+                }
+                if (!proxy.password().isBlank() && proxy.username().isBlank()) {
+                    errors.add("discord.proxy.username is required when a password is configured");
+                }
+            }
+        }
+        if (bridge.maxMediaBytes() < 1) {
+            errors.add("bridge.maxMediaBytes must be positive");
+        }
+        if (bridge.maxDiscordBatchBytes() < 1) {
+            errors.add("bridge.maxDiscordBatchBytes must be positive");
+        }
+        if (bridge.maxMediaBytes() > bridge.maxDiscordBatchBytes()) {
+            errors.add("bridge.maxMediaBytes must not exceed bridge.maxDiscordBatchBytes");
+        }
+        if (bridge.maxDiscordAttachments() < 1 || bridge.maxDiscordAttachments() > 10) {
+            errors.add("bridge.maxDiscordAttachments must be between 1 and 10");
+        }
+        if (bridge.workerThreads() < 1) {
+            errors.add("bridge.workerThreads must be positive");
+        }
+        validateBridgeFormat(bridge.qqToDiscordFormat(), "bridge.qqToDiscordFormat", errors);
+        validateBridgeFormat(bridge.discordToQqFormat(), "bridge.discordToQqFormat", errors);
 
         if (!errors.isEmpty()) {
             throw new IllegalArgumentException("Invalid configuration: " + String.join("; ", errors));
         }
         return config;
+    }
+
+    private static void validateBridgeFormat(String value, String name, List<String> errors) {
+        requireText(value, name, errors);
+        if (value != null && !value.contains("{message}")) {
+            errors.add(name + " must contain {message}");
+        }
     }
 
     private static <T> T requireSection(T value, String name, List<String> errors) {

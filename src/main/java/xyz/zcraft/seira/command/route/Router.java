@@ -15,6 +15,7 @@ import xyz.zcraft.seira.command.parse.CommandParser;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.config.AppConfig;
+import xyz.zcraft.seira.discord.DiscordBridgeService;
 import xyz.zcraft.seira.game.RankGuessGameService;
 import xyz.zcraft.seira.security.AdminRegistry;
 import xyz.zcraft.seira.util.OsuAuthHelper;
@@ -45,6 +46,7 @@ public class Router {
             AdminRegistry admins,
             BindingService bindingService,
             ScoreWatchService watchService,
+            DiscordBridgeService discordBridgeService,
             RankGuessGameService rankGuessGameService,
             Executor commandExecutor,
             Runnable commandMetric
@@ -82,6 +84,7 @@ public class Router {
                 messageSender, taskCoordinator, replyFactory, scoreCommands, admins::isAdmin, commandMetric
         );
         WatchCommandHandler watchCommands = new WatchCommandHandler(resolver, taskCoordinator, watchService, admins::isAdmin);
+        DcsCommandHandler dcsCommands = new DcsCommandHandler(discordBridgeService);
         RankGuessCommandHandler rankGuessCommands = new RankGuessCommandHandler(
                 taskCoordinator, replyFactory, rankGuessGameService, admins::isAdmin
         );
@@ -95,6 +98,7 @@ public class Router {
                 replayCommands,
                 generalCommands,
                 watchCommands,
+                dcsCommands,
                 rankGuessCommands
         );
         this.debugRoutes = new DebugRoutes(
@@ -187,6 +191,7 @@ public class Router {
             ReplayCommandHandler replayCommands,
             GeneralCommandHandler generalCommands,
             WatchCommandHandler watchCommands,
+            DcsCommandHandler dcsCommands,
             RankGuessCommandHandler rankGuessCommands
     ) {
         return CommandRegistry.builder()
@@ -221,6 +226,7 @@ public class Router {
                 .register(generalCommands::handleHelp, "help")
                 .register(generalCommands::handleFaq, "faq")
                 .register(watchCommands::handleWatch, "watch")
+                .register(dcsCommands::handleDcs, "dcs")
                 .register(rankGuessCommands::handleRankGuess, "rg")
                 .build();
     }

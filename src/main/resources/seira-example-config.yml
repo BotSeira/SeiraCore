@@ -45,3 +45,26 @@ cos:
   baseUrl: ""
   # 可选：对象前缀，默认 seira
   keyPrefix: "seira"
+
+# === Discord 消息同步 ===
+# 留空 token 时禁用 Discord 同步；群内使用 /dcs start <guild-id>.<channel-id> 建立映射。
+discord:
+  # 还需在 Discord Developer Portal 中开启 Message Content Intent。
+  token: "${DISCORD_BOT_TOKEN:-}"
+  proxy:
+    enabled: false
+    host: "127.0.0.1"
+    port: 7890
+    username: "${DISCORD_PROXY_USERNAME:-}"
+    password: "${DISCORD_PROXY_PASSWORD:-}"
+
+bridge:
+  # 单个媒体超过此大小时降级为说明文本。
+  maxMediaBytes: 20971520
+  # 保持 Discord multipart 请求低于官方 25 MiB 限制。
+  maxDiscordBatchBytes: 24117248
+  maxDiscordAttachments: 10
+  workerThreads: 4
+  # 可用占位符：{name}、{id}、{message}
+  qqToDiscordFormat: "[{name}] {message}"
+  discordToQqFormat: "[{name}] {message}"

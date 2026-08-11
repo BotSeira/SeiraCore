@@ -88,7 +88,9 @@ public final class RuntimeConfig {
                 previous.ostella(),
                 previous.binding(),
                 previous.qq(),
-                previous.cos()
+                previous.cos(),
+                previous.discord(),
+                previous.bridge()
         );
     }
 
@@ -111,6 +113,8 @@ public final class RuntimeConfig {
         addIfChanged(changed, "binding", previous.binding(), loaded.binding());
         addIfChanged(changed, "qq", previous.qq(), loaded.qq());
         addIfChanged(changed, "cos", previous.cos(), loaded.cos());
+        addIfChanged(changed, "discord", previous.discord(), loaded.discord());
+        addIfChanged(changed, "bridge", previous.bridge(), loaded.bridge());
         return List.copyOf(changed);
     }
 

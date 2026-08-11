@@ -12,7 +12,7 @@ public class PendingMessage {
     public static final int FILE_TYPE_IMAGE = 1;
     public static final int FILE_TYPE_VIDEO = 2;
     public static final int FILE_TYPE_VOICE = 3;
-    private static final int FILE_TYPE_FILE = 4;
+    public static final int FILE_TYPE_FILE = 4;
 
     private String content;
     private int msgType;
