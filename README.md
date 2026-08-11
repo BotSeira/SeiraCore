@@ -93,13 +93,13 @@ mvn -U clean compile exec:java
 | `/m`            | `/m <id/rsN/boN> [Mod]`                            | 获取指定谱面信息                                                                |
 | `/ap`           | `/ap <id/rsN/boN>`                                 | 获取指定谱面音频预览                                                            |
 | `/bgp`          | `/bgp <id/rsN/boN>`                                | 获取指定谱面背景预览                                                            |
-| `/s`            | `/s <id/rsN/boN>`                                  | 获取指定成绩图                                                                  |
-| `/sa`           | `/sa <id/rsN/boN>`                                 | 获取指定成绩分析图                                                              |
-| `/ma`           | `/ma [id/rsN/boN] [n/#n]`                          | 获取指定或最近目标成绩的Miss分析；省略目标时用`#n`指定Miss                      |
+| `/s`            | `/s <id/locId/rsN/boN>`                            | 获取指定的在线或本地成绩图                                                      |
+| `/sa`           | `/sa <id/locId/rsN/boN>`                           | 获取指定成绩分析图                                                              |
+| `/ma`           | `/ma [id/locId/rsN/boN] [n/#n]`                   | 获取指定或最近目标成绩的Miss分析；省略目标时用`#n`指定Miss                      |
 | `/u`            | `/u <uid/username/@user>`                          | 获取指定用户信息                                                                |
-| `/r`            | `/r [id/rsN/boN] [[mm:ss]-[mm:ss]]`                | 生成并发送指定或最近目标的回放视频。省略范围时自动识别高光，使用`-`渲染整个回放 |
+| `/r`            | `/r [id/locId/rsN/boN] [[mm:ss]-[mm:ss]]`          | 生成并发送指定或最近目标的回放视频。省略范围时自动识别高光，使用`-`渲染整个回放 |
 | `/rg`           | `/rg <start/#Rank/end>`                            | 在群聊中开始、参与或结束猜 Rank 游戏                                            |
-| `/rsc`          | `/rsc [id/rsN/boN] [+<id1>,<id2>...]`              | 生成并发送指定或最近目标的成绩同屏回放视频；追加用户和范围顺序不限              |
+| `/rsc`          | `/rsc [id/locId/rsN/boN] [+<id1>,<id2>...]`        | 生成并发送指定或最近目标的成绩同屏回放视频；追加用户和范围顺序不限              |
 | `/rstat`        | `/rstat [id]`                                      | 获取视频生成进度                                                                |
 | `/ms`           | `/ms <id/rsN/boN>`                                 | 获取指定谱面集信息                                                              |
 | `/dl`           | `/dl <id/rsN/boN/mp>`                              | 获取指定谱面集的镜像下载链接                                                    |
@@ -118,6 +118,8 @@ mvn -U clean compile exec:java
 部分指令会先回复“请求已加入队列，预计等待时间 X 秒”，待异步请求完成后再额外发送结果消息。
 
 `/r`和`/rsc`（回放渲染）会先返回“生成请求正在等待中，队列位置：N”，随后返回请求状态，最后在渲染完成后再发送回放视频。
+
+上传 osu! 服务器上不存在的 `.osr` 回放后，机器人会返回形如 `loc123456789` 的本地成绩ID；该ID可用于 `/s`、`/sa`、`/ma`、`/r`、`/rsc` 等成绩目标指令。
 
 ### 快捷查询
 

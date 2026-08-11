@@ -216,9 +216,14 @@ public final class Resolver {
             return new ShortcutTarget(mapId, userRef, "m", null, null);
         }
 
+        if (Patterns.LOCAL_SCORE_PATTERN.matcher(arg.trim()).matches()) {
+            return ShortcutTarget.localScore(arg.trim().toLowerCase(Locale.ROOT));
+        }
+
         Long id = parsePositiveLong(arg);
         if (id == null) {
-            return new ShortcutTarget(null, null, null, null, "参数无效。请输入纯数字ID或快捷指令 (例如 rs1, 12345#2)。");
+            return new ShortcutTarget(null, null, null, null,
+                    "参数无效。请输入数字ID、本地成绩ID或快捷指令 (例如 loc123456789, rs1, 12345#2)。");
         }
 
         return new ShortcutTarget(id, null, null, null, null);
@@ -265,6 +270,7 @@ public final class Resolver {
         private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo|rp|bp)(\\d+)?$");
         private static final Pattern SET_MACRO_PATTERN = Pattern.compile("^(\\d+)#(\\d+)$");
         private static final Pattern BEATMAP_MACRO_PATTERN = Pattern.compile("^m(\\d+)$");
+        private static final Pattern LOCAL_SCORE_PATTERN = Pattern.compile("(?i)^loc[1-9]\\d*$");
         private static final Pattern QQ_AT_PATTERN = Pattern.compile("^<@([A-Z|0-9]{32})>$");
         private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
         private static final Pattern SEARCH_PATTERN = Pattern.compile("^(?:#(\\d+) )?(.+)$");

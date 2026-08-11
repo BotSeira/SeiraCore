@@ -119,7 +119,9 @@ public final class ReplayCommandHandler {
             }
         }
 
-        RscTarget rscTarget = resolver.resolveRscTarget(ctx.groupId(), extraUidArg);
+        RscTarget rscTarget = target.isLocalScore() && extraUidArg == null
+                ? new RscTarget(new String[0], null)
+                : resolver.resolveRscTarget(ctx.groupId(), extraUidArg);
         if (rscTarget.errorMessage() != null) {
             ctx.sendReply(PendingMessage.ofString(rscTarget.errorMessage()));
             return;

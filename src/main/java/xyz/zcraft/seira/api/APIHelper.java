@@ -23,9 +23,11 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 public class APIHelper {
     private static final String ENDPOINT;
@@ -206,7 +208,9 @@ public class APIHelper {
 
     public static long lookupBeatmap(ShortcutTarget target, String auth) {
         long beatmapId;
-        if (!target.isMacro()) {
+        if (target.isLocalScore()) {
+            beatmapId = lookupScoreData(target.localScoreId()).get("beatmap_id").getAsLong();
+        } else if (!target.isMacro()) {
             beatmapId = target.explicitId();
         } else {
             try {
@@ -329,17 +333,17 @@ public class APIHelper {
     }
 
     public static Response<Base64Bytes> getScoreResponse(ShortcutTarget target) {
-        long scoreId = lookupScoreId(target);
+        String scoreId = lookupScoreId(target);
         return getBase64BytesResponse("/scores/" + scoreId, "获取成绩失败", null);
     }
 
     public static Response<Base64Bytes> getScoreAnalyzeResponse(ShortcutTarget target) {
-        long scoreId = lookupScoreId(target);
+        String scoreId = lookupScoreId(target);
         return getBase64BytesResponse("/scores/" + scoreId + "/analysis", "获取成绩分析失败", null);
     }
 
     public static Response<Base64Bytes> getMissVisualizeResponse(ShortcutTarget target, int index) {
-        long scoreId = lookupScoreId(target);
+        String scoreId = lookupScoreId(target);
         return getBase64BytesResponse("/scores/" + scoreId + "/misses/" + index + "/visualize", "获取Miss可视化失败", null);
     }
 
@@ -507,7 +511,14 @@ public class APIHelper {
 
     public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] ids, String auth,
                                                            QqUploadRequest qqUpload) {
-        if (ids == null || ids.length == 0) {
+        ids = ids == null ? new String[0] : ids;
+
+        if (target.isLocalScore()) {
+            ids = Stream.concat(Stream.of("s" + target.localScoreId()), Arrays.stream(ids))
+                    .distinct()
+                    .toArray(String[]::new);
+        }
+        if (ids.length == 0) {
             throw new RuntimeException("同屏回放需要至少一个ID。");
         }
 
@@ -539,7 +550,7 @@ public class APIHelper {
     private static ReplayTaskInfo createReplayTask(ShortcutTarget target,
                                                     TimeDurationParser.TimeRange timeRange,
                                                     QqUploadRequest qqUpload) {
-        long scoreId = lookupScoreId(target);
+        String scoreId = lookupScoreId(target);
 
         if (timeRange == null) {
             timeRange = getScoreHighlight(scoreId, 5);
@@ -555,6 +566,10 @@ public class APIHelper {
     }
 
     private static TimeDurationParser.TimeRange getScoreHighlight(long scoreId, int extend) {
+        return getScoreHighlight(String.valueOf(scoreId), extend);
+    }
+
+    private static TimeDurationParser.TimeRange getScoreHighlight(String scoreId, int extend) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/scores/" + scoreId + "/highlight"))
@@ -580,10 +595,12 @@ public class APIHelper {
         }
     }
 
-    private static long lookupScoreId(ShortcutTarget target) {
-        long scoreId;
-        if (!target.isMacro()) {
-            scoreId = target.explicitId();
+    private static String lookupScoreId(ShortcutTarget target) {
+        String scoreId;
+        if (target.isLocalScore()) {
+            scoreId = target.localScoreId();
+        } else if (!target.isMacro()) {
+            scoreId = String.valueOf(target.explicitId());
         } else {
             try {
                 final String query = getScoreQuery(target);
@@ -603,12 +620,30 @@ public class APIHelper {
 
                 ensureApiSuccess(rawResponse, "获取成绩失败");
 
-                scoreId = rawResponse.getData().getAsJsonObject().get("score_id").getAsLong();
+                scoreId = rawResponse.getData().getAsJsonObject().get("score_id").getAsString();
             } catch (IOException | InterruptedException e) {
                 throw requestFailure(e);
             }
         }
         return scoreId;
+    }
+
+    private static JsonObject lookupScoreData(String scoreId) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/scores/lookup?s=" + scoreId))
+                    .GET()
+                    .build();
+            HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                throw parseHttpError(response.body(), response.statusCode(), "获取本地成绩信息失败");
+            }
+            RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
+            ensureApiSuccess(payload, "获取本地成绩信息失败");
+            return requireDataObject(payload, "本地成绩响应缺少data");
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
+        }
     }
 
     @NotNull
@@ -837,7 +872,7 @@ public class APIHelper {
     }
 
     public static Response<List<MissData>> getScoreMissesResponse(ShortcutTarget target) {
-        final long scoreId = lookupScoreId(target);
+        final String scoreId = lookupScoreId(target);
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/scores/" + scoreId + "/misses"))
