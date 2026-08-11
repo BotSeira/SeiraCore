@@ -334,6 +334,13 @@ public final class DiscordBridgeService implements AutoCloseable {
     private static List<BridgeAttachment> collectDiscordAttachments(MessageReceivedEvent event) {
         List<BridgeAttachment> attachments = new ArrayList<>();
         Set<String> seen = new HashSet<>();
+        for (String url : BridgeFormatter.findImageUrls(event.getMessage().getContentDisplay())) {
+            if (seen.add(url)) {
+                attachments.add(new BridgeAttachment(
+                        filenameFromUrl(url), List.of(url), url, isGifUrl(url)
+                ));
+            }
+        }
         event.getMessage().getAttachments().forEach(item -> {
             if (seen.add(item.getUrl())) {
                 attachments.add(new BridgeAttachment(
@@ -374,6 +381,27 @@ public final class DiscordBridgeService implements AutoCloseable {
             }
         });
         return List.copyOf(attachments);
+    }
+
+    private static String filenameFromUrl(String value) {
+        try {
+            String path = URI.create(value).getPath();
+            if (path != null && path.lastIndexOf('/') < path.length() - 1) {
+                return path.substring(path.lastIndexOf('/') + 1);
+            }
+        } catch (IllegalArgumentException ignored) {
+            // The downloader will report malformed URLs if one reaches it.
+        }
+        return "discord-image";
+    }
+
+    private static boolean isGifUrl(String value) {
+        try {
+            String path = URI.create(value).getPath();
+            return path != null && path.toLowerCase(Locale.ROOT).endsWith(".gif");
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
     }
 
     static List<String> gifCandidates(MessageEmbed embed) {

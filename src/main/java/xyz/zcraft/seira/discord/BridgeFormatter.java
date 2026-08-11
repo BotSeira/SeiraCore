@@ -1,6 +1,8 @@
 package xyz.zcraft.seira.discord;
 
+import java.net.URI;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -19,6 +21,13 @@ final class BridgeFormatter {
             "<qqbot-face\\s+id=\"([^\"]+)\"\\s*/>", Pattern.CASE_INSENSITIVE
     );
     private static final Pattern SIMPLE_MENTION = Pattern.compile("<@([^>]+)>");
+    private static final Pattern MARKDOWN_LINK = Pattern.compile(
+            "\\[[^]\\r\\n]*]\\(\\s*<?(https?://[^\\s)>]+)>?\\s*\\)",
+            Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern RAW_URL = Pattern.compile(
+            "https?://[^\\s<>\\])]+", Pattern.CASE_INSENSITIVE
+    );
 
     private BridgeFormatter() {
     }
@@ -54,10 +63,37 @@ final class BridgeFormatter {
 
     static String removeSourceUrl(String text, String sourceUrl) {
         if (text == null || sourceUrl == null || sourceUrl.isBlank()) return text == null ? "" : text;
-        return text.replace("<" + sourceUrl + ">", "")
+        String markdownWithSource = "\\[[^]\\r\\n]*]\\(\\s*<?"
+                + Pattern.quote(sourceUrl) + ">?\\s*\\)";
+        return text.replaceAll(markdownWithSource, "")
+                .replace("<" + sourceUrl + ">", "")
                 .replace(sourceUrl, "")
                 .replace("<>", "")
+                .replaceAll("\\[\\s*]\\(\\s*\\)", "")
                 .strip();
+    }
+
+    static List<String> findImageUrls(String text) {
+        if (text == null || text.isBlank()) return List.of();
+        LinkedHashSet<String> urls = new LinkedHashSet<>();
+        Matcher markdown = MARKDOWN_LINK.matcher(text);
+        while (markdown.find()) addImageUrl(urls, markdown.group(1));
+        Matcher raw = RAW_URL.matcher(text);
+        while (raw.find()) addImageUrl(urls, raw.group());
+        return List.copyOf(urls);
+    }
+
+    private static void addImageUrl(LinkedHashSet<String> urls, String value) {
+        try {
+            String path = URI.create(value).getPath();
+            String lower = path == null ? "" : path.toLowerCase(java.util.Locale.ROOT);
+            if (lower.endsWith(".gif") || lower.endsWith(".png") || lower.endsWith(".jpg")
+                    || lower.endsWith(".jpeg") || lower.endsWith(".webp") || lower.endsWith(".bmp")) {
+                urls.add(value);
+            }
+        } catch (IllegalArgumentException ignored) {
+            // Ignore malformed links and leave them as text.
+        }
     }
 
     static List<String> splitDiscordText(String value) {
