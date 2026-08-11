@@ -43,6 +43,13 @@ public final class DcsCommandHandler {
             ctx.sendReply(PendingMessage.ofString("Discord 目标格式无效，应为 <guild-id>.<channel-id>。"));
             return;
         }
+
+        final boolean b = ctx.sendMessage(PendingMessage.ofString("正在尝试开启 Discord 消息同步，请稍候..."));
+        if (!b) {
+            ctx.sendReply(PendingMessage.ofString("由于缺少主动消息权限，无法添加消息同步！权限配置请见[这里](https://docs.seira.top/overview/use.html#extra-permission)~"));
+            return;
+        }
+
         DiscordBridgeService.BindResult result = bridgeService.bind(ctx.groupId(), target);
         if (!result.success()) {
             ctx.sendReply(PendingMessage.ofString("开启 Discord 同步失败：" + result.message()));
