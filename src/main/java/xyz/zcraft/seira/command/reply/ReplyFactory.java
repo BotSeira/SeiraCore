@@ -41,7 +41,7 @@ public final class ReplyFactory {
         return new Buttons(configSupplier.get().seira().directUrl());
     }
 
-    static String cmd(String command, String text) {
+    public static String cmd(String command, String text) {
         return "<qqbot-cmd-input text=\"%s\" show=\"%s\" reference=\"false\" />".formatted(command, text);
     }
 
@@ -571,6 +571,7 @@ public final class ReplyFactory {
                             > /rg <start/#Rank/end> - 在群聊中进行猜 Rank 游戏
                             > /lb <谱面ID> [玩家ID列表] - 获取指定谱面排行榜
                             > /watch add <玩家ID/用户名/@用户> [分钟] - 监视群友的新成绩
+                            > /wx start <UID列表> <谱面ID列表> - 监视指定玩家在指定谱面的成绩
                             > /f - 获取好友列表
                             
                             详细指令列表请在 [这里](https://docs.seira.top/overview/commands.html) 查看

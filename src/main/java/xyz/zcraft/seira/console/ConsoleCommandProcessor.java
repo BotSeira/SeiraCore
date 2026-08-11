@@ -5,7 +5,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.config.Configurator;
 import xyz.zcraft.seira.binding.UserDataStore;
-import xyz.zcraft.seira.bot.ProactiveMessenger;
+import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.route.Router;
 import xyz.zcraft.seira.config.AppConfig;
@@ -49,14 +49,14 @@ public final class ConsoleCommandProcessor {
     private final RuntimeConfig runtimeConfig;
     private final AdminRegistry admins;
     private final ConsoleDataAccess dataAccess;
-    private final ProactiveMessenger messenger;
+    private final MessageSender messenger;
     private final ConsoleRuntimeControl runtimeControl;
 
     public ConsoleCommandProcessor(
             RuntimeConfig runtimeConfig,
             AdminRegistry admins,
             ConsoleDataAccess dataAccess,
-            ProactiveMessenger messenger,
+            MessageSender messenger,
             ConsoleRuntimeControl runtimeControl
     ) {
         this.runtimeConfig = Objects.requireNonNull(runtimeConfig);

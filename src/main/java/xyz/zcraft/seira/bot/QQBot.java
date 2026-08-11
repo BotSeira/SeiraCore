@@ -19,8 +19,10 @@ import xyz.zcraft.seira.runtime.ApplicationExecutors;
 import xyz.zcraft.seira.security.AdminRegistry;
 import xyz.zcraft.seira.util.TokenManager;
 import xyz.zcraft.seira.watch.OstellaWatchApi;
-import xyz.zcraft.seira.watch.QqWatchScoreNotifier;
+import xyz.zcraft.seira.watch.SpecificScoreNotifier;
+import xyz.zcraft.seira.watch.WatchScoreNotifier;
 import xyz.zcraft.seira.watch.ScoreWatchService;
+import xyz.zcraft.seira.watch.SqliteSpecificScoreWatchStore;
 import xyz.zcraft.seira.watch.WatchView;
 
 import java.net.URI;
@@ -78,7 +80,9 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         LOG.info("Initializing score watch service");
         this.watchService = new ScoreWatchService(
                 new OstellaWatchApi(config.ostella().endpoint()),
-                new QqWatchScoreNotifier(sender),
+                new WatchScoreNotifier(sender),
+                new SpecificScoreNotifier(sender),
+                new SqliteSpecificScoreWatchStore(),
                 Duration.ofMinutes(config.seira().effectiveWatchIntervalMinutes())
         );
 

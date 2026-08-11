@@ -1,5 +1,6 @@
 package xyz.zcraft.seira.bot;
 
+import com.google.gson.Gson;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.bot.data.FileInfo;
@@ -10,9 +11,10 @@ import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.services.CosService;
 import xyz.zcraft.seira.util.TokenManager;
 
+import java.util.Map;
 import java.util.function.Supplier;
 
-public class MessageSender implements ProactiveMessenger {
+public class MessageSender {
     private static final int MAX_UPLOAD_ATTEMPTS = 10;
     private final Logger LOG = LogManager.getLogger(MessageSender.class);
     private final TokenManager tokenManager;
@@ -131,7 +133,6 @@ public class MessageSender implements ProactiveMessenger {
         }
     }
 
-    @Override
     public boolean sendPrivateText(String userId, String content) {
         Message message = new Message();
         message.setMsgType(PendingMessage.MSG_TYPE_TEXT);
@@ -139,11 +140,17 @@ public class MessageSender implements ProactiveMessenger {
         return sendPrivateMessage(userId, message);
     }
 
-    @Override
     public boolean sendGroupText(String groupId, String content) {
         Message message = new Message();
         message.setMsgType(PendingMessage.MSG_TYPE_TEXT);
         message.setContent(content);
+        return sendGroupMessage(groupId, message);
+    }
+
+    public boolean sendGroupMarkdown(String groupId, String content) {
+        Message message = new Message();
+        message.setMsgType(PendingMessage.MSG_TYPE_MARKDOWN);
+        message.setMarkdown(new Gson().toJsonTree(Map.of("content", content)).getAsJsonObject());
         return sendGroupMessage(groupId, message);
     }
 

@@ -5,25 +5,31 @@ import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.discord.DiscordBridgeMapping;
 import xyz.zcraft.seira.util.OsuAuthHelper;
+import xyz.zcraft.seira.watch.SpecificScoreWatchState;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Locale;
+import java.util.Set;
 
 public final class UserDataStore {
     private static final Logger LOG = LogManager.getLogger(UserDataStore.class);
     private static final Object INIT_LOCK = new Object();
 
     private static volatile String jdbcUrl;
+    private static volatile Path initializedDbPath;
 
     public static void init(String sqlitePath) {
         synchronized (INIT_LOCK) {
-            if (jdbcUrl != null) {
+            if (jdbcUrl != null && initializedDbPath != null && Files.exists(initializedDbPath)) {
                 return;
             }
             try {
@@ -33,6 +39,7 @@ public final class UserDataStore {
                     Files.createDirectories(parent);
                 }
                 jdbcUrl = "jdbc:sqlite:" + dbPath;
+                initializedDbPath = dbPath;
                 createTablesIfNeeded();
                 LOG.info("SQLite binding store initialized at {}", dbPath);
             } catch (Exception e) {
@@ -476,6 +483,180 @@ public final class UserDataStore {
         }
     }
 
+    public static void saveSpecificScoreWatch(SpecificScoreWatchState state) {
+        ensureInitialized();
+        String upsertWatch = """
+                INSERT INTO specific_score_watches(group_id, updated_at)
+                VALUES(?, ?)
+                ON CONFLICT(group_id) DO UPDATE SET updated_at = excluded.updated_at
+                """;
+        String deleteUsers = "DELETE FROM specific_score_watch_users WHERE group_id = ?";
+        String deleteBeatmaps = "DELETE FROM specific_score_watch_beatmaps WHERE group_id = ?";
+        String insertUser = """
+                INSERT INTO specific_score_watch_users(group_id, user_id, last_score_id)
+                VALUES(?, ?, ?)
+                """;
+        String insertBeatmap = """
+                INSERT INTO specific_score_watch_beatmaps(group_id, beatmap_id)
+                VALUES(?, ?)
+                """;
+        try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
+            connection.setAutoCommit(false);
+            try (PreparedStatement watchStatement = connection.prepareStatement(upsertWatch);
+                 PreparedStatement deleteUsersStatement = connection.prepareStatement(deleteUsers);
+                 PreparedStatement deleteBeatmapsStatement = connection.prepareStatement(deleteBeatmaps);
+                 PreparedStatement userStatement = connection.prepareStatement(insertUser);
+                 PreparedStatement beatmapStatement = connection.prepareStatement(insertBeatmap)) {
+                watchStatement.setString(1, state.groupId());
+                watchStatement.setLong(2, System.currentTimeMillis());
+                watchStatement.executeUpdate();
+
+                deleteUsersStatement.setString(1, state.groupId());
+                deleteUsersStatement.executeUpdate();
+                deleteBeatmapsStatement.setString(1, state.groupId());
+                deleteBeatmapsStatement.executeUpdate();
+
+                for (long userId : state.userIds()) {
+                    userStatement.setString(1, state.groupId());
+                    userStatement.setLong(2, userId);
+                    Long lastScoreId = state.lastScoreIds().get(userId);
+                    if (lastScoreId == null) {
+                        userStatement.setNull(3, Types.BIGINT);
+                    } else {
+                        userStatement.setLong(3, lastScoreId);
+                    }
+                    userStatement.addBatch();
+                }
+                userStatement.executeBatch();
+
+                for (long beatmapId : state.beatmapIds()) {
+                    beatmapStatement.setString(1, state.groupId());
+                    beatmapStatement.setLong(2, beatmapId);
+                    beatmapStatement.addBatch();
+                }
+                beatmapStatement.executeBatch();
+                connection.commit();
+            } catch (SQLException e) {
+                connection.rollback();
+                throw e;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to persist specific score watch", e);
+        }
+    }
+
+    public static boolean removeSpecificScoreWatch(String groupId) {
+        ensureInitialized();
+        try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
+            connection.setAutoCommit(false);
+            try (PreparedStatement users = connection.prepareStatement(
+                    "DELETE FROM specific_score_watch_users WHERE group_id = ?");
+                 PreparedStatement beatmaps = connection.prepareStatement(
+                         "DELETE FROM specific_score_watch_beatmaps WHERE group_id = ?");
+                 PreparedStatement watch = connection.prepareStatement(
+                         "DELETE FROM specific_score_watches WHERE group_id = ?")) {
+                users.setString(1, groupId);
+                users.executeUpdate();
+                beatmaps.setString(1, groupId);
+                beatmaps.executeUpdate();
+                watch.setString(1, groupId);
+                boolean removed = watch.executeUpdate() > 0;
+                connection.commit();
+                return removed;
+            } catch (SQLException e) {
+                connection.rollback();
+                throw e;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to remove specific score watch", e);
+        }
+    }
+
+    public static void updateSpecificScoreWatchCursor(String groupId, long userId, long scoreId) {
+        ensureInitialized();
+        String sql = """
+                UPDATE specific_score_watch_users
+                SET last_score_id = ?
+                WHERE group_id = ? AND user_id = ?
+                """;
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, scoreId);
+            statement.setString(2, groupId);
+            statement.setLong(3, userId);
+            if (statement.executeUpdate() != 1) {
+                throw new IllegalStateException("Specific score watch cursor no longer exists");
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to update specific score watch cursor", e);
+        }
+    }
+
+    public static List<SpecificScoreWatchState> findAllSpecificScoreWatches() {
+        ensureInitialized();
+        Map<String, Set<Long>> usersByGroup = new LinkedHashMap<>();
+        Map<String, Set<Long>> beatmapsByGroup = new LinkedHashMap<>();
+        Map<String, Map<Long, Long>> cursorsByGroup = new LinkedHashMap<>();
+        String groupsSql = "SELECT group_id FROM specific_score_watches ORDER BY group_id";
+        String usersSql = """
+                SELECT group_id, user_id, last_score_id
+                FROM specific_score_watch_users
+                ORDER BY group_id, user_id
+                """;
+        String beatmapsSql = """
+                SELECT group_id, beatmap_id
+                FROM specific_score_watch_beatmaps
+                ORDER BY group_id, beatmap_id
+                """;
+        try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
+            try (Statement statement = connection.createStatement();
+                 ResultSet resultSet = statement.executeQuery(groupsSql)) {
+                while (resultSet.next()) {
+                    String groupId = resultSet.getString("group_id");
+                    usersByGroup.put(groupId, new LinkedHashSet<>());
+                    beatmapsByGroup.put(groupId, new LinkedHashSet<>());
+                    cursorsByGroup.put(groupId, new LinkedHashMap<>());
+                }
+            }
+            try (Statement statement = connection.createStatement();
+                 ResultSet resultSet = statement.executeQuery(usersSql)) {
+                while (resultSet.next()) {
+                    String groupId = resultSet.getString("group_id");
+                    long userId = resultSet.getLong("user_id");
+                    usersByGroup.computeIfAbsent(groupId, _ -> new LinkedHashSet<>()).add(userId);
+                    long lastScoreId = resultSet.getLong("last_score_id");
+                    if (!resultSet.wasNull()) {
+                        cursorsByGroup.computeIfAbsent(groupId, _ -> new LinkedHashMap<>())
+                                .put(userId, lastScoreId);
+                    }
+                }
+            }
+            try (Statement statement = connection.createStatement();
+                 ResultSet resultSet = statement.executeQuery(beatmapsSql)) {
+                while (resultSet.next()) {
+                    beatmapsByGroup.computeIfAbsent(
+                            resultSet.getString("group_id"), _ -> new LinkedHashSet<>()
+                    ).add(resultSet.getLong("beatmap_id"));
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to load specific score watches", e);
+        }
+
+        List<SpecificScoreWatchState> states = new ArrayList<>();
+        usersByGroup.forEach((groupId, userIds) -> {
+            Set<Long> beatmapIds = beatmapsByGroup.getOrDefault(groupId, Set.of());
+            if (!userIds.isEmpty() && !beatmapIds.isEmpty()) {
+                states.add(new SpecificScoreWatchState(
+                        groupId, userIds, beatmapIds, cursorsByGroup.getOrDefault(groupId, Map.of())
+                ));
+            } else {
+                LOG.warn("Ignoring incomplete persisted /wx watch for group {}", groupId);
+            }
+        });
+        return List.copyOf(states);
+    }
+
     public static int countBoundUser() {
         ensureInitialized();
 
@@ -715,6 +896,27 @@ public final class UserDataStore {
                 CREATE INDEX IF NOT EXISTS idx_discord_bridges_target
                 ON discord_bridges(guild_id, channel_id)
                 """;
+        String specificScoreWatchSql = """
+                CREATE TABLE IF NOT EXISTS specific_score_watches (
+                    group_id TEXT NOT NULL PRIMARY KEY,
+                    updated_at BIGINT NOT NULL
+                )
+                """;
+        String specificScoreWatchUserSql = """
+                CREATE TABLE IF NOT EXISTS specific_score_watch_users (
+                    group_id TEXT NOT NULL,
+                    user_id BIGINT NOT NULL,
+                    last_score_id BIGINT,
+                    PRIMARY KEY(group_id, user_id)
+                )
+                """;
+        String specificScoreWatchBeatmapSql = """
+                CREATE TABLE IF NOT EXISTS specific_score_watch_beatmaps (
+                    group_id TEXT NOT NULL,
+                    beatmap_id BIGINT NOT NULL,
+                    PRIMARY KEY(group_id, beatmap_id)
+                )
+                """;
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
              Statement statement = connection.createStatement()) {
             statement.execute(bindingSql);
@@ -725,6 +927,9 @@ public final class UserDataStore {
             statement.execute(userInfoSql);
             statement.execute(discordBridgeSql);
             statement.execute(discordBridgeTargetIndexSql);
+            statement.execute(specificScoreWatchSql);
+            statement.execute(specificScoreWatchUserSql);
+            statement.execute(specificScoreWatchBeatmapSql);
         }
     }
 

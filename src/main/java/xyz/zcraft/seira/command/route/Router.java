@@ -84,6 +84,8 @@ public class Router {
                 messageSender, taskCoordinator, replyFactory, scoreCommands, admins::isAdmin, commandMetric
         );
         WatchCommandHandler watchCommands = new WatchCommandHandler(resolver, taskCoordinator, watchService, admins::isAdmin);
+        SpecificScoreWatchCommandHandler specificScoreWatchCommands =
+                new SpecificScoreWatchCommandHandler(taskCoordinator, watchService);
         DcsCommandHandler dcsCommands = new DcsCommandHandler(discordBridgeService);
         RankGuessCommandHandler rankGuessCommands = new RankGuessCommandHandler(
                 taskCoordinator, replyFactory, rankGuessGameService, admins::isAdmin
@@ -98,6 +100,7 @@ public class Router {
                 replayCommands,
                 generalCommands,
                 watchCommands,
+                specificScoreWatchCommands,
                 dcsCommands,
                 rankGuessCommands
         );
@@ -191,6 +194,7 @@ public class Router {
             ReplayCommandHandler replayCommands,
             GeneralCommandHandler generalCommands,
             WatchCommandHandler watchCommands,
+            SpecificScoreWatchCommandHandler specificScoreWatchCommands,
             DcsCommandHandler dcsCommands,
             RankGuessCommandHandler rankGuessCommands
     ) {
@@ -226,6 +230,7 @@ public class Router {
                 .register(generalCommands::handleHelp, "help")
                 .register(generalCommands::handleFaq, "faq")
                 .register(watchCommands::handleWatch, "watch")
+                .register(specificScoreWatchCommands::handleWx, "wx")
                 .register(dcsCommands::handleDcs, "dcs")
                 .register(rankGuessCommands::handleRankGuess, "rg")
                 .build();

@@ -27,23 +27,33 @@ public final class ScoreWatchService implements AutoCloseable {
 
     private final Object lock = new Object();
     private final Map<String, Map<Long, WatchEntry>> watchesByGroup = new LinkedHashMap<>();
+    private final Map<String, SpecificWatchEntry> specificWatchesByGroup = new LinkedHashMap<>();
     private final WatchApi api;
     private final WatchScoreNotifier notifier;
+    private final SpecificScoreNotifier specificNotifier;
+    private final SpecificScoreWatchStore specificWatchStore;
     private final Duration pollInterval;
     private final Clock clock;
     private final ScheduledExecutorService scheduler;
     private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
 
-    public ScoreWatchService(WatchApi api, WatchScoreNotifier notifier, Duration pollInterval) {
-        this(api, notifier, pollInterval, Clock.systemUTC());
-    }
-
-    ScoreWatchService(WatchApi api, WatchScoreNotifier notifier, Duration pollInterval, Clock clock) {
+    public ScoreWatchService(
+            WatchApi api,
+            WatchScoreNotifier notifier,
+            SpecificScoreNotifier specificNotifier,
+            SpecificScoreWatchStore specificWatchStore,
+            Duration pollInterval
+    ) {
         this.api = Objects.requireNonNull(api);
         this.notifier = Objects.requireNonNull(notifier);
+        this.specificNotifier = Objects.requireNonNull(specificNotifier);
+        this.specificWatchStore = Objects.requireNonNull(specificWatchStore);
         this.pollInterval = requirePositive(pollInterval, "pollInterval");
-        this.clock = Objects.requireNonNull(clock);
+        this.clock = Clock.systemUTC();
+        for (SpecificScoreWatchState state : specificWatchStore.loadAll()) {
+            specificWatchesByGroup.put(state.groupId(), SpecificWatchEntry.from(state));
+        }
         this.scheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
             Thread thread = new Thread(runnable, "seira-score-watch");
             thread.setDaemon(true);
@@ -166,6 +176,53 @@ public final class ScoreWatchService implements AutoCloseable {
         }
     }
 
+    public SpecificScoreWatchState startSpecific(
+            String groupId,
+            Set<Long> userIds,
+            Set<Long> beatmapIds
+    ) {
+        Objects.requireNonNull(groupId);
+        Set<Long> normalizedUserIds = requirePositiveIds(userIds, "userIds");
+        Set<Long> normalizedBeatmapIds = requirePositiveIds(beatmapIds, "beatmapIds");
+
+        Map<Long, List<RecentScore>> current = api.getRecentScores(normalizedUserIds, 1);
+        Map<Long, Long> lastScoreIds = new LinkedHashMap<>();
+        for (long userId : normalizedUserIds) {
+            current.getOrDefault(userId, List.of()).stream()
+                    .findFirst()
+                    .map(RecentScore::scoreId)
+                    .ifPresent(scoreId -> lastScoreIds.put(userId, scoreId));
+        }
+
+        SpecificScoreWatchState state = new SpecificScoreWatchState(
+                groupId, normalizedUserIds, normalizedBeatmapIds, lastScoreIds
+        );
+        synchronized (lock) {
+            specificWatchStore.save(state);
+            specificWatchesByGroup.put(groupId, SpecificWatchEntry.from(state));
+        }
+        return state;
+    }
+
+    public boolean stopSpecific(String groupId) {
+        Objects.requireNonNull(groupId);
+        synchronized (lock) {
+            if (!specificWatchesByGroup.containsKey(groupId)) {
+                return false;
+            }
+            specificWatchStore.delete(groupId);
+            specificWatchesByGroup.remove(groupId);
+            return true;
+        }
+    }
+
+    public SpecificScoreWatchState specificState(String groupId) {
+        synchronized (lock) {
+            SpecificWatchEntry entry = specificWatchesByGroup.get(groupId);
+            return entry == null ? null : entry.snapshot(groupId);
+        }
+    }
+
     public Status status() {
         synchronized (lock) {
             removeExpiredLocked(clock.instant());
@@ -189,17 +246,22 @@ public final class ScoreWatchService implements AutoCloseable {
     public void pollNow() {
         Instant now = clock.instant();
         Map<Long, List<WatchRef>> watchesByUid = snapshotByUid(now);
-        if (watchesByUid.isEmpty()) {
+        Map<Long, List<SpecificWatchRef>> specificWatchesByUid = snapshotSpecificByUid();
+        Set<Long> watchedUserIds = new LinkedHashSet<>(watchesByUid.keySet());
+        watchedUserIds.addAll(specificWatchesByUid.keySet());
+        if (watchedUserIds.isEmpty()) {
             return;
         }
 
-        Map<Long, List<RecentScore>> recentScores = api.getRecentScores(watchesByUid.keySet(), BATCH_SCORE_LIMIT);
+        Map<Long, List<RecentScore>> recentScores = api.getRecentScores(watchedUserIds, BATCH_SCORE_LIMIT);
         Map<Long, byte[]> renderedScores = new HashMap<>();
-        for (Map.Entry<Long, List<WatchRef>> userWatches : watchesByUid.entrySet()) {
-            long userId = userWatches.getKey();
+        for (long userId : watchedUserIds) {
             List<RecentScore> scores = recentScores.getOrDefault(userId, List.of());
-            for (WatchRef watch : userWatches.getValue()) {
+            for (WatchRef watch : watchesByUid.getOrDefault(userId, List.of())) {
                 sendNewScores(watch, scores, renderedScores);
+            }
+            for (SpecificWatchRef watch : specificWatchesByUid.getOrDefault(userId, List.of())) {
+                sendNewSpecificScores(watch, scores);
             }
         }
     }
@@ -235,6 +297,55 @@ public final class ScoreWatchService implements AutoCloseable {
                     result.computeIfAbsent(uid, _ -> new ArrayList<>()).add(new WatchRef(groupId, entry))
             ));
             return result;
+        }
+    }
+
+    private Map<Long, List<SpecificWatchRef>> snapshotSpecificByUid() {
+        synchronized (lock) {
+            Map<Long, List<SpecificWatchRef>> result = new LinkedHashMap<>();
+            specificWatchesByGroup.forEach((groupId, entry) -> entry.userIds.forEach(userId ->
+                    result.computeIfAbsent(userId, _ -> new ArrayList<>())
+                            .add(new SpecificWatchRef(groupId, userId, entry))
+            ));
+            return result;
+        }
+    }
+
+    private void sendNewSpecificScores(SpecificWatchRef watch, List<RecentScore> scores) {
+        List<RecentScore> newScores = scoresAfter(scores, watch.entry.lastScoreIds.get(watch.userId));
+        for (RecentScore score : newScores.reversed()) {
+            if (!isCurrent(watch)) {
+                return;
+            }
+            try {
+                if (watch.entry.beatmapIds.contains(score.beatmapId())
+                        && !specificNotifier.sendScoreId(watch.groupId, score.scoreId())) {
+                    LOG.warn("Failed to send specific watched score {} to group {}", score.scoreId(), watch.groupId);
+                    return;
+                }
+                markSpecificSeen(watch, score.scoreId());
+            } catch (RuntimeException e) {
+                LOG.error(
+                        "Failed to process specific watched score {} for group {}",
+                        score.scoreId(), watch.groupId, e
+                );
+                return;
+            }
+        }
+    }
+
+    private boolean isCurrent(SpecificWatchRef watch) {
+        synchronized (lock) {
+            return specificWatchesByGroup.get(watch.groupId) == watch.entry;
+        }
+    }
+
+    private void markSpecificSeen(SpecificWatchRef watch, long scoreId) {
+        synchronized (lock) {
+            if (specificWatchesByGroup.get(watch.groupId) == watch.entry) {
+                specificWatchStore.updateLastScoreId(watch.groupId, watch.userId, scoreId);
+                watch.entry.lastScoreIds.put(watch.userId, scoreId);
+            }
         }
     }
 
@@ -304,6 +415,20 @@ public final class ScoreWatchService implements AutoCloseable {
         return duration;
     }
 
+    private static Set<Long> requirePositiveIds(Set<Long> ids, String name) {
+        if (ids == null || ids.isEmpty()) {
+            throw new IllegalArgumentException(name + " must not be empty");
+        }
+        LinkedHashSet<Long> result = new LinkedHashSet<>();
+        for (Long id : ids) {
+            if (id == null || id <= 0) {
+                throw new IllegalArgumentException(name + " must contain only positive IDs");
+            }
+            result.add(id);
+        }
+        return Set.copyOf(result);
+    }
+
     @Override
     public void close() {
         if (closed.compareAndSet(false, true)) {
@@ -324,6 +449,29 @@ public final class ScoreWatchService implements AutoCloseable {
     }
 
     private record WatchRef(String groupId, WatchEntry entry) {
+    }
+
+    private static final class SpecificWatchEntry {
+        private final Set<Long> userIds;
+        private final Set<Long> beatmapIds;
+        private final Map<Long, Long> lastScoreIds;
+
+        private SpecificWatchEntry(Set<Long> userIds, Set<Long> beatmapIds, Map<Long, Long> lastScoreIds) {
+            this.userIds = userIds;
+            this.beatmapIds = beatmapIds;
+            this.lastScoreIds = new LinkedHashMap<>(lastScoreIds);
+        }
+
+        private static SpecificWatchEntry from(SpecificScoreWatchState state) {
+            return new SpecificWatchEntry(state.userIds(), state.beatmapIds(), state.lastScoreIds());
+        }
+
+        private SpecificScoreWatchState snapshot(String groupId) {
+            return new SpecificScoreWatchState(groupId, userIds, beatmapIds, lastScoreIds);
+        }
+    }
+
+    private record SpecificWatchRef(String groupId, long userId, SpecificWatchEntry entry) {
     }
 
     public record Status(boolean running, int groupCount, int taskCount, Duration pollInterval) {

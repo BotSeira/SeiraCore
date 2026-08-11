@@ -1,7 +1,5 @@
 # Seira
 
-> 项目的模块边界、生命周期与扩展约定见 [架构说明](docs/architecture.md)，本地运维指令见 [交互控制台](docs/console.md)。
-
 Seira 是一个提供 osu! 成绩查询的 QQ 机器人。
 支持生成最好成绩图、最近成绩图、排行榜等，持续更新中...
 
@@ -111,6 +109,7 @@ mvn -U clean compile exec:java
 | `/luck`         | `/luck`                                            | 今日人品                                                                        |
 | `/mp`           | `/mp`                                              | 多人房间列表                                                                    |
 | `/watch`        | `/watch add/del/list [目标]`                       | 添加/删除/列出监视任务                                                          |
+| `/wx`           | `/wx start <UID列表> <谱面ID列表>` / `/wx stop`    | 监视指定玩家在指定谱面取得的成绩，重启后自动恢复                                |
 | `/dcs`          | `/dcs start <guild-id>.<channel-id>` / `/dcs stop` | 开启或解除当前 QQ 群与 Discord 频道的双向消息同步                               |
 | `/stat`         | `/stat`                                            | 服务状态和统计信息文本                                                          |
 | `/inspect`      | `/inspect`                                         | 获取当前上下文信息                                                              |
