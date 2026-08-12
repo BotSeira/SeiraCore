@@ -21,7 +21,13 @@ final class BridgeFormatter {
     );
     // <faceType=1,faceId="86",ext="eyJ0ZXh0Ijoi5oCE54GrIn0=">
     private static final Pattern QQ_FACE = Pattern.compile(
-            "<faceType=1,faceId=\"(\\d+)\",ext=\"([^\"]+)\">", Pattern.CASE_INSENSITIVE
+            "<faceType=[1|3],faceId=\"(\\d+)\",ext=\"([^\"]+)\">", Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern QQ_MEME = Pattern.compile(
+            "<faceType=6,faceId=\"0\",ext=\"([^\"]+)\">", Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern QQ_MEME_ALT = Pattern.compile(
+            "<faceType=4,faceId=\"\",ext=\"([^\"]+)\">", Pattern.CASE_INSENSITIVE
     );
     private static final Pattern SIMPLE_MENTION = Pattern.compile("<@([^>]+)>");
     private static final Pattern MARKDOWN_LINK = Pattern.compile(
@@ -57,6 +63,8 @@ final class BridgeFormatter {
         result = QQ_EVERYONE_MENTION.matcher(result).replaceAll("@everyone");
         result = QQ_FACE.matcher(result).replaceAll(matchResult -> QqFaceNames.describe(matchResult.group(1)));
         result = SIMPLE_MENTION.matcher(result).replaceAll("@$1");
+        result = QQ_MEME.matcher(result).replaceAll("[动画表情]");
+        result = QQ_MEME_ALT.matcher(result).replaceAll("[动画表情:未知]");
         return result.strip();
     }
 
