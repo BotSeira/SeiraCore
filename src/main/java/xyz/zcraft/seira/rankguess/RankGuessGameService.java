@@ -137,14 +137,14 @@ public final class RankGuessGameService {
         return GuessResponse.of(guessResult, message);
     }
 
-    public static LinkedList<RankGuessGame.Hint> prepareHints(List<RankGuessGame.Hint> source) {
+    public static LinkedList<RankGuessGame.Hint> prepareHints(List<RankGuessGame.Hint> source, int maxCount) {
         var random = ThreadLocalRandom.current();
 
         List<RankGuessGame.Hint> remaining = new ArrayList<>(source);
         limitCategory(remaining, RankGuessGame.Hint.HintCategory.ACTIVITY, 2, random);
 
         LinkedList<RankGuessGame.Hint> result = new LinkedList<>();
-        while (!remaining.isEmpty()) {
+        while (!remaining.isEmpty() && result.size() < maxCount) {
             List<RankGuessGame.Hint> candidates = candidatesForNextHint(remaining, result);
             RankGuessGame.Hint selected = selectWeightedByStrength(
                     candidates,

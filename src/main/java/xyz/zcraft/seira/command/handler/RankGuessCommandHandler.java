@@ -142,7 +142,7 @@ public final class RankGuessCommandHandler {
 
                     StringBuilder result = new StringBuilder("回放渲染完成，游戏已开始！请在群内发送 `/rg #Rank` 猜测排名~");
 
-                    var hints = RankGuessGameService.prepareHints(round.getNormalHints());
+                    var hints = RankGuessGameService.prepareHints(round.getNormalHints(), 4);
 
                     if (!activeMessageEnabled) {
                         result.append("\n").append("> 提示: ");
