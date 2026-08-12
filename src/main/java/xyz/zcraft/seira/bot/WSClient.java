@@ -185,7 +185,12 @@ public class WSClient extends WebSocketClient {
     }
 
     private Map<String, String> parseMentions(JsonObject data) {
-        final JsonArray asJsonArray = data.get("mentions").getAsJsonArray();
+        final JsonElement mentionElement = data.get("mentions");
+        if (mentionElement == null || !mentionElement.isJsonArray()) {
+            return Map.of();
+        }
+
+        final JsonArray asJsonArray = mentionElement.getAsJsonArray();
 
         if (asJsonArray == null || asJsonArray.isJsonNull()) {
             return Map.of();
