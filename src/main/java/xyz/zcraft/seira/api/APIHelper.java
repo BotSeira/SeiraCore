@@ -475,7 +475,7 @@ public class APIHelper {
     public static RandomScore getRandomScore() {
         try {
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/scores/random"))
+                    .uri(URI.create(ENDPOINT + "/scores/random?min_rank=200000"))
                     .GET()
                     .build();
 
