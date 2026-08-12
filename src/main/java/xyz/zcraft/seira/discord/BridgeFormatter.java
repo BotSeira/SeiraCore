@@ -1,5 +1,7 @@
 package xyz.zcraft.seira.discord;
 
+import xyz.zcraft.seira.bot.QqFaceNames;
+
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -17,8 +19,9 @@ final class BridgeFormatter {
     private static final Pattern QQ_EVERYONE_MENTION = Pattern.compile(
             "<qqbot-at-everyone\\s*/>", Pattern.CASE_INSENSITIVE
     );
+    // <faceType=1,faceId="86",ext="eyJ0ZXh0Ijoi5oCE54GrIn0=">
     private static final Pattern QQ_FACE = Pattern.compile(
-            "<qqbot-face\\s+id=\"([^\"]+)\"\\s*/>", Pattern.CASE_INSENSITIVE
+            "<faceType=1,faceId=\"(\\d+)\",ext=\"([^\"]+)\"", Pattern.CASE_INSENSITIVE
     );
     private static final Pattern SIMPLE_MENTION = Pattern.compile("<@([^>]+)>");
     private static final Pattern MARKDOWN_LINK = Pattern.compile(
@@ -52,7 +55,7 @@ final class BridgeFormatter {
         if (value == null || value.isBlank()) return "";
         String result = QQ_USER_MENTION.matcher(value).replaceAll("@$1");
         result = QQ_EVERYONE_MENTION.matcher(result).replaceAll("@everyone");
-        result = QQ_FACE.matcher(result).replaceAll("[QQ表情:#$1]");
+        result = QQ_FACE.matcher(result).replaceAll(matchResult -> "[表情:" + QqFaceNames.describe(matchResult.group(1)) + "]");
         result = SIMPLE_MENTION.matcher(result).replaceAll("@$1");
         return result.strip();
     }
