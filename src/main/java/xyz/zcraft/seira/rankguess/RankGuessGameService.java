@@ -35,17 +35,19 @@ public final class RankGuessGameService {
         return reservation;
     }
 
-    public synchronized void activate(Reservation reservation, Round round) {
+    public synchronized RankGuessGame activate(Reservation reservation, Round round) {
         if (round == null) {
             throw new IllegalArgumentException("Round must not be null");
         }
         RankGuessGame game = games.get(reservation.groupId());
         if (game == null || !game.token.equals(reservation.token())) {
-            return;
+            return null;
         }
 
         game.round = round;
         game.guessingStartedAt = clock.instant();
+
+        return game;
     }
 
     public synchronized void cancel(Reservation reservation) {
@@ -62,10 +64,10 @@ public final class RankGuessGameService {
 
         RankGuessGame game = games.get(groupId);
         if (game == null) {
-            return GuessResponse.of(new GuessResult(GuessStatus.NO_GAME, guess, null, ""));
+            return GuessResponse.ofStatus(GuessStatus.NO_GAME);
         }
         if (game.round == null) {
-            return GuessResponse.of(new GuessResult(GuessStatus.STARTING, guess, null, ""));
+            return GuessResponse.ofStatus(GuessStatus.STARTING);
         }
 
         final int guessNumber = game.guessCount.incrementAndGet();
@@ -138,6 +140,7 @@ public final class RankGuessGameService {
         }
 
         games.remove(groupId);
+        game.markEnded();
         List<Standing> standings = new ArrayList<>(game.guesses.size());
         for (Map.Entry<String, Guess> entry : game.guesses.entrySet()) {
             Guess guess = entry.getValue();
@@ -221,8 +224,8 @@ public final class RankGuessGameService {
     }
 
     public record GuessResponse(GuessResult guessResult, String message) {
-        public static GuessResponse of(GuessResult guessResult) {
-            return new GuessResponse(guessResult, null);
+        public static GuessResponse ofStatus(GuessStatus status) {
+            return new GuessResponse(new GuessResult(status, 0, null, null), null);
         }
 
         public static GuessResponse of(GuessResult guessResult, String message) {
@@ -237,7 +240,7 @@ public final class RankGuessGameService {
     public record EndResult(EndStatus status, FinishedRound round) {
     }
 
-    public record Round(long userId, long scoreId, int bestIndex, long actualRank, Double pp) {
+    public record Round(long userId, long scoreId, int bestIndex, long actualRank, Double pp, RandomScore randomScore) {
         public Round {
             if (userId <= 0 || scoreId <= 0 || actualRank <= 0) {
                 throw new IllegalArgumentException("Rank Guess 数据必须包含有效的用户、成绩和排名");
@@ -265,7 +268,8 @@ public final class RankGuessGameService {
                     randomScore.score().getId(),
                     randomScore.bestIndex(),
                     randomScore.user().getStatistics().getGlobalRank(),
-                    randomScore.score().getPp()
+                    randomScore.score().getPp(),
+                    randomScore
             );
         }
     }

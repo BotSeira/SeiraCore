@@ -495,7 +495,8 @@ public class APIHelper {
             return new RandomScore(
                     GSON.fromJson(data.getAsJsonObject("user"), UserExtended.class),
                     GSON.fromJson(data.getAsJsonObject("score"), Score.class),
-                    data.get("best_index").getAsInt()
+                    data.get("best_index").getAsInt(),
+                    data.get("diff").getAsString()
             );
         } catch (IOException e) {
             throw requestFailure(e);

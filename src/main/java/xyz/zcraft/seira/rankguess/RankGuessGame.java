@@ -15,10 +15,16 @@ public final class RankGuessGame {
     public RankGuessGameService.Round round;
     public Instant guessingStartedAt;
     public long nextSequence;
+    @Getter
+    private boolean ended = false;
 
     RankGuessGame(UUID token, String starterUserId) {
         this.token = token;
         this.starterUserId = starterUserId;
+    }
+
+    public void markEnded() {
+        ended = true;
     }
 
     public double getMultiplierDelta(RankGuessGameService.ScoreMultiplier multiplier) {

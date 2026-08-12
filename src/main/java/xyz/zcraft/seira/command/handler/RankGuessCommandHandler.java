@@ -1,14 +1,18 @@
 package xyz.zcraft.seira.command.handler;
 
+import org.eclipse.jetty.plus.jndi.Link;
 import org.jetbrains.annotations.NotNull;
+import xyz.zcraft.osu.model.BeatmapExtended;
+import xyz.zcraft.osu.model.Score;
 import xyz.zcraft.seira.api.APIHelper;
+import xyz.zcraft.seira.api.data.RandomScore;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
 
-import java.util.Locale;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
@@ -96,12 +100,24 @@ public final class RankGuessCommandHandler {
                 ctx,
                 "Rank Guess Render",
                 () -> {
-                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "正在选定随机成绩..."));
+                    final PendingMessage message = PendingMessage.ofMarkdownRaw(at(ctx) + "正在选定随机成绩...");
+                    final boolean activeMessageEnabled = ctx.sendMessage(message);
+                    if (!activeMessageEnabled) {
+                        ctx.sendReply(message);
+                    }
+
                     var randomScore = APIHelper.getRandomScore();
                     RankGuessGameService.Round round = RankGuessGameService.Round.from(randomScore);
-                    ctx.sendReply(PendingMessage.ofMarkdownRaw(
-                            at(ctx) + "随机用户与成绩已选定，正在渲染回放片段..."
-                    ));
+
+                    final LinkedList<String> hintsForRound = getHintsFor(round);
+
+                    String content = at(ctx) + "随机用户与成绩已选定，正在渲染回放片段...";
+
+                    if (!activeMessageEnabled) {
+                        content += "\n\n> 提示: 由于缺少主动消息权限，阶段提示已禁用。权限配置请见[这里](https://docs.seira.top/overview/use.html#extra-permission)。";
+                    }
+
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(content));
 
                     var renderTask = APIHelper.createObscuredReplayRenderTask(
                             round.scoreId(), taskCoordinator.createVideoUploadRequest(ctx)
@@ -121,18 +137,82 @@ public final class RankGuessCommandHandler {
                     }
 
                     taskCoordinator.removeReplayResult(renderTask.taskId());
-                    games.activate(reservation, round);
+                    var game = games.activate(reservation, round);
+
+                    if (game == null) {
+                        ctx.sendReply(PendingMessage.ofMarkdownRaw("无法开始游戏，请稍后再试喵"));
+                        return;
+                    }
+
                     activated.set(true);
-                    String range = getRange(round.actualRank());
-                    ctx.sendReply(PendingMessage.ofMarkdownRaw(
-                            "回放渲染完成，游戏已开始！请在群内发送 `/rg #Rank` 猜测排名~\n"
-                                    + "> 提示: 这是一名 `" + range + "` 玩家的`BP" + round.bestIndex() + "`~"
-                    ));
+
+                    StringBuilder result = new StringBuilder("回放渲染完成，游戏已开始！请在群内发送 `/rg #Rank` 猜测排名~");
+
+                    if (!activeMessageEnabled) {
+                        result.append("\n").append("> 提示: ");
+                        for (String s : hintsForRound) {
+                            result.append("\n").append("> ").append(s);
+                        }
+                    } else {
+                        result.append("\n").append("> 下一个提示将在 1 分钟后揭晓~");
+                    }
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(result.toString().trim()));
+
+                    if (!activeMessageEnabled) {
+                        return;
+                    }
+
+                    Collections.shuffle(hintsForRound);
+
+                    while (!hintsForRound.isEmpty()) {
+                        try {
+                            //noinspection BusyWait
+                            Thread.sleep(60 * 1000);
+                        } catch (InterruptedException _) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+
+                        if (game.isEnded()) {
+                            return;
+                        }
+
+                        final String hint = hintsForRound.removeFirst();
+
+                        String hintContent = "> 提示: " + hint;
+
+                        if (!hintsForRound.isEmpty()) {
+                            hintContent += "\n" + "> 下一个提示将在 1 分钟后揭晓~";
+                        }
+
+                        ctx.sendReply(PendingMessage.ofMarkdownRaw(hintContent));
+                    }
                 }
         );
         if (!activated.get()) {
             games.cancel(reservation);
         }
+    }
+
+    private LinkedList<String> getHintsFor(RankGuessGameService.Round round) {
+        final RandomScore randomScore = round.randomScore();
+
+        LinkedList<String> hints = new LinkedList<>();
+
+        String range = getRange(round.actualRank());
+        hints.add("本玩家的排名范围为 `" + range + "`");
+        hints.add("这是此玩家的 `BP" + round.bestIndex() + "`");
+
+        final Score score = randomScore.score();
+        final Long perfect = score.getStatistics().getOrDefault("perfect", 0L);
+        final Long ok = score.getStatistics().getOrDefault("ok", 0L);
+        final Long meh = score.getStatistics().getOrDefault("meh", 0L);
+        final Long miss = score.getStatistics().getOrDefault("miss", 0L);
+
+        hints.add("本成绩的结果为: `%d / %d / %d / %d (%.2f%%)`".formatted(perfect, ok, meh, miss, score.getAccuracy() * 100));
+        hints.add("本谱面的难度为: `%s`".formatted(randomScore.beatmapDiff()));
+
+        return hints;
     }
 
     @NotNull
