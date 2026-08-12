@@ -1,16 +1,14 @@
 package xyz.zcraft.seira.command.handler;
 
-import org.jetbrains.annotations.NotNull;
-import xyz.zcraft.osu.model.Score;
 import xyz.zcraft.seira.api.APIHelper;
-import xyz.zcraft.seira.api.data.RandomScore;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
+import xyz.zcraft.seira.rankguess.RankGuessGame;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
 
-import java.util.*;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
@@ -74,7 +72,7 @@ public final class RankGuessCommandHandler {
             return;
         }
         if ("end".equalsIgnoreCase(argument)) {
-            end(ctx);
+            end(ctx, true);
             return;
         }
 
@@ -106,8 +104,6 @@ public final class RankGuessCommandHandler {
 
                     var randomScore = APIHelper.getRandomScore();
                     RankGuessGameService.Round round = RankGuessGameService.Round.from(randomScore);
-
-                    final LinkedList<String> hintsForRound = getHintsFor(round);
 
                     String content = at(ctx) + "随机用户与成绩已选定，正在渲染回放片段...";
 
@@ -146,90 +142,69 @@ public final class RankGuessCommandHandler {
 
                     StringBuilder result = new StringBuilder("回放渲染完成，游戏已开始！请在群内发送 `/rg #Rank` 猜测排名~");
 
-                    if (!activeMessageEnabled) {
-                        result.append("\n").append("> 提示: ");
-                        for (String s : hintsForRound) {
-                            result.append("\n").append("> ").append(s);
-                        }
-                    } else {
-                        result.append("\n").append("> 下一个提示将在 1 分钟后揭晓~");
-                    }
-                    ctx.sendReply(PendingMessage.ofMarkdownRaw(result.toString().trim()));
+                    var hints = RankGuessGameService.prepareHints(round.getNormalHints());
 
                     if (!activeMessageEnabled) {
+                        result.append("\n").append("> 提示: ");
+                        for (RankGuessGame.Hint s : hints) {
+                            result.append("\n").append("> ").append(s.content());
+                        }
+                    } else {
+                        result.append("\n").append("> 第一个提示将在 1 分钟后揭晓~");
+                    }
+                    boolean startMessageSent = ctx.sendReply(PendingMessage.ofMarkdownRaw(result.toString().trim()));
+
+                    if (!activeMessageEnabled) {
+                        if (startMessageSent) {
+                            game.revealHints(hints);
+                        }
                         return;
                     }
 
-                    Collections.shuffle(hintsForRound);
+                    boolean firstHint = true;
 
-                    while (!hintsForRound.isEmpty()) {
+                    while (!hints.isEmpty()) {
                         try {
                             //noinspection BusyWait
-                            Thread.sleep(60 * 1000);
+                            Thread.sleep((firstHint ? 60 : 30) * 1000);
                         } catch (InterruptedException _) {
                             Thread.currentThread().interrupt();
                             break;
                         }
 
+                        firstHint = false;
+
                         if (game.isEnded()) {
                             return;
                         }
 
-                        final String hint = hintsForRound.removeFirst();
+                        final var hint = hints.removeFirst();
 
-                        String hintContent = "> 提示: " + hint;
+                        String hintContent = "> 提示: " + hint.content();
 
-                        if (!hintsForRound.isEmpty()) {
-                            hintContent += "\n" + "> 下一个提示将在 1 分钟后揭晓~";
+                        if (!hints.isEmpty()) {
+                            hintContent += "\n" + "> 下一个提示将在 30 秒后揭晓~";
+                        } else {
+                            hintContent += "\n" + "> 所有提示已经揭晓!游戏将在 1 分钟后自动结束~";
                         }
 
-                        ctx.sendMessage(PendingMessage.ofMarkdownRaw(hintContent));
+                        if (ctx.sendMessage(PendingMessage.ofMarkdownRaw(hintContent))) {
+                            game.revealHint(hint);
+                        }
                     }
+
+                    try {
+                        Thread.sleep(60 * 1000);
+                    } catch (InterruptedException _) {
+                        Thread.currentThread().interrupt();
+                    }
+
+                    end(ctx, false);
                 }
         );
         if (!activated.get()) {
             games.cancel(reservation);
         }
-    }
-
-    private LinkedList<String> getHintsFor(RankGuessGameService.Round round) {
-        final RandomScore randomScore = round.randomScore();
-
-        LinkedList<String> hints = new LinkedList<>();
-
-        String range = getRange(round.actualRank());
-        hints.add("本玩家的排名范围为 `" + range + "`");
-        hints.add("这是此玩家的 `BP" + round.bestIndex() + "`");
-
-        final Score score = randomScore.score();
-        final Long perfect = score.getStatistics().getOrDefault("perfect", 0L);
-        final Long ok = score.getStatistics().getOrDefault("ok", 0L);
-        final Long meh = score.getStatistics().getOrDefault("meh", 0L);
-        final Long miss = score.getStatistics().getOrDefault("miss", 0L);
-
-        hints.add("本成绩的结果为: `%d / %d / %d / %d (%.2f%%)`".formatted(perfect, ok, meh, miss, score.getAccuracy() * 100));
-        hints.add("本谱面的难度为: `%s`".formatted(randomScore.beatmapDiff()));
-
-        return hints;
-    }
-
-    @NotNull
-    private String getRange(long l) {
-        String range;
-
-        if (l <= 10_000) {
-            range = "#1 - #10k";
-        } else if (l <= 50_000) {
-            range = "#10k - #50k";
-        } else if (l <= 200_000) {
-            range = "#50k - #200k";
-        } else if (l <= 500_000) {
-            range = "#200k - #500k";
-        } else {
-            range = ">#500k";
-        }
-
-        return range;
     }
 
     private void guess(Context ctx, long rank) {
@@ -251,9 +226,9 @@ public final class RankGuessCommandHandler {
         }
     }
 
-    private void end(Context ctx) {
+    private void end(Context ctx, boolean fromCommand) {
         RankGuessGameService.EndResult result = games.end(
-                ctx.groupId(), ctx.senderUserId(), adminAuthorizer.test(ctx.senderUserId())
+                ctx.groupId(), ctx.senderUserId(), adminAuthorizer.test(ctx.senderUserId()), !fromCommand
         );
         PendingMessage message = switch (result.status()) {
             case NO_GAME -> PendingMessage.ofString("本群当前没有进行中的 Rank Guess 喵");
@@ -263,6 +238,11 @@ public final class RankGuessCommandHandler {
             );
             case FINISHED -> replyFactory.rankGuessResultMessage(result.round());
         };
-        ctx.sendReply(message);
+
+        if (fromCommand) {
+            ctx.sendReply(message);
+        } else {
+            ctx.sendMessage(message);
+        }
     }
 }

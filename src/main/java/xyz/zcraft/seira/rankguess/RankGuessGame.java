@@ -12,6 +12,7 @@ public final class RankGuessGame {
     public final String starterUserId;
     public final Map<String, Guess> guesses = new LinkedHashMap<>();
     public final AtomicInteger guessCount = new AtomicInteger(0);
+    private final List<Hint> revealedHints = new ArrayList<>();
     public RankGuessGameService.Round round;
     public Instant guessingStartedAt;
     public long nextSequence;
@@ -27,6 +28,21 @@ public final class RankGuessGame {
         ended = true;
     }
 
+    public synchronized void revealHint(Hint hint) {
+        Objects.requireNonNull(hint, "hint");
+        if (!revealedHints.contains(hint)) {
+            revealedHints.add(hint);
+        }
+    }
+
+    public synchronized void revealHints(Collection<Hint> hints) {
+        Objects.requireNonNull(hints, "hints").forEach(this::revealHint);
+    }
+
+    public synchronized List<Hint> getRevealedHints() {
+        return List.copyOf(revealedHints);
+    }
+
     public double getMultiplierDelta(RankGuessGameService.ScoreMultiplier multiplier) {
         if (multiplier instanceof RankGuessGameService.ScoreMultiplier.FirstGuessMultiplier) {
             return 0.05;
@@ -38,6 +54,8 @@ public final class RankGuessGame {
             } else {
                 return -0.05;
             }
+        } else if (multiplier instanceof RankGuessGameService.ScoreMultiplier.HintMultiplier hintMultiplier) {
+            return -hintMultiplier.getHint().strength().penalty();
         }
         return 0;
     }
@@ -70,5 +88,35 @@ public final class RankGuessGame {
         }
 
         return builder.toString();
+    }
+
+    public record Hint(String content, String name, HintCategory category, HintStrength strength) {
+        public enum HintCategory {
+            RANK,
+            ACTIVITY,
+            BEST_PROFILE,
+            TARGET_SCORE,
+            DIFFICULTY,
+            PLAYSTYLE,
+            HISTORY
+        }
+
+        public enum HintStrength {
+            WEAK(0.01),
+            MEDIUM(0.02),
+            STRONG(0.03),
+            VERY_STRONG(0.04),
+            REVEALING(0.05);
+
+            private final double penalty;
+
+            HintStrength(double penalty) {
+                this.penalty = penalty;
+            }
+
+            public double penalty() {
+                return penalty;
+            }
+        }
     }
 }
