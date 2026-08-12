@@ -1,17 +1,16 @@
-package xyz.zcraft.seira.game;
+package xyz.zcraft.seira.rankguess;
 
+import lombok.Getter;
 import xyz.zcraft.seira.api.data.RandomScore;
 
 import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public final class RankGuessGameService {
     private static final Duration END_PROTECTION_DURATION = Duration.ofMinutes(3);
 
-    private final Map<String, Game> games = new HashMap<>();
+    private final Map<String, RankGuessGame> games = new HashMap<>();
     private final Clock clock;
 
     public RankGuessGameService() {
@@ -22,13 +21,17 @@ public final class RankGuessGameService {
         this.clock = clock;
     }
 
+    static double logarithmicError(long guess, long actualRank) {
+        return Math.abs(Math.log10(guess) - Math.log10(actualRank));
+    }
+
     public synchronized Reservation reserve(String groupId, String starterUserId) {
         if (games.containsKey(groupId)) {
             return null;
         }
 
         Reservation reservation = new Reservation(groupId, UUID.randomUUID());
-        games.put(groupId, new Game(reservation.token(), starterUserId));
+        games.put(groupId, new RankGuessGame(reservation.token(), starterUserId));
         return reservation;
     }
 
@@ -36,7 +39,7 @@ public final class RankGuessGameService {
         if (round == null) {
             throw new IllegalArgumentException("Round must not be null");
         }
-        Game game = games.get(reservation.groupId());
+        RankGuessGame game = games.get(reservation.groupId());
         if (game == null || !game.token.equals(reservation.token())) {
             return;
         }
@@ -46,23 +49,23 @@ public final class RankGuessGameService {
     }
 
     public synchronized void cancel(Reservation reservation) {
-        Game game = games.get(reservation.groupId());
+        RankGuessGame game = games.get(reservation.groupId());
         if (game != null && game.token.equals(reservation.token())) {
             games.remove(reservation.groupId());
         }
     }
 
-    public synchronized GuessResult guess(String groupId, String senderUserId, long guess) {
+    public synchronized GuessResponse guess(String groupId, String senderUserId, long guess) {
         if (guess <= 0) {
             throw new IllegalArgumentException("Rank must be positive");
         }
 
-        Game game = games.get(groupId);
+        RankGuessGame game = games.get(groupId);
         if (game == null) {
-            return new GuessResult(GuessStatus.NO_GAME, guess, null);
+            return GuessResponse.of(new GuessResult(GuessStatus.NO_GAME, guess, null, ""));
         }
         if (game.round == null) {
-            return new GuessResult(GuessStatus.STARTING, guess, null);
+            return GuessResponse.of(new GuessResult(GuessStatus.STARTING, guess, null, ""));
         }
 
         final int guessNumber = game.guessCount.incrementAndGet();
@@ -70,19 +73,12 @@ public final class RankGuessGameService {
         LinkedList<ScoreMultiplier> multipliers = new LinkedList<>();
 
         if (guessNumber == 1) {
-            multipliers.add(new ScoreMultiplier(0.05, "首猜加成"));
+            multipliers.add(new ScoreMultiplier.FirstGuessMultiplier());
         } else {
-            double orderMultiplier = Math.max(
-                    -0.10,
-                    0.00 - (guessNumber - 1) * 0.01
-            );
-
-            multipliers.add(new ScoreMultiplier(
-                    orderMultiplier,
-                    "第" + guessNumber + "猜"
-            ));
+            multipliers.add(new ScoreMultiplier.OrderMultiplier(guessNumber));
         }
 
+        String message = null;
 
         long closestGuess = Arrays.stream(
                         game.guesses.values().stream()
@@ -104,23 +100,31 @@ public final class RankGuessGameService {
                                     - Math.log10(guess)
                     ) < 0.005;
 
+            final int i = game.guessCount.get();
+
+            if (i >= 10) {
+                message = "提示：由于本次游戏参与人数较多，所有猜测的抄袭惩罚已降至 `-2.5%` ~";
+            }
+
             if (copied) {
-                multipliers.add(new ScoreMultiplier(
-                        -0.05,
-                        "抄袭惩罚"
-                ));
+                multipliers.add(new ScoreMultiplier.CopyPunishmentMultiplier());
             }
         }
 
-        final double sum = multipliers.stream().mapToDouble(ScoreMultiplier::multiplier).sum();
+        Guess previousGuess = game.guesses.put(senderUserId, new Guess(guess, game.nextSequence++, multipliers));
 
-        Guess previousGuess = game.guesses.put(senderUserId, new Guess(guess, game.nextSequence++, 1 + sum));
+        final GuessResult guessResult = new GuessResult(
+                previousGuess == null ? GuessStatus.RECORDED : GuessStatus.UPDATED,
+                guess,
+                multipliers,
+                game.getMultipliersString(multipliers)
+        );
 
-        return new GuessResult(previousGuess == null ? GuessStatus.RECORDED : GuessStatus.UPDATED, guess, multipliers);
+        return GuessResponse.of(guessResult, message);
     }
 
     public synchronized EndResult end(String groupId, String senderUserId, boolean admin) {
-        Game game = games.get(groupId);
+        RankGuessGame game = games.get(groupId);
         if (game == null) {
             return new EndResult(EndStatus.NO_GAME, null);
         }
@@ -140,12 +144,18 @@ public final class RankGuessGameService {
             double error = logarithmicError(guess.rank(), game.round.actualRank());
 
             final double pointsRaw = Math.max(0, 1000 * (1 - error));
+
+            double finalMultiplier = 1;
+            for (ScoreMultiplier multiplier : guess.multipliers()) {
+                finalMultiplier += game.getMultiplierDelta(multiplier);
+            }
+
             standings.add(new Standing(
                     entry.getKey(),
                     guess.rank(),
                     pointsRaw,
-                    guess.multiplier,
-                    pointsRaw * guess.multiplier,
+                    finalMultiplier,
+                    pointsRaw * finalMultiplier,
                     game.round.actualRank() - guess.rank(),
                     error,
                     guess.sequence()
@@ -162,13 +172,6 @@ public final class RankGuessGameService {
         );
     }
 
-    static double logarithmicError(long guess, long actualRank) {
-        return Math.abs(Math.log10(guess) - Math.log10(actualRank));
-    }
-
-    public record Reservation(String groupId, UUID token) {
-    }
-
     public enum GuessStatus {
         NO_GAME,
         STARTING,
@@ -176,45 +179,59 @@ public final class RankGuessGameService {
         UPDATED
     }
 
-    public record ScoreMultiplier(double multiplier, String reason){}
-
-    public record GuessResult(GuessStatus status, long rank, List<ScoreMultiplier> multipliers) {
-        public String getMultipliersString() {
-            if (multipliers == null || multipliers.isEmpty()) {
-                return "倍率: `x1.00`\n";
-            }
-
-            StringBuilder builder = new StringBuilder();
-
-            double sum = multipliers.stream()
-                    .mapToDouble(ScoreMultiplier::multiplier)
-                    .sum();
-
-            builder.append("倍率: `x")
-                    .append(String.format(Locale.US, "%.2f", 1 + sum))
-                    .append("`\n");
-
-            for (ScoreMultiplier multiplier : multipliers) {
-                builder.append("> ")
-                        .append(multiplier.reason())
-                        .append(": ")
-                        .append(String.format(
-                                Locale.US,
-                                "%+.0f%%",
-                                multiplier.multiplier() * 100
-                        ))
-                        .append("\n");
-            }
-
-            return builder.toString();
-        }
-    }
-
     public enum EndStatus {
         NO_GAME,
         STARTING,
         FORBIDDEN,
         FINISHED
+    }
+
+    public record Reservation(String groupId, UUID token) {
+    }
+
+    public abstract static class ScoreMultiplier {
+        @Getter
+        private final String reason;
+
+        protected ScoreMultiplier(String reason) {
+            this.reason = reason;
+        }
+
+        static class FirstGuessMultiplier extends ScoreMultiplier {
+            FirstGuessMultiplier() {
+                super("首猜加成");
+            }
+        }
+
+        static class OrderMultiplier extends ScoreMultiplier {
+            @Getter
+            private final int order;
+
+            OrderMultiplier(int order) {
+                this.order = order;
+                super("第" + order + "猜");
+            }
+        }
+
+        static class CopyPunishmentMultiplier extends ScoreMultiplier {
+            CopyPunishmentMultiplier() {
+                super("抄袭惩罚");
+            }
+        }
+    }
+
+    public record GuessResponse(GuessResult guessResult, String message) {
+        public static GuessResponse of(GuessResult guessResult) {
+            return new GuessResponse(guessResult, null);
+        }
+
+        public static GuessResponse of(GuessResult guessResult, String message) {
+            return new GuessResponse(guessResult, message);
+        }
+    }
+
+    public record GuessResult(GuessStatus status, long rank, List<ScoreMultiplier> multipliers, String multiplierString) {
+
     }
 
     public record EndResult(EndStatus status, FinishedRound round) {
@@ -251,38 +268,5 @@ public final class RankGuessGameService {
                     randomScore.score().getPp()
             );
         }
-    }
-
-    public record Standing(
-            String senderUserId,
-            long guess,
-            double pointsRaw,
-            double multiplier,
-            double points,
-            long delta,
-            double error,
-            long sequence
-    ) {
-    }
-
-    public record FinishedRound(Round round, List<Standing> standings) {
-    }
-
-    private static final class Game {
-        private final UUID token;
-        private final String starterUserId;
-        private final Map<String, Guess> guesses = new LinkedHashMap<>();
-        private final AtomicInteger guessCount = new AtomicInteger(0);
-        private Round round;
-        private Instant guessingStartedAt;
-        private long nextSequence;
-
-        private Game(UUID token, String starterUserId) {
-            this.token = token;
-            this.starterUserId = starterUserId;
-        }
-    }
-
-    private record Guess(long rank, long sequence, double multiplier) {
     }
 }

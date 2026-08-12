@@ -6,7 +6,7 @@ import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
-import xyz.zcraft.seira.game.RankGuessGameService;
+import xyz.zcraft.seira.rankguess.RankGuessGameService;
 
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -155,7 +155,8 @@ public final class RankGuessCommandHandler {
     }
 
     private void guess(Context ctx, long rank) {
-        RankGuessGameService.GuessResult result = games.guess(ctx.groupId(), ctx.senderUserId(), rank);
+        RankGuessGameService.GuessResponse response = games.guess(ctx.groupId(), ctx.senderUserId(), rank);
+        final RankGuessGameService.GuessResult result = response.guessResult();
         PendingMessage message = switch (result.status()) {
             case NO_GAME -> PendingMessage.ofString("本群当前没有进行中的 Rank Guess 喵");
             case STARTING -> PendingMessage.ofString("回放仍在渲染，请等待视频发送后再猜测喵");
@@ -163,10 +164,13 @@ public final class RankGuessCommandHandler {
                     at(ctx)
                             + "已" + (result.status() == RankGuessGameService.GuessStatus.UPDATED ? "更新" : "记录") + "你的猜测："
                             + "`#" + String.format(Locale.US, "%,d", rank) + "`"
-                            + " " + result.getMultipliersString()
+                            + " " + result.multiplierString()
             );
         };
         ctx.sendReply(message);
+        if (response.message() != null && !response.message().isBlank()) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(response.message()));
+        }
     }
 
     private void end(Context ctx) {

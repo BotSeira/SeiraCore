@@ -12,7 +12,7 @@ import xyz.zcraft.seira.console.OstellaCacheControlClient;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.RuntimeConfig;
 import xyz.zcraft.seira.discord.DiscordBridgeService;
-import xyz.zcraft.seira.game.RankGuessGameService;
+import xyz.zcraft.seira.rankguess.RankGuessGameService;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.services.CosService;
 import xyz.zcraft.seira.runtime.ApplicationExecutors;

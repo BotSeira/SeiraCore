@@ -16,7 +16,7 @@ import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.discord.DiscordBridgeService;
-import xyz.zcraft.seira.game.RankGuessGameService;
+import xyz.zcraft.seira.rankguess.RankGuessGameService;
 import xyz.zcraft.seira.security.AdminRegistry;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 import xyz.zcraft.seira.watch.ScoreWatchService;

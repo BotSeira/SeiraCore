@@ -15,7 +15,9 @@ import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.BindingConfig;
 import xyz.zcraft.seira.data.UploadedImage;
-import xyz.zcraft.seira.game.RankGuessGameService;
+import xyz.zcraft.seira.rankguess.FinishedRound;
+import xyz.zcraft.seira.rankguess.RankGuessGameService;
+import xyz.zcraft.seira.rankguess.Standing;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.services.DailyLuck;
 import xyz.zcraft.seira.util.VersionInfo;
@@ -72,7 +74,7 @@ public final class ReplyFactory {
         return new Buttons(configSupplier.get().seira().directUrl());
     }
 
-    public PendingMessage rankGuessResultMessage(RankGuessGameService.FinishedRound result) {
+    public PendingMessage rankGuessResultMessage(FinishedRound result) {
         RankGuessGameService.Round round = result.round();
         String rank = String.format(Locale.US, "%,d", round.actualRank());
         String pp = round.pp() == null
@@ -89,7 +91,7 @@ public final class ReplyFactory {
             content.append("> （暂无猜测）");
         } else {
             for (int i = 0; i < result.standings().size(); i++) {
-                RankGuessGameService.Standing standing = result.standings().get(i);
+                Standing standing = result.standings().get(i);
                 content.append(
                         "> %d. %s: %,dpts(x%.2f) #%,d(%+,d/%+.2f%%)\n"
                                 .formatted(
