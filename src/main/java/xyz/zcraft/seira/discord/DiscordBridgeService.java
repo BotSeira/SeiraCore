@@ -133,7 +133,7 @@ public final class DiscordBridgeService implements AutoCloseable {
     private void relayQqToDiscord(DiscordBridgeMapping mapping, QqIncomingMessage message) {
         try {
             if (!mapping.equals(mappings.get(message.groupId()))) return;
-            StringBuilder body = new StringBuilder(BridgeFormatter.normalizeQqText(message.text()));
+            StringBuilder body = new StringBuilder(BridgeFormatter.normalizeQqText(message));
             List<DownloadedMedia> media = new ArrayList<>();
             for (Attachment attachment : message.attachments()) {
                 try {

@@ -18,6 +18,7 @@ import xyz.zcraft.seira.discord.QqIncomingMessage;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -167,6 +168,8 @@ public class WSClient extends WebSocketClient {
         String openId = author.get("member_openid").getAsString();
         String groupId = data.get("group_openid").getAsString();
         List<Attachment> attachments = parseAttachments(data);
+        Map<String, String> mentions = parseMentions(data);
+
         if (!openId.equals(config.qq().selfId())) {
             discordBridgeService.acceptQqMessage(new QqIncomingMessage(
                     groupId,
@@ -174,10 +177,32 @@ public class WSClient extends WebSocketClient {
                     firstText(author, "nickname", "username", "member_name", "member_openid"),
                     msgId,
                     stripSelfMention(content),
-                    attachments
+                    attachments,
+                    mentions
             ));
         }
         router.onGroupMessageReceived(groupId, openId, msgId, content);
+    }
+
+    private Map<String, String> parseMentions(JsonObject data) {
+        final JsonArray asJsonArray = data.get("mentions").getAsJsonArray();
+
+        if (asJsonArray == null || asJsonArray.isJsonNull()) {
+            return Map.of();
+        }
+
+        Map<String, String> mentions = new java.util.HashMap<>(asJsonArray.size());
+
+        for (JsonElement jsonElement : asJsonArray) {
+            final JsonObject obj = jsonElement.getAsJsonObject();
+
+            final String id = obj.get("id").getAsString();
+            final String username = obj.get("username").getAsString();
+
+            mentions.put(username, id);
+        }
+
+        return mentions;
     }
 
     private List<Attachment> parseAttachments(JsonObject data) {

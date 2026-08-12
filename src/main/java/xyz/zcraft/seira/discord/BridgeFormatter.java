@@ -57,12 +57,13 @@ final class BridgeFormatter {
         return rendered.toString().stripTrailing();
     }
 
-    static String normalizeQqText(String value) {
+    static String normalizeQqText(QqIncomingMessage message) {
+        final String value = message.text();
         if (value == null || value.isBlank()) return "";
         String result = QQ_USER_MENTION.matcher(value).replaceAll("@$1");
         result = QQ_EVERYONE_MENTION.matcher(result).replaceAll("@everyone");
-        result = QQ_FACE.matcher(result).replaceAll(matchResult -> QqFaceNames.describe(matchResult.group(1)));
-        result = SIMPLE_MENTION.matcher(result).replaceAll("@$1");
+        result = QQ_FACE.matcher(result).replaceAll(r -> QqFaceNames.describe(r.group(1)));
+        result = SIMPLE_MENTION.matcher(result).replaceAll(r -> "@" + message.mentions().getOrDefault(r.group(1), r.group(1)));
         result = QQ_MEME.matcher(result).replaceAll("[动画表情]");
         result = QQ_MEME_ALT.matcher(result).replaceAll("[动画表情:未知]");
         return result.strip();
