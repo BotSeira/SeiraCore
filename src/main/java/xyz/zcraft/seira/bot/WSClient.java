@@ -204,7 +204,7 @@ public class WSClient extends WebSocketClient {
             final String id = obj.get("id").getAsString();
             final String username = obj.get("username").getAsString();
 
-            mentions.put(username, id);
+            mentions.put(id, username);
         }
 
         return mentions;
