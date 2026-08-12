@@ -1,8 +1,6 @@
 package xyz.zcraft.seira.command.handler;
 
-import org.eclipse.jetty.plus.jndi.Link;
 import org.jetbrains.annotations.NotNull;
-import xyz.zcraft.osu.model.BeatmapExtended;
 import xyz.zcraft.osu.model.Score;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.data.RandomScore;
@@ -185,7 +183,7 @@ public final class RankGuessCommandHandler {
                             hintContent += "\n" + "> 下一个提示将在 1 分钟后揭晓~";
                         }
 
-                        ctx.sendReply(PendingMessage.ofMarkdownRaw(hintContent));
+                        ctx.sendMessage(PendingMessage.ofMarkdownRaw(hintContent));
                     }
                 }
         );
