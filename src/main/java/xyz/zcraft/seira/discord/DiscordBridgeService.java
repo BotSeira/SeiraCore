@@ -17,6 +17,7 @@ import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.Attachment;
 import xyz.zcraft.seira.bot.data.FileInfo;
+import xyz.zcraft.seira.bot.data.MDMessage;
 import xyz.zcraft.seira.bot.data.Message;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.config.BridgeConfig;
@@ -128,6 +129,71 @@ public final class DiscordBridgeService implements AutoCloseable {
         if (mapping == null || isDcsCommand(message.text())) return;
         queue("qq:" + mapping.guildId() + ':' + mapping.channelId())
                 .execute(() -> relayQqToDiscord(mapping, message));
+    }
+
+    /** Relays the portable part of a QQ command result to the mapped Discord channel. */
+    public void acceptQqCommandReply(String groupId, PendingMessage message) {
+        DiscordBridgeMapping mapping = mappings.get(groupId);
+        if (mapping == null || message == null) return;
+        queue("qq:" + mapping.guildId() + ':' + mapping.channelId())
+                .execute(() -> relayQqCommandReply(mapping, groupId, message));
+    }
+
+    private void relayQqCommandReply(
+            DiscordBridgeMapping mapping,
+            String groupId,
+            PendingMessage message
+    ) {
+        try {
+            if (!mapping.equals(mappings.get(groupId))) return;
+            String content = message instanceof MDMessage markdown
+                    ? markdown.getMarkdown()
+                    : message.getContent();
+            StringBuilder body = new StringBuilder(BridgeFormatter.normalizeQqText(content, Map.of()));
+            List<DownloadedMedia> media = new ArrayList<>();
+
+            for (String imageUrl : BridgeFormatter.findImageUrls(body.toString())) {
+                try {
+                    media.add(qqMediaDownloader.download(imageUrl, "command-result"));
+                    replaceBody(body, BridgeFormatter.removeSourceUrl(body.toString(), imageUrl));
+                } catch (Exception e) {
+                    LOG.warn("Could not download command reply image {}: {}", imageUrl, e.getMessage());
+                }
+            }
+
+            if (message.getFileBase64() != null) {
+                try {
+                    byte[] data = Base64.getDecoder().decode(message.getFileBase64());
+                    if (data.length > bridgeConfig.maxMediaBytes()) {
+                        throw new IllegalArgumentException("Media exceeds configured size limit");
+                    }
+                    String contentType = commandMediaContentType(message.getFileType(), data);
+                    media.add(new DownloadedMedia(
+                            data,
+                            "command-result" + MediaFormat.extensionFor(contentType),
+                            contentType,
+                            ""
+                    ));
+                } catch (IllegalArgumentException e) {
+                    appendLine(body, "[媒体无法转发到 Discord]");
+                    LOG.warn("Could not decode command reply media: {}", e.getMessage());
+                }
+            } else if (message.getFileUrl() != null && !message.getFileUrl().isBlank()) {
+                try {
+                    media.add(qqMediaDownloader.download(message.getFileUrl(), "command-result"));
+                } catch (Exception e) {
+                    appendLine(body, "[媒体无法转发到 Discord] " + message.getFileUrl());
+                    LOG.warn("Could not download command reply media {}: {}", message.getFileUrl(), e.getMessage());
+                }
+            }
+
+            String rendered = BridgeFormatter.escapeDiscordMentions(body.toString().strip());
+            if (!rendered.isBlank() || !media.isEmpty()) {
+                sendDiscordBatches(mapping, rendered, media, "Seira", "Seira");
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to relay QQ command reply for group {} to Discord", groupId, e);
+        }
     }
 
     private void relayQqToDiscord(DiscordBridgeMapping mapping, QqIncomingMessage message) {
@@ -476,6 +542,20 @@ public final class DiscordBridgeService implements AutoCloseable {
         if (contentType.startsWith("video/")) return PendingMessage.FILE_TYPE_VIDEO;
         if (contentType.startsWith("audio/")) return PendingMessage.FILE_TYPE_VOICE;
         return PendingMessage.FILE_TYPE_FILE;
+    }
+
+    private static String commandMediaContentType(int fileType, byte[] data) {
+        return MediaFormat.detectContentType(data).orElse(switch (fileType) {
+            case PendingMessage.FILE_TYPE_IMAGE -> "image/png";
+            case PendingMessage.FILE_TYPE_VIDEO -> "video/mp4";
+            case PendingMessage.FILE_TYPE_VOICE -> "audio/ogg";
+            default -> "application/octet-stream";
+        });
+    }
+
+    private static void replaceBody(StringBuilder target, String value) {
+        target.setLength(0);
+        target.append(value);
     }
 
     private static boolean isDcsCommand(String text) {

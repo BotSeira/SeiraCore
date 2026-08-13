@@ -6,6 +6,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -30,6 +31,10 @@ final class BridgeFormatter {
             "<faceType=4,faceId=\"\",ext=\"([^\"]+)\">", Pattern.CASE_INSENSITIVE
     );
     private static final Pattern SIMPLE_MENTION = Pattern.compile("<@([^>]+)>");
+    private static final Pattern MARKDOWN_IMAGE = Pattern.compile(
+            "!\\[[^]\\r\\n]*]\\(\\s*<?(https?://[^\\s)>]+)>?\\s*\\)",
+            Pattern.CASE_INSENSITIVE
+    );
     private static final Pattern MARKDOWN_LINK = Pattern.compile(
             "\\[[^]\\r\\n]*]\\(\\s*<?(https?://[^\\s)>]+)>?\\s*\\)",
             Pattern.CASE_INSENSITIVE
@@ -58,12 +63,16 @@ final class BridgeFormatter {
     }
 
     static String normalizeQqText(QqIncomingMessage message) {
-        final String value = message.text();
+        return normalizeQqText(message.text(), message.mentions());
+    }
+
+    static String normalizeQqText(String value, Map<String, String> mentions) {
         if (value == null || value.isBlank()) return "";
         String result = QQ_USER_MENTION.matcher(value).replaceAll("@$1");
         result = QQ_EVERYONE_MENTION.matcher(result).replaceAll("@everyone");
         result = QQ_FACE.matcher(result).replaceAll(r -> QqFaceNames.describe(r.group(1)));
-        result = SIMPLE_MENTION.matcher(result).replaceAll(r -> "@" + message.mentions().getOrDefault(r.group(1), r.group(1)));
+        Map<String, String> resolvedMentions = mentions == null ? Map.of() : mentions;
+        result = SIMPLE_MENTION.matcher(result).replaceAll(r -> "@" + resolvedMentions.getOrDefault(r.group(1), r.group(1)));
         result = QQ_MEME.matcher(result).replaceAll("[动画表情]");
         result = QQ_MEME_ALT.matcher(result).replaceAll("[动画表情:未知]");
         return result.strip();
@@ -75,7 +84,7 @@ final class BridgeFormatter {
 
     static String removeSourceUrl(String text, String sourceUrl) {
         if (text == null || sourceUrl == null || sourceUrl.isBlank()) return text == null ? "" : text;
-        String markdownWithSource = "\\[[^]\\r\\n]*]\\(\\s*<?"
+        String markdownWithSource = "!?\\[[^]\\r\\n]*]\\(\\s*<?"
                 + Pattern.quote(sourceUrl) + ">?\\s*\\)";
         return text.replaceAll(markdownWithSource, "")
                 .replace("<" + sourceUrl + ">", "")
@@ -88,11 +97,24 @@ final class BridgeFormatter {
     static List<String> findImageUrls(String text) {
         if (text == null || text.isBlank()) return List.of();
         LinkedHashSet<String> urls = new LinkedHashSet<>();
+        Matcher images = MARKDOWN_IMAGE.matcher(text);
+        while (images.find()) addHttpUrl(urls, images.group(1));
         Matcher markdown = MARKDOWN_LINK.matcher(text);
         while (markdown.find()) addImageUrl(urls, markdown.group(1));
         Matcher raw = RAW_URL.matcher(text);
         while (raw.find()) addImageUrl(urls, raw.group());
         return List.copyOf(urls);
+    }
+
+    private static void addHttpUrl(LinkedHashSet<String> urls, String value) {
+        try {
+            String scheme = URI.create(value).getScheme();
+            if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
+                urls.add(value);
+            }
+        } catch (IllegalArgumentException ignored) {
+            // Ignore malformed links and leave them as text.
+        }
     }
 
     private static void addImageUrl(LinkedHashSet<String> urls, String value) {

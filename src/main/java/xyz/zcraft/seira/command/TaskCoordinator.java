@@ -14,6 +14,7 @@ import xyz.zcraft.seira.bot.data.MDMessage;
 import xyz.zcraft.seira.bot.data.Message;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.data.UploadedImage;
+import xyz.zcraft.seira.discord.DiscordBridgeService;
 import xyz.zcraft.seira.services.ApiRequestStats;
 import xyz.zcraft.seira.services.BotStat;
 
@@ -30,12 +31,18 @@ public final class TaskCoordinator {
     private static final Logger LOG = LogManager.getLogger(TaskCoordinator.class);
 
     private final MessageSender messageSender;
+    private final DiscordBridgeService discordBridgeService;
     private final ApiRequestStats apiRequestStats = new ApiRequestStats();
     private final ReplayResultStore replayResults;
 
-    public TaskCoordinator(MessageSender messageSender, ReplayResultStore replayResults) {
+    public TaskCoordinator(
+            MessageSender messageSender,
+            ReplayResultStore replayResults,
+            DiscordBridgeService discordBridgeService
+    ) {
         this.messageSender = messageSender;
         this.replayResults = replayResults;
+        this.discordBridgeService = java.util.Objects.requireNonNull(discordBridgeService);
     }
 
     public CommandReplyChannel openReplyChannel(
@@ -101,7 +108,7 @@ public final class TaskCoordinator {
             return PendingMessage.ofString("回放视频生成失败，请稍后重试。");
         }
         return result.qqFile() != null
-                ? PendingMessage.ofUploadedVideo(result.qqFile())
+                ? PendingMessage.ofUploadedVideo(result.qqFile(), result.videoUrl())
                 : PendingMessage.ofVideoUrl(result.videoUrl());
     }
 
@@ -231,6 +238,13 @@ public final class TaskCoordinator {
             sendResult = messageSender.sendGroupMessage(targetId, message);
         } else {
             sendResult = messageSender.sendPrivateMessage(targetId, message);
+        }
+
+        if (sendResult && groupMessage) {
+            PendingMessage portableResult = uploadResult
+                    ? pendingMsg
+                    : PendingMessage.ofString("媒体文件上传失败");
+            discordBridgeService.acceptQqCommandReply(targetId, portableResult);
         }
 
         return uploadResult && sendResult;

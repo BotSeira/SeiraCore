@@ -59,7 +59,7 @@ public class Router {
         Resolver resolver = new Resolver();
         TargetHistory targetHistory = new TargetHistory();
         ReplayResultStore replayResults = new ReplayResultStore();
-        this.taskCoordinator = new TaskCoordinator(messageSender, replayResults);
+        this.taskCoordinator = new TaskCoordinator(messageSender, replayResults, discordBridgeService);
         this.authHelper = new OsuAuthHelper(startupConfig.binding());
         BindingCommandHandler bindingCommands = new BindingCommandHandler(startupConfig, replyFactory, bindingService);
         ScoreCommandHandler scoreCommands = new ScoreCommandHandler(

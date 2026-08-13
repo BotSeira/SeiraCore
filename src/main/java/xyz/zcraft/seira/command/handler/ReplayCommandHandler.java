@@ -164,7 +164,7 @@ public final class ReplayCommandHandler {
         APIHelper.ReplayRenderResult replayResult = replayResults.get(jobId);
         if (replayResult != null) {
             PendingMessage video = replayResult.qqFile() != null
-                    ? PendingMessage.ofUploadedVideo(replayResult.qqFile())
+                    ? PendingMessage.ofUploadedVideo(replayResult.qqFile(), replayResult.videoUrl())
                     : PendingMessage.ofVideoUrl(replayResult.videoUrl());
             if (ctx.sendReply(video)) {
                 replayResults.remove(jobId);
