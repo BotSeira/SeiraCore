@@ -71,15 +71,16 @@ final class BridgeFormatter {
 
     static String normalizeQqText(String value, Map<String, String> mentions) {
         if (value == null || value.isBlank()) return "";
-        String result = QQ_USER_MENTION.matcher(value).replaceAll("@$1");
-        result = QQ_EVERYONE_MENTION.matcher(result).replaceAll("@everyone");
+        String result = QQ_EVERYONE_MENTION.matcher(value).replaceAll("@everyone");
         result = QQ_CMD_INPUT.matcher(result).replaceAll("$1");
         result = QQ_FACE.matcher(result).replaceAll(r -> QqFaceNames.describe(r.group(1)));
-        Map<String, String> resolvedMentions = mentions == null ? Map.of() : mentions;
+
         if (mentions == null) {
             result = SIMPLE_MENTION.matcher(result).replaceAll("");
+            result = QQ_USER_MENTION.matcher(result).replaceAll("");
         } else {
-            result = SIMPLE_MENTION.matcher(result).replaceAll(r -> "@" + resolvedMentions.getOrDefault(r.group(1), r.group(1)));
+            result = SIMPLE_MENTION.matcher(result).replaceAll(r -> "@" + mentions.getOrDefault(r.group(1), r.group(1)));
+            result = QQ_USER_MENTION.matcher(result).replaceAll(r -> "@" + mentions.getOrDefault(r.group(1), r.group(1)));
         }
         result = QQ_MEME.matcher(result).replaceAll("[动画表情]");
         result = QQ_MEME_ALT.matcher(result).replaceAll("[动画表情:未知]");
