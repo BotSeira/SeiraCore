@@ -149,7 +149,7 @@ public final class DiscordBridgeService implements AutoCloseable {
             String content = message instanceof MDMessage markdown
                     ? markdown.getMarkdown()
                     : message.getContent();
-            StringBuilder body = new StringBuilder(BridgeFormatter.normalizeQqText(content, Map.of()));
+            StringBuilder body = new StringBuilder(BridgeFormatter.normalizeQqText(content, null));
             List<DownloadedMedia> media = new ArrayList<>();
 
             for (String imageUrl : BridgeFormatter.findImageUrls(body.toString())) {
