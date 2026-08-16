@@ -61,26 +61,6 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/e5f7cea1-d759-4a0e-a8ec-5ad0f0fcc274" />
 
-## 快速开始
-
-### 1) 准备环境
-
-- JDK 25
-- Maven
-- QQ 机器人应用凭据 或 Napcat服务
-- 一个可访问的 oStella API
-
-### 2) 配置 `config.yml`
-
-启动程序时，若不存在`config.yml`则会自动创建。请根据提示编辑 `config.yml`。
-默认配置参见[seira-example-config.yml](/src/main/resources/seira-example-config.yml)
-
-### 3) 启动
-
-```shell
-mvn -U clean compile exec:java
-```
-
 ## 常用命令
 
 > 所有命令都以 `/` 开头。指令详情请见[文档](https://docs.seira.top/overview/commands.html)。
@@ -169,3 +149,27 @@ mvn -U clean compile exec:java
 | `/debug.db <sql>`                  | 对后端数据库执行指定的SQL语句          |
 | `/debug.update-user-info`          | 更新数据库中所有玩家的信息             |
 | `/debug.active-message`            | 发送一条主动消息                       |
+
+## 自行部署
+
+> [!NOTE]
+> 此节仅面向想自行部署 Seira 的用户。
+> 若想直接使用，请见[使用指南](https://docs.seira.top/overview/use.html)
+
+### 1) 准备环境
+
+- JDK 25
+- Maven
+- QQ 开放平台机器人应用凭据
+- 一个可访问的 oStella API
+
+### 2) 配置 `config.yml`
+
+启动程序时，若不存在`config.yml`则会自动创建。请根据提示编辑 `config.yml`。
+默认配置参见[seira-example-config.yml](/src/main/resources/seira-example-config.yml)
+
+### 3) 启动
+
+```shell
+mvn -U clean compile exec:java
+```
