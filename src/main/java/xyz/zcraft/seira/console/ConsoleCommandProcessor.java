@@ -369,7 +369,7 @@ public final class ConsoleCommandProcessor {
             case "list" -> input.size() == 3 ? runtimeControl.listPanels(input.value(2)) : ConsoleResult.failure("Usage: panel list <c2c/group>");
             case "delete" -> input.size() == 3 ? runtimeControl.deletePanel(input.value(2)) : ConsoleResult.failure("Usage: panel delete <panel-id>");
             case "get" -> input.size() == 3 ? runtimeControl.getPanel(input.value(2)) : ConsoleResult.failure("Usage: panel get <panel-id>");
-            case "create" -> input.size() == 5 ? runtimeControl.createPanel(input.value(2), input.value(3)) : ConsoleResult.failure("Usage: panel create <c2c/group> <path-to-json>");
+            case "create" -> input.size() == 4 ? runtimeControl.createPanel(input.value(2), input.value(3)) : ConsoleResult.failure("Usage: panel create <c2c/group> <path-to-json>");
             case "edit" -> input.size() == 4 ? runtimeControl.editPanel(input.value(2), input.value(3)) : ConsoleResult.failure("Usage: panel edit <panel_id> <path-to-json>");
             default -> ConsoleResult.failure("Usage: panel <list|delete|get|create|edit> [args]");
         };
