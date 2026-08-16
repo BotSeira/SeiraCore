@@ -37,57 +37,57 @@
     },
     {
       "type": "command",
-      ",name": "/s",
+      "name": "/s",
       "desc": "查询指定成绩"
     },
     {
       "type": "command",
-      ",name": "/sa",
+      "name": "/sa",
       "desc": "获取指定成绩分析"
     },
     {
       "type": "command",
-      ",name": "/ma",
+      "name": "/ma",
       "desc": "获取指定成绩Miss分析"
     },
     {
       "type": "command",
-      ",name": "/sms",
+      "name": "/sms",
       "desc": "搜索谱面"
     },
     {
       "type": "command",
-      ",name": "/luck",
+      "name": "/luck",
       "desc": "今日运势"
     },
     {
       "type": "command",
-      ",name": "/r",
+      "name": "/r",
       "desc": "渲染回放"
     },
     {
       "type": "command",
-      ",name": "/rsc",
+      "name": "/rsc",
       "desc": "渲染同屏回放"
     },
     {
       "type": "command",
-      ",name": "/rstat",
+      "name": "/rstat",
       "desc": "查询回放渲染状态"
     },
     {
       "type": "command",
-      ",name": "/stat",
+      "name": "/stat",
       "desc": "服务器状态"
     },
     {
       "type": "command",
-      ",name": "/rg",
+      "name": "/rg",
       "desc": "猜Rank游戏"
     },
     {
       "type": "command",
-      ",name": "/watch",
+      "name": "/watch",
       "desc": "成绩监视"
     },
     {

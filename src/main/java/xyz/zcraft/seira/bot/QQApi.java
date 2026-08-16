@@ -578,6 +578,7 @@ public class QQApi {
         try {
             JsonObject body = new JsonObject();
             body.addProperty("scope", scope);
+            body.addProperty("target_type", "all");
             body.add("panel", gson.toJsonTree(panel));
 
             final var request = newRequestBuilder(accessToken)
