@@ -1,12 +1,17 @@
 package xyz.zcraft.seira.bot;
 
+import com.google.gson.Gson;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.seira.bot.data.Panel;
+import xyz.zcraft.seira.bot.data.PanelItem;
+import xyz.zcraft.seira.bot.data.PanelRecord;
 import xyz.zcraft.seira.bot.data.QQUser;
 import xyz.zcraft.seira.binding.BindingService;
 import xyz.zcraft.seira.command.AttachmentHandler;
 import xyz.zcraft.seira.command.route.Router;
+import xyz.zcraft.seira.console.ConsoleCommandProcessor;
 import xyz.zcraft.seira.console.ConsoleRuntimeControl;
 import xyz.zcraft.seira.console.OstellaCacheControlClient;
 import xyz.zcraft.seira.config.AppConfig;
@@ -26,6 +31,8 @@ import xyz.zcraft.seira.watch.SqliteSpecificScoreWatchStore;
 import xyz.zcraft.seira.watch.WatchView;
 
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -275,5 +282,100 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
     @Override
     public void requestStop() {
         stop();
+    }
+
+    @Override
+    public ConsoleCommandProcessor.ConsoleResult listPanels(String scope) {
+        try {
+            final List<PanelRecord> panelRecords = QQApi.listPanels(tokenManager.getToken(), scope);
+
+            StringBuilder sb = new StringBuilder();
+
+            sb.append("=== List of panels ===\n");
+            sb.append("panel_id \t | scope \t | version \t | remark \n");
+            for (PanelRecord record : panelRecords) {
+                sb.append(record.panelId()).append("\t | ")
+                        .append(record.scope()).append("\t | ")
+                        .append(record.version()).append("\t | ")
+                        .append(record.panel().remark()).append("\n");
+            }
+            return ConsoleCommandProcessor.ConsoleResult.success(sb.toString());
+        } catch (Exception e) {
+            return ConsoleCommandProcessor.ConsoleResult.failure("Error listing panels: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public ConsoleCommandProcessor.ConsoleResult getPanel(String panelId) {
+        try {
+            final var panelRecord = QQApi.getPanel(tokenManager.getToken(), panelId);
+
+            StringBuilder sb = new StringBuilder();
+
+            sb.append("=== Panel info ===\n");
+            sb.append("panel_id: ").append(panelId).append("\n");
+            sb.append("scope: ").append(panelRecord.scope()).append("\n");
+            sb.append("version: ").append(panelRecord.version()).append("\n");
+            sb.append("updated_at: ").append(panelRecord.updatedAt()).append("\n");
+            sb.append("created_at: ").append(panelRecord.createdAt()).append("\n");
+            final Panel panel = panelRecord.panel();
+            sb.append("panel: ").append("\n");
+            sb.append("   version: ").append(panel.version()).append("\n");
+            sb.append("   remark: ").append(panel.remark()).append("\n");
+            final List<PanelItem> items = panel.items();
+            sb.append("   items: ").append("\n");
+            for (PanelItem item : items) {
+                sb.append("      - name: ").append(item.name()).append("\n");
+                sb.append("        desc: ").append(item.desc()).append("\n");
+                sb.append("        type: ").append(item.type()).append("\n");
+                sb.append("        only_admin: ").append(item.onlyAdmin()).append("\n");
+                sb.append("        link: ").append(item.link()).append("\n");
+            }
+
+            sb.append("=== End of panel info ===");
+            return ConsoleCommandProcessor.ConsoleResult.success(sb.toString());
+        } catch (Exception e) {
+            return ConsoleCommandProcessor.ConsoleResult.failure("Error getting panel: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public ConsoleCommandProcessor.ConsoleResult createPanel(String scope, String jsonPath) {
+        try {
+            final String s = Files.readString(Path.of(jsonPath));
+
+            final Panel panel = new Gson().fromJson(s, Panel.class);
+
+            final String panelId = QQApi.createPanel(tokenManager.getToken(), scope, panel);
+
+            return ConsoleCommandProcessor.ConsoleResult.success("Panel created with ID: " + panelId);
+        } catch (Exception e) {
+            return ConsoleCommandProcessor.ConsoleResult.failure("Error creating panel: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public ConsoleCommandProcessor.ConsoleResult deletePanel(String panelId) {
+        try {
+            QQApi.deletePanel(tokenManager.getToken(), panelId);
+            return ConsoleCommandProcessor.ConsoleResult.success("Panel deleted with ID: " + panelId);
+        } catch (Exception e) {
+            return ConsoleCommandProcessor.ConsoleResult.failure("Error deleting panel: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public ConsoleCommandProcessor.ConsoleResult editPanel(String panelId, String jsonPath) {
+        try {
+            final String s = Files.readString(Path.of(jsonPath));
+
+            final Panel panel = new Gson().fromJson(s, Panel.class);
+
+            final int version = QQApi.editPanel(tokenManager.getToken(), panelId, panel);
+
+            return ConsoleCommandProcessor.ConsoleResult.success("Panel edited with ID: " + panelId + ", version: " + version);
+        } catch (Exception e) {
+            return ConsoleCommandProcessor.ConsoleResult.failure("Error editing panel: " + e.getMessage());
+        }
     }
 }

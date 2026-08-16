@@ -33,7 +33,7 @@ public final class ConsoleCommandProcessor {
     private static final Pattern SQL_IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
     private static final List<String> ROOT_COMMANDS = List.of(
             "help", "status", "metrics", "system", "config", "admin", "data", "send",
-            "watch", "cache", "gateway", "log", "inspect", "stop"
+            "watch", "cache", "gateway", "log", "inspect", "stop", "panel"
     );
     private static final Map<String, List<String>> SUBCOMMANDS = Map.of(
             "config", List.of("show", "check", "reload"),
@@ -43,7 +43,8 @@ public final class ConsoleCommandProcessor {
             "watch", List.of("status", "list", "poll", "remove", "clear"),
             "cache", List.of("query", "delete", "get", "fetch"),
             "gateway", List.of("status", "reconnect"),
-            "log", List.of("show", "level")
+            "log", List.of("show", "level"),
+            "panel", List.of("list", "create", "delete", "edit", "get")
     );
 
     private final RuntimeConfig runtimeConfig;
@@ -83,6 +84,7 @@ public final class ConsoleCommandProcessor {
                 case "send" -> send(input);
                 case "watch" -> watch(input);
                 case "cache" -> cache(input);
+                case "panel" -> panel(input);
                 case "gateway" -> gateway(input);
                 case "log" -> log(input);
                 case "inspect" -> exact(input, 1, this::inspect, "Usage: inspect");
@@ -124,6 +126,8 @@ public final class ConsoleCommandProcessor {
                       send <group|private> <id> <text>   Send a proactive text message
                       watch <status|list|poll|remove|clear>
                                                          Inspect and control score watches
+                      panel <list|delete|get|create|edit> [args]
+                                                         Manage command panels
                       cache <query|delete|get|fetch> <type> <id>
                                                          Inspect/delete cache through oStella and workers
                       gateway <status|reconnect>         Inspect or reconnect the QQ gateway
@@ -182,6 +186,13 @@ public final class ConsoleCommandProcessor {
                     log show
                     log level <trace|debug|info|warn|error>
                     The change lasts until restart or a config reload changes debugMode.""";
+            case "panel" -> """
+                    panel list <scope>
+                    panel get <panel-id>
+                    panel delete <panel-id>
+                    panel create <c2c/group> <path-to-json>
+                    panel edit <panel-id> <path-to-json>
+                    Manage command panels to be displayed on QQ platform.""";
             case "inspect" -> "inspect\nShows IDs and parsed command data from the last dispatched QQ message.";
             case "stop", "shutdown", "exit", "quit" -> "stop confirm\nGracefully stops the gateway and all application services.";
             default -> null;
@@ -347,6 +358,20 @@ public final class ConsoleCommandProcessor {
             case "remove" -> input.size() == 3 ? removeAdmin(input.value(2))
                     : ConsoleResult.failure("Usage: admin remove <openid>");
             default -> ConsoleResult.failure("Usage: admin <list|check|add|remove> [openid]");
+        };
+    }
+
+    private ConsoleResult panel(ConsoleInputParser.ParsedInput input) {
+        if (input.size() < 2) {
+            return ConsoleResult.failure("Usage: panel <list|delete|get|create|edit> [args]");
+        }
+        return switch (input.value(1).toLowerCase(Locale.ROOT)) {
+            case "list" -> input.size() == 3 ? runtimeControl.listPanels(input.value(2)) : ConsoleResult.failure("Usage: panel list <c2c/group>");
+            case "delete" -> input.size() == 3 ? runtimeControl.deletePanel(input.value(2)) : ConsoleResult.failure("Usage: panel delete <panel-id>");
+            case "get" -> input.size() == 3 ? runtimeControl.getPanel(input.value(2)) : ConsoleResult.failure("Usage: panel get <panel-id>");
+            case "create" -> input.size() == 5 ? runtimeControl.createPanel(input.value(2), input.value(3)) : ConsoleResult.failure("Usage: panel create <c2c/group> <path-to-json>");
+            case "edit" -> input.size() == 4 ? runtimeControl.editPanel(input.value(2), input.value(3)) : ConsoleResult.failure("Usage: panel edit <panel_id> <path-to-json>");
+            default -> ConsoleResult.failure("Usage: panel <list|delete|get|create|edit> [args]");
         };
     }
 
@@ -750,11 +775,11 @@ public final class ConsoleCommandProcessor {
     }
 
     public record ConsoleResult(boolean success, String message) {
-        static ConsoleResult success(String message) {
+        public static ConsoleResult success(String message) {
             return new ConsoleResult(true, message);
         }
 
-        static ConsoleResult failure(String message) {
+        public static ConsoleResult failure(String message) {
             return new ConsoleResult(false, message);
         }
     }

@@ -1,15 +1,9 @@
 package xyz.zcraft.seira.bot;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.seira.bot.data.AccessToken;
-import xyz.zcraft.seira.bot.data.FileInfo;
-import xyz.zcraft.seira.bot.data.Message;
-import xyz.zcraft.seira.bot.data.QQUser;
+import xyz.zcraft.seira.bot.data.*;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,11 +20,7 @@ import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HexFormat;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -549,5 +539,97 @@ public class QQApi {
             Thread.currentThread().interrupt();
         }
         return new RuntimeException(exception);
+    }
+
+    public static List<PanelRecord> listPanels(AccessToken accessToken, String scope) {
+        try {
+            final var request = newRequestBuilder(accessToken)
+                    .uri(URI.create(ENDPOINT + "/v2/panels" + "?scope=" + scope + "&limit=50"))
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            final JsonObject rootObj = JsonParser.parseString(response.body()).getAsJsonObject();
+
+            final JsonArray recordsArr = rootObj.getAsJsonArray("records");
+
+            final LinkedList<PanelRecord> records = new LinkedList<>();
+
+            for (JsonElement jsonElement : recordsArr) {
+                records.add(gson.fromJson(jsonElement, PanelRecord.class));
+            }
+
+            return records;
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
+        }
+    }
+
+    public static PanelRecord getPanel(AccessToken accessToken, String panelId) {
+        try {
+            final var request = newRequestBuilder(accessToken)
+                    .uri(URI.create(ENDPOINT + "/v2/panels/" + panelId))
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            return gson.fromJson(parseResponseData(response, "get panel"), PanelRecord.class);
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
+        }
+    }
+
+    public static String createPanel(AccessToken accessToken, String scope, Panel panel) {
+        try {
+            JsonObject body = new JsonObject();
+            body.addProperty("scope", scope);
+            body.add("panel", gson.toJsonTree(panel));
+
+            final var request = newRequestBuilder(accessToken)
+                    .uri(URI.create(ENDPOINT + "/v2/panels"))
+                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            return JsonParser.parseString(response.body()).getAsJsonObject().get("panel_id").getAsString();
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
+        }
+    }
+
+    public static void deletePanel(AccessToken accessToken, String panelId) {
+        try {
+            final var request = newRequestBuilder(accessToken)
+                    .uri(URI.create(ENDPOINT + "/v2/panels/" + panelId))
+                    .DELETE()
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                throw new  RuntimeException("Failed to delete panel with ID: " + panelId);
+            }
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
+        }
+    }
+
+    public static int editPanel(AccessToken accessToken, String panelId, Panel newPanel) {
+        try {
+            JsonObject body = new JsonObject();
+            body.add("panel", gson.toJsonTree(newPanel));
+
+            final var request = newRequestBuilder(accessToken)
+                    .uri(URI.create(ENDPOINT + "/v2/panels/" + panelId))
+                    .PUT(HttpRequest.BodyPublishers.ofString(body.toString()))
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            return JsonParser.parseString(response.body()).getAsJsonObject().get("version").getAsInt();
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
+        }
     }
 }
