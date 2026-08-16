@@ -292,11 +292,11 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
             StringBuilder sb = new StringBuilder();
 
             sb.append("=== List of panels ===\n");
-            sb.append("panel_id \t | scope \t | version \t | remark \n");
+            sb.append("panel_id \t\t | scope \t | version \t\t | remark \n");
             for (PanelRecord record : panelRecords) {
-                sb.append(record.panelId()).append("\t | ")
+                sb.append(record.panelId()).append("\t\t | ")
                         .append(record.scope()).append("\t | ")
-                        .append(record.version()).append("\t | ")
+                        .append(record.version()).append("\t\t | ")
                         .append(record.panel().remark()).append("\n");
             }
             return ConsoleCommandProcessor.ConsoleResult.success(sb.toString());
