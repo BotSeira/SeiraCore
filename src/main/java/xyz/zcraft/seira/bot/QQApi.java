@@ -21,12 +21,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 public class QQApi {
     private static final String ENDPOINT = "https://api.sgroup.qq.com";
@@ -510,16 +505,6 @@ public class QQApi {
                 .header("Accept", "application/json");
     }
 
-    private record MediaDigests(String md5, String sha1, String md5First10m) {
-    }
-
-    private record UploadPart(int index, String presignedUrl, long blockSize) {
-    }
-
-    private record UploadPrepare(String uploadId, long blockSize, List<UploadPart> parts, int concurrency,
-                                 int retryTimeoutSeconds, int retryDelaySeconds) {
-    }
-
     public static QQUser getSelf(AccessToken accessToken) {
         try {
             final var request = newRequestBuilder(accessToken)
@@ -553,6 +538,10 @@ public class QQApi {
 
             final JsonArray recordsArr = rootObj.getAsJsonArray("records");
 
+            if (recordsArr == null || recordsArr.isEmpty()) {
+                return List.of();
+            }
+
             final LinkedList<PanelRecord> records = new LinkedList<>();
 
             for (JsonElement jsonElement : recordsArr) {
@@ -573,6 +562,12 @@ public class QQApi {
                     .build();
 
             final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                LOG.error("Failed to get panel, status code: {} body={}", response.statusCode(), response.body());
+                throw new RuntimeException("Failed to get panel, status code: " + response.statusCode() + " body=" + response.body());
+            }
+
             return gson.fromJson(parseResponseData(response, "get panel"), PanelRecord.class);
         } catch (IOException | InterruptedException e) {
             throw requestFailure(e);
@@ -592,6 +587,11 @@ public class QQApi {
 
             final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
 
+            if (response.statusCode() != 200) {
+                LOG.error("Failed to create panel, status code: {} body={}", response.statusCode(), response.body());
+                throw new RuntimeException("Failed to create panel, status code: " + response.statusCode() + " body=" + response.body());
+            }
+
             return JsonParser.parseString(response.body()).getAsJsonObject().get("panel_id").getAsString();
         } catch (IOException | InterruptedException e) {
             throw requestFailure(e);
@@ -608,7 +608,8 @@ public class QQApi {
             final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() != 200) {
-                throw new  RuntimeException("Failed to delete panel with ID: " + panelId);
+                LOG.error("Failed to delete panel, status code: {} body={}", response.statusCode(), response.body());
+                throw new RuntimeException("Failed to delete panel with ID: " + panelId);
             }
         } catch (IOException | InterruptedException e) {
             throw requestFailure(e);
@@ -627,9 +628,24 @@ public class QQApi {
 
             final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
 
+            if (response.statusCode() != 200) {
+                LOG.error("Failed to edit panel, status code: {} body={}", response.statusCode(), response.body());
+                throw new RuntimeException("Failed to edit panel, status code: " + response.statusCode() + " body=" + response.body());
+            }
+
             return JsonParser.parseString(response.body()).getAsJsonObject().get("version").getAsInt();
         } catch (IOException | InterruptedException e) {
             throw requestFailure(e);
         }
+    }
+
+    private record MediaDigests(String md5, String sha1, String md5First10m) {
+    }
+
+    private record UploadPart(int index, String presignedUrl, long blockSize) {
+    }
+
+    private record UploadPrepare(String uploadId, long blockSize, List<UploadPart> parts, int concurrency,
+                                 int retryTimeoutSeconds, int retryDelaySeconds) {
     }
 }
