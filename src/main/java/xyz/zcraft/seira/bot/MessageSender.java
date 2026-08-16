@@ -1,15 +1,21 @@
 package xyz.zcraft.seira.bot;
 
+import com.google.gson.Gson;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.bot.data.Message;
 import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.api.data.QqUploadRequest;
 import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.services.CosService;
 import xyz.zcraft.seira.util.TokenManager;
 
+import java.util.Map;
+import java.util.function.Supplier;
+
 public class MessageSender {
+    private static final int MAX_UPLOAD_ATTEMPTS = 10;
     private final Logger LOG = LogManager.getLogger(MessageSender.class);
     private final TokenManager tokenManager;
     private final CosService cos;
@@ -47,6 +53,14 @@ public class MessageSender {
         return cos.uploadImage(imageUrl);
     }
 
+    public QqUploadRequest createVideoUploadRequest(String targetId, boolean groupMessage) {
+        var token = tokenManager.getToken();
+        if (token == null || token.token() == null || token.token().isBlank()) {
+            return null;
+        }
+        return new QqUploadRequest(token.token(), groupMessage ? "groups" : "users", targetId);
+    }
+
     public FileInfo uploadPrivateMedia(String userId, int fileType, String url, boolean uploadCos) {
         LOG.info("Uploading private media for user {}, fileType {}, url {}", userId, fileType, url);
 
@@ -62,24 +76,16 @@ public class MessageSender {
         try {
             if (uploadCos) url = cos.uploadFromUrl(url, fileType);
         } catch (Exception e) {
-            LOG.error("Failed to upload private media to COS");
+            LOG.error("Failed to upload private media to COS", e);
             return null;
         }
 
-        for (int i = 1; i <= 10; i++) {
-            try {
-                return QQApi.uploadPrivateMedia(tokenManager.getToken(), userId, fileType, url);
-            } catch (RuntimeException e) {
-                LOG.error("Failed to upload private media ({}/10) {}", i, userId, e);
-            }
-
-            try {
-                Thread.sleep(i * 1000);
-            } catch (Exception _) {
-            }
-        }
-
-        return null;
+        String uploadUrl = url;
+        return retryUpload(
+                () -> QQApi.uploadPrivateMedia(tokenManager.getToken(), userId, fileType, uploadUrl),
+                1_000L,
+                "private media for " + userId
+        );
     }
 
     public FileInfo uploadGroupMedia(String groupId, int fileType, String url, boolean uploadCos) {
@@ -97,24 +103,16 @@ public class MessageSender {
         try {
             if (uploadCos) url = cos.uploadFromUrl(url, fileType);
         } catch (Exception e) {
-            LOG.error("Failed to upload group media to COS");
+            LOG.error("Failed to upload group media to COS", e);
             return null;
         }
 
-        for (int i = 1; i <= 10; i++) {
-            try {
-                return QQApi.uploadGroupMedia(tokenManager.getToken(), groupId, fileType, url);
-            } catch (RuntimeException e) {
-                LOG.error("Failed to upload group media ({}/10) {}", i, groupId, e);
-            }
-
-            try {
-                Thread.sleep(i * 2000);
-            } catch (Exception _) {
-            }
-        }
-
-        return null;
+        String uploadUrl = url;
+        return retryUpload(
+                () -> QQApi.uploadGroupMedia(tokenManager.getToken(), groupId, fileType, uploadUrl),
+                2_000L,
+                "group media for " + groupId
+        );
     }
 
     public FileInfo uploadPrivateMediaBase64(String userId, int fileType, String base64Str) {
@@ -133,5 +131,48 @@ public class MessageSender {
             LOG.error("Failed to upload group media {}", groupId, e);
             return null;
         }
+    }
+
+    public boolean sendPrivateText(String userId, String content) {
+        Message message = new Message();
+        message.setMsgType(PendingMessage.MSG_TYPE_TEXT);
+        message.setContent(content);
+        return sendPrivateMessage(userId, message);
+    }
+
+    public boolean sendGroupText(String groupId, String content) {
+        Message message = new Message();
+        message.setMsgType(PendingMessage.MSG_TYPE_TEXT);
+        message.setContent(content);
+        return sendGroupMessage(groupId, message);
+    }
+
+    public boolean sendGroupMarkdown(String groupId, String content) {
+        Message message = new Message();
+        message.setMsgType(PendingMessage.MSG_TYPE_MARKDOWN);
+        message.setMarkdown(new Gson().toJsonTree(Map.of("content", content)).getAsJsonObject());
+        return sendGroupMessage(groupId, message);
+    }
+
+    private FileInfo retryUpload(Supplier<FileInfo> operation, long baseDelayMillis, String description) {
+        for (int attempt = 1; attempt <= MAX_UPLOAD_ATTEMPTS; attempt++) {
+            try {
+                return operation.get();
+            } catch (RuntimeException e) {
+                LOG.error("Failed to upload {} ({}/{})", description, attempt, MAX_UPLOAD_ATTEMPTS, e);
+            }
+
+            if (attempt == MAX_UPLOAD_ATTEMPTS) {
+                break;
+            }
+            try {
+                Thread.sleep(Math.multiplyExact(baseDelayMillis, attempt));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                LOG.warn("Interrupted while retrying upload of {}", description);
+                return null;
+            }
+        }
+        return null;
     }
 }

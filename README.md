@@ -5,6 +5,8 @@ Seira 是一个提供 osu! 成绩查询的 QQ 机器人。
 
 Seira 依赖 [oStella](https://github.com/BotSeira/oStella) 作为上游数据服务。
 
+详细使用文档在[这里](https://docs.seira.top/)~
+
 ## 添加机器人
 
 扫描下面的二维码添加机器人↓
@@ -17,7 +19,7 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 
 如果使用过程中遇到了问题，或是有功能建议，欢迎Issue & PR 🥰
 
-另外，由于QQ机器人最近正在进行业务调整，部分功能（如指令列表和视频上传）可能会不稳定或暂时不可用
+另外，由于QQ机器人最近正在进行业务调整，部分功能可能会不稳定或暂时不可用
 
 ## Seira 能干什么？
 
@@ -40,6 +42,10 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/024fe6b2-c10a-4c9e-aefc-9c784826a9b7" />
 
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/dd9ab809-b7aa-44b2-a749-8a841781b30c" />
+
+### 玩猜 Rank！
+
+<img width="400"  alt="image" src="https://github.com/user-attachments/assets/c1caf387-381c-442f-99da-5b4257657576" />
 
 ### 查询群友的排行榜！
 
@@ -77,43 +83,49 @@ mvn -U clean compile exec:java
 
 ## 常用命令
 
-> 所有命令都以 `/` 开头。
+> 所有命令都以 `/` 开头。指令详情请见[文档](https://docs.seira.top/overview/commands.html)。
 
-| 命令            | 用法                                  | 结果                                                                            |
-|-----------------|---------------------------------------|---------------------------------------------------------------------------------|
-| `/bind`         | `/bind`                               | 开始osu账号绑定流程                                                             |
-| `/unbind`       | `/unbind`                             | 解除当前用户的osu账号绑定                                                       |
-| `/clearhistory` | `/clearhistory`                       | 清除当前用户在群聊中的记录                                                      |
-| `/f`            | `/f`                                  | 获取好友列表                                                                    |
-| `/fall`         | `/fall`                               | 获取全部好友列表                                                                |
-| `/fclear`       | `/fclear`                             | 清除好友记录                                                                    |
-| `/bo`           | `/bo [n] [uid/username/@user]`        | 最好n个成绩图，无参时获取最佳成绩详情                                           |
-| `/rs`           | `/rs [n] [uid/username/@user]`        | 最近n个成绩图，无参时获取最近一个成绩详情                                       |
-| `/rp`           | `/rp [n] [uid/username/@user]`        | 最近n个通过成绩图，无参时获取最近一个通过成绩详情                               |
-| `/m`            | `/m <id/rsN/boN> [Mod]`               | 获取指定谱面信息                                                                |
-| `/ap`           | `/ap <id/rsN/boN>`                    | 获取指定谱面音频预览                                                            |
-| `/bgp`          | `/bgp <id/rsN/boN>`                   | 获取指定谱面背景预览                                                            |
-| `/s`            | `/s <id/rsN/boN>`                     | 获取指定成绩图                                                                  |
-| `/sa`           | `/sa <id/rsN/boN>`                    | 获取指定成绩分析图                                                              |
-| `/ma`           | `/ma [id/rsN/boN] [n/#n]`             | 获取指定或最近目标成绩的Miss分析；省略目标时用`#n`指定Miss                      |
-| `/u`            | `/u <uid/username/@user>`             | 获取指定用户信息                                                                |
-| `/r`            | `/r [id/rsN/boN] [[mm:ss]-[mm:ss]]`   | 生成并发送指定或最近目标的回放视频。省略范围时自动识别高光，使用`-`渲染整个回放 |
-| `/rsc`          | `/rsc [id/rsN/boN] [+<id1>,<id2>...]` | 生成并发送指定或最近目标的成绩同屏回放视频；追加用户和范围顺序不限              |
-| `/rstat`        | `/rstat [id]`                         | 获取视频生成进度                                                                |
-| `/ms`           | `/ms <id/rsN/boN>`                    | 获取指定谱面集信息                                                              |
-| `/dl`           | `/dl <id/rsN/boN/mp>`                 | 获取指定谱面集的镜像下载链接                                                    |
-| `/sms`          | `/sms <query>`                        | 搜索谱面集                                                                      |
-| `/lb`           | `/lb [id] [<uid1>,<uid2>...]`         | 列出指定谱面排行或表现分排行                                                    |
-| `/daily`        | `/daily`                              | 每日挑战信息                                                                    |
-| `/luck`         | `/luck`                               | 今日人品                                                                        |
-| `/mp`           | `/mp`                                 | 多人房间列表                                                                    |
-| `/stat`         | `/stat`                               | 服务状态和统计信息文本                                                          |
-| `/inspect`      | `/inspect`                            | 获取当前上下文信息                                                              |
-| `/help`         | `/help`                               | 显示帮助信息                                                                    |
+| 命令            | 用法                                               | 结果                                                                            |
+|-----------------|----------------------------------------------------|---------------------------------------------------------------------------------|
+| `/bind`         | `/bind`                                            | 开始osu账号绑定流程                                                             |
+| `/unbind`       | `/unbind`                                          | 解除当前用户的osu账号绑定                                                       |
+| `/clearhistory` | `/clearhistory`                                    | 清除当前用户在群聊中的记录                                                      |
+| `/f`            | `/f`                                               | 获取好友列表                                                                    |
+| `/fall`         | `/fall`                                            | 获取全部好友列表                                                                |
+| `/fclear`       | `/fclear`                                          | 清除好友记录                                                                    |
+| `/bo`           | `/bo [n] [uid/username/@user]`                     | 最好n个成绩图，无参时获取最佳成绩详情                                           |
+| `/rs`           | `/rs [n] [uid/username/@user]`                     | 最近n个成绩图，无参时获取最近一个成绩详情                                       |
+| `/rp`           | `/rp [n] [uid/username/@user]`                     | 最近n个通过成绩图，无参时获取最近一个通过成绩详情                               |
+| `/m`            | `/m <id/rsN/boN> [Mod]`                            | 获取指定谱面信息                                                                |
+| `/ap`           | `/ap <id/rsN/boN>`                                 | 获取指定谱面音频预览                                                            |
+| `/bgp`          | `/bgp <id/rsN/boN>`                                | 获取指定谱面背景预览                                                            |
+| `/s`            | `/s <id/locId/rsN/boN>`                            | 获取指定的在线或本地成绩图                                                      |
+| `/sa`           | `/sa <id/locId/rsN/boN>`                           | 获取指定成绩分析图                                                              |
+| `/ma`           | `/ma [id/locId/rsN/boN] [n/#n]`                    | 获取指定或最近目标成绩的Miss分析；省略目标时用`#n`指定Miss                      |
+| `/u`            | `/u <uid/username/@user>`                          | 获取指定用户信息                                                                |
+| `/r`            | `/r [id/locId/rsN/boN] [[mm:ss]-[mm:ss]]`          | 生成并发送指定或最近目标的回放视频。省略范围时自动识别高光，使用`-`渲染整个回放 |
+| `/rg`           | `/rg <start/#Rank/end>`                            | 在群聊中开始、参与或结束猜 Rank 游戏                                            |
+| `/rsc`          | `/rsc [id/locId/rsN/boN] [+<id1>,<id2>...]`        | 生成并发送指定或最近目标的成绩同屏回放视频；追加用户和范围顺序不限              |
+| `/rstat`        | `/rstat [id]`                                      | 获取视频生成进度                                                                |
+| `/ms`           | `/ms <id/rsN/boN>`                                 | 获取指定谱面集信息                                                              |
+| `/dl`           | `/dl <id/rsN/boN/mp>`                              | 获取指定谱面集的镜像下载链接                                                    |
+| `/sms`          | `/sms <query>`                                     | 搜索谱面集                                                                      |
+| `/lb`           | `/lb [id] [<uid1>,<uid2>...]`                      | 列出指定谱面排行或表现分排行                                                    |
+| `/daily`        | `/daily`                                           | 每日挑战信息                                                                    |
+| `/luck`         | `/luck`                                            | 今日人品                                                                        |
+| `/mp`           | `/mp`                                              | 多人房间列表                                                                    |
+| `/watch`        | `/watch add/del/list [目标]`                       | 添加/删除/列出监视任务                                                          |
+| `/wx`           | `/wx start <UID列表> <谱面ID列表>` / `/wx stop`    | 监视指定玩家在指定谱面取得的成绩，重启后自动恢复                                |
+| `/dcs`          | `/dcs start <guild-id>.<channel-id>` / `/dcs stop` | 开启或解除当前 QQ 群与 Discord 频道的双向消息同步                               |
+| `/stat`         | `/stat`                                            | 服务状态和统计信息文本                                                          |
+| `/inspect`      | `/inspect`                                         | 获取当前上下文信息                                                              |
+| `/help`         | `/help`                                            | 显示帮助信息                                                                    |
 
 部分指令会先回复“请求已加入队列，预计等待时间 X 秒”，待异步请求完成后再额外发送结果消息。
 
 `/r`和`/rsc`（回放渲染）会先返回“生成请求正在等待中，队列位置：N”，随后返回请求状态，最后在渲染完成后再发送回放视频。
+
+上传 osu! 服务器上不存在的 `.osr` 回放后，机器人会返回形如 `loc123456789` 的本地成绩ID；该ID可用于 `/s`、`/sa`、`/ma`、`/r`、`/rsc` 等成绩目标指令。
 
 ### 快捷查询
 

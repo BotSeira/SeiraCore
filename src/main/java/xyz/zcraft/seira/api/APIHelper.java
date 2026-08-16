@@ -10,7 +10,8 @@ import xyz.zcraft.osu.model.*;
 import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.command.ResolutionException;
-import xyz.zcraft.seira.command.resolution.ShortcutTarget;
+import xyz.zcraft.seira.command.parse.ShortcutTarget;
+import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
@@ -22,9 +23,11 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 public class APIHelper {
     private static final String ENDPOINT;
@@ -65,7 +68,7 @@ public class APIHelper {
                     .content(followed)
                     .build();
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -91,7 +94,7 @@ public class APIHelper {
                     .content(GSON.fromJson(data, UserExtended.class))
                     .build();
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -153,7 +156,7 @@ public class APIHelper {
                     mods == null || mods.isBlank() ? "NM" : mods
             );
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -179,7 +182,7 @@ public class APIHelper {
                     .content(GSON.fromJson(data, MultiplayerRoom.class))
                     .build();
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -205,7 +208,9 @@ public class APIHelper {
 
     public static long lookupBeatmap(ShortcutTarget target, String auth) {
         long beatmapId;
-        if (!target.isMacro()) {
+        if (target.isLocalScore()) {
+            beatmapId = lookupScoreData(target.localScoreId()).get("beatmap_id").getAsLong();
+        } else if (!target.isMacro()) {
             beatmapId = target.explicitId();
         } else {
             try {
@@ -229,7 +234,7 @@ public class APIHelper {
 
                 beatmapId = rawResponse.getData().getAsJsonObject().get("beatmap_id").getAsLong();
             } catch (IOException | InterruptedException e) {
-                throw new RuntimeException(e);
+                throw requestFailure(e);
             }
         }
         return beatmapId;
@@ -279,7 +284,7 @@ public class APIHelper {
 
             return GSON.fromJson(data, Beatmapset.class);
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -309,7 +314,7 @@ public class APIHelper {
 
                 beatmapsetId = rawResponse.getData().getAsJsonObject().get("beatmapset_id").getAsLong();
             } catch (IOException | InterruptedException e) {
-                throw new RuntimeException(e);
+                throw requestFailure(e);
             }
         }
         return beatmapsetId;
@@ -328,17 +333,17 @@ public class APIHelper {
     }
 
     public static Response<Base64Bytes> getScoreResponse(ShortcutTarget target) {
-        long scoreId = lookupScoreId(target);
+        String scoreId = lookupScoreId(target);
         return getBase64BytesResponse("/scores/" + scoreId, "获取成绩失败", null);
     }
 
     public static Response<Base64Bytes> getScoreAnalyzeResponse(ShortcutTarget target) {
-        long scoreId = lookupScoreId(target);
+        String scoreId = lookupScoreId(target);
         return getBase64BytesResponse("/scores/" + scoreId + "/analysis", "获取成绩分析失败", null);
     }
 
     public static Response<Base64Bytes> getMissVisualizeResponse(ShortcutTarget target, int index) {
-        long scoreId = lookupScoreId(target);
+        String scoreId = lookupScoreId(target);
         return getBase64BytesResponse("/scores/" + scoreId + "/misses/" + index + "/visualize", "获取Miss可视化失败", null);
     }
 
@@ -365,7 +370,7 @@ public class APIHelper {
                     .content(new Base64Bytes(imageBytes))
                     .build();
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -404,7 +409,7 @@ public class APIHelper {
                     .beatmapsetId(data.get("beatmapset_id").getAsString())
                     .build();
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -433,24 +438,101 @@ public class APIHelper {
                     .content(items)
                     .build();
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
     public static ReplayTaskInfo createReplayRenderTask(ShortcutTarget target, TimeDurationParser.TimeRange timeRange) {
-        return createReplayTask(target, timeRange);
+        return createReplayTask(target, timeRange, null);
+    }
+
+    public static ReplayTaskInfo createReplayRenderTask(ShortcutTarget target,
+                                                         TimeDurationParser.TimeRange timeRange,
+                                                         QqUploadRequest qqUpload) {
+        return createReplayTask(target, timeRange, qqUpload);
+    }
+
+    public static ReplayTaskInfo createObscuredReplayRenderTask(long scoreId) {
+        return createObscuredReplayRenderTask(scoreId, null);
+    }
+
+    public static ReplayTaskInfo createObscuredReplayRenderTask(long scoreId, QqUploadRequest qqUpload) {
+        if (scoreId <= 0) {
+            throw new IllegalArgumentException("成绩ID必须为正整数");
+        }
+
+        TimeDurationParser.TimeRange timeRange = getScoreHighlight(scoreId, 10);
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(ENDPOINT + "/replays/renders/score/" + scoreId
+                        + "?obscured=true" + timeRange.toQueryString()))
+                .header("Content-Type", "application/json")
+                .POST(renderRequestBody(qqUpload))
+                .build();
+
+        return getReplayTaskInfo(request);
+    }
+
+    public static RandomScore getRandomScore() {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/scores/random?min_rank=500000"))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            if (codeNotOk(response.statusCode())) {
+                throw parseHttpError(response.body(), response.statusCode(), "获取随机成绩失败");
+            }
+
+            RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
+            ensureApiSuccess(payload, "获取随机成绩失败");
+            JsonObject data = requireDataObject(payload, "随机成绩响应缺少data");
+            if (!data.has("user") || !data.get("user").isJsonObject()
+                    || !data.has("score") || !data.get("score").isJsonObject()) {
+                throw new RuntimeException("随机成绩响应缺少用户或成绩数据");
+            }
+
+            return new RandomScore(
+                    GSON.fromJson(data.getAsJsonObject("user"), UserExtended.class),
+                    GSON.fromJson(data.getAsJsonObject("score"), Score.class),
+                    data.get("best_index").getAsInt(),
+                    data.get("diff").getAsString()
+            );
+        } catch (IOException e) {
+            throw requestFailure(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("随机成绩请求被中断", e);
+        }
     }
 
     public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] ids, String auth) {
-        if (ids == null || ids.length == 0) {
+        return createReplayShowcaseTask(target, ids, auth, null);
+    }
+
+    public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] ids, String auth,
+                                                           QqUploadRequest qqUpload) {
+        ids = ids == null ? new String[0] : ids;
+
+        if (target.isLocalScore()) {
+            ids = Stream.concat(Stream.of("s" + target.localScoreId()), Arrays.stream(ids))
+                    .distinct()
+                    .toArray(String[]::new);
+        }
+        if (ids.length == 0) {
             throw new RuntimeException("同屏回放需要至少一个ID。");
         }
 
         final long beatmapId = lookupBeatmap(target, auth);
 
+        JsonObject body = GSON.toJsonTree(Map.of("ids", ids)).getAsJsonObject();
+        if (qqUpload != null) {
+            body.add("qqUpload", GSON.toJsonTree(qqUpload));
+        }
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(ENDPOINT + "/replays/renders/showcase/" + beatmapId))
-                .POST(HttpRequest.BodyPublishers.ofString(GSON.toJsonTree(Map.of("ids", ids)).toString()))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                 .build();
 
         return getReplayTaskInfo(request);
@@ -458,29 +540,37 @@ public class APIHelper {
 
     public static ReplayRenderResult waitReplayVideo(String taskId) {
         try {
-            waitReplayDone(taskId);
-            return new ReplayRenderResult(ENDPOINT + "/replays/" + taskId + "/video/replay.mp4", taskId);
+            FileInfo qqFile = waitReplayDone(taskId);
+            return new ReplayRenderResult(
+                    ENDPOINT + "/replays/" + taskId + "/video/replay.mp4", taskId, qqFile);
         } catch (RuntimeException _) {
             return null;
         }
     }
 
-    private static ReplayTaskInfo createReplayTask(ShortcutTarget target, TimeDurationParser.TimeRange timeRange) {
-        long scoreId = lookupScoreId(target);
+    private static ReplayTaskInfo createReplayTask(ShortcutTarget target,
+                                                    TimeDurationParser.TimeRange timeRange,
+                                                    QqUploadRequest qqUpload) {
+        String scoreId = lookupScoreId(target);
 
         if (timeRange == null) {
-            timeRange = getScoreHighlight(scoreId);
+            timeRange = getScoreHighlight(scoreId, 5);
         }
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(ENDPOINT + "/replays/renders/score/" + scoreId + "?" + timeRange.toQueryString()))
-                .POST(HttpRequest.BodyPublishers.noBody())
+                .header("Content-Type", "application/json")
+                .POST(renderRequestBody(qqUpload))
                 .build();
 
         return getReplayTaskInfo(request);
     }
 
-    private static TimeDurationParser.TimeRange getScoreHighlight(long scoreId) {
+    private static TimeDurationParser.TimeRange getScoreHighlight(long scoreId, int extend) {
+        return getScoreHighlight(String.valueOf(scoreId), extend);
+    }
+
+    private static TimeDurationParser.TimeRange getScoreHighlight(String scoreId, int extend) {
         try {
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/scores/" + scoreId + "/highlight"))
@@ -498,18 +588,20 @@ public class APIHelper {
             final JsonObject data = rawResponse.getData().getAsJsonObject();
 
             return new TimeDurationParser.TimeRange(
-                    Math.max(0, (int) (data.get("start").getAsLong() / 1000)) - 5,
-                    (int) (data.get("end").getAsLong() / 1000) + 5
+                    Math.max(0, (int) (data.get("start").getAsLong() / 1000)) - extend,
+                    (int) (data.get("end").getAsLong() / 1000) + extend
             );
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
-    private static long lookupScoreId(ShortcutTarget target) {
-        long scoreId;
-        if (!target.isMacro()) {
-            scoreId = target.explicitId();
+    private static String lookupScoreId(ShortcutTarget target) {
+        String scoreId;
+        if (target.isLocalScore()) {
+            scoreId = target.localScoreId();
+        } else if (!target.isMacro()) {
+            scoreId = String.valueOf(target.explicitId());
         } else {
             try {
                 final String query = getScoreQuery(target);
@@ -529,12 +621,30 @@ public class APIHelper {
 
                 ensureApiSuccess(rawResponse, "获取成绩失败");
 
-                scoreId = rawResponse.getData().getAsJsonObject().get("score_id").getAsLong();
+                scoreId = rawResponse.getData().getAsJsonObject().get("score_id").getAsString();
             } catch (IOException | InterruptedException e) {
-                throw new RuntimeException(e);
+                throw requestFailure(e);
             }
         }
         return scoreId;
+    }
+
+    private static JsonObject lookupScoreData(String scoreId) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/scores/lookup?s=" + scoreId))
+                    .GET()
+                    .build();
+            HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                throw parseHttpError(response.body(), response.statusCode(), "获取本地成绩信息失败");
+            }
+            RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
+            ensureApiSuccess(payload, "获取本地成绩信息失败");
+            return requireDataObject(payload, "本地成绩响应缺少data");
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
+        }
     }
 
     @NotNull
@@ -571,18 +681,21 @@ public class APIHelper {
 
             return new ReplayTaskInfo(taskId, status, position, beatmap, data.getAsJsonArray("scores"), start, end);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Replay render request interrupted", e);
         }
     }
 
-    private static void waitReplayDone(String taskId) {
+    private static FileInfo waitReplayDone(String taskId) {
         for (int attempt = 1; attempt <= REPLAY_MAX_POLL_ATTEMPTS; attempt++) {
-            String status = getReplayStatus(taskId);
+            JsonObject statusData = getReplayStatus(taskId);
+            String status = statusData.get("status").getAsString();
             if ("done".equalsIgnoreCase(status)) {
-                return;
+                return statusData.has("qqFile") && statusData.get("qqFile").isJsonObject()
+                        ? GSON.fromJson(statusData.getAsJsonObject("qqFile"), FileInfo.class)
+                        : null;
             }
             if ("failed".equalsIgnoreCase(status) || "canceled".equalsIgnoreCase(status)) {
                 throw new RuntimeException("回放渲染失败，状态：" + status);
@@ -598,7 +711,7 @@ public class APIHelper {
         throw new RuntimeException("回放渲染超时，请稍后重试。");
     }
 
-    private static String getReplayStatus(String taskId) {
+    private static JsonObject getReplayStatus(String taskId) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/replays/" + taskId + "/status"))
@@ -614,13 +727,22 @@ public class APIHelper {
             if (!data.has("status") || data.get("status").isJsonNull()) {
                 throw new RuntimeException("回放渲染状态响应缺少status");
             }
-            return data.get("status").getAsString();
+            return data;
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Replay status request interrupted", e);
         }
+    }
+
+    private static HttpRequest.BodyPublisher renderRequestBody(QqUploadRequest qqUpload) {
+        if (qqUpload == null) {
+            return HttpRequest.BodyPublishers.noBody();
+        }
+        JsonObject body = new JsonObject();
+        body.add("qqUpload", GSON.toJsonTree(qqUpload));
+        return HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8);
     }
 
     private static void ensureApiSuccess(RawResponse payload, String fallbackMessage) {
@@ -712,13 +834,14 @@ public class APIHelper {
 
             return GSON.fromJson(data, RenderStat.class);
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
-    public static boolean[] getServerStatus() {
+    public static ServerStatus getServerStatus() {
         boolean oStella = false;
         boolean osu = false;
+        String oStellaVersion = null;
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/health"))
@@ -733,21 +856,24 @@ public class APIHelper {
                     && rawResponse.isSuccess()) {
                 oStella = true;
 
-                if (rawResponse.getData() != null && rawResponse.getData().isJsonObject()) {
-                    JsonObject data = rawResponse.getData().getAsJsonObject();
-                    if (data.has("osu-api") && !data.get("osu-api").isJsonNull()) {
-                        osu = data.get("osu-api").getAsBoolean();
+                final JsonElement rawResponseData = rawResponse.getData();
+                if (rawResponseData != null && rawResponseData.isJsonObject()) {
+                    JsonObject data = rawResponseData.getAsJsonObject();
+
+                    oStellaVersion = data.get("ostella_version").getAsString();
+                    if (data.has("osu_api") && !data.get("osu_api").isJsonNull()) {
+                        osu = data.get("osu_api").getAsBoolean();
                     }
                 }
             }
         } catch (Exception _) {
         }
 
-        return new boolean[]{true, oStella, osu};
+        return new ServerStatus(true, oStella, oStellaVersion, osu);
     }
 
     public static Response<List<MissData>> getScoreMissesResponse(ShortcutTarget target) {
-        final long scoreId = lookupScoreId(target);
+        final String scoreId = lookupScoreId(target);
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/scores/" + scoreId + "/misses"))
@@ -778,7 +904,7 @@ public class APIHelper {
                     .content(misses)
                     .build();
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -816,7 +942,7 @@ public class APIHelper {
                     .content(GSON.fromJson(data, User.class))
                     .build();
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("查找玩家请求被中断", e);
@@ -847,22 +973,8 @@ public class APIHelper {
 
             return users;
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
-    }
-
-    public record ReplayRenderResult(String videoUrl, String taskId) {
-    }
-
-    public record ReplayTaskInfo(
-            String taskId,
-            String status,
-            Integer position,
-            BeatmapExtended beatmap,
-            JsonArray scores,
-            Double start,
-            Double end
-    ) {
     }
 
     public static ReplayUploadInfo uploadReplay(byte[] replayBytes) {
@@ -891,7 +1003,34 @@ public class APIHelper {
 
             return GSON.fromJson(r.getData().getAsJsonObject(), ReplayUploadInfo.class);
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
+    }
+
+    private static RuntimeException requestFailure(Exception exception) {
+        if (exception instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+        }
+        return new RuntimeException(exception);
+    }
+
+    public record ServerStatus(boolean gateway, boolean oStella, String oStellaVersion, boolean osu) {
+    }
+
+    public record ReplayRenderResult(String videoUrl, String taskId, FileInfo qqFile) {
+        public ReplayRenderResult(String videoUrl, String taskId) {
+            this(videoUrl, taskId, null);
+        }
+    }
+
+    public record ReplayTaskInfo(
+            String taskId,
+            String status,
+            Integer position,
+            BeatmapExtended beatmap,
+            JsonArray scores,
+            Double start,
+            Double end
+    ) {
     }
 }

@@ -76,12 +76,14 @@ public class DailyLuck {
 
     private static void loadFromFile() {
         synchronized (LUCK_FILE) {
+            luckDate = null;
+            luck.clear();
+            ids.clear();
             if (Files.exists(LUCK_FILE)) {
                 JsonObject obj;
                 try {
                     obj = JsonParser.parseString(Files.readString(LUCK_FILE)).getAsJsonObject();
                     luckDate = obj.get("date").getAsString();
-                    luck.clear();
                     obj.get("luck").getAsJsonObject().entrySet().forEach(entry -> {
                         String id = entry.getKey();
                         JsonObject luckObj = entry.getValue().getAsJsonObject();

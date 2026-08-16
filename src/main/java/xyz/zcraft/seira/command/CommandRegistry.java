@@ -5,33 +5,35 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.function.Supplier;
 
-final class CommandRegistry {
-    private final Map<String, Function<Context, RouteDecision>> handlers;
+public final class CommandRegistry {
+    private final Map<String, CommandHandler> handlers;
 
-    private CommandRegistry(Map<String, Function<Context, RouteDecision>> handlers) {
+    private CommandRegistry(Map<String, CommandHandler> handlers) {
         this.handlers = Map.copyOf(handlers);
     }
 
-    static Builder builder() {
+    public static Builder builder() {
         return new Builder();
     }
 
-    RouteDecision dispatch(Context context, Supplier<RouteDecision> fallback) {
-        Function<Context, RouteDecision> handler = handlers.get(normalize(context.command()));
-        return handler == null ? fallback.get() : handler.apply(context);
+    public void dispatch(Context context, CommandHandler fallback) {
+        CommandHandler handler = handlers.get(normalize(context.command()));
+        (handler == null ? fallback : handler).handle(context);
     }
 
-    Set<String> registeredCommands() {
+    public Set<String> registeredCommands() {
         return handlers.keySet();
     }
 
-    static final class Builder {
-        private final Map<String, Function<Context, RouteDecision>> handlers = new LinkedHashMap<>();
+    public static final class Builder {
+        private final Map<String, CommandHandler> handlers = new LinkedHashMap<>();
 
-        Builder register(Function<Context, RouteDecision> handler, String... commands) {
+        public Builder register(CommandHandler handler, String... commands) {
+            return registerInternal(handler, commands);
+        }
+
+        private Builder registerInternal(CommandHandler handler, String... commands) {
             Objects.requireNonNull(handler, "handler");
             if (commands == null || commands.length == 0) {
                 throw new IllegalArgumentException("At least one command is required");
@@ -49,7 +51,7 @@ final class CommandRegistry {
             return this;
         }
 
-        CommandRegistry build() {
+        public CommandRegistry build() {
             return new CommandRegistry(handlers);
         }
     }

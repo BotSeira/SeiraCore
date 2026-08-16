@@ -12,12 +12,13 @@ public class PendingMessage {
     public static final int FILE_TYPE_IMAGE = 1;
     public static final int FILE_TYPE_VIDEO = 2;
     public static final int FILE_TYPE_VOICE = 3;
-    private static final int FILE_TYPE_FILE = 4;
+    public static final int FILE_TYPE_FILE = 4;
 
     private String content;
     private int msgType;
     private String fileUrl = null;
     private String fileBase64 = null;
+    private FileInfo uploadedMedia = null;
     private int fileType = -1;
     private boolean upload = true;
 
@@ -49,6 +50,22 @@ public class PendingMessage {
         message.fileType = FILE_TYPE_VIDEO;
         message.msgType = MSG_TYPE_MEDIA;
         message.fileUrl = videoUrl;
+        return message;
+    }
+
+    public static PendingMessage ofUploadedVideo(FileInfo fileInfo) {
+        return ofUploadedVideo(fileInfo, null);
+    }
+
+    public static PendingMessage ofUploadedVideo(FileInfo fileInfo, String sourceUrl) {
+        if (fileInfo == null || fileInfo.getFileInfo() == null || fileInfo.getFileInfo().isBlank()) {
+            throw new IllegalArgumentException("Uploaded video file info is required");
+        }
+        final PendingMessage message = new PendingMessage();
+        message.fileType = FILE_TYPE_VIDEO;
+        message.msgType = MSG_TYPE_MEDIA;
+        message.uploadedMedia = fileInfo;
+        message.fileUrl = sourceUrl;
         return message;
     }
 

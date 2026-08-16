@@ -6,13 +6,15 @@
 
     <groupId>com.github.BotSeira</groupId>
     <artifactId>SeiraCore</artifactId>
-    <version>1.8.0</version>
+    <version>1.10.1</version>
 
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <exec.mainClass>xyz.zcraft.seira.Seira</exec.mainClass>
+        <jline.version>4.3.1</jline.version>
+        <jda.version>6.4.1</jda.version>
     </properties>
 
     <repositories>
@@ -26,7 +28,18 @@
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>version.properties</exclude>
+                </excludes>
+            </resource>
+
+            <resource>
+                <directory>src/main/resources</directory>
                 <filtering>true</filtering>
+                <includes>
+                    <include>version.properties</include>
+                </includes>
             </resource>
         </resources>
         <plugins>
@@ -84,6 +97,18 @@
     </build>
 
     <dependencies>
+        <dependency>
+            <groupId>net.dv8tion</groupId>
+            <artifactId>JDA</artifactId>
+            <version>${jda.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.jline</groupId>
+            <artifactId>jline</artifactId>
+            <version>${jline.version}</version>
+        </dependency>
+
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
@@ -176,7 +201,7 @@
         <dependency>
             <groupId>io.javalin</groupId>
             <artifactId>javalin</artifactId>
-            <version>7.1.0</version>
+            <version>7.2.2</version>
         </dependency>
     </dependencies>
 </project>

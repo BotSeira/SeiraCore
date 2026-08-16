@@ -1,0 +1,100 @@
+{
+  "items": [
+    {
+      "type": "command",
+      "name": "/rp",
+      "desc": "查询最近通过成绩"
+    },
+    {
+      "type": "command",
+      "name": "/rs",
+      "desc": "查询通过成绩"
+    },
+    {
+      "type": "command",
+      "name": "/bind",
+      "desc": "绑定账号"
+    },
+    {
+      "type": "command",
+      "name": "/unbind",
+      "desc": "解绑账号"
+    },
+    {
+      "type": "command",
+      "name": "/f",
+      "desc": "获取好友列表"
+    },
+    {
+      "type": "command",
+      "name": "/mp",
+      "desc": "查看当前多人房间"
+    },
+    {
+      "type": "command",
+      "name": "/bp",
+      "desc": "查询最好成绩"
+    },
+    {
+      "type": "command",
+      "name": "/s",
+      "desc": "查询指定成绩"
+    },
+    {
+      "type": "command",
+      "name": "/sa",
+      "desc": "获取指定成绩分析"
+    },
+    {
+      "type": "command",
+      "name": "/ma",
+      "desc": "获取指定成绩Miss分析"
+    },
+    {
+      "type": "command",
+      "name": "/sms",
+      "desc": "搜索谱面"
+    },
+    {
+      "type": "command",
+      "name": "/luck",
+      "desc": "今日运势"
+    },
+    {
+      "type": "command",
+      "name": "/r",
+      "desc": "渲染回放"
+    },
+    {
+      "type": "command",
+      "name": "/rsc",
+      "desc": "渲染同屏回放"
+    },
+    {
+      "type": "command",
+      "name": "/rstat",
+      "desc": "查询回放渲染状态"
+    },
+    {
+      "type": "command",
+      "name": "/stat",
+      "desc": "服务器状态"
+    },
+    {
+      "type": "command",
+      "name": "/rg",
+      "desc": "猜Rank游戏"
+    },
+    {
+      "type": "command",
+      "name": "/watch",
+      "desc": "成绩监视"
+    },
+    {
+      "type": "link",
+      "name": "指令列表",
+      "link": "https://docs.seira.top/overview/commands.html"
+    }
+  ],
+  "remark": "v1.10.0"
+}

@@ -3,25 +3,33 @@ package xyz.zcraft.seira.binding;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.api.data.OsuToken;
+import xyz.zcraft.seira.discord.DiscordBridgeMapping;
 import xyz.zcraft.seira.util.OsuAuthHelper;
+import xyz.zcraft.seira.watch.SpecificScoreWatchState;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Locale;
+import java.util.Set;
 
 public final class UserDataStore {
     private static final Logger LOG = LogManager.getLogger(UserDataStore.class);
     private static final Object INIT_LOCK = new Object();
 
     private static volatile String jdbcUrl;
+    private static volatile Path initializedDbPath;
 
     public static void init(String sqlitePath) {
         synchronized (INIT_LOCK) {
-            if (jdbcUrl != null) {
+            if (jdbcUrl != null && initializedDbPath != null && Files.exists(initializedDbPath)) {
                 return;
             }
             try {
@@ -31,6 +39,7 @@ public final class UserDataStore {
                     Files.createDirectories(parent);
                 }
                 jdbcUrl = "jdbc:sqlite:" + dbPath;
+                initializedDbPath = dbPath;
                 createTablesIfNeeded();
                 LOG.info("SQLite binding store initialized at {}", dbPath);
             } catch (Exception e) {
@@ -379,6 +388,275 @@ public final class UserDataStore {
         return uids;
     }
 
+    public static boolean isGroupMember(String groupId, String openId) {
+        ensureInitialized();
+        String sql = "SELECT 1 FROM group_members WHERE group_id = ? AND open_id = ?";
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, groupId);
+            statement.setString(2, openId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next();
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to query group member", e);
+        }
+    }
+
+    public static Optional<String> findGroupOpenIdByUid(String groupId, long osuUid) {
+        ensureInitialized();
+        String sql = """
+                SELECT gm.open_id
+                FROM group_members gm
+                JOIN user_bindings ub
+                  ON ub.open_id = gm.open_id
+                WHERE gm.group_id = ?
+                  AND ub.osu_uid = ?
+                ORDER BY gm.updated_at DESC
+                LIMIT 1
+                """;
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, groupId);
+            statement.setLong(2, osuUid);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next()
+                        ? Optional.of(resultSet.getString("open_id"))
+                        : Optional.empty();
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to query group binding", e);
+        }
+    }
+
+    public static void upsertDiscordBridge(DiscordBridgeMapping mapping) {
+        ensureInitialized();
+        String sql = """
+                INSERT INTO discord_bridges(group_id, guild_id, channel_id, updated_at)
+                VALUES(?, ?, ?, ?)
+                ON CONFLICT(group_id) DO UPDATE SET
+                    guild_id = excluded.guild_id,
+                    channel_id = excluded.channel_id,
+                    updated_at = excluded.updated_at
+                """;
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, mapping.groupId());
+            statement.setString(2, mapping.guildId());
+            statement.setString(3, mapping.channelId());
+            statement.setLong(4, System.currentTimeMillis());
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to persist Discord bridge", e);
+        }
+    }
+
+    public static boolean removeDiscordBridge(String groupId) {
+        ensureInitialized();
+        String sql = "DELETE FROM discord_bridges WHERE group_id = ?";
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, groupId);
+            return statement.executeUpdate() > 0;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to remove Discord bridge", e);
+        }
+    }
+
+    public static List<DiscordBridgeMapping> findAllDiscordBridges() {
+        ensureInitialized();
+        String sql = "SELECT group_id, guild_id, channel_id FROM discord_bridges ORDER BY group_id";
+        List<DiscordBridgeMapping> mappings = new ArrayList<>();
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+            while (resultSet.next()) {
+                mappings.add(new DiscordBridgeMapping(
+                        resultSet.getString("group_id"),
+                        resultSet.getString("guild_id"),
+                        resultSet.getString("channel_id")
+                ));
+            }
+            return List.copyOf(mappings);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to load Discord bridges", e);
+        }
+    }
+
+    public static void saveSpecificScoreWatch(SpecificScoreWatchState state) {
+        ensureInitialized();
+        String upsertWatch = """
+                INSERT INTO specific_score_watches(group_id, updated_at)
+                VALUES(?, ?)
+                ON CONFLICT(group_id) DO UPDATE SET updated_at = excluded.updated_at
+                """;
+        String deleteUsers = "DELETE FROM specific_score_watch_users WHERE group_id = ?";
+        String deleteBeatmaps = "DELETE FROM specific_score_watch_beatmaps WHERE group_id = ?";
+        String insertUser = """
+                INSERT INTO specific_score_watch_users(group_id, user_id, last_score_id)
+                VALUES(?, ?, ?)
+                """;
+        String insertBeatmap = """
+                INSERT INTO specific_score_watch_beatmaps(group_id, beatmap_id)
+                VALUES(?, ?)
+                """;
+        try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
+            connection.setAutoCommit(false);
+            try (PreparedStatement watchStatement = connection.prepareStatement(upsertWatch);
+                 PreparedStatement deleteUsersStatement = connection.prepareStatement(deleteUsers);
+                 PreparedStatement deleteBeatmapsStatement = connection.prepareStatement(deleteBeatmaps);
+                 PreparedStatement userStatement = connection.prepareStatement(insertUser);
+                 PreparedStatement beatmapStatement = connection.prepareStatement(insertBeatmap)) {
+                watchStatement.setString(1, state.groupId());
+                watchStatement.setLong(2, System.currentTimeMillis());
+                watchStatement.executeUpdate();
+
+                deleteUsersStatement.setString(1, state.groupId());
+                deleteUsersStatement.executeUpdate();
+                deleteBeatmapsStatement.setString(1, state.groupId());
+                deleteBeatmapsStatement.executeUpdate();
+
+                for (long userId : state.userIds()) {
+                    userStatement.setString(1, state.groupId());
+                    userStatement.setLong(2, userId);
+                    Long lastScoreId = state.lastScoreIds().get(userId);
+                    if (lastScoreId == null) {
+                        userStatement.setNull(3, Types.BIGINT);
+                    } else {
+                        userStatement.setLong(3, lastScoreId);
+                    }
+                    userStatement.addBatch();
+                }
+                userStatement.executeBatch();
+
+                for (long beatmapId : state.beatmapIds()) {
+                    beatmapStatement.setString(1, state.groupId());
+                    beatmapStatement.setLong(2, beatmapId);
+                    beatmapStatement.addBatch();
+                }
+                beatmapStatement.executeBatch();
+                connection.commit();
+            } catch (SQLException e) {
+                connection.rollback();
+                throw e;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to persist specific score watch", e);
+        }
+    }
+
+    public static boolean removeSpecificScoreWatch(String groupId) {
+        ensureInitialized();
+        try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
+            connection.setAutoCommit(false);
+            try (PreparedStatement users = connection.prepareStatement(
+                    "DELETE FROM specific_score_watch_users WHERE group_id = ?");
+                 PreparedStatement beatmaps = connection.prepareStatement(
+                         "DELETE FROM specific_score_watch_beatmaps WHERE group_id = ?");
+                 PreparedStatement watch = connection.prepareStatement(
+                         "DELETE FROM specific_score_watches WHERE group_id = ?")) {
+                users.setString(1, groupId);
+                users.executeUpdate();
+                beatmaps.setString(1, groupId);
+                beatmaps.executeUpdate();
+                watch.setString(1, groupId);
+                boolean removed = watch.executeUpdate() > 0;
+                connection.commit();
+                return removed;
+            } catch (SQLException e) {
+                connection.rollback();
+                throw e;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to remove specific score watch", e);
+        }
+    }
+
+    public static void updateSpecificScoreWatchCursor(String groupId, long userId, long scoreId) {
+        ensureInitialized();
+        String sql = """
+                UPDATE specific_score_watch_users
+                SET last_score_id = ?
+                WHERE group_id = ? AND user_id = ?
+                """;
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, scoreId);
+            statement.setString(2, groupId);
+            statement.setLong(3, userId);
+            if (statement.executeUpdate() != 1) {
+                throw new IllegalStateException("Specific score watch cursor no longer exists");
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to update specific score watch cursor", e);
+        }
+    }
+
+    public static List<SpecificScoreWatchState> findAllSpecificScoreWatches() {
+        ensureInitialized();
+        Map<String, Set<Long>> usersByGroup = new LinkedHashMap<>();
+        Map<String, Set<Long>> beatmapsByGroup = new LinkedHashMap<>();
+        Map<String, Map<Long, Long>> cursorsByGroup = new LinkedHashMap<>();
+        String groupsSql = "SELECT group_id FROM specific_score_watches ORDER BY group_id";
+        String usersSql = """
+                SELECT group_id, user_id, last_score_id
+                FROM specific_score_watch_users
+                ORDER BY group_id, user_id
+                """;
+        String beatmapsSql = """
+                SELECT group_id, beatmap_id
+                FROM specific_score_watch_beatmaps
+                ORDER BY group_id, beatmap_id
+                """;
+        try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
+            try (Statement statement = connection.createStatement();
+                 ResultSet resultSet = statement.executeQuery(groupsSql)) {
+                while (resultSet.next()) {
+                    String groupId = resultSet.getString("group_id");
+                    usersByGroup.put(groupId, new LinkedHashSet<>());
+                    beatmapsByGroup.put(groupId, new LinkedHashSet<>());
+                    cursorsByGroup.put(groupId, new LinkedHashMap<>());
+                }
+            }
+            try (Statement statement = connection.createStatement();
+                 ResultSet resultSet = statement.executeQuery(usersSql)) {
+                while (resultSet.next()) {
+                    String groupId = resultSet.getString("group_id");
+                    long userId = resultSet.getLong("user_id");
+                    usersByGroup.computeIfAbsent(groupId, _ -> new LinkedHashSet<>()).add(userId);
+                    long lastScoreId = resultSet.getLong("last_score_id");
+                    if (!resultSet.wasNull()) {
+                        cursorsByGroup.computeIfAbsent(groupId, _ -> new LinkedHashMap<>())
+                                .put(userId, lastScoreId);
+                    }
+                }
+            }
+            try (Statement statement = connection.createStatement();
+                 ResultSet resultSet = statement.executeQuery(beatmapsSql)) {
+                while (resultSet.next()) {
+                    beatmapsByGroup.computeIfAbsent(
+                            resultSet.getString("group_id"), _ -> new LinkedHashSet<>()
+                    ).add(resultSet.getLong("beatmap_id"));
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to load specific score watches", e);
+        }
+
+        List<SpecificScoreWatchState> states = new ArrayList<>();
+        usersByGroup.forEach((groupId, userIds) -> {
+            Set<Long> beatmapIds = beatmapsByGroup.getOrDefault(groupId, Set.of());
+            if (!userIds.isEmpty() && !beatmapIds.isEmpty()) {
+                states.add(new SpecificScoreWatchState(
+                        groupId, userIds, beatmapIds, cursorsByGroup.getOrDefault(groupId, Map.of())
+                ));
+            } else {
+                LOG.warn("Ignoring incomplete persisted /wx watch for group {}", groupId);
+            }
+        });
+        return List.copyOf(states);
+    }
+
     public static int countBoundUser() {
         ensureInitialized();
 
@@ -455,6 +733,78 @@ public final class UserDataStore {
         } catch (SQLException e) {
             throw new RuntimeException("Failed to execute SQL: " + sql, e);
         }
+    }
+
+    public static QueryResult queryReadOnly(String sql, int maxRows) {
+        ensureInitialized();
+        if (sql == null || sql.isBlank()) {
+            throw new IllegalArgumentException("SQL query must not be blank");
+        }
+        if (maxRows < 1 || maxRows > 200) {
+            throw new IllegalArgumentException("maxRows must be between 1 and 200");
+        }
+
+        String statementSql = sql.strip();
+        if (statementSql.endsWith(";")) {
+            statementSql = statementSql.substring(0, statementSql.length() - 1).stripTrailing();
+        }
+        if (statementSql.contains(";")) {
+            throw new IllegalArgumentException("Multiple SQL statements are not allowed");
+        }
+        String normalized = statementSql.toLowerCase(Locale.ROOT);
+        String keyword = normalized.split("\\s+", 2)[0];
+        if (!List.of("select", "with", "pragma", "explain").contains(keyword)) {
+            throw new IllegalArgumentException("Only SELECT, WITH, PRAGMA and EXPLAIN queries are allowed");
+        }
+        if ("pragma".equals(keyword) && !isAllowedReadOnlyPragma(normalized)) {
+            throw new IllegalArgumentException("This PRAGMA is not allowed in the read-only console");
+        }
+
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             Statement queryOnly = connection.createStatement();
+             Statement statement = connection.createStatement()) {
+            queryOnly.execute("PRAGMA query_only = ON");
+            statement.setMaxRows(maxRows + 1);
+            statement.setQueryTimeout(10);
+            // SQL is intentionally accepted from the trusted local console. The
+            // SQLite connection is query-only and the result size is bounded.
+            //noinspection SqlSourceToSinkFlow
+            try (ResultSet resultSet = statement.executeQuery(statementSql)) {
+                ResultSetMetaData metadata = resultSet.getMetaData();
+                int columnCount = metadata.getColumnCount();
+                List<String> columns = new ArrayList<>(columnCount);
+                for (int index = 1; index <= columnCount; index++) {
+                    columns.add(metadata.getColumnLabel(index));
+                }
+
+                List<List<String>> rows = new ArrayList<>();
+                boolean truncated = false;
+                while (resultSet.next()) {
+                    if (rows.size() == maxRows) {
+                        truncated = true;
+                        break;
+                    }
+                    List<String> row = new ArrayList<>(columnCount);
+                    for (int index = 1; index <= columnCount; index++) {
+                        row.add(resultSet.getString(index));
+                    }
+                    rows.add(List.copyOf(row));
+                }
+                return new QueryResult(List.copyOf(columns), List.copyOf(rows), truncated);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to execute read-only SQL query", e);
+        }
+    }
+
+    private static boolean isAllowedReadOnlyPragma(String normalizedSql) {
+        String pragma = normalizedSql.substring("pragma".length()).stripLeading();
+        int separator = pragma.indexOf('(');
+        String name = (separator >= 0 ? pragma.substring(0, separator) : pragma).strip();
+        return List.of(
+                "table_info", "table_xinfo", "table_list", "index_list", "index_info",
+                "index_xinfo", "foreign_key_list", "database_list", "compile_options"
+        ).contains(name);
     }
 
     public static List<Long> findAllUsers() {
@@ -534,6 +884,39 @@ public final class UserDataStore {
                     PRIMARY KEY(uid)
                 )
                 """;
+        String discordBridgeSql = """
+                CREATE TABLE IF NOT EXISTS discord_bridges (
+                    group_id TEXT NOT NULL PRIMARY KEY,
+                    guild_id TEXT NOT NULL,
+                    channel_id TEXT NOT NULL,
+                    updated_at BIGINT NOT NULL
+                )
+                """;
+        String discordBridgeTargetIndexSql = """
+                CREATE INDEX IF NOT EXISTS idx_discord_bridges_target
+                ON discord_bridges(guild_id, channel_id)
+                """;
+        String specificScoreWatchSql = """
+                CREATE TABLE IF NOT EXISTS specific_score_watches (
+                    group_id TEXT NOT NULL PRIMARY KEY,
+                    updated_at BIGINT NOT NULL
+                )
+                """;
+        String specificScoreWatchUserSql = """
+                CREATE TABLE IF NOT EXISTS specific_score_watch_users (
+                    group_id TEXT NOT NULL,
+                    user_id BIGINT NOT NULL,
+                    last_score_id BIGINT,
+                    PRIMARY KEY(group_id, user_id)
+                )
+                """;
+        String specificScoreWatchBeatmapSql = """
+                CREATE TABLE IF NOT EXISTS specific_score_watch_beatmaps (
+                    group_id TEXT NOT NULL,
+                    beatmap_id BIGINT NOT NULL,
+                    PRIMARY KEY(group_id, beatmap_id)
+                )
+                """;
         try (Connection connection = DriverManager.getConnection(jdbcUrl);
              Statement statement = connection.createStatement()) {
             statement.execute(bindingSql);
@@ -542,6 +925,11 @@ public final class UserDataStore {
             statement.execute(followSql);
             statement.execute(followIndexSql);
             statement.execute(userInfoSql);
+            statement.execute(discordBridgeSql);
+            statement.execute(discordBridgeTargetIndexSql);
+            statement.execute(specificScoreWatchSql);
+            statement.execute(specificScoreWatchUserSql);
+            statement.execute(specificScoreWatchBeatmapSql);
         }
     }
 
@@ -549,6 +937,9 @@ public final class UserDataStore {
         if (jdbcUrl == null) {
             throw new IllegalStateException("UserBindingStore is not initialized");
         }
+    }
+
+    public record QueryResult(List<String> columns, List<List<String>> rows, boolean truncated) {
     }
 }
 

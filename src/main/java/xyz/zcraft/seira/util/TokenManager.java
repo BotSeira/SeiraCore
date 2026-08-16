@@ -9,15 +9,18 @@ import xyz.zcraft.seira.bot.data.AccessToken;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-public class TokenManager {
+public class TokenManager implements AutoCloseable {
     private static final Logger LOG = LogManager.getLogger(TokenManager.class);
 
-    private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread thread = new Thread(r, "access-token-poller");
         thread.setDaemon(true);
         return thread;
     });
+    private final AtomicBoolean started = new AtomicBoolean();
+    private final AtomicBoolean closed = new AtomicBoolean();
 
     private final String clientId;
     private final String clientSecret;
@@ -28,11 +31,13 @@ public class TokenManager {
     public TokenManager(String clientId, String clientSecret) {
         this.clientId = clientId;
         this.clientSecret = clientSecret;
-
-        startPolling();
     }
 
-    private void startPolling() {
+    public synchronized void start() {
+        ensureOpen();
+        if (started.get()) {
+            return;
+        }
         scheduler.scheduleAtFixedRate(() -> {
             try {
                 if (!isValid()) {
@@ -43,6 +48,7 @@ public class TokenManager {
                 LOG.error("Background token check encountered an error", e);
             }
         }, 0, 60, TimeUnit.SECONDS);
+        started.set(true);
     }
 
     public boolean isValid() {
@@ -68,6 +74,7 @@ public class TokenManager {
     }
 
     public void blockUntilValid() {
+        ensureOpen();
         if (isValid()) {
             return;
         }
@@ -75,7 +82,9 @@ public class TokenManager {
         LOG.info("Startup paused: Waiting for a valid QQ API access token...");
 
         while (!isValid()) {
+            ensureOpen();
             synchronized (this) {
+                ensureOpen();
                 if (isValid()) {
                     break;
                 }
@@ -95,6 +104,20 @@ public class TokenManager {
                     }
                 }
             }
+        }
+    }
+
+    private void ensureOpen() {
+        if (closed.get()) {
+            throw new IllegalStateException("Token manager has been closed");
+        }
+    }
+
+    @Override
+    public synchronized void close() {
+        if (closed.compareAndSet(false, true)) {
+            started.set(false);
+            scheduler.shutdownNow();
         }
     }
 }

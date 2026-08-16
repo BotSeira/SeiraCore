@@ -1,15 +1,9 @@
 package xyz.zcraft.seira.bot;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.seira.bot.data.AccessToken;
-import xyz.zcraft.seira.bot.data.FileInfo;
-import xyz.zcraft.seira.bot.data.Message;
-import xyz.zcraft.seira.bot.data.QQUser;
+import xyz.zcraft.seira.bot.data.*;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,17 +20,8 @@ import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HexFormat;
-import java.util.List;
-import java.util.Locale;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
+import java.util.concurrent.*;
 
 public class QQApi {
     private static final String ENDPOINT = "https://api.sgroup.qq.com";
@@ -64,7 +49,7 @@ public class QQApi {
                     .get("url")
                     .getAsString();
         } catch (IOException | InterruptedException | URISyntaxException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -100,7 +85,7 @@ public class QQApi {
                 throw new RuntimeException("Failed to send private message to " + openId + " " + send.body());
             }
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -116,7 +101,7 @@ public class QQApi {
                 throw new RuntimeException("Failed to send group message to " + groupId + " " + send.body());
             }
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -143,7 +128,7 @@ public class QQApi {
             LOG.debug("Upload private media response: status={}", response.statusCode());
             return parseUploadedFileInfo(response, "upload private media");
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -170,7 +155,7 @@ public class QQApi {
 
             return parseUploadedFileInfo(response, "upload private media");
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -473,7 +458,7 @@ public class QQApi {
             final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             return parseUploadedFileInfo(response, "upload private media(base64)");
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -492,7 +477,7 @@ public class QQApi {
             final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             return parseUploadedFileInfo(response, "upload private media(base64)");
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
     }
 
@@ -520,16 +505,6 @@ public class QQApi {
                 .header("Accept", "application/json");
     }
 
-    private record MediaDigests(String md5, String sha1, String md5First10m) {
-    }
-
-    private record UploadPart(int index, String presignedUrl, long blockSize) {
-    }
-
-    private record UploadPrepare(String uploadId, long blockSize, List<UploadPart> parts, int concurrency,
-                                 int retryTimeoutSeconds, int retryDelaySeconds) {
-    }
-
     public static QQUser getSelf(AccessToken accessToken) {
         try {
             final var request = newRequestBuilder(accessToken)
@@ -540,7 +515,138 @@ public class QQApi {
             final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             return gson.fromJson(parseResponseData(response, "get self info"), QQUser.class);
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            throw requestFailure(e);
         }
+    }
+
+    private static RuntimeException requestFailure(Exception exception) {
+        if (exception instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+        }
+        return new RuntimeException(exception);
+    }
+
+    public static List<PanelRecord> listPanels(AccessToken accessToken, String scope) {
+        try {
+            final var request = newRequestBuilder(accessToken)
+                    .uri(URI.create(ENDPOINT + "/v2/panels" + "?scope=" + scope + "&limit=50"))
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            final JsonObject rootObj = JsonParser.parseString(response.body()).getAsJsonObject();
+
+            final JsonArray recordsArr = rootObj.getAsJsonArray("records");
+
+            if (recordsArr == null || recordsArr.isEmpty()) {
+                return List.of();
+            }
+
+            final LinkedList<PanelRecord> records = new LinkedList<>();
+
+            for (JsonElement jsonElement : recordsArr) {
+                records.add(gson.fromJson(jsonElement, PanelRecord.class));
+            }
+
+            return records;
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
+        }
+    }
+
+    public static PanelRecord getPanel(AccessToken accessToken, String panelId) {
+        try {
+            final var request = newRequestBuilder(accessToken)
+                    .uri(URI.create(ENDPOINT + "/v2/panels/" + panelId))
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                LOG.error("Failed to get panel, status code: {} body={}", response.statusCode(), response.body());
+                throw new RuntimeException("Failed to get panel, status code: " + response.statusCode() + " body=" + response.body());
+            }
+
+            return gson.fromJson(parseResponseData(response, "get panel"), PanelRecord.class);
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
+        }
+    }
+
+    public static String createPanel(AccessToken accessToken, String scope, Panel panel) {
+        try {
+            JsonObject body = new JsonObject();
+            body.addProperty("scope", scope);
+            body.addProperty("target_type", "all");
+            body.add("panel", gson.toJsonTree(panel));
+
+            final var request = newRequestBuilder(accessToken)
+                    .uri(URI.create(ENDPOINT + "/v2/panels"))
+                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                LOG.error("Failed to create panel, status code: {} body={}", response.statusCode(), response.body());
+                throw new RuntimeException("Failed to create panel, status code: " + response.statusCode() + " body=" + response.body());
+            }
+
+            return JsonParser.parseString(response.body()).getAsJsonObject().get("panel_id").getAsString();
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
+        }
+    }
+
+    public static void deletePanel(AccessToken accessToken, String panelId) {
+        try {
+            final var request = newRequestBuilder(accessToken)
+                    .uri(URI.create(ENDPOINT + "/v2/panels/" + panelId))
+                    .DELETE()
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                LOG.error("Failed to delete panel, status code: {} body={}", response.statusCode(), response.body());
+                throw new RuntimeException("Failed to delete panel with ID: " + panelId);
+            }
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
+        }
+    }
+
+    public static int editPanel(AccessToken accessToken, String panelId, Panel newPanel) {
+        try {
+            JsonObject body = new JsonObject();
+            body.add("panel", gson.toJsonTree(newPanel));
+
+            final var request = newRequestBuilder(accessToken)
+                    .uri(URI.create(ENDPOINT + "/v2/panels/" + panelId))
+                    .PUT(HttpRequest.BodyPublishers.ofString(body.toString()))
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                LOG.error("Failed to edit panel, status code: {} body={}", response.statusCode(), response.body());
+                throw new RuntimeException("Failed to edit panel, status code: " + response.statusCode() + " body=" + response.body());
+            }
+
+            return JsonParser.parseString(response.body()).getAsJsonObject().get("version").getAsInt();
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
+        }
+    }
+
+    private record MediaDigests(String md5, String sha1, String md5First10m) {
+    }
+
+    private record UploadPart(int index, String presignedUrl, long blockSize) {
+    }
+
+    private record UploadPrepare(String uploadId, long blockSize, List<UploadPart> parts, int concurrency,
+                                 int retryTimeoutSeconds, int retryDelaySeconds) {
     }
 }
