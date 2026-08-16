@@ -5,6 +5,8 @@ Seira 是一个提供 osu! 成绩查询的 QQ 机器人。
 
 Seira 依赖 [oStella](https://github.com/BotSeira/oStella) 作为上游数据服务。
 
+详细使用文档在[这里](https://docs.seira.top/)~
+
 ## 添加机器人
 
 扫描下面的二维码添加机器人↓
@@ -17,7 +19,7 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 
 如果使用过程中遇到了问题，或是有功能建议，欢迎Issue & PR 🥰
 
-另外，由于QQ机器人最近正在进行业务调整，部分功能（如指令列表和视频上传）可能会不稳定或暂时不可用
+另外，由于QQ机器人最近正在进行业务调整，部分功能可能会不稳定或暂时不可用
 
 ## Seira 能干什么？
 
@@ -40,6 +42,10 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/024fe6b2-c10a-4c9e-aefc-9c784826a9b7" />
 
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/dd9ab809-b7aa-44b2-a749-8a841781b30c" />
+
+### 玩猜 Rank！
+
+<img width="400"  alt="image" src="https://github.com/user-attachments/assets/c1caf387-381c-442f-99da-5b4257657576" />
 
 ### 查询群友的排行榜！
 
@@ -77,7 +83,7 @@ mvn -U clean compile exec:java
 
 ## 常用命令
 
-> 所有命令都以 `/` 开头。
+> 所有命令都以 `/` 开头。指令详情请见[文档](https://docs.seira.top/overview/commands.html)。
 
 | 命令            | 用法                                               | 结果                                                                            |
 |-----------------|----------------------------------------------------|---------------------------------------------------------------------------------|
@@ -95,7 +101,7 @@ mvn -U clean compile exec:java
 | `/bgp`          | `/bgp <id/rsN/boN>`                                | 获取指定谱面背景预览                                                            |
 | `/s`            | `/s <id/locId/rsN/boN>`                            | 获取指定的在线或本地成绩图                                                      |
 | `/sa`           | `/sa <id/locId/rsN/boN>`                           | 获取指定成绩分析图                                                              |
-| `/ma`           | `/ma [id/locId/rsN/boN] [n/#n]`                   | 获取指定或最近目标成绩的Miss分析；省略目标时用`#n`指定Miss                      |
+| `/ma`           | `/ma [id/locId/rsN/boN] [n/#n]`                    | 获取指定或最近目标成绩的Miss分析；省略目标时用`#n`指定Miss                      |
 | `/u`            | `/u <uid/username/@user>`                          | 获取指定用户信息                                                                |
 | `/r`            | `/r [id/locId/rsN/boN] [[mm:ss]-[mm:ss]]`          | 生成并发送指定或最近目标的回放视频。省略范围时自动识别高光，使用`-`渲染整个回放 |
 | `/rg`           | `/rg <start/#Rank/end>`                            | 在群聊中开始、参与或结束猜 Rank 游戏                                            |
