@@ -73,9 +73,9 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 | `/f`            | `/f`                                               | 获取好友列表                                                                    |
 | `/fall`         | `/fall`                                            | 获取全部好友列表                                                                |
 | `/fclear`       | `/fclear`                                          | 清除好友记录                                                                    |
-| `/bo`           | `/bo [n] [uid/username/@user] [filters...]`        | 最好n个成绩图，可按acc/combo/mod/time/pp等过滤；无参时获取最佳成绩详情          |
-| `/rs`           | `/rs [n] [uid/username/@user] [filters...]`        | 最近n个成绩图，可追加过滤条件；无参时获取最近一个成绩详情                       |
-| `/rp`           | `/rp [n] [uid/username/@user] [filters...]`        | 最近n个通过成绩图，可追加过滤条件；无参时获取最近一个通过成绩详情               |
+| `/bo`           | `/bo [n] [uid/username/@user] [filters...]`        | 获取最多200条最好成绩后过滤；无参时获取最佳成绩详情                             |
+| `/rs`           | `/rs [n] [uid/username/@user] [filters...]`        | 获取最多200条最近成绩后过滤；无参时获取最近一个成绩详情                         |
+| `/rp`           | `/rp [n] [uid/username/@user] [filters...]`        | 获取最多200条最近通过成绩后过滤；无参时获取最近一个通过成绩详情                 |
 | `/m`            | `/m <id/rsN/boN> [Mod]`                            | 获取指定谱面信息                                                                |
 | `/ap`           | `/ap <id/rsN/boN>`                                 | 获取指定谱面音频预览                                                            |
 | `/bgp`          | `/bgp <id/rsN/boN>`                                | 获取指定谱面背景预览                                                            |

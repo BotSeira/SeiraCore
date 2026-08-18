@@ -12,6 +12,8 @@ seira:
   adminIds: [ ]
   # 新成绩监视的批量轮询间隔（分钟）
   watchIntervalMinutes: 5
+  # 多人房间结果监视的轮询间隔（秒）
+  multiplayerWatchIntervalSeconds: 30
 
 # === 用户绑定配置 ===
 binding:

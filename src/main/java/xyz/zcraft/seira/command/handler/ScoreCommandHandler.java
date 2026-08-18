@@ -13,6 +13,8 @@ import xyz.zcraft.seira.command.parse.UserRefResolution;
 import xyz.zcraft.seira.data.UserRef;
 
 public final class ScoreCommandHandler {
+    private static final int MAX_SCORE_LIST_COUNT = 200;
+
     private final Resolver resolver;
     private final TargetHistory targetHistory;
     private final TaskCoordinator taskCoordinator;
@@ -89,8 +91,8 @@ public final class ScoreCommandHandler {
     private ScoreListRequest parseScoreListRequest(Context ctx, String usage) {
         String[] args = ctx.args();
         Integer count = resolver.parsePositiveInt(args[0]);
-        if (count == null) {
-            ctx.sendReply(PendingMessage.ofString(usage));
+        if (count == null || count > MAX_SCORE_LIST_COUNT) {
+            ctx.sendReply(PendingMessage.ofString(usage + "\n数量必须在 1 到 " + MAX_SCORE_LIST_COUNT + " 之间。"));
             return null;
         }
 

@@ -24,6 +24,9 @@ import xyz.zcraft.seira.runtime.ApplicationExecutors;
 import xyz.zcraft.seira.security.AdminRegistry;
 import xyz.zcraft.seira.util.TokenManager;
 import xyz.zcraft.seira.watch.OstellaWatchApi;
+import xyz.zcraft.seira.watch.OstellaMultiplayerRoomWatchApi;
+import xyz.zcraft.seira.watch.MultiplayerRoomWatchService;
+import xyz.zcraft.seira.watch.QqMultiplayerRoomNotifier;
 import xyz.zcraft.seira.watch.SpecificScoreNotifier;
 import xyz.zcraft.seira.watch.WatchScoreNotifier;
 import xyz.zcraft.seira.watch.ScoreWatchService;
@@ -50,6 +53,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
     @Getter
     private final MessageSender sender;
     private final ScoreWatchService watchService;
+    private final MultiplayerRoomWatchService multiplayerRoomWatchService;
     private final DiscordBridgeService discordBridgeService;
     private final AppConfig startupConfig;
     private final Router router;
@@ -93,6 +97,13 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                 Duration.ofMinutes(config.seira().effectiveWatchIntervalMinutes())
         );
 
+        LOG.info("Initializing multiplayer room watch service");
+        this.multiplayerRoomWatchService = new MultiplayerRoomWatchService(
+                new OstellaMultiplayerRoomWatchApi(config.ostella().endpoint()),
+                new QqMultiplayerRoomNotifier(sender),
+                Duration.ofSeconds(config.seira().effectiveMultiplayerWatchIntervalSeconds())
+        );
+
         LOG.info("Initializing rank guess service");
         RankGuessGameService rankGuessGameService = new RankGuessGameService();
         this.attachmentHandler = new AttachmentHandler(executors.attachmentDownloads());
@@ -102,6 +113,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                 admins,
                 bindingService,
                 watchService,
+                multiplayerRoomWatchService,
                 discordBridgeService,
                 rankGuessGameService,
                 executors.commandTasks(),
@@ -119,6 +131,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         runnerThread = Thread.currentThread();
         tokenManager.start();
         watchService.start();
+        multiplayerRoomWatchService.start();
         discordBridgeService.start();
         LOG.info("Starting bot connection loop...");
 
@@ -214,6 +227,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
             thread.interrupt();
         }
         watchService.close();
+        multiplayerRoomWatchService.close();
         discordBridgeService.close();
         tokenManager.close();
     }

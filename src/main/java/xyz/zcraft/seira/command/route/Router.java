@@ -20,6 +20,7 @@ import xyz.zcraft.seira.rankguess.RankGuessGameService;
 import xyz.zcraft.seira.security.AdminRegistry;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 import xyz.zcraft.seira.watch.ScoreWatchService;
+import xyz.zcraft.seira.watch.MultiplayerRoomWatchService;
 
 import java.util.Optional;
 import java.util.Set;
@@ -46,6 +47,7 @@ public class Router {
             AdminRegistry admins,
             BindingService bindingService,
             ScoreWatchService watchService,
+            MultiplayerRoomWatchService multiplayerRoomWatchService,
             DiscordBridgeService discordBridgeService,
             RankGuessGameService rankGuessGameService,
             Executor commandExecutor,
@@ -87,6 +89,8 @@ public class Router {
         WatchCommandHandler watchCommands = new WatchCommandHandler(resolver, taskCoordinator, watchService, admins::isAdmin);
         SpecificScoreWatchCommandHandler specificScoreWatchCommands =
                 new SpecificScoreWatchCommandHandler(taskCoordinator, watchService);
+        MultiplayerRoomWatchCommandHandler multiplayerRoomWatchCommands =
+                new MultiplayerRoomWatchCommandHandler(taskCoordinator, multiplayerRoomWatchService);
         DcsCommandHandler dcsCommands = new DcsCommandHandler(discordBridgeService);
         RankGuessCommandHandler rankGuessCommands = new RankGuessCommandHandler(
                 taskCoordinator, replyFactory, rankGuessGameService, admins::isAdmin
@@ -102,6 +106,7 @@ public class Router {
                 generalCommands,
                 watchCommands,
                 specificScoreWatchCommands,
+                multiplayerRoomWatchCommands,
                 dcsCommands,
                 rankGuessCommands
         );
@@ -196,6 +201,7 @@ public class Router {
             GeneralCommandHandler generalCommands,
             WatchCommandHandler watchCommands,
             SpecificScoreWatchCommandHandler specificScoreWatchCommands,
+            MultiplayerRoomWatchCommandHandler multiplayerRoomWatchCommands,
             DcsCommandHandler dcsCommands,
             RankGuessCommandHandler rankGuessCommands
     ) {
@@ -233,6 +239,7 @@ public class Router {
                 .register(generalCommands::handleFaq, "faq")
                 .register(watchCommands::handleWatch, "watch")
                 .register(specificScoreWatchCommands::handleWx, "wx")
+                .register(multiplayerRoomWatchCommands::handleMpWatch, "mpwatch")
                 .register(dcsCommands::handleDcs, "dcs")
                 .register(rankGuessCommands::handleRankGuess, "rg")
                 .build();
