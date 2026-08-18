@@ -4,6 +4,7 @@ import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.data.Response;
 import xyz.zcraft.seira.api.data.SearchQuery;
 import xyz.zcraft.seira.api.data.SearchResultItem;
+import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.*;
 import xyz.zcraft.seira.command.parse.Resolver;
@@ -20,6 +21,7 @@ public final class BeatmapCommandHandler {
     private final TargetHistory lastTarget;
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
+    private final VideoRenderRecord videoRenderRecord;
     private final Function<String, String> accessTokenProvider;
 
     public BeatmapCommandHandler(
@@ -27,12 +29,14 @@ public final class BeatmapCommandHandler {
             TargetHistory targetHistory,
             TaskCoordinator taskCoordinator,
             ReplyFactory replyFactory,
+            VideoRenderRecord videoRenderRecord,
             Function<String, String> accessTokenProvider
     ) {
         this.resolver = resolver;
         this.lastTarget = targetHistory;
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
+        this.videoRenderRecord = videoRenderRecord;
         this.accessTokenProvider = accessTokenProvider;
     }
 
@@ -109,6 +113,43 @@ public final class BeatmapCommandHandler {
                     final long id = APIHelper.lookupBeatmapset(target, accessTokenProvider.apply(ctx.senderUserId()));
                     ctx.sendReply(PendingMessage.ofVoiceUrl("https://b.ppy.sh/preview/" + id + ".mp3").doUpload(false));
                 }
+        );
+    }
+
+    public void handleBpv(Context ctx) {
+        if (ctx.args().length < 1) {
+            ctx.sendReply(PendingMessage.ofString(CommandUsage.BPV));
+            return;
+        }
+
+        TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(
+                ctx.args(), ctx.senderUserId());
+        if (ctx.args().length > targetResolution.consumedArgs() + 1) {
+            ctx.sendReply(PendingMessage.ofString(CommandUsage.BPV));
+            return;
+        }
+
+        ShortcutTarget target = targetResolution.target();
+        if (target.isError()) {
+            ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+            return;
+        }
+
+        String mods = ctx.args().length == targetResolution.consumedArgs() + 1
+                ? ctx.args()[targetResolution.consumedArgs()]
+                : null;
+        lastTarget.put(ctx.senderUserId(), target);
+
+        taskCoordinator.runReplayRequest(
+                ctx,
+                "Beatmap Preview Render",
+                qqUpload -> {
+                    APIHelper.ReplayTaskInfo task = APIHelper.createBeatmapPreviewTask(
+                            target, mods, accessTokenProvider.apply(ctx.senderUserId()), qqUpload);
+                    videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
+                    return task;
+                },
+                replyFactory::replayMessage
         );
     }
 

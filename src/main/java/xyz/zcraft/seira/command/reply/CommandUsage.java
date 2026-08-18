@@ -7,6 +7,7 @@ public final class CommandUsage {
     public static final String RS = "用法：/rs <个数> [玩家ID/用户名/@用户]";
     public static final String M = "用法：/m <谱面ID 或 快捷查询> [Mod]";
     public static final String AP = "用法：/ap <谱面ID 或 快捷查询>";
+    public static final String BPV = "用法：/bpv <谱面ID 或 快捷查询> [Mod]";
     public static final String BGP = "用法：/bgp <谱面ID 或 快捷查询>";
     public static final String DL = "用法：/dl <谱面集ID 或 快捷查询>";
     public static final String S = "用法：/s <成绩ID 或 快捷查询>";

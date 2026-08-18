@@ -510,6 +510,25 @@ public class APIHelper {
         return createReplayShowcaseTask(target, ids, auth, null);
     }
 
+    public static ReplayTaskInfo createBeatmapPreviewTask(ShortcutTarget target, String mods, String auth,
+                                                           QqUploadRequest qqUpload) {
+        long beatmapId = lookupBeatmap(target, auth);
+        JsonObject body = new JsonObject();
+        if (mods != null && !mods.isBlank()) {
+            body.addProperty("mods", mods);
+        }
+        if (qqUpload != null) {
+            body.add("qqUpload", GSON.toJsonTree(qqUpload));
+        }
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(ENDPOINT + "/replays/renders/preview/" + beatmapId))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                .build();
+        return getReplayTaskInfo(request);
+    }
+
     public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] ids, String auth,
                                                            QqUploadRequest qqUpload) {
         ids = ids == null ? new String[0] : ids;
@@ -678,8 +697,11 @@ public class APIHelper {
 
             Double start = data.has("start") ? data.get("start").getAsDouble() : null;
             Double end = data.has("end") ? data.get("end").getAsDouble() : null;
+            String mods = data.has("mods") ? data.get("mods").getAsString() : null;
+            String selection = data.has("selection") ? data.get("selection").getAsString() : null;
 
-            return new ReplayTaskInfo(taskId, status, position, beatmap, data.getAsJsonArray("scores"), start, end);
+            return new ReplayTaskInfo(
+                    taskId, status, position, beatmap, data.getAsJsonArray("scores"), start, end, mods, selection);
         } catch (IOException e) {
             throw requestFailure(e);
         } catch (InterruptedException e) {
@@ -1030,7 +1052,9 @@ public class APIHelper {
             BeatmapExtended beatmap,
             JsonArray scores,
             Double start,
-            Double end
+            Double end,
+            String mods,
+            String selection
     ) {
     }
 }

@@ -324,6 +324,19 @@ public final class ReplyFactory {
                 sb.append("\n");
             }
 
+            if (taskInfo.mods() != null) {
+                sb.append("> Mod: ").append(taskInfo.mods()).append("\n");
+            }
+            if (taskInfo.selection() != null) {
+                String selection = switch (taskInfo.selection()) {
+                    case "kiai" -> "Kiai 段";
+                    case "high-pressure" -> "高压段";
+                    case "full-map" -> "完整可用片段";
+                    default -> taskInfo.selection();
+                };
+                sb.append("> 选段: ").append(selection).append("\n");
+            }
+
             if (taskInfo.scores() != null) {
                 JsonArray scores = taskInfo.scores();
                 sb.append("> 共 %d 个成绩:".formatted(scores.size()));

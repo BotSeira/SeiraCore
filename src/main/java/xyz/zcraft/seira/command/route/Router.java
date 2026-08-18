@@ -59,6 +59,7 @@ public class Router {
         Resolver resolver = new Resolver();
         TargetHistory targetHistory = new TargetHistory();
         ReplayResultStore replayResults = new ReplayResultStore();
+        VideoRenderRecord videoRenderRecord = new VideoRenderRecord();
         this.taskCoordinator = new TaskCoordinator(messageSender, replayResults, discordBridgeService);
         this.authHelper = new OsuAuthHelper(startupConfig.binding());
         BindingCommandHandler bindingCommands = new BindingCommandHandler(startupConfig, replyFactory, bindingService);
@@ -66,7 +67,7 @@ public class Router {
                 resolver, targetHistory, taskCoordinator, replyFactory
         );
         BeatmapCommandHandler beatmapCommands = new BeatmapCommandHandler(
-                resolver, targetHistory, taskCoordinator, replyFactory, this::getAccessTokenFor
+                resolver, targetHistory, taskCoordinator, replyFactory, videoRenderRecord, this::getAccessTokenFor
         );
         SocialCommandHandler socialCommands = new SocialCommandHandler(
                 resolver, authHelper, taskCoordinator, replyFactory, this::getAccessTokenFor
@@ -76,7 +77,7 @@ public class Router {
                 targetHistory,
                 taskCoordinator,
                 replyFactory,
-                new VideoRenderRecord(),
+                videoRenderRecord,
                 replayResults,
                 this::getAccessTokenFor
         );
@@ -209,6 +210,7 @@ public class Router {
                 .register(ctx -> scoreCommands.handleRs(ctx, false), "rp")
                 .register(beatmapCommands::handleM, "m")
                 .register(beatmapCommands::handleAp, "ap")
+                .register(beatmapCommands::handleBpv, "bpv")
                 .register(beatmapCommands::handleBgp, "bgp")
                 .register(ctx -> socialCommands.handleF(ctx, !ctx.inGroup()), "f")
                 .register(ctx -> socialCommands.handleF(ctx, true), "fall")
