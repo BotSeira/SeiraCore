@@ -356,7 +356,11 @@ public class APIHelper {
     }
 
     public static Response<Base64Bytes> getScoreResponse(ShortcutTarget target) {
-        String scoreId = lookupScoreId(target);
+        return getScoreResponse(target, List.of());
+    }
+
+    public static Response<Base64Bytes> getScoreResponse(ShortcutTarget target, List<String> filters) {
+        String scoreId = lookupScoreId(target, filters);
         return getBase64BytesResponse("/scores/" + scoreId, "获取成绩失败", null);
     }
 
@@ -635,6 +639,10 @@ public class APIHelper {
     }
 
     private static String lookupScoreId(ShortcutTarget target) {
+        return lookupScoreId(target, List.of());
+    }
+
+    private static String lookupScoreId(ShortcutTarget target, List<String> filters) {
         String scoreId;
         if (target.isLocalScore()) {
             scoreId = target.localScoreId();
@@ -642,7 +650,7 @@ public class APIHelper {
             scoreId = String.valueOf(target.explicitId());
         } else {
             try {
-                final String query = getScoreQuery(target);
+                final String query = getScoreQuery(target) + encodeScoreFilters(filters);
 
                 HttpRequest localRequest = HttpRequest.newBuilder()
                         .uri(URI.create(ENDPOINT + query))

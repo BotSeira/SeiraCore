@@ -48,6 +48,10 @@ public final class ScoreCommandHandler {
             );
             return;
         }
+        if (ScoreFilterArguments.looksLikeFilter(ctx.args()[0])) {
+            handleFilteredSingleScore(ctx, "bo");
+            return;
+        }
 
         ScoreListRequest request = parseScoreListRequest(ctx, CommandUsage.BO);
         if (request == null) return;
@@ -76,6 +80,10 @@ public final class ScoreCommandHandler {
             );
             return;
         }
+        if (ScoreFilterArguments.looksLikeFilter(ctx.args()[0])) {
+            handleFilteredSingleScore(ctx, ctx.command());
+            return;
+        }
 
         ScoreListRequest request = parseScoreListRequest(ctx, CommandUsage.RS);
         if (request == null) return;
@@ -85,6 +93,28 @@ public final class ScoreCommandHandler {
                 "Recent Score",
                 () -> APIHelper.getRecentResponse(request.count(), request.userRef(), includeFail, request.filters()),
                 replyFactory::rsMessage
+        );
+    }
+
+    private void handleFilteredSingleScore(Context ctx, String macroType) {
+        ScoreFilterArguments.ParseResult filters = ScoreFilterArguments.parse(ctx.args(), 0);
+        if (filters.isError()) {
+            ctx.sendReply(PendingMessage.ofString(filters.errorMessage() + "\n" + CommandUsage.SCORE_FILTERS));
+            return;
+        }
+
+        Long uid = resolver.resolveBoundUid(ctx.senderUserId());
+        if (uid == null) {
+            ctx.sendReply(PendingMessage.ofString(CommandUsage.NO_BIND));
+            return;
+        }
+
+        ShortcutTarget target = new ShortcutTarget(null, new UserRef.ByUid(uid), macroType, 1L, null);
+        taskCoordinator.runImageRequest(
+                ctx,
+                "Score",
+                () -> APIHelper.getScoreResponse(target, filters.filters()),
+                replyFactory::scoreMessage
         );
     }
 
