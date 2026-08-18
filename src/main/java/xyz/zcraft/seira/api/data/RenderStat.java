@@ -9,4 +9,5 @@ public class RenderStat {
     private String progress;
     private String speed;
     private String eta;
+    private String error;
 }

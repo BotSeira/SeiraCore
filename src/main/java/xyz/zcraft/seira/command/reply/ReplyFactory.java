@@ -400,6 +400,9 @@ public final class ReplyFactory {
                 sb.append("速度: ").append(renderStat.getSpeed() == null ? "未知" : renderStat.getSpeed()).append("\n");
                 sb.append("预计时间: ").append(renderStat.getEta() == null ? "未知" : renderStat.getEta()).append("\n");
             }
+            if (renderStat.getError() != null && !renderStat.getError().isBlank()) {
+                sb.append("原因: ").append(renderStat.getError()).append("\n");
+            }
 
             return sb.toString().trim();
         }

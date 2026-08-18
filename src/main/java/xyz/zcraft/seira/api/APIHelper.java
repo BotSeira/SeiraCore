@@ -581,13 +581,9 @@ public class APIHelper {
     }
 
     public static ReplayRenderResult waitReplayVideo(String taskId) {
-        try {
-            FileInfo qqFile = waitReplayDone(taskId);
-            return new ReplayRenderResult(
-                    ENDPOINT + "/replays/" + taskId + "/video/replay.mp4", taskId, qqFile);
-        } catch (RuntimeException _) {
-            return null;
-        }
+        FileInfo qqFile = waitReplayDone(taskId);
+        return new ReplayRenderResult(
+                ENDPOINT + "/replays/" + taskId + "/video/replay.mp4", taskId, qqFile);
     }
 
     private static ReplayTaskInfo createReplayTask(ShortcutTarget target,
@@ -742,8 +738,13 @@ public class APIHelper {
                         ? GSON.fromJson(statusData.getAsJsonObject("qqFile"), FileInfo.class)
                         : null;
             }
-            if ("failed".equalsIgnoreCase(status) || "canceled".equalsIgnoreCase(status)) {
-                throw new RuntimeException("回放渲染失败，状态：" + status);
+            if ("failed".equalsIgnoreCase(status)
+                    || "timeout".equalsIgnoreCase(status)
+                    || "canceled".equalsIgnoreCase(status)) {
+                String error = statusData.has("error") && !statusData.get("error").isJsonNull()
+                        ? statusData.get("error").getAsString()
+                        : null;
+                throw new ReplayRenderException(status, error);
             }
             try {
                 Thread.sleep(REPLAY_POLL_INTERVAL_MS);

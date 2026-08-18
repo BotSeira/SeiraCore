@@ -5,6 +5,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.ApiRequestException;
+import xyz.zcraft.seira.api.ReplayRenderException;
 import xyz.zcraft.seira.api.data.Base64Bytes;
 import xyz.zcraft.seira.api.data.QqUploadRequest;
 import xyz.zcraft.seira.api.data.Response;
@@ -289,7 +290,7 @@ public final class TaskCoordinator {
 
     }
 
-    private String resolveErrorMessage(Exception exception) {
+    static String resolveErrorMessage(Exception exception) {
         Throwable cursor = exception;
         while (cursor != null) {
             switch (cursor) {
@@ -300,6 +301,9 @@ public final class TaskCoordinator {
                     return "oStella API 无法连接，请稍后再试。";
                 }
                 case ResolutionException e -> {
+                    return e.getMessage();
+                }
+                case ReplayRenderException e -> {
                     return e.getMessage();
                 }
                 default -> {
