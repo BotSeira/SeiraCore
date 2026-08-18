@@ -1,5 +1,10 @@
 package xyz.zcraft.seira.command.handler;
 
+import xyz.zcraft.osu.model.MultiplayerRoom;
+import xyz.zcraft.seira.api.APIHelper;
+import xyz.zcraft.seira.api.data.OsuToken;
+import xyz.zcraft.seira.api.data.Response;
+import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.ResolutionException;
@@ -35,25 +40,40 @@ public final class MultiplayerRoomWatchCommandHandler {
             ctx.sendReply(PendingMessage.ofString("/mpwatch 仅支持群聊使用。"));
             return;
         }
+
         if (ctx.argumentCount() == 0) {
-            usage(ctx);
+            handleStart(ctx, true);
             return;
         }
 
         switch (ctx.argument(0).toLowerCase(Locale.ROOT)) {
-            case "start" -> handleStart(ctx);
+            case "start" -> handleStart(ctx, false);
             case "stop" -> handleStop(ctx);
             case "status", "list" -> handleStatus(ctx);
             default -> usage(ctx);
         }
     }
 
-    private void handleStart(Context ctx) {
-        if (ctx.argumentCount() != 2) {
+    private void handleStart(Context ctx, boolean current) {
+        if (ctx.argumentCount() != 2 && !current) {
             usage(ctx);
             return;
         }
-        Long roomId = parseRoomId(ctx.argument(1));
+
+        Long roomId;
+
+        if (!current) {
+            roomId = parseRoomId(ctx.argument(1));
+        } else {
+            final OsuToken osuToken = UserDataStore.findOsuToken(ctx.senderUserId());
+            if (osuToken == null) {
+                ctx.sendReply("由于未绑定账户，无法获取当前房间~");
+                return;
+            }
+            final Response<MultiplayerRoom> multiplayerRoom = APIHelper.getMultiplayerRoom(osuToken.accessToken());
+            roomId = multiplayerRoom.getContent().getId();
+        }
+
         if (roomId == null) {
             ctx.sendReply(PendingMessage.ofString("房间 ID 或链接格式不正确。\n" + USAGE));
             return;
