@@ -233,9 +233,11 @@ public final class Resolver {
         return Patterns.USER_MACRO_PATTERN.matcher(arg.trim()).matches();
     }
 
-    private boolean looksLikeMention(String token) {
+    public boolean looksLikeMention(String token) {
         String trimmed = token == null ? "" : token.trim();
-        return trimmed.startsWith("@") || trimmed.startsWith("[CQ:at,");
+        return trimmed.startsWith("@")
+                || trimmed.startsWith("[CQ:at,")
+                || (trimmed.startsWith("<@") && trimmed.endsWith(">"));
     }
 
     public String extractMentionedUserId(String token) {

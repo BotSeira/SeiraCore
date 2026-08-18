@@ -98,7 +98,7 @@ public final class ScoreCommandHandler {
 
         int nextArg = 1;
         UserRef userRef;
-        if (nextArg < args.length && !ScoreFilterArguments.looksLikeFilter(args[nextArg])) {
+        if (nextArg < args.length && resolver.looksLikeMention(args[nextArg])) {
             UserRefResolution resolution = resolver.resolveUserRefArgument(args[nextArg]);
             if (resolution.errorMessage() != null) {
                 ctx.sendReply(PendingMessage.ofString(resolution.errorMessage()));
