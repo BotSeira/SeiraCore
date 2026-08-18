@@ -4,6 +4,7 @@ import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.*;
 import xyz.zcraft.seira.command.parse.Resolver;
+import xyz.zcraft.seira.command.parse.ScoreFilterArguments;
 import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.command.parse.ShortcutTarget;
@@ -30,47 +31,7 @@ public final class ScoreCommandHandler {
     }
 
     public void handleBo(Context ctx) {
-        if (ctx.args().length == 2) {
-            Integer n = resolver.parsePositiveInt(ctx.args()[0]);
-            if (n == null) {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.BO));
-                return;
-            }
-            UserRefResolution userRefResolution = resolver.resolveUserRefArgument(ctx.args()[1]);
-            if (userRefResolution.errorMessage() != null) {
-                ctx.sendReply(PendingMessage.ofString(userRefResolution.errorMessage()));
-                return;
-            }
-            if (userRefResolution.userRef() == null) {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.BO));
-                return;
-            }
-
-            taskCoordinator.runImageRequest(
-                    ctx,
-                    "Best Scores",
-                    () -> APIHelper.getBoNResponse(n, userRefResolution.userRef()),
-                    replyFactory::boMessage
-            );
-        } else if (ctx.args().length == 1) {
-            Integer n = resolver.parsePositiveInt(ctx.args()[0]);
-            if (n == null) {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.BO));
-                return;
-            }
-            Long uid = resolver.resolveBoundUid(ctx.senderUserId());
-            if (uid == null) {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.NO_BIND));
-                return;
-            }
-
-            taskCoordinator.runImageRequest(
-                    ctx,
-                    "Best Scores",
-                    () -> APIHelper.getBoNResponse(n, new UserRef.ByUid(uid)),
-                    replyFactory::boMessage
-            );
-        } else if (ctx.args().length == 0) {
+        if (ctx.args().length == 0) {
             ShortcutTarget target = resolver.parseTarget("bo1", ctx.senderUserId());
             if (target.isError()) {
                 ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
@@ -83,55 +44,22 @@ public final class ScoreCommandHandler {
                     () -> APIHelper.getScoreResponse(target),
                     replyFactory::scoreMessage
             );
-        } else {
-            ctx.sendReply(PendingMessage.ofString(CommandUsage.BO));
+            return;
         }
+
+        ScoreListRequest request = parseScoreListRequest(ctx, CommandUsage.BO);
+        if (request == null) return;
+
+        taskCoordinator.runImageRequest(
+                ctx,
+                "Best Scores",
+                () -> APIHelper.getBoNResponse(request.count(), request.userRef(), request.filters()),
+                replyFactory::boMessage
+        );
     }
 
     public void handleRs(Context ctx, boolean includeFail) {
-        if (ctx.args().length == 2) {
-            Integer n = resolver.parsePositiveInt(ctx.args()[0]);
-            if (n == null) {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.RS));
-                return;
-            }
-
-            UserRefResolution userRefResolution = resolver.resolveUserRefArgument(ctx.args()[1]);
-            if (userRefResolution.errorMessage() != null) {
-                ctx.sendReply(PendingMessage.ofString(userRefResolution.errorMessage()));
-                return;
-            }
-
-            if (userRefResolution.userRef() == null) {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.RS));
-                return;
-            }
-
-            taskCoordinator.runImageRequest(
-                    ctx,
-                    "Recent Score",
-                    () -> APIHelper.getRecentResponse(n, userRefResolution.userRef(), includeFail),
-                    replyFactory::rsMessage
-            );
-        } else if (ctx.args().length == 1) {
-            Integer n = resolver.parsePositiveInt(ctx.args()[0]);
-            if (n == null) {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.RS));
-                return;
-            }
-            Long uid = resolver.resolveBoundUid(ctx.senderUserId());
-            if (uid == null) {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.NO_BIND));
-                return;
-            }
-
-            taskCoordinator.runImageRequest(
-                    ctx,
-                    "Recent Score",
-                    () -> APIHelper.getRecentResponse(n, new UserRef.ByUid(uid), includeFail),
-                    replyFactory::rsMessage
-            );
-        } else if (ctx.args().length == 0) {
+        if (ctx.args().length == 0) {
             ShortcutTarget target = resolver.parseTarget(ctx.command() + "1", ctx.senderUserId());
             if (target.isError()) {
                 ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
@@ -144,9 +72,60 @@ public final class ScoreCommandHandler {
                     () -> APIHelper.getScoreResponse(target),
                     replyFactory::scoreMessage
             );
-        } else {
-            ctx.sendReply(PendingMessage.ofString(CommandUsage.RS));
+            return;
         }
+
+        ScoreListRequest request = parseScoreListRequest(ctx, CommandUsage.RS);
+        if (request == null) return;
+
+        taskCoordinator.runImageRequest(
+                ctx,
+                "Recent Score",
+                () -> APIHelper.getRecentResponse(request.count(), request.userRef(), includeFail, request.filters()),
+                replyFactory::rsMessage
+        );
+    }
+
+    private ScoreListRequest parseScoreListRequest(Context ctx, String usage) {
+        String[] args = ctx.args();
+        Integer count = resolver.parsePositiveInt(args[0]);
+        if (count == null) {
+            ctx.sendReply(PendingMessage.ofString(usage));
+            return null;
+        }
+
+        int nextArg = 1;
+        UserRef userRef;
+        if (nextArg < args.length && !ScoreFilterArguments.looksLikeFilter(args[nextArg])) {
+            UserRefResolution resolution = resolver.resolveUserRefArgument(args[nextArg]);
+            if (resolution.errorMessage() != null) {
+                ctx.sendReply(PendingMessage.ofString(resolution.errorMessage()));
+                return null;
+            }
+            if (resolution.userRef() == null) {
+                ctx.sendReply(PendingMessage.ofString(usage));
+                return null;
+            }
+            userRef = resolution.userRef();
+            nextArg++;
+        } else {
+            Long uid = resolver.resolveBoundUid(ctx.senderUserId());
+            if (uid == null) {
+                ctx.sendReply(PendingMessage.ofString(CommandUsage.NO_BIND));
+                return null;
+            }
+            userRef = new UserRef.ByUid(uid);
+        }
+
+        ScoreFilterArguments.ParseResult filters = ScoreFilterArguments.parse(args, nextArg);
+        if (filters.isError()) {
+            ctx.sendReply(PendingMessage.ofString(filters.errorMessage() + "\n" + CommandUsage.SCORE_FILTERS));
+            return null;
+        }
+        return new ScoreListRequest(count, userRef, filters.filters());
+    }
+
+    private record ScoreListRequest(int count, UserRef userRef, java.util.List<String> filters) {
     }
 
     public void handleS(Context ctx) {

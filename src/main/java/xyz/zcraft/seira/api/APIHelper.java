@@ -99,8 +99,16 @@ public class APIHelper {
     }
 
     public static Response<Base64Bytes> getBoNResponse(int n, UserRef userRef) {
+        return getBoNResponse(n, userRef, List.of());
+    }
+
+    public static Response<Base64Bytes> getBoNResponse(int n, UserRef userRef, List<String> filters) {
         long uid = resolveUid(userRef);
-        return getBase64BytesResponse("/users/" + uid + "/scores/bestof?" + "n=" + n, "获取最好成绩失败", null);
+        return getBase64BytesResponse(
+                "/users/" + uid + "/scores/bestof?n=" + n + encodeScoreFilters(filters),
+                "获取最好成绩失败",
+                null
+        );
     }
 
     public static Response<Base64Bytes> getGroupLeaderboardResponse(ShortcutTarget target, List<Long> uids, String auth) {
@@ -187,8 +195,23 @@ public class APIHelper {
     }
 
     public static Response<Base64Bytes> getRecentResponse(int n, UserRef userRef, boolean includeFail) {
+        return getRecentResponse(n, userRef, includeFail, List.of());
+    }
+
+    public static Response<Base64Bytes> getRecentResponse(int n, UserRef userRef, boolean includeFail, List<String> filters) {
         long uid = resolveUid(userRef);
-        return getBase64BytesResponse("/users/" + uid + "/scores/recent" + "?n=" + n + "&fail=" + includeFail, "获取最近成绩失败", null);
+        return getBase64BytesResponse(
+                "/users/" + uid + "/scores/recent?n=" + n + "&fail=" + includeFail + encodeScoreFilters(filters),
+                "获取最近成绩失败",
+                null
+        );
+    }
+
+    private static String encodeScoreFilters(List<String> filters) {
+        if (filters == null || filters.isEmpty()) {
+            return "";
+        }
+        return "&filters=" + URLEncoder.encode(String.join(",", filters), StandardCharsets.UTF_8);
     }
 
     public static Response<Base64Bytes> getBeatmapResponse(ShortcutTarget target, String mod, String auth) {
