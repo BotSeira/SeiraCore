@@ -55,19 +55,14 @@ public final class MultiplayerRoomWatchCommandHandler {
     }
 
     private void handleStart(Context ctx, boolean current) {
-        if (ctx.argumentCount() != 2 && !current) {
-            usage(ctx);
-            return;
-        }
-
         Long roomId;
 
-        if (!current) {
+        if (!current || ctx.argumentCount() != 2) {
             roomId = parseRoomId(ctx.argument(1));
         } else {
             final OsuToken osuToken = UserDataStore.findOsuToken(ctx.senderUserId());
             if (osuToken == null) {
-                ctx.sendReply("由于未绑定账户，无法获取当前房间~");
+                ctx.sendReply("由于未绑定账户，无法获取当前房间，请手动提供ID~");
                 return;
             }
             final Response<MultiplayerRoom> multiplayerRoom = APIHelper.getMultiplayerRoom(osuToken.accessToken());
