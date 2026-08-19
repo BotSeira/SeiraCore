@@ -60,19 +60,20 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
         );
     }
 
-    public RoomWatchView watch(String groupId, long roomId) {
+    public RoomWatchView watch(String groupId, MultiplayerRoomVersion version, long roomId) {
         Objects.requireNonNull(groupId);
+        Objects.requireNonNull(version);
         if (roomId <= 0) {
             throw new IllegalArgumentException("房间 ID 必须为正整数。");
         }
-        RoomWatchSnapshot snapshot = api.getSnapshot(roomId);
+        RoomWatchSnapshot snapshot = api.getSnapshot(version, roomId);
         if (!snapshot.active()) {
             throw new IllegalStateException("该多人房间已经结束，无法开始监视。");
         }
 
         Set<Long> baseline = new LinkedHashSet<>();
         snapshot.completedPlays().forEach(play -> baseline.add(play.playlistItemId()));
-        WatchEntry entry = new WatchEntry(snapshot.roomId(), snapshot.roomName(), baseline);
+        WatchEntry entry = new WatchEntry(version, snapshot.roomId(), snapshot.roomName(), baseline);
         synchronized (lock) {
             watchesByGroup.put(groupId, entry);
         }
@@ -94,8 +95,8 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
     }
 
     public void pollNow() {
-        Map<Long, List<WatchRef>> watchesByRoom = snapshotByRoom();
-        for (Map.Entry<Long, List<WatchRef>> room : watchesByRoom.entrySet()) {
+        Map<RoomKey, List<WatchRef>> watchesByRoom = snapshotByRoom();
+        for (Map.Entry<RoomKey, List<WatchRef>> room : watchesByRoom.entrySet()) {
             try {
                 processRoom(room.getKey(), room.getValue());
             } catch (RuntimeException e) {
@@ -104,8 +105,8 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
         }
     }
 
-    private void processRoom(long roomId, List<WatchRef> watches) {
-        RoomWatchSnapshot snapshot = api.getSnapshot(roomId);
+    private void processRoom(RoomKey room, List<WatchRef> watches) {
+        RoomWatchSnapshot snapshot = api.getSnapshot(room.version(), room.roomId());
         List<CompletedRoomPlay> completed = snapshot.completedPlays().stream()
                 .sorted(Comparator
                         .comparing(CompletedRoomPlay::playedAt, Comparator.nullsLast(String::compareTo))
@@ -122,7 +123,8 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
                 if (notifier.sendRoomEnded(watch.groupId(), snapshot)) {
                     removeIfCurrent(watch);
                 } else {
-                    LOG.warn("Failed to send room-ended notice for room {} to group {}", roomId, watch.groupId());
+                    LOG.warn("Failed to send {} room-ended notice for room {} to group {}",
+                            room.version().value(), room.roomId(), watch.groupId());
                 }
             }
         }
@@ -140,7 +142,7 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
             try {
                 byte[] image = rendered.computeIfAbsent(
                         play.playlistItemId(),
-                        itemId -> api.renderResult(watch.entry().roomId, itemId)
+                        itemId -> api.renderResult(watch.entry().version, watch.entry().roomId, itemId)
                 );
                 if (!notifier.sendResult(watch.groupId(), image)) {
                     LOG.warn(
@@ -161,11 +163,11 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
         return true;
     }
 
-    private Map<Long, List<WatchRef>> snapshotByRoom() {
+    private Map<RoomKey, List<WatchRef>> snapshotByRoom() {
         synchronized (lock) {
-            Map<Long, List<WatchRef>> result = new LinkedHashMap<>();
+            Map<RoomKey, List<WatchRef>> result = new LinkedHashMap<>();
             watchesByGroup.forEach((groupId, entry) -> result
-                    .computeIfAbsent(entry.roomId, ignored -> new ArrayList<>())
+                    .computeIfAbsent(new RoomKey(entry.version, entry.roomId), ignored -> new ArrayList<>())
                     .add(new WatchRef(groupId, entry)));
             return result;
         }
@@ -216,7 +218,7 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
     }
 
     private static RoomWatchView view(WatchEntry entry) {
-        return new RoomWatchView(entry.roomId, entry.roomName);
+        return new RoomWatchView(entry.version, entry.roomId, entry.roomName);
     }
 
     @Override
@@ -227,11 +229,18 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
     }
 
     private static final class WatchEntry {
+        private final MultiplayerRoomVersion version;
         private final long roomId;
         private final String roomName;
         private final Set<Long> sentPlaylistItemIds;
 
-        private WatchEntry(long roomId, String roomName, Set<Long> sentPlaylistItemIds) {
+        private WatchEntry(
+                MultiplayerRoomVersion version,
+                long roomId,
+                String roomName,
+                Set<Long> sentPlaylistItemIds
+        ) {
+            this.version = version;
             this.roomId = roomId;
             this.roomName = roomName;
             this.sentPlaylistItemIds = new LinkedHashSet<>(sentPlaylistItemIds);
@@ -239,5 +248,8 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
     }
 
     private record WatchRef(String groupId, WatchEntry entry) {
+    }
+
+    private record RoomKey(MultiplayerRoomVersion version, long roomId) {
     }
 }

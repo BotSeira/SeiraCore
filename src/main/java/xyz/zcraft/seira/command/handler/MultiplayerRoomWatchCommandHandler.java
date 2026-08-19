@@ -10,6 +10,7 @@ import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.watch.MultiplayerRoomWatchService;
+import xyz.zcraft.seira.watch.MultiplayerRoomVersion;
 import xyz.zcraft.seira.watch.RoomWatchView;
 
 import java.util.Locale;
@@ -19,9 +20,13 @@ import java.util.regex.Pattern;
 
 public final class MultiplayerRoomWatchCommandHandler {
     private static final String USAGE =
-            "用法：/mpwatch start <房间ID/房间链接>；/mpwatch stop；/mpwatch status";
-    private static final Pattern ROOM_URL = Pattern.compile(
+            "用法：/mpwatch [start] <房间ID> [stable|lazer]；"
+                    + "/mpwatch [start] <房间链接>；/mpwatch stop；/mpwatch status";
+    private static final Pattern LAZER_ROOM_URL = Pattern.compile(
             "(?i)^https?://(?:www\\.)?osu\\.ppy\\.sh/multiplayer/rooms/(\\d+)(?:[/?#].*)?$"
+    );
+    private static final Pattern STABLE_ROOM_URL = Pattern.compile(
+            "(?i)^https?://(?:www\\.)?osu\\.ppy\\.sh/(?:community/matches|mp)/(\\d+)(?:[/?#].*)?$"
     );
 
     private final TaskCoordinator taskCoordinator;
@@ -42,35 +47,41 @@ public final class MultiplayerRoomWatchCommandHandler {
         }
 
         if (ctx.argumentCount() == 0) {
-            handleStart(ctx, true);
+            handleStart(ctx, 0);
             return;
         }
 
         switch (ctx.argument(0).toLowerCase(Locale.ROOT)) {
-            case "start" -> handleStart(ctx, false);
+            case "start" -> handleStart(ctx, 1);
             case "stop" -> handleStop(ctx);
             case "status", "list" -> handleStatus(ctx);
-            default -> usage(ctx);
+            default -> handleStart(ctx, 0);
         }
     }
 
-    private void handleStart(Context ctx, boolean current) {
-        Long roomId;
+    private void handleStart(Context ctx, int argumentOffset) {
+        int startArgumentCount = ctx.argumentCount() - argumentOffset;
+        if (startArgumentCount < 0 || startArgumentCount > 2) {
+            usage(ctx);
+            return;
+        }
 
-        if (!current || ctx.argumentCount() != 2) {
-            roomId = parseRoomId(ctx.argument(1));
-        } else {
+        RoomTarget target;
+        if (startArgumentCount == 0) {
             final OsuToken osuToken = UserDataStore.findOsuToken(ctx.senderUserId());
             if (osuToken == null) {
                 ctx.sendReply("由于未绑定账户，无法获取当前房间，请手动提供ID~");
                 return;
             }
             final Response<MultiplayerRoom> multiplayerRoom = APIHelper.getMultiplayerRoom(osuToken.accessToken());
-            roomId = multiplayerRoom.getContent().getId();
+            target = new RoomTarget(multiplayerRoom.getContent().getId(), MultiplayerRoomVersion.LAZER);
+        } else {
+            String version = startArgumentCount == 2 ? ctx.argument(argumentOffset + 1) : null;
+            target = parseRoomTarget(ctx.argument(argumentOffset), version);
         }
 
-        if (roomId == null) {
-            ctx.sendReply(PendingMessage.ofString("房间 ID 或链接格式不正确。\n" + USAGE));
+        if (target == null) {
+            ctx.sendReply(PendingMessage.ofString("房间 ID、链接或版本格式不正确。\n" + USAGE));
             return;
         }
 
@@ -82,9 +93,9 @@ public final class MultiplayerRoomWatchCommandHandler {
                 return;
             }
             try {
-                RoomWatchView view = watchService.watch(ctx.groupId(), roomId);
+                RoomWatchView view = watchService.watch(ctx.groupId(), target.version(), target.roomId());
                 ctx.sendReply(PendingMessage.ofString(
-                        "已开始监视多人房间“" + view.roomName() + "” (#" + view.roomId() + ")。"
+                        "已开始监视" + formatRoom(view) + "。"
                                 + "之后完成的每张图都会自动推送结果。"
                 ));
             } catch (IllegalArgumentException | IllegalStateException e) {
@@ -102,7 +113,7 @@ public final class MultiplayerRoomWatchCommandHandler {
         ctx.sendReply(PendingMessage.ofString(
                 stopped == null
                         ? "当前群聊没有多人房间监视。"
-                        : "已停止监视多人房间“" + stopped.roomName() + "” (#" + stopped.roomId() + ")。"
+                        : "已停止监视" + formatRoom(stopped) + "。"
         ));
     }
 
@@ -115,31 +126,57 @@ public final class MultiplayerRoomWatchCommandHandler {
         ctx.sendReply(PendingMessage.ofString(
                 view == null
                         ? "当前群聊没有多人房间监视。"
-                        : "当前正在监视多人房间“" + view.roomName() + "” (#" + view.roomId() + ")。"
+                        : "当前正在监视" + formatRoom(view) + "。"
         ));
     }
 
-    static Long parseRoomId(String value) {
+    static RoomTarget parseRoomTarget(String value, String explicitVersion) {
         if (value == null || value.isBlank()) {
             return null;
         }
         String normalized = value.trim();
         String numeric = normalized;
-        Matcher matcher = ROOM_URL.matcher(normalized);
-        if (matcher.matches()) {
-            numeric = matcher.group(1);
+        MultiplayerRoomVersion inferredVersion = null;
+        Matcher lazerMatcher = LAZER_ROOM_URL.matcher(normalized);
+        Matcher stableMatcher = STABLE_ROOM_URL.matcher(normalized);
+        if (lazerMatcher.matches()) {
+            numeric = lazerMatcher.group(1);
+            inferredVersion = MultiplayerRoomVersion.LAZER;
+        } else if (stableMatcher.matches()) {
+            numeric = stableMatcher.group(1);
+            inferredVersion = MultiplayerRoomVersion.STABLE;
         } else if (!normalized.matches("\\d+")) {
             return null;
         }
+
+        MultiplayerRoomVersion requestedVersion = explicitVersion == null
+                ? null
+                : MultiplayerRoomVersion.parse(explicitVersion);
+        if (explicitVersion != null && requestedVersion == null) {
+            return null;
+        }
+        if (inferredVersion != null && requestedVersion != null && inferredVersion != requestedVersion) {
+            return null;
+        }
+        MultiplayerRoomVersion version = inferredVersion != null
+                ? inferredVersion
+                : requestedVersion == null ? MultiplayerRoomVersion.LAZER : requestedVersion;
         try {
             long roomId = Long.parseLong(numeric);
-            return roomId > 0 ? roomId : null;
+            return roomId > 0 ? new RoomTarget(roomId, version) : null;
         } catch (NumberFormatException ignored) {
             return null;
         }
     }
 
+    private static String formatRoom(RoomWatchView view) {
+        return view.version().value() + " 多人房间“" + view.roomName() + "” (#" + view.roomId() + ")";
+    }
+
     private static void usage(Context ctx) {
         ctx.sendReply(PendingMessage.ofString(USAGE));
+    }
+
+    record RoomTarget(long roomId, MultiplayerRoomVersion version) {
     }
 }

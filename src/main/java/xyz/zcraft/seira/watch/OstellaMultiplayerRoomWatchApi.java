@@ -28,9 +28,10 @@ public final class OstellaMultiplayerRoomWatchApi implements MultiplayerRoomWatc
     }
 
     @Override
-    public RoomWatchSnapshot getSnapshot(long roomId) {
+    public RoomWatchSnapshot getSnapshot(MultiplayerRoomVersion version, long roomId) {
         HttpResponse<String> response = get(
-                "/multiplayer/rooms/" + requirePositive(roomId, "roomId") + "/watch",
+                "/multiplayer/rooms/" + requirePositive(roomId, "roomId") + "/watch?version="
+                        + requireVersion(version).value(),
                 HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
         );
         if (response.statusCode() == 404) {
@@ -47,10 +48,11 @@ public final class OstellaMultiplayerRoomWatchApi implements MultiplayerRoomWatc
     }
 
     @Override
-    public byte[] renderResult(long roomId, long playlistItemId) {
+    public byte[] renderResult(MultiplayerRoomVersion version, long roomId, long playlistItemId) {
         HttpResponse<byte[]> response = get(
                 "/multiplayer/rooms/" + requirePositive(roomId, "roomId")
-                        + "/playlist/" + requirePositive(playlistItemId, "playlistItemId") + "/result",
+                        + "/playlist/" + requirePositive(playlistItemId, "playlistItemId") + "/result?version="
+                        + requireVersion(version).value(),
                 HttpResponse.BodyHandlers.ofByteArray()
         );
         ensureSuccessfulStatus(response.statusCode(), response.body(), "生成多人房间结果图片");
@@ -109,5 +111,12 @@ public final class OstellaMultiplayerRoomWatchApi implements MultiplayerRoomWatc
             throw new IllegalArgumentException(name + " must be positive");
         }
         return value;
+    }
+
+    private static MultiplayerRoomVersion requireVersion(MultiplayerRoomVersion version) {
+        if (version == null) {
+            throw new IllegalArgumentException("version is required");
+        }
+        return version;
     }
 }
