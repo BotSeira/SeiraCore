@@ -76,7 +76,7 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 | `/bo`           | `/bo [n] [uid/username/@user] [filters...]`        | 获取最多200条最好成绩后过滤；省略n时返回第一个匹配成绩详情                      |
 | `/rs`           | `/rs [n] [uid/username/@user] [filters...]`        | 获取最多200条最近成绩后过滤；省略n时返回第一个匹配成绩详情                      |
 | `/rp`           | `/rp [n] [uid/username/@user] [filters...]`        | 获取最多200条最近通过成绩后过滤；省略n时返回第一个匹配成绩详情                  |
-| `/tb`           | `/tb [uid/username/@user]`                         | 获取最近200条通过成绩与全部200条BP的交集，并保留全BP排名编号                   |
+| `/tb`           | `/tb [#days] [uid/username/@user]`                 | 获取近N天达成的BP（默认1天），并保留完整BP排名编号                              |
 | `/m`            | `/m <id/rsN/boN> [Mod]`                            | 获取指定谱面信息                                                                |
 | `/ap`           | `/ap <id/rsN/boN>`                                 | 获取指定谱面音频预览                                                            |
 | `/bgp`          | `/bgp <id/rsN/boN>`                                | 获取指定谱面背景预览                                                            |

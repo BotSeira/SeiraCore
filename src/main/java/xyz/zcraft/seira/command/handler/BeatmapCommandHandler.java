@@ -88,6 +88,49 @@ public final class BeatmapCommandHandler {
         }
     }
 
+    public void handleBma(Context ctx) {
+        if (ctx.args().length >= 1) {
+            TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(
+                    ctx.args(), ctx.senderUserId());
+            ShortcutTarget target = targetResolution.target();
+            if (target.isError()) {
+                ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+                return;
+            }
+
+            lastTarget.put(ctx.senderUserId(), target);
+            if (ctx.args().length > targetResolution.consumedArgs() + 1) {
+                ctx.sendReply(PendingMessage.ofString(CommandUsage.BMA));
+                return;
+            }
+
+            String mod = ctx.args().length == targetResolution.consumedArgs() + 1
+                    ? ctx.args()[targetResolution.consumedArgs()]
+                    : null;
+            taskCoordinator.runImageRequest(
+                    ctx,
+                    "Beatmap Analysis",
+                    () -> APIHelper.getBeatmapAnalysisResponse(
+                            target, mod, accessTokenProvider.apply(ctx.senderUserId())),
+                    replyFactory::beatmapMessage
+            );
+            return;
+        }
+
+        ShortcutTarget target = lastTarget.get(ctx.senderUserId());
+        if (target == null) {
+            ctx.sendReply(PendingMessage.ofString(CommandUsage.BMA));
+            return;
+        }
+        taskCoordinator.runImageRequest(
+                ctx,
+                "Beatmap Analysis",
+                () -> APIHelper.getBeatmapAnalysisResponse(
+                        target, null, accessTokenProvider.apply(ctx.senderUserId())),
+                replyFactory::beatmapMessage
+        );
+    }
+
     public void handleAp(Context ctx) {
         ShortcutTarget target;
 

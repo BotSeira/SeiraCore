@@ -585,9 +585,10 @@ public final class ReplyFactory {
                             > /rp - 获取最近通过的一个成绩
                             > /bo [个数] [玩家ID] - 获取一个或多个最佳成绩
                             > /rp [个数] [玩家ID] - 获取最近通过一个或多个成绩
-                            > /tb [玩家ID] - 获取今日新增的BP
+                            > /tb [#天数] [玩家ID] - 获取近N天达成的BP
                             > /s <成绩ID或快捷查询> - 获取指定成绩
                             > /m <谱面ID或快捷查询> - 获取谱面
+                            > /bma <谱面ID或快捷查询> [Mod] - 分析谱面PP构成和类型
                             > /ms <谱面集ID或快捷查询> - 获取谱面集
                             > /r [成绩ID或快捷查询] [[mm:ss]-[mm:ss]] - 生成成绩高光视频或指定片段
                             > /rg <start/#Rank/end> - 在群聊中进行猜 Rank 游戏
@@ -792,6 +793,9 @@ public final class ReplyFactory {
                     Button.row(
                             Button.command(3, "预览音频", "/ap m" + beatmapId),
                             Button.command(4, "查询自己的分数", "/s m" + beatmapId)
+                    ),
+                    Button.row(
+                            Button.command(5, "分析谱面", "/bma " + beatmapId)
                     )
             );
         }

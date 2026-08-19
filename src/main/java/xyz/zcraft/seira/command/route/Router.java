@@ -216,6 +216,7 @@ public class Router {
                 .register(ctx -> scoreCommands.handleRs(ctx, false), "rp")
                 .register(scoreCommands::handleTb, "tb")
                 .register(beatmapCommands::handleM, "m")
+                .register(beatmapCommands::handleBma, "bma")
                 .register(beatmapCommands::handleAp, "ap")
                 .register(beatmapCommands::handleBpv, "bpv")
                 .register(beatmapCommands::handleBgp, "bgp")

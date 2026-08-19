@@ -97,14 +97,15 @@ public final class ScoreCommandHandler {
     }
 
     public void handleTb(Context ctx) {
-        if (ctx.args().length > 1) {
+        TbArguments request = parseTbArguments(ctx.args());
+        if (request == null) {
             ctx.sendReply(PendingMessage.ofString(CommandUsage.TB));
             return;
         }
 
         UserRef userRef;
-        if (ctx.args().length == 1) {
-            UserRefResolution resolution = resolver.resolveUserRefArgument(ctx.args()[0]);
+        if (request.target() != null) {
+            UserRefResolution resolution = resolver.resolveUserRefArgument(request.target());
             if (resolution.errorMessage() != null) {
                 ctx.sendReply(PendingMessage.ofString(resolution.errorMessage()));
                 return;
@@ -126,10 +127,29 @@ public final class ScoreCommandHandler {
         UserRef target = userRef;
         taskCoordinator.runImageRequest(
                 ctx,
-                "Today's Best Scores",
-                () -> APIHelper.getTodayBestResponse(target),
+                "Recent Best Scores",
+                () -> APIHelper.getTodayBestResponse(target, request.days()),
                 replyFactory::tbMessage
         );
+    }
+
+    static TbArguments parseTbArguments(String[] args) {
+        int days = 1;
+        int targetIndex = 0;
+        if (args.length > 0 && args[0].startsWith("#")) {
+            try {
+                days = Integer.parseInt(args[0].substring(1));
+            } catch (NumberFormatException e) {
+                return null;
+            }
+            if (days <= 0) return null;
+            targetIndex = 1;
+        }
+        if (args.length - targetIndex > 1) return null;
+        return new TbArguments(days, args.length > targetIndex ? args[targetIndex] : null);
+    }
+
+    record TbArguments(int days, String target) {
     }
 
     private void handleFilteredSingleScore(Context ctx, String macroType) {

@@ -112,10 +112,14 @@ public class APIHelper {
     }
 
     public static Response<Base64Bytes> getTodayBestResponse(UserRef userRef) {
+        return getTodayBestResponse(userRef, 1);
+    }
+
+    public static Response<Base64Bytes> getTodayBestResponse(UserRef userRef, int days) {
         long uid = resolveUid(userRef);
         return getBase64BytesResponse(
-                "/users/" + uid + "/scores/today-best",
-                "获取今日BP失败",
+                "/users/" + uid + "/scores/today-best?days=" + days,
+                "获取近期BP失败",
                 null
         );
     }
@@ -226,6 +230,15 @@ public class APIHelper {
     public static Response<Base64Bytes> getBeatmapResponse(ShortcutTarget target, String mod, String auth) {
         final long beatmapId = lookupBeatmap(target, auth);
         return getBase64BytesResponse("/beatmaps/" + beatmapId + (mod != null ? "?mod=" + mod : ""), "获取谱面失败", null);
+    }
+
+    public static Response<Base64Bytes> getBeatmapAnalysisResponse(ShortcutTarget target, String mod, String auth) {
+        final long beatmapId = lookupBeatmap(target, auth);
+        String query = "/beatmaps/" + beatmapId + "/analysis";
+        if (mod != null && !mod.isBlank()) {
+            query += "?mod=" + URLEncoder.encode(mod, StandardCharsets.UTF_8);
+        }
+        return getBase64BytesResponse(query, "获取谱面分析失败", null);
     }
 
     public static Response<Base64Bytes> getBeatmapsetBgResponse(ShortcutTarget target, String auth) {
