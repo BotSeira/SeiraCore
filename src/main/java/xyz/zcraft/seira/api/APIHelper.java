@@ -111,6 +111,15 @@ public class APIHelper {
         );
     }
 
+    public static Response<Base64Bytes> getUserInfoResponse(UserRef userRef) {
+        long uid = resolveUid(userRef);
+        return getBase64BytesResponse(
+                "/users/" + uid,
+                "获取玩家资料失败",
+                null
+        );
+    }
+
     public static Response<Base64Bytes> getTodayBestResponse(UserRef userRef) {
         return getTodayBestResponse(userRef, 1);
     }

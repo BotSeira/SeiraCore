@@ -84,7 +84,7 @@ public class Router {
                 this::getAccessTokenFor
         );
         GeneralCommandHandler generalCommands = new GeneralCommandHandler(
-                messageSender, taskCoordinator, replyFactory, scoreCommands, admins::isAdmin, commandMetric
+                messageSender, taskCoordinator, replyFactory, resolver, admins::isAdmin
         );
         WatchCommandHandler watchCommands = new WatchCommandHandler(resolver, taskCoordinator, watchService, admins::isAdmin);
         SpecificScoreWatchCommandHandler specificScoreWatchCommands =

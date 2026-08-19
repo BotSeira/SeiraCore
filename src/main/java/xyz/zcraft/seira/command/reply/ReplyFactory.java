@@ -127,6 +127,14 @@ public final class ReplyFactory {
         );
     }
 
+    public PendingMessage userInfoMessage(Context ctx, Response<?> response) {
+        return PendingMessage.ofMarkdownRaw(
+                at(ctx) + "玩家资料查询完成\n" +
+                        "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()),
+                buttons().userInfoButtons(response.getUserId())
+        );
+    }
+
     public PendingMessage tbMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "今日BP查询完成\n" +
@@ -715,6 +723,18 @@ public final class ReplyFactory {
             );
         }
 
+        List<List<Button>> userInfoButtons(String userId) {
+            return Button.keyboard(
+                    Button.row(
+                            Button.command(1, "查询最好成绩", "/bo 5 " + userId),
+                            Button.command(2, "查询最近成绩", "/rs 5 " + userId)
+                    ),
+                    Button.row(
+                            Button.openUrl(3, "在游戏中查看", directUrl + "/u/" + userId)
+                    )
+            );
+        }
+
         List<List<Button>> rsButtons() {
             return Button.keyboard(Button.row(
                     Button.command(1, "查询最好成绩", "/s bo1"),
@@ -795,7 +815,8 @@ public final class ReplyFactory {
                             Button.command(4, "查询自己的分数", "/s m" + beatmapId)
                     ),
                     Button.row(
-                            Button.command(5, "分析谱面", "/bma " + beatmapId)
+                            Button.command(5, "预览谱面", "/bpv " + beatmapId),
+                            Button.command(6, "分析谱面", "/bma " + beatmapId)
                     )
             );
         }
