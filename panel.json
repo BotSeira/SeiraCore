@@ -37,6 +37,11 @@
     },
     {
       "type": "command",
+      "name": "/tb",
+      "desc": "查询今日新增BP"
+    },
+    {
+      "type": "command",
       "name": "/s",
       "desc": "查询指定成绩"
     },

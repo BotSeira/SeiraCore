@@ -96,6 +96,42 @@ public final class ScoreCommandHandler {
         );
     }
 
+    public void handleTb(Context ctx) {
+        if (ctx.args().length > 1) {
+            ctx.sendReply(PendingMessage.ofString(CommandUsage.TB));
+            return;
+        }
+
+        UserRef userRef;
+        if (ctx.args().length == 1) {
+            UserRefResolution resolution = resolver.resolveUserRefArgument(ctx.args()[0]);
+            if (resolution.errorMessage() != null) {
+                ctx.sendReply(PendingMessage.ofString(resolution.errorMessage()));
+                return;
+            }
+            if (resolution.userRef() == null) {
+                ctx.sendReply(PendingMessage.ofString(CommandUsage.TB));
+                return;
+            }
+            userRef = resolution.userRef();
+        } else {
+            Long uid = resolver.resolveBoundUid(ctx.senderUserId());
+            if (uid == null) {
+                ctx.sendReply(PendingMessage.ofString(CommandUsage.NO_BIND));
+                return;
+            }
+            userRef = new UserRef.ByUid(uid);
+        }
+
+        UserRef target = userRef;
+        taskCoordinator.runImageRequest(
+                ctx,
+                "Today's Best Scores",
+                () -> APIHelper.getTodayBestResponse(target),
+                replyFactory::tbMessage
+        );
+    }
+
     private void handleFilteredSingleScore(Context ctx, String macroType) {
         ScoreFilterArguments.ParseResult filters = ScoreFilterArguments.parse(ctx.args(), 0);
         if (filters.isError()) {

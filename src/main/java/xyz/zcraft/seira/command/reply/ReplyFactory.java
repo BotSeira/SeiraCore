@@ -127,6 +127,15 @@ public final class ReplyFactory {
         );
     }
 
+    public PendingMessage tbMessage(Context ctx, Response<?> response) {
+        return PendingMessage.ofMarkdownRaw(
+                at(ctx) + "今日BP查询完成\n" +
+                        "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()) + "\n" +
+                        "> 数量: " + response.getScoreIds().size(),
+                buttons().boButtons(response.getUserId())
+        );
+    }
+
     public PendingMessage beatmapMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "谱面查询完成\n" +
@@ -576,6 +585,7 @@ public final class ReplyFactory {
                             > /rp - 获取最近通过的一个成绩
                             > /bo [个数] [玩家ID] - 获取一个或多个最佳成绩
                             > /rp [个数] [玩家ID] - 获取最近通过一个或多个成绩
+                            > /tb [玩家ID] - 获取今日新增的BP
                             > /s <成绩ID或快捷查询> - 获取指定成绩
                             > /m <谱面ID或快捷查询> - 获取谱面
                             > /ms <谱面集ID或快捷查询> - 获取谱面集

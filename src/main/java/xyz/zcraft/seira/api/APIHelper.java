@@ -111,6 +111,15 @@ public class APIHelper {
         );
     }
 
+    public static Response<Base64Bytes> getTodayBestResponse(UserRef userRef) {
+        long uid = resolveUid(userRef);
+        return getBase64BytesResponse(
+                "/users/" + uid + "/scores/today-best",
+                "获取今日BP失败",
+                null
+        );
+    }
+
     public static Response<Base64Bytes> getGroupLeaderboardResponse(ShortcutTarget target, List<Long> uids, String auth) {
         final long beatmapId = lookupBeatmap(target, auth);
         return getBase64BytesResponse(
