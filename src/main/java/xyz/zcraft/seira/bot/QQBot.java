@@ -54,6 +54,8 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
     private final MessageSender sender;
     private final ScoreWatchService watchService;
     private final MultiplayerRoomWatchService multiplayerRoomWatchService;
+    private final RankGuessGameService rankGuessGameService;
+    private final RealtimeServiceInterruptionNotifier interruptionNotifier;
     private final DiscordBridgeService discordBridgeService;
     private final AppConfig startupConfig;
     private final Router router;
@@ -84,6 +86,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         this.cos = new CosService(config.cos());
 
         this.sender = new MessageSender(tokenManager, cos);
+        this.interruptionNotifier = new RealtimeServiceInterruptionNotifier(sender);
 
         LOG.info("Initializing Discord bridge service");
         this.discordBridgeService = new DiscordBridgeService(config.discord(), config.bridge(), sender);
@@ -105,7 +108,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         );
 
         LOG.info("Initializing rank guess service");
-        RankGuessGameService rankGuessGameService = new RankGuessGameService();
+        this.rankGuessGameService = new RankGuessGameService();
         this.attachmentHandler = new AttachmentHandler(executors.attachmentDownloads());
         this.router = new Router(
                 sender,
@@ -295,6 +298,19 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
 
     @Override
     public void requestStop() {
+        RealtimeServiceInterruptionNotifier.NotificationResult result = interruptionNotifier.notifyGroups(
+                watchService.activeTransientGroupIds(),
+                rankGuessGameService.activeGroupIds(),
+                multiplayerRoomWatchService.activeGroupIds()
+        );
+        if (result.failedGroups() == 0) {
+            LOG.info("Sent restart interruption notices to {} affected groups", result.sentGroups());
+        } else {
+            LOG.warn(
+                    "Sent restart interruption notices to {}/{} affected groups",
+                    result.sentGroups(), result.targetGroups()
+            );
+        }
         stop();
     }
 

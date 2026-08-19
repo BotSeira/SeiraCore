@@ -94,6 +94,12 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
         }
     }
 
+    public Set<String> activeGroupIds() {
+        synchronized (lock) {
+            return Set.copyOf(watchesByGroup.keySet());
+        }
+    }
+
     public void pollNow() {
         Map<RoomKey, List<WatchRef>> watchesByRoom = snapshotByRoom();
         for (Map.Entry<RoomKey, List<WatchRef>> room : watchesByRoom.entrySet()) {

@@ -62,6 +62,10 @@ public final class RankGuessGameService {
         }
     }
 
+    public synchronized Set<String> activeGroupIds() {
+        return Set.copyOf(games.keySet());
+    }
+
     public synchronized GuessResponse guess(String groupId, String senderUserId, long guess) {
         if (guess <= 0) {
             throw new IllegalArgumentException("Rank must be positive");
