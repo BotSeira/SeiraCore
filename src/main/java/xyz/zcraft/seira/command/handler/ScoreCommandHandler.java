@@ -62,7 +62,13 @@ public final class ScoreCommandHandler {
             );
             return;
         }
-        if (ScoreFilterArguments.looksLikeFilter(ctx.args()[0])) {
+
+        if (resolver.looksLikeMention(ctx.args()[0])) {
+            if (ctx.args().length == 1 || (ctx.args().length > 1 && ScoreFilterArguments.looksLikeFilter(ctx.args()[1]))) {
+                handleFilteredSingleScore(ctx, "bo");
+                return;
+            }
+        } else if (ScoreFilterArguments.looksLikeFilter(ctx.args()[0])) {
             handleFilteredSingleScore(ctx, "bo");
             return;
         }
@@ -96,7 +102,7 @@ public final class ScoreCommandHandler {
         }
 
         if (resolver.looksLikeMention(ctx.args()[0])) {
-            if (ctx.args().length > 1 && ScoreFilterArguments.looksLikeFilter(ctx.args()[1])) {
+            if (ctx.args().length == 1 || (ctx.args().length > 1 && ScoreFilterArguments.looksLikeFilter(ctx.args()[1]))) {
                 handleFilteredSingleScore(ctx, ctx.command());
                 return;
             }
