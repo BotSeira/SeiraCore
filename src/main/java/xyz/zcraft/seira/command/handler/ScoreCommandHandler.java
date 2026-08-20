@@ -2,14 +2,12 @@ package xyz.zcraft.seira.command.handler;
 
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.bot.data.PendingMessage;
-import xyz.zcraft.seira.command.*;
-import xyz.zcraft.seira.command.parse.Resolver;
-import xyz.zcraft.seira.command.parse.ScoreFilterArguments;
+import xyz.zcraft.seira.command.Context;
+import xyz.zcraft.seira.command.TargetHistory;
+import xyz.zcraft.seira.command.TaskCoordinator;
+import xyz.zcraft.seira.command.parse.*;
 import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
-import xyz.zcraft.seira.command.parse.ShortcutTarget;
-import xyz.zcraft.seira.command.parse.TargetResolution;
-import xyz.zcraft.seira.command.parse.UserRefResolution;
 import xyz.zcraft.seira.data.UserRef;
 
 public final class ScoreCommandHandler {
@@ -30,6 +28,22 @@ public final class ScoreCommandHandler {
         this.targetHistory = targetHistory;
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
+    }
+
+    static TbArguments parseTbArguments(String[] args) {
+        int days = 1;
+        int targetIndex = 0;
+        if (args.length > 0 && args[0].startsWith("#")) {
+            try {
+                days = Integer.parseInt(args[0].substring(1));
+            } catch (NumberFormatException e) {
+                return null;
+            }
+            if (days <= 0) return null;
+            targetIndex = 1;
+        }
+        if (args.length - targetIndex > 1) return null;
+        return new TbArguments(days, args.length > targetIndex ? args[targetIndex] : null);
     }
 
     public void handleBo(Context ctx) {
@@ -80,7 +94,13 @@ public final class ScoreCommandHandler {
             );
             return;
         }
-        if (ScoreFilterArguments.looksLikeFilter(ctx.args()[0])) {
+
+        if (resolver.looksLikeMention(ctx.args()[0])) {
+            if (ctx.args().length > 1 && ScoreFilterArguments.looksLikeFilter(ctx.args()[1])) {
+                handleFilteredSingleScore(ctx, ctx.command());
+                return;
+            }
+        } else if (ScoreFilterArguments.looksLikeFilter(ctx.args()[0])) {
             handleFilteredSingleScore(ctx, ctx.command());
             return;
         }
@@ -133,39 +153,34 @@ public final class ScoreCommandHandler {
         );
     }
 
-    static TbArguments parseTbArguments(String[] args) {
-        int days = 1;
-        int targetIndex = 0;
-        if (args.length > 0 && args[0].startsWith("#")) {
-            try {
-                days = Integer.parseInt(args[0].substring(1));
-            } catch (NumberFormatException e) {
-                return null;
-            }
-            if (days <= 0) return null;
-            targetIndex = 1;
-        }
-        if (args.length - targetIndex > 1) return null;
-        return new TbArguments(days, args.length > targetIndex ? args[targetIndex] : null);
-    }
-
-    record TbArguments(int days, String target) {
-    }
-
     private void handleFilteredSingleScore(Context ctx, String macroType) {
+        UserRef targetUser = null;
+
+        if (resolver.looksLikeMention(ctx.args()[0])) {
+            final UserRefResolution userRefResolution = resolver.resolveUserRefArgument(ctx.args()[0]);
+            if (userRefResolution.errorMessage() != null) {
+                ctx.sendReply(PendingMessage.ofString(userRefResolution.errorMessage()));
+                return;
+            }
+            targetUser = userRefResolution.userRef();
+        }
+
         ScoreFilterArguments.ParseResult filters = ScoreFilterArguments.parse(ctx.args(), 0);
         if (filters.isError()) {
             ctx.sendReply(PendingMessage.ofString(filters.errorMessage() + "\n" + CommandUsage.SCORE_FILTERS));
             return;
         }
 
-        Long uid = resolver.resolveBoundUid(ctx.senderUserId());
-        if (uid == null) {
-            ctx.sendReply(PendingMessage.ofString(CommandUsage.NO_BIND));
-            return;
+        if (targetUser == null) {
+            Long uid = resolver.resolveBoundUid(ctx.senderUserId());
+            if (uid == null) {
+                ctx.sendReply(PendingMessage.ofString(CommandUsage.NO_BIND));
+                return;
+            }
+            targetUser = new UserRef.ByUid(uid);
         }
 
-        ShortcutTarget target = new ShortcutTarget(null, new UserRef.ByUid(uid), macroType, 1L, null);
+        ShortcutTarget target = new ShortcutTarget(null, targetUser, macroType, 1L, null);
         taskCoordinator.runImageRequest(
                 ctx,
                 "Score",
@@ -211,9 +226,6 @@ public final class ScoreCommandHandler {
             return null;
         }
         return new ScoreListRequest(count, userRef, filters.filters());
-    }
-
-    private record ScoreListRequest(int count, UserRef userRef, java.util.List<String> filters) {
     }
 
     public void handleS(Context ctx) {
@@ -344,6 +356,12 @@ public final class ScoreCommandHandler {
             return null;
         }
         return resolver.parsePositiveInt(value);
+    }
+
+    record TbArguments(int days, String target) {
+    }
+
+    private record ScoreListRequest(int count, UserRef userRef, java.util.List<String> filters) {
     }
 
 }
