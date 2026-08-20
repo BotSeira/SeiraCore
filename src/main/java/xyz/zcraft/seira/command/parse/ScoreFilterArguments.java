@@ -10,9 +10,12 @@ import java.util.regex.Pattern;
 /** Parses score-list filters and converts aliases to oStella's compact filter syntax. */
 public final class ScoreFilterArguments {
     private static final Pattern FILTER_PATTERN = Pattern.compile(
-            "(?i)^(acc(?:uracy)?|combo|pp|time|length|len|star|stars|sr|bpm|miss|misses|score|mod|mods|rank)"
-                    + "(大于等于|小于等于|不包含|不等于|包含|等于|大于|小于|>=|<=|!=|!~|>|<|=|~)(.+)$"
+            "(?i)^(acc(?:uracy)?|combo|pp|time|length|len|star|stars|sr|bpm|miss|misses|score|mod|mods|rank"
+                    + "|title|artist|mapper|genre|language|video|storyboard|fullcombo)"
+                    + "(>=|<=|!=|!~|>|<|=|~)(.+)$"
     );
+    private static final Pattern MISS_SHORTHAND_PATTERN = Pattern.compile("(?i)^(!?)(\\d+)miss(?:es)?$");
+    private static final Pattern NEGATED_RANK_SHORTHAND_PATTERN = Pattern.compile("(?i)^!(XH|X|SH|S|A|B|C|D|F)$");
     private static final Pattern DURATION_PATTERN = Pattern.compile("(?i)^(?:(\\d+)m)?(?:(\\d+(?:\\.\\d+)?)s)?$");
     private static final Set<String> RANKS = Set.of("XH", "X", "SH", "S", "A", "B", "C", "D", "F");
 
@@ -21,7 +24,9 @@ public final class ScoreFilterArguments {
 
     public static boolean looksLikeFilter(String value) {
         if (value == null) return false;
-        return value.matches(".*(?:>=|<=|!=|!~|>|<|=|~|大于等于|小于等于|不包含|不等于|包含|等于|大于|小于).*");
+        String trimmed = value.trim();
+        return !expandShorthand(trimmed).equals(trimmed)
+                || trimmed.matches(".*(?:>=|<=|!=|!~|>|<|=|~).*");
     }
 
     public static ParseResult parse(String[] args, int startIndex) {
@@ -41,13 +46,14 @@ public final class ScoreFilterArguments {
     }
 
     private static String parseOne(String token) {
-        Matcher matcher = FILTER_PATTERN.matcher(token.trim());
+        String expanded = expandShorthand(token.trim());
+        Matcher matcher = FILTER_PATTERN.matcher(expanded);
         if (!matcher.matches()) {
             throw new IllegalArgumentException("无法识别 `" + token + "`");
         }
 
         String field = normalizeField(matcher.group(1));
-        String operator = normalizeOperator(matcher.group(2));
+        String operator = matcher.group(2);
         String value = matcher.group(3).trim();
 
         if (field.equals("mod")) {
@@ -62,6 +68,21 @@ public final class ScoreFilterArguments {
             value = value.toUpperCase(Locale.ROOT);
             if (!RANKS.contains(value)) {
                 throw new IllegalArgumentException("rank 必须是 XH/X/SH/S/A/B/C/D/F");
+            }
+        } else if (Set.of("title", "artist", "mapper", "genre", "language").contains(field)) {
+            if (!Set.of("~", "!~", "=", "!=").contains(operator)) {
+                throw new IllegalArgumentException(field + " 仅支持 ~、!~、=、!=");
+            }
+            if (value.isBlank()) {
+                throw new IllegalArgumentException(field + " 不能为空");
+            }
+        } else if (Set.of("video", "storyboard", "fullcombo").contains(field)) {
+            if (!Set.of("=", "!=").contains(operator)) {
+                throw new IllegalArgumentException(field + " 仅支持 =、!=");
+            }
+            value = value.toLowerCase(Locale.ROOT);
+            if (!Set.of("true", "false").contains(value)) {
+                throw new IllegalArgumentException(field + " 必须是 true 或 false");
             }
         } else {
             if (Set.of("~", "!~").contains(operator)) {
@@ -91,22 +112,40 @@ public final class ScoreFilterArguments {
             case "score" -> "score";
             case "mod", "mods" -> "mod";
             case "rank" -> "rank";
+            case "title" -> "title";
+            case "artist" -> "artist";
+            case "mapper" -> "mapper";
+            case "genre" -> "genre";
+            case "language" -> "language";
+            case "video" -> "video";
+            case "storyboard" -> "storyboard";
+            case "fullcombo" -> "fullcombo";
             default -> throw new IllegalArgumentException("未知字段 " + value);
         };
     }
 
-    private static String normalizeOperator(String value) {
-        return switch (value) {
-            case "大于等于" -> ">=";
-            case "小于等于" -> "<=";
-            case "不包含" -> "!~";
-            case "不等于" -> "!=";
-            case "包含" -> "~";
-            case "等于" -> "=";
-            case "大于" -> ">";
-            case "小于" -> "<";
-            default -> value;
+    private static String expandShorthand(String value) {
+        Matcher missMatcher = MISS_SHORTHAND_PATTERN.matcher(value);
+        if (missMatcher.matches()) {
+            return "miss" + (missMatcher.group(1).isEmpty() ? "=" : "!=") + missMatcher.group(2);
+        }
+
+        String booleanFilter = switch (value.toLowerCase(Locale.ROOT)) {
+            case "video" -> "video=true";
+            case "!video" -> "video=false";
+            case "sb", "storyboard" -> "storyboard=true";
+            case "!sb", "!storyboard" -> "storyboard=false";
+            case "fc", "fullcombo" -> "fullcombo=true";
+            case "!fc", "!fullcombo" -> "fullcombo=false";
+            default -> null;
         };
+        if (booleanFilter != null) return booleanFilter;
+
+        Matcher rankMatcher = NEGATED_RANK_SHORTHAND_PATTERN.matcher(value);
+        if (rankMatcher.matches()) {
+            return "rank!=" + rankMatcher.group(1).toUpperCase(Locale.ROOT);
+        }
+        return value;
     }
 
     private static void validateMods(String value) {
