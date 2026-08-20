@@ -4,11 +4,13 @@ import xyz.zcraft.osu.model.Beatmapset;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.PendingMessage;
-import xyz.zcraft.seira.command.*;
+import xyz.zcraft.seira.command.Context;
+import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.parse.UserRefResolution;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.data.UploadedImage;
+import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.services.DailyLuck;
 
 import java.util.function.Predicate;
@@ -35,25 +37,28 @@ public final class GeneralCommandHandler {
     }
 
     public void handleU(Context context) {
-        if (context.argumentCount() != 1) {
-            context.sendReply(PendingMessage.ofString("用法：/u <玩家ID/用户名/@用户>"));
-            return;
+        UserRef userRef;
+        if (context.argumentCount() == 0) {
+            Long boundUid = resolver.resolveBoundUid(context.senderUserId());
+            userRef = boundUid == null ? null : new UserRef.ByUid(boundUid);
+        } else {
+            UserRefResolution target = resolver.resolveUserRefArgument(context.argument(0));
+            if (target.errorMessage() != null) {
+                context.sendReply(PendingMessage.ofString(target.errorMessage()));
+                return;
+            }
+            userRef = target.userRef();
         }
 
-        UserRefResolution target = resolver.resolveUserRefArgument(context.argument(0));
-        if (target.errorMessage() != null) {
-            context.sendReply(PendingMessage.ofString(target.errorMessage()));
-            return;
-        }
-        if (target.userRef() == null) {
-            context.sendReply(PendingMessage.ofString("用法：/u <玩家ID/用户名/@用户>"));
+        if (userRef == null) {
+            context.sendReply(PendingMessage.ofString("用法：/u [玩家ID/用户名/@用户]"));
             return;
         }
 
         taskCoordinator.runImageRequest(
                 context,
                 "User Info",
-                () -> APIHelper.getUserInfoResponse(target.userRef()),
+                () -> APIHelper.getUserInfoResponse(userRef),
                 replyFactory::userInfoMessage
         );
     }
