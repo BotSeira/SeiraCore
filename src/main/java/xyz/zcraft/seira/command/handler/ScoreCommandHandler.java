@@ -161,6 +161,7 @@ public final class ScoreCommandHandler {
 
     private void handleFilteredSingleScore(Context ctx, String macroType) {
         UserRef targetUser = null;
+        int startIndex = 0;
 
         if (resolver.looksLikeMention(ctx.args()[0])) {
             final UserRefResolution userRefResolution = resolver.resolveUserRefArgument(ctx.args()[0]);
@@ -169,9 +170,10 @@ public final class ScoreCommandHandler {
                 return;
             }
             targetUser = userRefResolution.userRef();
+            startIndex = 1;
         }
 
-        ScoreFilterArguments.ParseResult filters = ScoreFilterArguments.parse(ctx.args(), 0);
+        ScoreFilterArguments.ParseResult filters = ScoreFilterArguments.parse(ctx.args(), startIndex);
         if (filters.isError()) {
             ctx.sendReply(PendingMessage.ofString(filters.errorMessage() + "\n" + CommandUsage.SCORE_FILTERS));
             return;
