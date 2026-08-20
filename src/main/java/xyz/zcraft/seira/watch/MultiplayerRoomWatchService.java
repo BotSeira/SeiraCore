@@ -22,7 +22,7 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
     private static final Logger LOG = LogManager.getLogger(MultiplayerRoomWatchService.class);
 
     private final Object lock = new Object();
-    private final Map<String, WatchEntry> watchesByGroup = new LinkedHashMap<>();
+    private final Map<String, Map<String, WatchEntry>> watchesByGroup = new LinkedHashMap<>();
     private final MultiplayerRoomWatchApi api;
     private final MultiplayerRoomNotifier notifier;
     private final Duration pollInterval;
@@ -60,11 +60,21 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
         );
     }
 
-    public RoomWatchView watch(String groupId, MultiplayerRoomVersion version, long roomId) {
-        Objects.requireNonNull(groupId);
+    public RoomWatchView watch(
+            String groupId,
+            String userId,
+            MultiplayerRoomVersion version,
+            long roomId
+    ) {
+        requireIdentifier(groupId, "groupId");
+        requireIdentifier(userId, "userId");
         Objects.requireNonNull(version);
         if (roomId <= 0) {
             throw new IllegalArgumentException("房间 ID 必须为正整数。");
+        }
+        RoomKey room = new RoomKey(version, roomId);
+        synchronized (lock) {
+            ensureRoomAvailable(groupId, userId, room);
         }
         RoomWatchSnapshot snapshot = api.getSnapshot(version, roomId);
         if (!snapshot.active()) {
@@ -75,21 +85,46 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
         snapshot.completedPlays().forEach(play -> baseline.add(play.playlistItemId()));
         WatchEntry entry = new WatchEntry(version, snapshot.roomId(), snapshot.roomName(), baseline);
         synchronized (lock) {
-            watchesByGroup.put(groupId, entry);
+            ensureRoomAvailable(groupId, userId, room);
+            watchesByGroup.computeIfAbsent(groupId, ignored -> new LinkedHashMap<>())
+                    .put(userId, entry);
         }
         return view(entry);
     }
 
-    public RoomWatchView stop(String groupId) {
+    public RoomWatchView stop(String groupId, String userId) {
+        requireIdentifier(groupId, "groupId");
+        requireIdentifier(userId, "userId");
         synchronized (lock) {
-            WatchEntry removed = watchesByGroup.remove(groupId);
+            Map<String, WatchEntry> groupWatches = watchesByGroup.get(groupId);
+            if (groupWatches == null) {
+                return null;
+            }
+            WatchEntry removed = groupWatches.remove(userId);
+            if (groupWatches.isEmpty()) {
+                watchesByGroup.remove(groupId);
+            }
             return removed == null ? null : view(removed);
         }
     }
 
-    public RoomWatchView get(String groupId) {
+    public List<RoomWatchView> stopAll(String groupId) {
+        requireIdentifier(groupId, "groupId");
         synchronized (lock) {
-            WatchEntry entry = watchesByGroup.get(groupId);
+            Map<String, WatchEntry> removed = watchesByGroup.remove(groupId);
+            if (removed == null) {
+                return List.of();
+            }
+            return removed.values().stream().map(MultiplayerRoomWatchService::view).toList();
+        }
+    }
+
+    public RoomWatchView get(String groupId, String userId) {
+        requireIdentifier(groupId, "groupId");
+        requireIdentifier(userId, "userId");
+        synchronized (lock) {
+            Map<String, WatchEntry> groupWatches = watchesByGroup.get(groupId);
+            WatchEntry entry = groupWatches == null ? null : groupWatches.get(userId);
             return entry == null ? null : view(entry);
         }
     }
@@ -172,29 +207,29 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
     private Map<RoomKey, List<WatchRef>> snapshotByRoom() {
         synchronized (lock) {
             Map<RoomKey, List<WatchRef>> result = new LinkedHashMap<>();
-            watchesByGroup.forEach((groupId, entry) -> result
+            watchesByGroup.forEach((groupId, groupWatches) -> groupWatches.forEach((userId, entry) -> result
                     .computeIfAbsent(new RoomKey(entry.version, entry.roomId), ignored -> new ArrayList<>())
-                    .add(new WatchRef(groupId, entry)));
+                    .add(new WatchRef(groupId, userId, entry))));
             return result;
         }
     }
 
     private boolean isCurrent(WatchRef watch) {
         synchronized (lock) {
-            return watchesByGroup.get(watch.groupId()) == watch.entry();
+            return currentEntry(watch) == watch.entry();
         }
     }
 
     private boolean wasSent(WatchRef watch, long playlistItemId) {
         synchronized (lock) {
-            return watchesByGroup.get(watch.groupId()) != watch.entry()
+            return currentEntry(watch) != watch.entry()
                     || watch.entry().sentPlaylistItemIds.contains(playlistItemId);
         }
     }
 
     private void markSent(WatchRef watch, long playlistItemId) {
         synchronized (lock) {
-            if (watchesByGroup.get(watch.groupId()) == watch.entry()) {
+            if (currentEntry(watch) == watch.entry()) {
                 watch.entry().sentPlaylistItemIds.add(playlistItemId);
             }
         }
@@ -202,9 +237,32 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
 
     private void removeIfCurrent(WatchRef watch) {
         synchronized (lock) {
-            if (watchesByGroup.get(watch.groupId()) == watch.entry()) {
-                watchesByGroup.remove(watch.groupId());
+            Map<String, WatchEntry> groupWatches = watchesByGroup.get(watch.groupId());
+            if (groupWatches != null && groupWatches.get(watch.userId()) == watch.entry()) {
+                groupWatches.remove(watch.userId());
+                if (groupWatches.isEmpty()) {
+                    watchesByGroup.remove(watch.groupId());
+                }
             }
+        }
+    }
+
+    private WatchEntry currentEntry(WatchRef watch) {
+        Map<String, WatchEntry> groupWatches = watchesByGroup.get(watch.groupId());
+        return groupWatches == null ? null : groupWatches.get(watch.userId());
+    }
+
+    private void ensureRoomAvailable(String groupId, String userId, RoomKey room) {
+        Map<String, WatchEntry> groupWatches = watchesByGroup.get(groupId);
+        if (groupWatches == null) {
+            return;
+        }
+        boolean watchedByAnotherUser = groupWatches.entrySet().stream()
+                .anyMatch(watch -> !watch.getKey().equals(userId)
+                        && watch.getValue().version == room.version()
+                        && watch.getValue().roomId == room.roomId());
+        if (watchedByAnotherUser) {
+            throw new IllegalStateException("该多人房间已由本群其他用户监视，不能重复监视。");
         }
     }
 
@@ -221,6 +279,12 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
             throw new IllegalArgumentException("pollInterval must be positive");
         }
         return duration;
+    }
+
+    private static void requireIdentifier(String value, String name) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(name + " must not be blank");
+        }
     }
 
     private static RoomWatchView view(WatchEntry entry) {
@@ -253,7 +317,7 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
         }
     }
 
-    private record WatchRef(String groupId, WatchEntry entry) {
+    private record WatchRef(String groupId, String userId, WatchEntry entry) {
     }
 
     private record RoomKey(MultiplayerRoomVersion version, long roomId) {

@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
 public final class MultiplayerRoomWatchCommandHandler {
     private static final String USAGE =
             "用法：/mpwatch [start] <房间ID> [stable|lazer]；"
-                    + "/mpwatch [start] <房间链接>；/mpwatch stop；/mpwatch status";
+                    + "/mpwatch [start] <房间链接>；/mpwatch stop [all]；/mpwatch status";
     private static final Pattern LAZER_ROOM_URL = Pattern.compile(
             "(?i)^https?://(?:www\\.)?osu\\.ppy\\.sh/multiplayer/rooms/(\\d+)(?:[/?#].*)?$"
     );
@@ -93,7 +93,9 @@ public final class MultiplayerRoomWatchCommandHandler {
                 return;
             }
             try {
-                RoomWatchView view = watchService.watch(ctx.groupId(), target.version(), target.roomId());
+                RoomWatchView view = watchService.watch(
+                        ctx.groupId(), ctx.senderUserId(), target.version(), target.roomId()
+                );
                 ctx.sendReply(PendingMessage.ofString(
                         "已开始监视" + formatRoom(view) + "。"
                                 + "之后完成的每张图都会自动推送结果。"
@@ -105,15 +107,24 @@ public final class MultiplayerRoomWatchCommandHandler {
     }
 
     private void handleStop(Context ctx) {
+        if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
+            int stoppedCount = watchService.stopAll(ctx.groupId()).size();
+            ctx.sendReply(PendingMessage.ofString(
+                    stoppedCount == 0
+                            ? "当前群聊没有多人房间监视。"
+                            : "已停止当前群聊的全部 " + stoppedCount + " 个多人房间监视。"
+            ));
+            return;
+        }
         if (ctx.argumentCount() != 1) {
             usage(ctx);
             return;
         }
-        RoomWatchView stopped = watchService.stop(ctx.groupId());
+        RoomWatchView stopped = watchService.stop(ctx.groupId(), ctx.senderUserId());
         ctx.sendReply(PendingMessage.ofString(
                 stopped == null
-                        ? "当前群聊没有多人房间监视。"
-                        : "已停止监视" + formatRoom(stopped) + "。"
+                        ? "你当前没有在本群启动多人房间监视。"
+                        : "已停止你启动的监视：" + formatRoom(stopped) + "。"
         ));
     }
 
@@ -122,11 +133,11 @@ public final class MultiplayerRoomWatchCommandHandler {
             usage(ctx);
             return;
         }
-        RoomWatchView view = watchService.get(ctx.groupId());
+        RoomWatchView view = watchService.get(ctx.groupId(), ctx.senderUserId());
         ctx.sendReply(PendingMessage.ofString(
                 view == null
-                        ? "当前群聊没有多人房间监视。"
-                        : "当前正在监视" + formatRoom(view) + "。"
+                        ? "你当前没有在本群启动多人房间监视。"
+                        : "你当前正在监视" + formatRoom(view) + "。"
         ));
     }
 

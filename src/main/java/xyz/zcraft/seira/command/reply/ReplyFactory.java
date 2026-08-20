@@ -603,7 +603,7 @@ public final class ReplyFactory {
                             > /lb <谱面ID> [玩家ID列表] - 获取指定谱面排行榜
                             > /watch add <玩家ID/用户名/@用户> [分钟] - 监视群友的新成绩
                             > /wx start <UID列表> <谱面ID列表> - 监视指定玩家在指定谱面的成绩
-                            > /mpwatch [start] <房间ID> [stable|lazer] - 监视多人房间的逐图结果（链接可自动识别版本）
+                            > /mpwatch [start] <房间ID> [stable|lazer] - 监视多人房间的逐图结果（链接可自动识别版本，stop all 停止本群全部监视）
                             > /f - 获取好友列表
                             
                             详细指令列表请在 [这里](https://docs.seira.top/overview/commands.html) 查看
