@@ -64,6 +64,10 @@ public record Context(
         return requireReplies().sendReply(Objects.requireNonNull(message, "message"));
     }
 
+    public boolean sendReply(String message) {
+        return requireReplies().sendReply(PendingMessage.ofString(message));
+    }
+
     /** Sends an active message to the same user or group, without an inbound message reference. */
     public boolean sendMessage(PendingMessage message) {
         return requireReplies().sendProactive(Objects.requireNonNull(message, "message"));

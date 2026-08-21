@@ -4,9 +4,13 @@ import xyz.zcraft.osu.model.Beatmapset;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.PendingMessage;
-import xyz.zcraft.seira.command.*;
+import xyz.zcraft.seira.command.Context;
+import xyz.zcraft.seira.command.TaskCoordinator;
+import xyz.zcraft.seira.command.parse.Resolver;
+import xyz.zcraft.seira.command.parse.UserRefResolution;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.data.UploadedImage;
+import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.services.DailyLuck;
 
 import java.util.function.Predicate;
@@ -15,38 +19,48 @@ public final class GeneralCommandHandler {
     private final MessageSender messageSender;
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
-    private final ScoreCommandHandler scoreCommands;
+    private final Resolver resolver;
     private final Predicate<String> adminAuthorizer;
-    private final Runnable commandMetric;
 
     public GeneralCommandHandler(
             MessageSender messageSender,
             TaskCoordinator taskCoordinator,
             ReplyFactory replyFactory,
-            ScoreCommandHandler scoreCommands,
-            Predicate<String> adminAuthorizer,
-            Runnable commandMetric
+            Resolver resolver,
+            Predicate<String> adminAuthorizer
     ) {
         this.messageSender = messageSender;
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
-        this.scoreCommands = scoreCommands;
+        this.resolver = resolver;
         this.adminAuthorizer = adminAuthorizer;
-        this.commandMetric = commandMetric;
     }
 
     public void handleU(Context context) {
-        if (context.argumentCount() != 1) {
-            context.sendReply(PendingMessage.ofString("用法：/u <玩家ID/用户名/@用户>"));
+        UserRef userRef;
+        if (context.argumentCount() == 0) {
+            Long boundUid = resolver.resolveBoundUid(context.senderUserId());
+            userRef = boundUid == null ? null : new UserRef.ByUid(boundUid);
+        } else {
+            UserRefResolution target = resolver.resolveUserRefArgument(context.argument(0));
+            if (target.errorMessage() != null) {
+                context.sendReply(PendingMessage.ofString(target.errorMessage()));
+                return;
+            }
+            userRef = target.userRef();
+        }
+
+        if (userRef == null) {
+            context.sendReply(PendingMessage.ofString("用法：/u [玩家ID/用户名/@用户]"));
             return;
         }
 
-        String target = context.argument(0);
-        Context bestScoreContext = context.asCommand("bo", new String[]{"8", target}, "8 " + target);
-
-        // /u historically routed through /bo and therefore counted both commands.
-        commandMetric.run();
-        scoreCommands.handleBo(bestScoreContext);
+        taskCoordinator.runImageRequest(
+                context,
+                "User Info",
+                () -> APIHelper.getUserInfoResponse(userRef),
+                replyFactory::userInfoMessage
+        );
     }
 
     public void handleLuck(Context context) {

@@ -80,6 +80,7 @@ public final class RuntimeConfig {
                 newSeira.directUrl(),
                 newSeira.queueMessageInGroup(),
                 oldSeira.watchIntervalMinutes(),
+                oldSeira.multiplayerWatchIntervalSeconds(),
                 newSeira.debugMode(),
                 newSeira.adminIds() == null ? List.of() : List.copyOf(newSeira.adminIds())
         );
@@ -109,6 +110,9 @@ public final class RuntimeConfig {
         addIfChanged(changed, "seira.sqlitePath", previous.seira().sqlitePath(), loaded.seira().sqlitePath());
         addIfChanged(changed, "seira.watchIntervalMinutes", previous.seira().watchIntervalMinutes(),
                 loaded.seira().watchIntervalMinutes());
+        addIfChanged(changed, "seira.multiplayerWatchIntervalSeconds",
+                previous.seira().multiplayerWatchIntervalSeconds(),
+                loaded.seira().multiplayerWatchIntervalSeconds());
         addIfChanged(changed, "ostella", previous.ostella(), loaded.ostella());
         addIfChanged(changed, "binding", previous.binding(), loaded.binding());
         addIfChanged(changed, "qq", previous.qq(), loaded.qq());

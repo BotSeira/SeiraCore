@@ -2,7 +2,9 @@ package xyz.zcraft.seira.command.parse;
 
 import xyz.zcraft.seira.command.Context;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.function.UnaryOperator;
@@ -36,12 +38,41 @@ public final class CommandParser {
             return ParseResult.emptyCommand();
         }
 
-        String[] parts = body.split("\\s+");
+        String[] parts = splitArguments(body);
         String command = parts[0].toLowerCase(Locale.ROOT);
         String query = body.substring(parts[0].length()).trim();
         String[] args = Arrays.copyOfRange(parts, 1, parts.length);
 
         return ParseResult.parsed(new Context(senderUserId, groupId, messageId, command, args, query));
+    }
+
+    /** Splits arguments on unquoted whitespace and removes double-quote delimiters. */
+    private static String[] splitArguments(String body) {
+        List<String> parts = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean quoted = false;
+
+        for (int i = 0; i < body.length(); i++) {
+            char character = body.charAt(i);
+            if (character == '\\' && i + 1 < body.length() && body.charAt(i + 1) == '"') {
+                current.append('"');
+                i++;
+            } else if (character == '"') {
+                quoted = !quoted;
+            } else if (Character.isWhitespace(character) && !quoted) {
+                if (!current.isEmpty()) {
+                    parts.add(current.toString());
+                    current.setLength(0);
+                }
+            } else {
+                current.append(character);
+            }
+        }
+
+        if (!current.isEmpty()) {
+            parts.add(current.toString());
+        }
+        return parts.toArray(String[]::new);
     }
 
     public record ParseResult(Status status, Context context) {

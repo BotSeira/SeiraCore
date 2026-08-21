@@ -24,6 +24,9 @@ import xyz.zcraft.seira.runtime.ApplicationExecutors;
 import xyz.zcraft.seira.security.AdminRegistry;
 import xyz.zcraft.seira.util.TokenManager;
 import xyz.zcraft.seira.watch.OstellaWatchApi;
+import xyz.zcraft.seira.watch.OstellaMultiplayerRoomWatchApi;
+import xyz.zcraft.seira.watch.MultiplayerRoomWatchService;
+import xyz.zcraft.seira.watch.QqMultiplayerRoomNotifier;
 import xyz.zcraft.seira.watch.SpecificScoreNotifier;
 import xyz.zcraft.seira.watch.WatchScoreNotifier;
 import xyz.zcraft.seira.watch.ScoreWatchService;
@@ -50,6 +53,9 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
     @Getter
     private final MessageSender sender;
     private final ScoreWatchService watchService;
+    private final MultiplayerRoomWatchService multiplayerRoomWatchService;
+    private final RankGuessGameService rankGuessGameService;
+    private final RealtimeServiceInterruptionNotifier interruptionNotifier;
     private final DiscordBridgeService discordBridgeService;
     private final AppConfig startupConfig;
     private final Router router;
@@ -80,6 +86,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         this.cos = new CosService(config.cos());
 
         this.sender = new MessageSender(tokenManager, cos);
+        this.interruptionNotifier = new RealtimeServiceInterruptionNotifier(sender);
 
         LOG.info("Initializing Discord bridge service");
         this.discordBridgeService = new DiscordBridgeService(config.discord(), config.bridge(), sender);
@@ -93,8 +100,15 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                 Duration.ofMinutes(config.seira().effectiveWatchIntervalMinutes())
         );
 
+        LOG.info("Initializing multiplayer room watch service");
+        this.multiplayerRoomWatchService = new MultiplayerRoomWatchService(
+                new OstellaMultiplayerRoomWatchApi(config.ostella().endpoint()),
+                new QqMultiplayerRoomNotifier(sender),
+                Duration.ofSeconds(config.seira().effectiveMultiplayerWatchIntervalSeconds())
+        );
+
         LOG.info("Initializing rank guess service");
-        RankGuessGameService rankGuessGameService = new RankGuessGameService();
+        this.rankGuessGameService = new RankGuessGameService();
         this.attachmentHandler = new AttachmentHandler(executors.attachmentDownloads());
         this.router = new Router(
                 sender,
@@ -102,6 +116,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                 admins,
                 bindingService,
                 watchService,
+                multiplayerRoomWatchService,
                 discordBridgeService,
                 rankGuessGameService,
                 executors.commandTasks(),
@@ -119,6 +134,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         runnerThread = Thread.currentThread();
         tokenManager.start();
         watchService.start();
+        multiplayerRoomWatchService.start();
         discordBridgeService.start();
         LOG.info("Starting bot connection loop...");
 
@@ -214,6 +230,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
             thread.interrupt();
         }
         watchService.close();
+        multiplayerRoomWatchService.close();
         discordBridgeService.close();
         tokenManager.close();
     }
@@ -281,6 +298,19 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
 
     @Override
     public void requestStop() {
+        RealtimeServiceInterruptionNotifier.NotificationResult result = interruptionNotifier.notifyGroups(
+                watchService.activeTransientGroupIds(),
+                rankGuessGameService.activeGroupIds(),
+                multiplayerRoomWatchService.activeGroupIds()
+        );
+        if (result.failedGroups() == 0) {
+            LOG.info("Sent restart interruption notices to {} affected groups", result.sentGroups());
+        } else {
+            LOG.warn(
+                    "Sent restart interruption notices to {}/{} affected groups",
+                    result.sentGroups(), result.targetGroups()
+            );
+        }
         stop();
     }
 

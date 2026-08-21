@@ -176,6 +176,14 @@ public final class ScoreWatchService implements AutoCloseable {
         }
     }
 
+    /** Returns groups whose temporary score watches will be lost when this process stops. */
+    public Set<String> activeTransientGroupIds() {
+        synchronized (lock) {
+            removeExpiredLocked(clock.instant());
+            return Set.copyOf(watchesByGroup.keySet());
+        }
+    }
+
     public SpecificScoreWatchState startSpecific(
             String groupId,
             Set<Long> userIds,

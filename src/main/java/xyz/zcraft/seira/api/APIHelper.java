@@ -99,8 +99,38 @@ public class APIHelper {
     }
 
     public static Response<Base64Bytes> getBoNResponse(int n, UserRef userRef) {
+        return getBoNResponse(n, userRef, List.of());
+    }
+
+    public static Response<Base64Bytes> getBoNResponse(int n, UserRef userRef, List<String> filters) {
         long uid = resolveUid(userRef);
-        return getBase64BytesResponse("/users/" + uid + "/scores/bestof?" + "n=" + n, "获取最好成绩失败", null);
+        return getBase64BytesResponse(
+                "/users/" + uid + "/scores/bestof?n=" + n + encodeScoreFilters(filters),
+                "获取最好成绩失败",
+                null
+        );
+    }
+
+    public static Response<Base64Bytes> getUserInfoResponse(UserRef userRef) {
+        long uid = resolveUid(userRef);
+        return getBase64BytesResponse(
+                "/users/" + uid,
+                "获取玩家资料失败",
+                null
+        );
+    }
+
+    public static Response<Base64Bytes> getTodayBestResponse(UserRef userRef) {
+        return getTodayBestResponse(userRef, 1);
+    }
+
+    public static Response<Base64Bytes> getTodayBestResponse(UserRef userRef, int days) {
+        long uid = resolveUid(userRef);
+        return getBase64BytesResponse(
+                "/users/" + uid + "/scores/today-best?days=" + days,
+                "获取近期BP失败",
+                null
+        );
     }
 
     public static Response<Base64Bytes> getGroupLeaderboardResponse(ShortcutTarget target, List<Long> uids, String auth) {
@@ -187,13 +217,37 @@ public class APIHelper {
     }
 
     public static Response<Base64Bytes> getRecentResponse(int n, UserRef userRef, boolean includeFail) {
+        return getRecentResponse(n, userRef, includeFail, List.of());
+    }
+
+    public static Response<Base64Bytes> getRecentResponse(int n, UserRef userRef, boolean includeFail, List<String> filters) {
         long uid = resolveUid(userRef);
-        return getBase64BytesResponse("/users/" + uid + "/scores/recent" + "?n=" + n + "&fail=" + includeFail, "获取最近成绩失败", null);
+        return getBase64BytesResponse(
+                "/users/" + uid + "/scores/recent?n=" + n + "&fail=" + includeFail + encodeScoreFilters(filters),
+                "获取最近成绩失败",
+                null
+        );
+    }
+
+    private static String encodeScoreFilters(List<String> filters) {
+        if (filters == null || filters.isEmpty()) {
+            return "";
+        }
+        return "&filters=" + URLEncoder.encode(String.join(",", filters), StandardCharsets.UTF_8);
     }
 
     public static Response<Base64Bytes> getBeatmapResponse(ShortcutTarget target, String mod, String auth) {
         final long beatmapId = lookupBeatmap(target, auth);
         return getBase64BytesResponse("/beatmaps/" + beatmapId + (mod != null ? "?mod=" + mod : ""), "获取谱面失败", null);
+    }
+
+    public static Response<Base64Bytes> getBeatmapAnalysisResponse(ShortcutTarget target, String mod, String auth) {
+        final long beatmapId = lookupBeatmap(target, auth);
+        String query = "/beatmaps/" + beatmapId + "/analysis";
+        if (mod != null && !mod.isBlank()) {
+            query += "?mod=" + URLEncoder.encode(mod, StandardCharsets.UTF_8);
+        }
+        return getBase64BytesResponse(query, "获取谱面分析失败", null);
     }
 
     public static Response<Base64Bytes> getBeatmapsetBgResponse(ShortcutTarget target, String auth) {
@@ -333,7 +387,11 @@ public class APIHelper {
     }
 
     public static Response<Base64Bytes> getScoreResponse(ShortcutTarget target) {
-        String scoreId = lookupScoreId(target);
+        return getScoreResponse(target, List.of());
+    }
+
+    public static Response<Base64Bytes> getScoreResponse(ShortcutTarget target, List<String> filters) {
+        String scoreId = lookupScoreId(target, filters);
         return getBase64BytesResponse("/scores/" + scoreId, "获取成绩失败", null);
     }
 
@@ -510,6 +568,25 @@ public class APIHelper {
         return createReplayShowcaseTask(target, ids, auth, null);
     }
 
+    public static ReplayTaskInfo createBeatmapPreviewTask(ShortcutTarget target, String mods, String auth,
+                                                           QqUploadRequest qqUpload) {
+        long beatmapId = lookupBeatmap(target, auth);
+        JsonObject body = new JsonObject();
+        if (mods != null && !mods.isBlank()) {
+            body.addProperty("mods", mods);
+        }
+        if (qqUpload != null) {
+            body.add("qqUpload", GSON.toJsonTree(qqUpload));
+        }
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(ENDPOINT + "/replays/renders/preview/" + beatmapId))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                .build();
+        return getReplayTaskInfo(request);
+    }
+
     public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] ids, String auth,
                                                            QqUploadRequest qqUpload) {
         ids = ids == null ? new String[0] : ids;
@@ -539,13 +616,9 @@ public class APIHelper {
     }
 
     public static ReplayRenderResult waitReplayVideo(String taskId) {
-        try {
-            FileInfo qqFile = waitReplayDone(taskId);
-            return new ReplayRenderResult(
-                    ENDPOINT + "/replays/" + taskId + "/video/replay.mp4", taskId, qqFile);
-        } catch (RuntimeException _) {
-            return null;
-        }
+        FileInfo qqFile = waitReplayDone(taskId);
+        return new ReplayRenderResult(
+                ENDPOINT + "/replays/" + taskId + "/video/replay.mp4", taskId, qqFile);
     }
 
     private static ReplayTaskInfo createReplayTask(ShortcutTarget target,
@@ -597,6 +670,10 @@ public class APIHelper {
     }
 
     private static String lookupScoreId(ShortcutTarget target) {
+        return lookupScoreId(target, List.of());
+    }
+
+    private static String lookupScoreId(ShortcutTarget target, List<String> filters) {
         String scoreId;
         if (target.isLocalScore()) {
             scoreId = target.localScoreId();
@@ -604,7 +681,7 @@ public class APIHelper {
             scoreId = String.valueOf(target.explicitId());
         } else {
             try {
-                final String query = getScoreQuery(target);
+                final String query = getScoreQuery(target) + encodeScoreFilters(filters);
 
                 HttpRequest localRequest = HttpRequest.newBuilder()
                         .uri(URI.create(ENDPOINT + query))
@@ -678,8 +755,11 @@ public class APIHelper {
 
             Double start = data.has("start") ? data.get("start").getAsDouble() : null;
             Double end = data.has("end") ? data.get("end").getAsDouble() : null;
+            String mods = data.has("mods") ? data.get("mods").getAsString() : null;
+            String selection = data.has("selection") ? data.get("selection").getAsString() : null;
 
-            return new ReplayTaskInfo(taskId, status, position, beatmap, data.getAsJsonArray("scores"), start, end);
+            return new ReplayTaskInfo(
+                    taskId, status, position, beatmap, data.getAsJsonArray("scores"), start, end, mods, selection);
         } catch (IOException e) {
             throw requestFailure(e);
         } catch (InterruptedException e) {
@@ -697,8 +777,13 @@ public class APIHelper {
                         ? GSON.fromJson(statusData.getAsJsonObject("qqFile"), FileInfo.class)
                         : null;
             }
-            if ("failed".equalsIgnoreCase(status) || "canceled".equalsIgnoreCase(status)) {
-                throw new RuntimeException("回放渲染失败，状态：" + status);
+            if ("failed".equalsIgnoreCase(status)
+                    || "timeout".equalsIgnoreCase(status)
+                    || "canceled".equalsIgnoreCase(status)) {
+                String error = statusData.has("error") && !statusData.get("error").isJsonNull()
+                        ? statusData.get("error").getAsString()
+                        : null;
+                throw new ReplayRenderException(status, error);
             }
             try {
                 Thread.sleep(REPLAY_POLL_INTERVAL_MS);
@@ -1030,7 +1115,9 @@ public class APIHelper {
             BeatmapExtended beatmap,
             JsonArray scores,
             Double start,
-            Double end
+            Double end,
+            String mods,
+            String selection
     ) {
     }
 }

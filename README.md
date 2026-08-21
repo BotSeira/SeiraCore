@@ -61,26 +61,6 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/e5f7cea1-d759-4a0e-a8ec-5ad0f0fcc274" />
 
-## 快速开始
-
-### 1) 准备环境
-
-- JDK 25
-- Maven
-- QQ 机器人应用凭据 或 Napcat服务
-- 一个可访问的 oStella API
-
-### 2) 配置 `config.yml`
-
-启动程序时，若不存在`config.yml`则会自动创建。请根据提示编辑 `config.yml`。
-默认配置参见[seira-example-config.yml](/src/main/resources/seira-example-config.yml)
-
-### 3) 启动
-
-```shell
-mvn -U clean compile exec:java
-```
-
 ## 常用命令
 
 > 所有命令都以 `/` 开头。指令详情请见[文档](https://docs.seira.top/overview/commands.html)。
@@ -93,16 +73,17 @@ mvn -U clean compile exec:java
 | `/f`            | `/f`                                               | 获取好友列表                                                                    |
 | `/fall`         | `/fall`                                            | 获取全部好友列表                                                                |
 | `/fclear`       | `/fclear`                                          | 清除好友记录                                                                    |
-| `/bo`           | `/bo [n] [uid/username/@user]`                     | 最好n个成绩图，无参时获取最佳成绩详情                                           |
-| `/rs`           | `/rs [n] [uid/username/@user]`                     | 最近n个成绩图，无参时获取最近一个成绩详情                                       |
-| `/rp`           | `/rp [n] [uid/username/@user]`                     | 最近n个通过成绩图，无参时获取最近一个通过成绩详情                               |
+| `/bo`           | `/bo [n] [uid/username/@user] [filters...]`        | 获取最多200条最好成绩后过滤；省略n时返回第一个匹配成绩详情                      |
+| `/rs`           | `/rs [n] [uid/username/@user] [filters...]`        | 获取最多200条最近成绩后过滤；省略n时返回第一个匹配成绩详情                      |
+| `/rp`           | `/rp [n] [uid/username/@user] [filters...]`        | 获取最多200条最近通过成绩后过滤；省略n时返回第一个匹配成绩详情                  |
+| `/tb`           | `/tb [#days] [uid/username/@user]`                 | 获取近N天达成的BP（默认1天），并保留完整BP排名编号                              |
 | `/m`            | `/m <id/rsN/boN> [Mod]`                            | 获取指定谱面信息                                                                |
 | `/ap`           | `/ap <id/rsN/boN>`                                 | 获取指定谱面音频预览                                                            |
 | `/bgp`          | `/bgp <id/rsN/boN>`                                | 获取指定谱面背景预览                                                            |
 | `/s`            | `/s <id/locId/rsN/boN>`                            | 获取指定的在线或本地成绩图                                                      |
 | `/sa`           | `/sa <id/locId/rsN/boN>`                           | 获取指定成绩分析图                                                              |
 | `/ma`           | `/ma [id/locId/rsN/boN] [n/#n]`                    | 获取指定或最近目标成绩的Miss分析；省略目标时用`#n`指定Miss                      |
-| `/u`            | `/u <uid/username/@user>`                          | 获取指定用户信息                                                                |
+| `/u`            | `/u [uid/username/@user]`                          | 获取指定用户信息                                                                |
 | `/r`            | `/r [id/locId/rsN/boN] [[mm:ss]-[mm:ss]]`          | 生成并发送指定或最近目标的回放视频。省略范围时自动识别高光，使用`-`渲染整个回放 |
 | `/rg`           | `/rg <start/#Rank/end>`                            | 在群聊中开始、参与或结束猜 Rank 游戏                                            |
 | `/rsc`          | `/rsc [id/locId/rsN/boN] [+<id1>,<id2>...]`        | 生成并发送指定或最近目标的成绩同屏回放视频；追加用户和范围顺序不限              |
@@ -115,6 +96,7 @@ mvn -U clean compile exec:java
 | `/luck`         | `/luck`                                            | 今日人品                                                                        |
 | `/mp`           | `/mp`                                              | 多人房间列表                                                                    |
 | `/watch`        | `/watch add/del/list [目标]`                       | 添加/删除/列出监视任务                                                          |
+| `/mpwatch`      | `/mpwatch start/stop/status [目标]`                | 按群成员添加、停止或查看多人房间监视；`stop all` 可停止本群全部监视             |
 | `/wx`           | `/wx start <UID列表> <谱面ID列表>` / `/wx stop`    | 监视指定玩家在指定谱面取得的成绩，重启后自动恢复                                |
 | `/dcs`          | `/dcs start <guild-id>.<channel-id>` / `/dcs stop` | 开启或解除当前 QQ 群与 Discord 频道的双向消息同步                               |
 | `/stat`         | `/stat`                                            | 服务状态和统计信息文本                                                          |
@@ -169,3 +151,27 @@ mvn -U clean compile exec:java
 | `/debug.db <sql>`                  | 对后端数据库执行指定的SQL语句          |
 | `/debug.update-user-info`          | 更新数据库中所有玩家的信息             |
 | `/debug.active-message`            | 发送一条主动消息                       |
+
+## 自行部署
+
+> [!NOTE]
+> 此节仅面向想自行部署 Seira 的用户。
+> 若想直接使用，请见[使用指南](https://docs.seira.top/overview/use.html)
+
+### 1) 准备环境
+
+- JDK 25
+- Maven
+- QQ 开放平台机器人应用凭据
+- 一个可访问的 oStella API
+
+### 2) 配置 `config.yml`
+
+启动程序时，若不存在`config.yml`则会自动创建。请根据提示编辑 `config.yml`。
+默认配置参见[seira-example-config.yml](/src/main/resources/seira-example-config.yml)
+
+### 3) 启动
+
+```shell
+mvn -U clean compile exec:java
+```

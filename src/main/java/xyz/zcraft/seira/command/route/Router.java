@@ -20,6 +20,7 @@ import xyz.zcraft.seira.rankguess.RankGuessGameService;
 import xyz.zcraft.seira.security.AdminRegistry;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 import xyz.zcraft.seira.watch.ScoreWatchService;
+import xyz.zcraft.seira.watch.MultiplayerRoomWatchService;
 
 import java.util.Optional;
 import java.util.Set;
@@ -46,6 +47,7 @@ public class Router {
             AdminRegistry admins,
             BindingService bindingService,
             ScoreWatchService watchService,
+            MultiplayerRoomWatchService multiplayerRoomWatchService,
             DiscordBridgeService discordBridgeService,
             RankGuessGameService rankGuessGameService,
             Executor commandExecutor,
@@ -59,6 +61,7 @@ public class Router {
         Resolver resolver = new Resolver();
         TargetHistory targetHistory = new TargetHistory();
         ReplayResultStore replayResults = new ReplayResultStore();
+        VideoRenderRecord videoRenderRecord = new VideoRenderRecord();
         this.taskCoordinator = new TaskCoordinator(messageSender, replayResults, discordBridgeService);
         this.authHelper = new OsuAuthHelper(startupConfig.binding());
         BindingCommandHandler bindingCommands = new BindingCommandHandler(startupConfig, replyFactory, bindingService);
@@ -66,7 +69,7 @@ public class Router {
                 resolver, targetHistory, taskCoordinator, replyFactory
         );
         BeatmapCommandHandler beatmapCommands = new BeatmapCommandHandler(
-                resolver, targetHistory, taskCoordinator, replyFactory, this::getAccessTokenFor
+                resolver, targetHistory, taskCoordinator, replyFactory, videoRenderRecord, this::getAccessTokenFor
         );
         SocialCommandHandler socialCommands = new SocialCommandHandler(
                 resolver, authHelper, taskCoordinator, replyFactory, this::getAccessTokenFor
@@ -76,16 +79,18 @@ public class Router {
                 targetHistory,
                 taskCoordinator,
                 replyFactory,
-                new VideoRenderRecord(),
+                videoRenderRecord,
                 replayResults,
                 this::getAccessTokenFor
         );
         GeneralCommandHandler generalCommands = new GeneralCommandHandler(
-                messageSender, taskCoordinator, replyFactory, scoreCommands, admins::isAdmin, commandMetric
+                messageSender, taskCoordinator, replyFactory, resolver, admins::isAdmin
         );
         WatchCommandHandler watchCommands = new WatchCommandHandler(resolver, taskCoordinator, watchService, admins::isAdmin);
         SpecificScoreWatchCommandHandler specificScoreWatchCommands =
                 new SpecificScoreWatchCommandHandler(taskCoordinator, watchService);
+        MultiplayerRoomWatchCommandHandler multiplayerRoomWatchCommands =
+                new MultiplayerRoomWatchCommandHandler(taskCoordinator, multiplayerRoomWatchService);
         DcsCommandHandler dcsCommands = new DcsCommandHandler(discordBridgeService);
         RankGuessCommandHandler rankGuessCommands = new RankGuessCommandHandler(
                 taskCoordinator, replyFactory, rankGuessGameService, admins::isAdmin
@@ -101,6 +106,7 @@ public class Router {
                 generalCommands,
                 watchCommands,
                 specificScoreWatchCommands,
+                multiplayerRoomWatchCommands,
                 dcsCommands,
                 rankGuessCommands
         );
@@ -195,6 +201,7 @@ public class Router {
             GeneralCommandHandler generalCommands,
             WatchCommandHandler watchCommands,
             SpecificScoreWatchCommandHandler specificScoreWatchCommands,
+            MultiplayerRoomWatchCommandHandler multiplayerRoomWatchCommands,
             DcsCommandHandler dcsCommands,
             RankGuessCommandHandler rankGuessCommands
     ) {
@@ -207,8 +214,11 @@ public class Router {
                 .register(socialCommands::handleMp, "mp")
                 .register(ctx -> scoreCommands.handleRs(ctx, true), "rs")
                 .register(ctx -> scoreCommands.handleRs(ctx, false), "rp")
+                .register(scoreCommands::handleTb, "tb")
                 .register(beatmapCommands::handleM, "m")
+                .register(beatmapCommands::handleBma, "bma")
                 .register(beatmapCommands::handleAp, "ap")
+                .register(beatmapCommands::handleBpv, "bpv")
                 .register(beatmapCommands::handleBgp, "bgp")
                 .register(ctx -> socialCommands.handleF(ctx, !ctx.inGroup()), "f")
                 .register(ctx -> socialCommands.handleF(ctx, true), "fall")
@@ -231,6 +241,7 @@ public class Router {
                 .register(generalCommands::handleFaq, "faq")
                 .register(watchCommands::handleWatch, "watch")
                 .register(specificScoreWatchCommands::handleWx, "wx")
+                .register(multiplayerRoomWatchCommands::handleMpWatch, "mpwatch")
                 .register(dcsCommands::handleDcs, "dcs")
                 .register(rankGuessCommands::handleRankGuess, "rg")
                 .build();

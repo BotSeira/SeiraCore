@@ -127,6 +127,23 @@ public final class ReplyFactory {
         );
     }
 
+    public PendingMessage userInfoMessage(Context ctx, Response<?> response) {
+        return PendingMessage.ofMarkdownRaw(
+                at(ctx) + "玩家资料查询完成\n" +
+                        "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()),
+                buttons().userInfoButtons(response.getUserId())
+        );
+    }
+
+    public PendingMessage tbMessage(Context ctx, Response<?> response) {
+        return PendingMessage.ofMarkdownRaw(
+                at(ctx) + "今日BP查询完成\n" +
+                        "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()) + "\n" +
+                        "> 数量: " + response.getScoreIds().size(),
+                buttons().boButtons(response.getUserId())
+        );
+    }
+
     public PendingMessage beatmapMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "谱面查询完成\n" +
@@ -324,6 +341,19 @@ public final class ReplyFactory {
                 sb.append("\n");
             }
 
+            if (taskInfo.mods() != null) {
+                sb.append("> Mod: ").append(taskInfo.mods()).append("\n");
+            }
+            if (taskInfo.selection() != null) {
+                String selection = switch (taskInfo.selection()) {
+                    case "kiai" -> "Kiai 段";
+                    case "high-pressure" -> "高压段";
+                    case "full-map" -> "完整可用片段";
+                    default -> taskInfo.selection();
+                };
+                sb.append("> 选段: ").append(selection).append("\n");
+            }
+
             if (taskInfo.scores() != null) {
                 JsonArray scores = taskInfo.scores();
                 sb.append("> 共 %d 个成绩:".formatted(scores.size()));
@@ -386,6 +416,9 @@ public final class ReplyFactory {
                 sb.append("进度: ").append(renderStat.getProgress() == null ? "未知" : renderStat.getProgress()).append("\n");
                 sb.append("速度: ").append(renderStat.getSpeed() == null ? "未知" : renderStat.getSpeed()).append("\n");
                 sb.append("预计时间: ").append(renderStat.getEta() == null ? "未知" : renderStat.getEta()).append("\n");
+            }
+            if (renderStat.getError() != null && !renderStat.getError().isBlank()) {
+                sb.append("原因: ").append(renderStat.getError()).append("\n");
             }
 
             return sb.toString().trim();
@@ -560,14 +593,17 @@ public final class ReplyFactory {
                             > /rp - 获取最近通过的一个成绩
                             > /bo [个数] [玩家ID] - 获取一个或多个最佳成绩
                             > /rp [个数] [玩家ID] - 获取最近通过一个或多个成绩
+                            > /tb [#天数] [玩家ID] - 获取近N天达成的BP
                             > /s <成绩ID或快捷查询> - 获取指定成绩
                             > /m <谱面ID或快捷查询> - 获取谱面
+                            > /bma <谱面ID或快捷查询> [Mod] - 分析谱面PP构成和类型
                             > /ms <谱面集ID或快捷查询> - 获取谱面集
                             > /r [成绩ID或快捷查询] [[mm:ss]-[mm:ss]] - 生成成绩高光视频或指定片段
                             > /rg <start/#Rank/end> - 在群聊中进行猜 Rank 游戏
                             > /lb <谱面ID> [玩家ID列表] - 获取指定谱面排行榜
                             > /watch add <玩家ID/用户名/@用户> [分钟] - 监视群友的新成绩
                             > /wx start <UID列表> <谱面ID列表> - 监视指定玩家在指定谱面的成绩
+                            > /mpwatch [start] <房间ID> [stable|lazer] - 监视多人房间的逐图结果（链接可自动识别版本，stop all 停止本群全部监视）
                             > /f - 获取好友列表
                             
                             详细指令列表请在 [这里](https://docs.seira.top/overview/commands.html) 查看
@@ -687,6 +723,18 @@ public final class ReplyFactory {
             );
         }
 
+        List<List<Button>> userInfoButtons(String userId) {
+            return Button.keyboard(
+                    Button.row(
+                            Button.command(1, "查询最好成绩", "/bo 5 " + userId),
+                            Button.command(2, "查询最近成绩", "/rs 5 " + userId)
+                    ),
+                    Button.row(
+                            Button.openUrl(3, "在游戏中查看", directUrl + "/u/" + userId)
+                    )
+            );
+        }
+
         List<List<Button>> rsButtons() {
             return Button.keyboard(Button.row(
                     Button.command(1, "查询最好成绩", "/s bo1"),
@@ -765,6 +813,10 @@ public final class ReplyFactory {
                     Button.row(
                             Button.command(3, "预览音频", "/ap m" + beatmapId),
                             Button.command(4, "查询自己的分数", "/s m" + beatmapId)
+                    ),
+                    Button.row(
+                            Button.command(5, "预览谱面", "/bpv " + beatmapId),
+                            Button.command(6, "分析谱面", "/bma " + beatmapId)
                     )
             );
         }

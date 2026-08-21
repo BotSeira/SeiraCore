@@ -1,14 +1,10 @@
 {
+  "#note": "items should be no bigger than 20 elements",
   "items": [
     {
       "type": "command",
       "name": "/rp",
       "desc": "查询最近通过成绩"
-    },
-    {
-      "type": "command",
-      "name": "/rs",
-      "desc": "查询通过成绩"
     },
     {
       "type": "command",
@@ -34,6 +30,11 @@
       "type": "command",
       "name": "/bp",
       "desc": "查询最好成绩"
+    },
+    {
+      "type": "command",
+      "name": "/tb",
+      "desc": "查询近期达成BP"
     },
     {
       "type": "command",
