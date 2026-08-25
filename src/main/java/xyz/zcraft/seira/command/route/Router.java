@@ -96,7 +96,7 @@ public class Router {
                 taskCoordinator, replyFactory, rankGuessGameService, admins::isAdmin
         );
         this.unknownCommand = generalCommands::handleUnknown;
-        this.commandParser = new CommandParser(resolver::preProcess);
+        this.commandParser = new CommandParser(resolver::sanitize);
         this.commandRegistry = createCommandRegistry(
                 bindingCommands,
                 scoreCommands,
@@ -130,7 +130,6 @@ public class Router {
     }
 
     private void handleMessageReceived(String targetId, String groupId, String userId, String messageId, String rawContent, boolean groupMessage) {
-        LOG.info("Received {} message : {}", groupMessage ? "group" : "private", rawContent);
         AtomicInteger messageSeqCounter = new AtomicInteger(1);
         try {
             final boolean group = groupMessage && groupId != null && !groupId.isBlank();
@@ -167,6 +166,7 @@ public class Router {
             Context context = parseResult.context().withReplies(replies);
             commandExecutor.execute(() -> {
                 try {
+                    LOG.info("Routing {} message : {}", groupMessage ? "group" : "private", context.rawContent());
                     dispatch(context);
                 } catch (Exception e) {
                     context.sendReply(PendingMessage.ofString("处理指令时发生错误，请稍后再试。"));
@@ -241,7 +241,7 @@ public class Router {
                 .register(generalCommands::handleFaq, "faq")
                 .register(watchCommands::handleWatch, "watch")
                 .register(specificScoreWatchCommands::handleWx, "wx")
-                .register(multiplayerRoomWatchCommands::handleMpWatch, "mpwatch")
+                .register(multiplayerRoomWatchCommands::handleMpWatch, "mpwatch", "mpw")
                 .register(dcsCommands::handleDcs, "dcs")
                 .register(rankGuessCommands::handleRankGuess, "rg")
                 .build();

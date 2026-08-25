@@ -12,11 +12,14 @@ import java.util.regex.Pattern;
 public final class Resolver {
     private static final ArrayList<String> USER_MACRO_TYPES = new ArrayList<>(List.of("rs", "bo", "rp"));
 
-    public String preProcess(String rawContent) {
+    public String sanitize(String rawContent) {
         Matcher matcher = Patterns.USER_MACRO_PATTERN.matcher(rawContent);
         if (matcher.matches()) {
-            return "s " + rawContent;
+            rawContent = "s " + rawContent;
         }
+
+        // Add surrounding space to <@>
+        rawContent = Patterns.QQ_INLINE_AT_PATTERN.matcher(rawContent).replaceAll(r -> " " + r.group() + " ");
 
         return rawContent;
     }
@@ -274,6 +277,7 @@ public final class Resolver {
         private static final Pattern BEATMAP_MACRO_PATTERN = Pattern.compile("^m(\\d+)$");
         private static final Pattern LOCAL_SCORE_PATTERN = Pattern.compile("(?i)^loc[1-9]\\d*$");
         private static final Pattern QQ_AT_PATTERN = Pattern.compile("^<@([A-Z|0-9]{32})>$");
+        private static final Pattern QQ_INLINE_AT_PATTERN = Pattern.compile("(<@[A-Z|0-9]{32}>)");
         private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
         private static final Pattern SEARCH_PATTERN = Pattern.compile("^(?:#(\\d+) )?(.+)$");
         private static final Pattern RSC_TARGET_PATTERN = Pattern.compile("^[us]?\\d+$");

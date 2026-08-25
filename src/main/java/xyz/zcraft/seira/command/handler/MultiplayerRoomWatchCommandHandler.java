@@ -96,8 +96,8 @@ public final class MultiplayerRoomWatchCommandHandler {
                 RoomWatchView view = watchService.watch(
                         ctx.groupId(), ctx.senderUserId(), target.version(), target.roomId()
                 );
-                ctx.sendReply(PendingMessage.ofString(
-                        "已开始监视" + formatRoom(view) + "。"
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(
+                        "已开始监视 `" + formatRoom(view) + "` 。"
                                 + "之后完成的每张图都会自动推送结果。"
                 ));
             } catch (IllegalArgumentException | IllegalStateException e) {

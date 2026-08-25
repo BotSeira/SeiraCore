@@ -11,6 +11,7 @@ public record Context(
         String command,
         String[] args,
         String query,
+        String rawContent,
         CommandReplyChannel replies) {
     public Context(
             String senderUserId,
@@ -18,9 +19,10 @@ public record Context(
             String messageId,
             String command,
             String[] args,
+            String rawContent,
             String query
     ) {
-        this(senderUserId, groupId, messageId, command, args, query, null);
+        this(senderUserId, groupId, messageId, command, args, query, rawContent, null);
     }
 
     public Context {
@@ -48,18 +50,20 @@ public record Context(
 
     public Context withReplies(CommandReplyChannel replyChannel) {
         return new Context(
-                senderUserId, groupId, messageId, command, args, query,
+                senderUserId, groupId, messageId, command, args, query, rawContent,
                 Objects.requireNonNull(replyChannel, "replyChannel")
         );
     }
 
     public Context asCommand(String nextCommand, String[] nextArgs, String nextQuery) {
         return new Context(
-                senderUserId, groupId, messageId, nextCommand, nextArgs, nextQuery, replies
+                senderUserId, groupId, messageId, nextCommand, nextArgs, nextQuery, rawContent, replies
         );
     }
 
-    /** Sends a passive reply associated with the message that invoked this command. */
+    /**
+     * Sends a passive reply associated with the message that invoked this command.
+     */
     public boolean sendReply(PendingMessage message) {
         return requireReplies().sendReply(Objects.requireNonNull(message, "message"));
     }
@@ -68,7 +72,9 @@ public record Context(
         return requireReplies().sendReply(PendingMessage.ofString(message));
     }
 
-    /** Sends an active message to the same user or group, without an inbound message reference. */
+    /**
+     * Sends an active message to the same user or group, without an inbound message reference.
+     */
     public boolean sendMessage(PendingMessage message) {
         return requireReplies().sendProactive(Objects.requireNonNull(message, "message"));
     }
