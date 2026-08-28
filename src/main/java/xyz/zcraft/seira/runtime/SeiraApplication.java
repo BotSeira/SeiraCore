@@ -92,5 +92,6 @@ public final class SeiraApplication implements AutoCloseable {
         bot.close();
         DailyLuck.saveToFile();
         BotStat.shutdown();
+        LOG.info("Shutdown complete");
     }
 }
