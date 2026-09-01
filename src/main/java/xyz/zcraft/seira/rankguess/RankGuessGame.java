@@ -11,6 +11,7 @@ public final class RankGuessGame {
     public final UUID token;
     public final String starterUserId;
     public final Map<String, Guess> guesses = new LinkedHashMap<>();
+    public boolean copyPunishmentReduced = false;
     public final AtomicInteger guessCount = new AtomicInteger(0);
     private final List<Hint> revealedHints = new ArrayList<>();
     public RankGuessGameService.Round round;

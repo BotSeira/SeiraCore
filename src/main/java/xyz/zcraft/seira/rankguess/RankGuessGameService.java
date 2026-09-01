@@ -118,9 +118,10 @@ public final class RankGuessGameService {
                                     - Math.log10(guess)
                     ) < 0.005;
 
-            final int i = game.guessCount.get();
+            final int i = game.guesses.size();
 
-            if (i >= 10) {
+            if (i >= 10 && !game.copyPunishmentReduced) {
+                game.copyPunishmentReduced = true;
                 message = "提示：由于本次游戏参与人数较多，所有猜测的抄袭惩罚已降至 `-2.5%` ~";
             }
 
