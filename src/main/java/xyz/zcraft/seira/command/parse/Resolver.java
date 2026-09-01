@@ -91,9 +91,9 @@ public final class Resolver {
             return new UserRefResolution(new UserRef.ByUid(boundUid), null);
         }
 
-        if (looksLikeMention(arg)) {
-            return new UserRefResolution(null, "@用户格式无效，请使用 @用户 后再输入指令。示例：/bo 5 @123456");
-        }
+//        if (looksLikeMention(arg)) {
+//            return new UserRefResolution(null, "@用户格式无效，请使用 @用户 后再输入指令。示例：/bo 5 @123456");
+//        }
 
         String username = arg == null ? "" : arg.trim();
         return new UserRefResolution(username.isEmpty() ? null : new UserRef.ByUsername(username), null);
@@ -269,6 +269,10 @@ public final class Resolver {
         } catch (NumberFormatException ignored) {
             return null;
         }
+    }
+
+    public boolean looksLikeUid(String arg) {
+        return Pattern.compile("^\\d+$").matcher(arg).matches();
     }
 
     private static final class Patterns {

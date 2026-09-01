@@ -165,7 +165,11 @@ public final class BindingService implements AutoCloseable {
         Javalin currentServer = server;
         server = null;
         if (currentServer != null) {
-            currentServer.stop();
+            try {
+                currentServer.stop();
+            } catch (Exception e) {
+                LOG.warn("Error stopping server", e);
+            }
         }
         bindingTasks.clear();
     }
