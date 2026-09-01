@@ -443,7 +443,7 @@ public final class RankGuessGameService {
                     RankGuessGame.Hint.HintStrength.MEDIUM
             ));
 
-            final long perfect = score.getStatistics().getOrDefault("perfect", 0L);
+            final long perfect = score.getStatistics().getOrDefault("great", 0L);
             final long ok = score.getStatistics().getOrDefault("ok", 0L);
             final long meh = score.getStatistics().getOrDefault("meh", 0L);
             final long miss = score.getStatistics().getOrDefault("miss", 0L);
