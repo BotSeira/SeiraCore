@@ -108,7 +108,7 @@ public final class RankGuessCommandHandler {
                     String content = at(ctx) + "随机用户与成绩已选定，正在渲染回放片段...";
 
                     if (!activeMessageEnabled) {
-                        content += "\n\n> 提示: 由于缺少主动消息权限，阶段提示已禁用。权限配置请见[这里](https://docs.seira.top/overview/use.html#extra-permission)。";
+                        content += "\n\n> 提示: 由于缺少主动消息权限，阶段提示与自动结束已禁用。稍后需要使用 `/rg end` 手动结束。权限配置请见[这里](https://docs.seira.top/overview/use.html#extra-permission)。";
                     }
 
                     ctx.sendReply(PendingMessage.ofMarkdownRaw(content));

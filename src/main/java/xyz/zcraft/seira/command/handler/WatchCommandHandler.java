@@ -106,7 +106,7 @@ public final class WatchCommandHandler {
                     at(ctx) + "正在尝试添加监视..."
             ));
             if (!b) {
-                ctx.sendReply(PendingMessage.ofString("由于缺少主动消息权限，无法添加监视！权限配置请见[这里](https://docs.seira.top/overview/use.html#extra-permission)~"));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw("由于缺少主动消息权限，无法添加监视！权限配置请见[这里](https://docs.seira.top/overview/use.html#extra-permission)~"));
                 return;
             }
 
