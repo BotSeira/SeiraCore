@@ -18,7 +18,7 @@ public final class RankGuessGame {
     public Instant guessingStartedAt;
     public long nextSequence;
     @Getter
-    private boolean ended = false;
+    private volatile boolean ended = false;
 
     RankGuessGame(UUID token, String starterUserId) {
         this.token = token;
@@ -89,6 +89,13 @@ public final class RankGuessGame {
         }
 
         return builder.toString();
+    }
+
+    public double getNextMaxPoints() {
+        final double hintsMultiplier = -revealedHints.stream().mapToDouble(h -> h.strength().penalty()).sum();
+        final double orderMultiplier = Math.max(-0.10, 0.00 - (guessCount.get() - 2) * 0.01);
+
+        return 1000 * (1 + hintsMultiplier + orderMultiplier);
     }
 
     public record Hint(String content, String name, HintCategory category, HintStrength strength) {

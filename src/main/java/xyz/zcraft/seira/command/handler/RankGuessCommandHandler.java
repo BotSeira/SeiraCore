@@ -8,7 +8,10 @@ import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.TaskCoordinator;
+import xyz.zcraft.seira.command.parse.Resolver;
+import xyz.zcraft.seira.command.parse.UserRefResolution;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
+import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.rankguess.RankGuessGame;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
 
@@ -28,17 +31,20 @@ public final class RankGuessCommandHandler {
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
     private final RankGuessGameService games;
+    private final Resolver resolver;
     private final Predicate<String> adminAuthorizer;
 
     public RankGuessCommandHandler(
             TaskCoordinator taskCoordinator,
             ReplyFactory replyFactory,
             RankGuessGameService games,
+            Resolver resolver,
             Predicate<String> adminAuthorizer
     ) {
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
         this.games = games;
+        this.resolver = resolver;
         this.adminAuthorizer = adminAuthorizer;
     }
 
@@ -103,15 +109,30 @@ public final class RankGuessCommandHandler {
                 ctx.sendReply(PendingMessage.ofString(USAGE));
                 return;
             }
-            end(ctx, true);
+            end(ctx, false);
             return;
         }
 
-        Long rank = parseRank(argument);
-        if (rank == null) {
-            ctx.sendReply(PendingMessage.ofString(USAGE));
-            return;
+        Long rank = null;
+
+        if (resolver.looksLikeMention(argument)) {
+            final UserRefResolution userRefResolution = resolver.resolveUserRefArgument(argument);
+
+            if (userRefResolution.errorMessage() != null) {
+                ctx.sendReply(userRefResolution.errorMessage());
+            }
+
+            final UserRef userRef = userRefResolution.userRef();
+
+            rank = APIHelper.getUserRank(userRef);
+        } else {
+            rank = parseRank(argument);
+            if (rank == null) {
+                ctx.sendReply(PendingMessage.ofString(USAGE));
+                return;
+            }
         }
+
         guess(ctx, rank);
     }
 
@@ -224,7 +245,7 @@ public final class RankGuessCommandHandler {
 
                     boolean firstHint = true;
 
-                    while (!hints.isEmpty()) {
+                    while (!hints.isEmpty() && !game.isEnded()) {
                         try {
                             //noinspection BusyWait
                             Thread.sleep((firstHint ? 60 : 30) * 1000);
@@ -260,7 +281,9 @@ public final class RankGuessCommandHandler {
                         Thread.currentThread().interrupt();
                     }
 
-                    end(ctx, false);
+                    if (!game.isEnded()) {
+                        end(ctx, true);
+                    }
                 }
         );
         if (!activated.get()) {
@@ -286,12 +309,18 @@ public final class RankGuessCommandHandler {
         if (response.message() != null && !response.message().isBlank()) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(response.message()));
         }
+
+        if (rank == response.game().getRound().actualRank()) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw("看来已经有人知晓了答案喵！游戏将会自动结束~"));
+            end(ctx, true);
+        }
     }
 
-    private void end(Context ctx, boolean fromCommand) {
+    private void end(Context ctx, boolean force) {
         RankGuessGameService.EndResult result = games.end(
-                ctx.groupId(), ctx.senderUserId(), adminAuthorizer.test(ctx.senderUserId()), !fromCommand
+                ctx.groupId(), ctx.senderUserId(), adminAuthorizer.test(ctx.senderUserId()), force
         );
+
         PendingMessage message = switch (result.status()) {
             case NO_GAME -> PendingMessage.ofString("本群当前没有进行中的 Rank Guess 喵");
             case STARTING -> PendingMessage.ofString("高光仍在渲染，请等待视频发送后再结束游戏喵");
@@ -301,9 +330,7 @@ public final class RankGuessCommandHandler {
             case FINISHED -> replyFactory.rankGuessResultMessage(ctx, result.round());
         };
 
-        if (fromCommand) {
-            ctx.sendReply(message);
-        } else {
+        if (!ctx.sendReply(message)) {
             ctx.sendMessage(message);
         }
     }

@@ -93,7 +93,7 @@ public class Router {
                 new MultiplayerRoomWatchCommandHandler(taskCoordinator, multiplayerRoomWatchService);
         DcsCommandHandler dcsCommands = new DcsCommandHandler(discordBridgeService);
         RankGuessCommandHandler rankGuessCommands = new RankGuessCommandHandler(
-                taskCoordinator, replyFactory, rankGuessGameService, admins::isAdmin
+                taskCoordinator, replyFactory, rankGuessGameService, resolver, admins::isAdmin
         );
         this.unknownCommand = generalCommands::handleUnknown;
         this.commandParser = new CommandParser(resolver::sanitize);

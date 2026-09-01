@@ -140,7 +140,7 @@ public final class RankGuessGameService {
                 game.guesses.size()
         );
 
-        return GuessResponse.of(guessResult, message);
+        return GuessResponse.of(game, guessResult, message);
     }
 
     // TODO This is so messed up. Need to rewrite in the future.
@@ -370,13 +370,13 @@ public final class RankGuessGameService {
         }
     }
 
-    public record GuessResponse(GuessResult guessResult, String message) {
+    public record GuessResponse(RankGuessGame game, GuessResult guessResult,  String message) {
         public static GuessResponse ofStatus(GuessStatus status) {
-            return new GuessResponse(new GuessResult(status, 0, null, null, 0), null);
+            return new GuessResponse(null, new GuessResult(status, 0, null, null, 0), null);
         }
 
-        public static GuessResponse of(GuessResult guessResult, String message) {
-            return new GuessResponse(guessResult, message);
+        public static GuessResponse of(RankGuessGame game, GuessResult guessResult, String message) {
+            return new GuessResponse(game, guessResult, message);
         }
     }
 

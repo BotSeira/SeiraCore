@@ -86,7 +86,7 @@ public final class Resolver {
         if (mentionedUserId != null) {
             Long boundUid = resolveBoundUid(mentionedUserId);
             if (boundUid == null) {
-                return new UserRefResolution(null, "被@的用户还没有绑定玩家ID，请先让对方使用 /bind <玩家ID>");
+                return new UserRefResolution(null, "被@的用户还没有绑定玩家ID，请先让对方使用 /bind");
             }
             return new UserRefResolution(new UserRef.ByUid(boundUid), null);
         }
@@ -113,7 +113,7 @@ public final class Resolver {
         if (extraUidArg == null || extraUidArg.trim().startsWith("+")) {
             List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(groupId);
             if (groupBoundUids.isEmpty()) {
-                return new RscTarget(null, "本群还没有已绑定的玩家，请先使用 /bind <玩家ID>");
+                return new RscTarget(null, "本群还没有已绑定的玩家，请先使用 /bind");
             }
             groupBoundUids.stream().map(String::valueOf).forEach(merged::add);
         }

@@ -1045,6 +1045,33 @@ public class APIHelper {
         throw new ResolutionException("无法识别指定的玩家");
     }
 
+    public static long getUserRank(UserRef userRef) {
+        long uid = resolveUid(userRef);
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/users/" + uid + "/rank"))
+                    .header("Content-Type", "application/json")
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw parseHttpError(send.body(), send.statusCode(), "获取玩家Rank失败");
+            }
+
+            final RawResponse response = GSON.fromJson(send.body(), RawResponse.class);
+            ensureApiSuccess(response, "获取玩家Rank失败");
+            final JsonObject data = requireDataObject(response, "获取玩家Rank响应缺少用户数据");
+            return data.get("global_rank").getAsLong();
+        } catch (IOException e) {
+            throw requestFailure(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("获取玩家Rank请求被中断", e);
+        }
+    }
+
     public static Response<User> lookupUser(String username) {
         try {
             HttpRequest request = HttpRequest.newBuilder()

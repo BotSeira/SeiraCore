@@ -30,7 +30,7 @@ public final class BindingCommandHandler {
         }
 
         if (ctx.args().length != 0) {
-            ctx.sendReply(PendingMessage.ofString("用法：/bind"));
+            ctx.sendReply(PendingMessage.ofString("用法(无需ID)：/bind"));
             return;
         }
 
