@@ -138,7 +138,7 @@ public class APIHelper {
         return getBase64BytesResponse(
                 "/beatmaps/" + beatmapId + "/leaderboards",
                 "获取群排行失败",
-                GSON.toJsonTree(Map.of("uids", uids)).toString()
+                GSON.toJsonTree(Map.of("targets", uids)).toString()
         );
     }
 
@@ -146,7 +146,7 @@ public class APIHelper {
         return getBase64BytesResponse(
                 "/users/leaderboards",
                 "获取排行失败",
-                GSON.toJsonTree(Map.of("uids", uids)).toString()
+                GSON.toJsonTree(Map.of("targets", uids)).toString()
         );
     }
 
@@ -587,22 +587,22 @@ public class APIHelper {
         return getReplayTaskInfo(request);
     }
 
-    public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] ids, String auth,
+    public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget beatmapTarget, String[] scoreTargets, String auth,
                                                            QqUploadRequest qqUpload) {
-        ids = ids == null ? new String[0] : ids;
+        scoreTargets = scoreTargets == null ? new String[0] : scoreTargets;
 
-        if (target.isLocalScore()) {
-            ids = Stream.concat(Stream.of("s" + target.localScoreId()), Arrays.stream(ids))
+        if (beatmapTarget.isLocalScore()) {
+            scoreTargets = Stream.concat(Stream.of("s" + beatmapTarget.localScoreId()), Arrays.stream(scoreTargets))
                     .distinct()
                     .toArray(String[]::new);
         }
-        if (ids.length == 0) {
+        if (scoreTargets.length == 0) {
             throw new RuntimeException("同屏回放需要至少一个ID。");
         }
 
-        final long beatmapId = lookupBeatmap(target, auth);
+        final long beatmapId = lookupBeatmap(beatmapTarget, auth);
 
-        JsonObject body = GSON.toJsonTree(Map.of("ids", ids)).getAsJsonObject();
+        JsonObject body = GSON.toJsonTree(Map.of("ids", scoreTargets)).getAsJsonObject();
         if (qqUpload != null) {
             body.add("qqUpload", GSON.toJsonTree(qqUpload));
         }

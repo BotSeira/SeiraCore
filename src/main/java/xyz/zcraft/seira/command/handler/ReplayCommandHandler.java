@@ -92,7 +92,7 @@ public final class ReplayCommandHandler {
         TargetResolution targetResolution = targetHistory.resolveOptionalTarget(
                 ctx,
                 resolver,
-                arg -> arg.startsWith("+") || TimeDurationParser.isTimeRange(arg)
+                arg -> arg.startsWith("+") || arg.startsWith("=")
         );
         ShortcutTarget target = targetResolution.target();
         if (target == null) {
@@ -106,13 +106,11 @@ public final class ReplayCommandHandler {
 
         String extraUidArg = null;
 
-        for (int i = targetResolution.consumedArgs(); i < ctx.args().length; i++) {
+        int i = targetResolution.consumedArgs();
+
+        if (i < ctx.args().length) {
             if (ctx.args()[i].startsWith("+") || ctx.args()[i].startsWith("=")) {
-                if (extraUidArg != null) {
-                    ctx.sendReply(PendingMessage.ofString(CommandUsage.RSC));
-                    return;
-                }
-                extraUidArg = ctx.args()[i];
+                extraUidArg = ctx.query().substring(Math.max(ctx.query().indexOf("+"), ctx.query().indexOf("=")));
             } else {
                 ctx.sendReply(PendingMessage.ofString(CommandUsage.RSC));
                 return;
@@ -127,7 +125,7 @@ public final class ReplayCommandHandler {
             return;
         }
 
-        String[] uidArray = rscTarget.uids();
+        String[] targetsArray = rscTarget.targets();
 
         targetHistory.rememberExplicitTarget(ctx, targetResolution);
 
@@ -136,7 +134,7 @@ public final class ReplayCommandHandler {
                 "Showcase Render",
                 qqUpload -> {
                     var task = APIHelper.createReplayShowcaseTask(
-                            target, uidArray, accessTokenProvider.apply(ctx.senderUserId()), qqUpload);
+                            target, targetsArray, accessTokenProvider.apply(ctx.senderUserId()), qqUpload);
                     videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
                     return task;
                 },

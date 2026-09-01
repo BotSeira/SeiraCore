@@ -96,7 +96,15 @@ public final class Resolver {
 //        }
 
         String username = arg == null ? "" : arg.trim();
-        return new UserRefResolution(username.isEmpty() ? null : new UserRef.ByUsername(username), null);
+        if (username.startsWith("@")) {
+            username = username.substring(1);
+        }
+
+        if (username.isEmpty()) {
+            return new UserRefResolution(null, null);
+        }
+
+        return new UserRefResolution(new UserRef.ByUsername(username), null);
     }
 
     public RscTarget resolveRscTarget(String groupId, String extraUidArg) {
@@ -120,10 +128,21 @@ public final class Resolver {
 
         String[] extraTokens = body.split(",");
         for (String token : extraTokens) {
-            if (!Patterns.RSC_TARGET_PATTERN.matcher(token.trim()).matches()) {
+            if (Patterns.RSC_TARGET_PATTERN.matcher(token.trim()).matches()) {
+                merged.add(token);
+            } else if (looksLikeMention(token)) {
+                final UserRefResolution userRefResolution = resolveUserRefArgument(token);
+                if (userRefResolution.errorMessage() != null) {
+                    return new RscTarget(null, "解析 " + token + " 时出错:" + userRefResolution.errorMessage());
+                }
+                if (userRefResolution.userRef() instanceof UserRef.ByUid ref) {
+                    merged.add("u" + ref.getUid());
+                } else if (userRefResolution.userRef() instanceof UserRef.ByUsername ref) {
+                    merged.add("@" + ref.getUsername());
+                }
+            } else {
                 return new RscTarget(null, "追加ID列表包含非法值。");
             }
-            merged.add(token.trim());
         }
 
         return new RscTarget(merged.toArray(String[]::new), null);
