@@ -18,7 +18,7 @@ import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class RankGuessCommandHandler {
     private static final String USAGE = "用法：/rg start | /rg #Rank | /rg end";
-    private static final Pattern RANK_PATTERN = Pattern.compile("^#(\\d+)[wk]?$");
+    private static final Pattern RANK_PATTERN = Pattern.compile("^#?(\\d+)[wk]?$");
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
     private final RankGuessGameService games;
