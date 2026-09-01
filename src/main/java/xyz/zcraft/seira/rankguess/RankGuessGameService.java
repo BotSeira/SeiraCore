@@ -143,6 +143,7 @@ public final class RankGuessGameService {
         return GuessResponse.of(guessResult, message);
     }
 
+    // TODO This is so messed up. Need to rewrite in the future.
     public static LinkedList<RankGuessGame.Hint> prepareHints(List<RankGuessGame.Hint> source, int maxCount) {
         var random = ThreadLocalRandom.current();
 
@@ -244,8 +245,10 @@ public final class RankGuessGameService {
     private static EnumMap<RankGuessGame.Hint.HintStrength, Double> strengthWeights(double progress) {
         double[] first = {50, 35, 15, 0, 0};
         double[] middle = {25, 35, 30, 10, 0};
-        double[] late = {10, 20, 35, 35, 0};
+        double[] late = {0, 5, 40, 55, 0};
+
         double phase = progress <= 0.5 ? progress * 2 : (progress - 0.5) * 2;
+
         double[] from = progress <= 0.5 ? first : middle;
         double[] to = progress <= 0.5 ? middle : late;
 
