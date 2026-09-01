@@ -64,7 +64,7 @@ public final class ReplyFactory {
         return PendingMessage.ofMarkdownRaw(
                 ("\n" + "## Replay上传成功~" + "\n" +
                         "> 成绩: " + cmd("/s " + info.scoreId(), String.valueOf(info.scoreId())) + "\n" +
-                        "> 铺面: " + cmd("/m " + info.beatmapId(), String.valueOf(info.beatmapId())) + "\n" +
+                        "> 谱面: " + cmd("/m " + info.beatmapId(), String.valueOf(info.beatmapId())) + "\n" +
                         "> 用户: " + cmd("/u " + info.userId(), info.username()) + "\n").trim(),
                 null
         );

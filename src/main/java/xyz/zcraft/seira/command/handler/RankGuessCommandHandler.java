@@ -68,6 +68,11 @@ public final class RankGuessCommandHandler {
             return;
         }
 
+        if (ctx.argumentCount() == 0) {
+            ctx.sendReply(PendingMessage.ofString(USAGE));
+            return;
+        }
+
         String argument = ctx.argument(0);
         if ("start".equalsIgnoreCase(argument)) {
             if (ctx.argumentCount() == 2) {
