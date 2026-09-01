@@ -1,6 +1,10 @@
 package xyz.zcraft.seira.command.handler;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.api.APIHelper;
+import xyz.zcraft.seira.api.data.RandomScore;
+import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.TaskCoordinator;
@@ -8,6 +12,7 @@ import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.rankguess.RankGuessGame;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
@@ -17,7 +22,8 @@ import java.util.regex.Pattern;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class RankGuessCommandHandler {
-    private static final String USAGE = "用法：/rg start | /rg #Rank | /rg end";
+    private static final Logger LOG = LogManager.getLogger(RankGuessCommandHandler.class);
+    private static final String USAGE = "用法：/rg start | /rg group | /rg #Rank | /rg end";
     private static final Pattern RANK_PATTERN = Pattern.compile("^#?(\\d+)[wk]?$");
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
@@ -61,17 +67,37 @@ public final class RankGuessCommandHandler {
             ctx.sendReply(PendingMessage.ofString("/rg 仅支持群聊使用。"));
             return;
         }
-        if (ctx.argumentCount() != 1) {
-            ctx.sendReply(PendingMessage.ofString(USAGE));
-            return;
-        }
 
         String argument = ctx.argument(0);
         if ("start".equalsIgnoreCase(argument)) {
-            start(ctx);
+            if (ctx.argumentCount() == 2) {
+                final String arg = ctx.argument(1);
+                if ("group".equalsIgnoreCase(arg) || "g".equalsIgnoreCase(arg)) {
+                    start(ctx, true);
+                    return;
+                }
+            } else if (ctx.argumentCount() == 1) {
+                start(ctx, false);
+                return;
+            }
+
+            ctx.sendReply(PendingMessage.ofString(USAGE));
+            return;
+        }
+        if ("group".equalsIgnoreCase(argument)) {
+            if (ctx.argumentCount() != 1) {
+                ctx.sendReply(PendingMessage.ofString(USAGE));
+                return;
+            }
+
+            start(ctx, true);
             return;
         }
         if ("end".equalsIgnoreCase(argument)) {
+            if (ctx.argumentCount() != 1) {
+                ctx.sendReply(PendingMessage.ofString(USAGE));
+                return;
+            }
             end(ctx, true);
             return;
         }
@@ -84,7 +110,7 @@ public final class RankGuessCommandHandler {
         guess(ctx, rank);
     }
 
-    private void start(Context ctx) {
+    private void start(Context ctx, boolean fromGroup) {
         RankGuessGameService.Reservation reservation = games.reserve(ctx.groupId(), ctx.senderUserId());
         if (reservation == null) {
             ctx.sendReply(PendingMessage.ofString("本群已有一轮 Rank Guess 正在进行。"));
@@ -102,10 +128,30 @@ public final class RankGuessCommandHandler {
                         ctx.sendReply(message);
                     }
 
-                    var randomScore = APIHelper.getRandomScore();
+                    RandomScore randomScore;
+
+                    if (fromGroup) {
+                        final List<Long> uids = UserDataStore.findBoundUidsByGroup(ctx.groupId());
+                        if (uids.isEmpty()) {
+                            ctx.sendReply(PendingMessage.ofMarkdownRaw("本群没有绑定的用户，无法开始游戏喵"));
+                            return;
+                        }
+                        randomScore = APIHelper.getRandomScoreFromUsers(uids);
+                    } else {
+                        randomScore = APIHelper.getRandomScore();
+                    }
+
                     RankGuessGameService.Round round = RankGuessGameService.Round.from(randomScore);
 
-                    String content = at(ctx) + "随机用户与成绩已选定，正在渲染回放片段...";
+                    String content = at(ctx);
+
+                    if (fromGroup) {
+                        content += "随机群友及其成绩已选定";
+                    } else {
+                        content += "随机用户与成绩已选定";
+                    }
+
+                    content += "，正在渲染回放片段...";
 
                     if (!activeMessageEnabled) {
                         content += "\n\n> 提示: 由于缺少主动消息权限，阶段提示与自动结束已禁用。稍后需要使用 `/rg end` 手动结束。权限配置请见[这里](https://docs.seira.top/overview/use.html#extra-permission)。";
@@ -117,7 +163,13 @@ public final class RankGuessCommandHandler {
                             round.scoreId(), taskCoordinator.createVideoUploadRequest(ctx)
                     );
 
-                    var replay = taskCoordinator.waitForReplay(renderTask);
+                    APIHelper.ReplayRenderResult replay = null;
+                    try {
+                        replay = taskCoordinator.waitForReplay(renderTask);
+                    } catch (Exception e) {
+                        LOG.error("Failed to render replay for rank guess", e);
+                    }
+
                     if (replay == null) {
                         ctx.sendReply(PendingMessage.ofMarkdownRaw("由于回放渲染失败，本轮游戏已取消~"));
                         return;
@@ -141,6 +193,10 @@ public final class RankGuessCommandHandler {
                     activated.set(true);
 
                     StringBuilder result = new StringBuilder("回放渲染完成，游戏已开始！请在群内发送 `/rg #Rank` 猜测排名~");
+
+                    if (fromGroup) {
+                        result.append("\n").append("__Tip: 这是一位群友的成绩喵~__").append("\n");
+                    }
 
                     var hints = RankGuessGameService.prepareHints(round.getNormalHints(), 4);
 
@@ -217,7 +273,7 @@ public final class RankGuessCommandHandler {
                     at(ctx)
                             + "已" + (result.status() == RankGuessGameService.GuessStatus.UPDATED ? "更新" : "记录") + "你的猜测："
                             + "`#" + String.format(Locale.US, "%,d", rank) + "`"
-                            + " " + result.multiplierString() + "\n\n"
+                            + " " + result.multiplierString() + "\n"
                             + "目前已经有 `" + result.guessCount() + "` 个猜测~"
             );
         };
@@ -237,7 +293,7 @@ public final class RankGuessCommandHandler {
             case FORBIDDEN -> PendingMessage.ofString(
                     "开始猜测后的3分钟内，仅发起者和机器人管理员可以结束游戏喵"
             );
-            case FINISHED -> replyFactory.rankGuessResultMessage(result.round());
+            case FINISHED -> replyFactory.rankGuessResultMessage(ctx, result.round());
         };
 
         if (fromCommand) {

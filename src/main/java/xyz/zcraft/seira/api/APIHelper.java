@@ -564,6 +564,48 @@ public class APIHelper {
         }
     }
 
+    public static RandomScore getRandomScoreFromUsers(List<Long> uids) {
+        try {
+            JsonObject body = new JsonObject();
+            final JsonArray uidsArray = new JsonArray();
+            for (Long uid : uids) {
+                uidsArray.add(uid);
+            }
+
+            body.add("uids", uidsArray);
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/scores/random/users"))
+                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                    .build();
+
+            HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            if (codeNotOk(response.statusCode())) {
+                throw parseHttpError(response.body(), response.statusCode(), "获取随机成绩失败");
+            }
+
+            RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
+            ensureApiSuccess(payload, "获取随机成绩失败");
+            JsonObject data = requireDataObject(payload, "随机成绩响应缺少data");
+            if (!data.has("user") || !data.get("user").isJsonObject()
+                    || !data.has("score") || !data.get("score").isJsonObject()) {
+                throw new RuntimeException("随机成绩响应缺少用户或成绩数据");
+            }
+
+            return new RandomScore(
+                    GSON.fromJson(data.getAsJsonObject("user"), UserExtended.class),
+                    GSON.fromJson(data.getAsJsonObject("score"), Score.class),
+                    data.get("best_index").getAsInt(),
+                    data.get("diff").getAsString()
+            );
+        } catch (IOException e) {
+            throw requestFailure(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("随机成绩请求被中断", e);
+        }
+    }
+
     public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] ids, String auth) {
         return createReplayShowcaseTask(target, ids, auth, null);
     }

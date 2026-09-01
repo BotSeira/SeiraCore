@@ -97,10 +97,8 @@ public final class TaskCoordinator {
         }
 
         APIHelper.ReplayRenderResult result = APIHelper.waitReplayVideo(taskInfo.taskId());
-        if (result != null) {
-            replayResults.put(taskInfo.taskId(), result);
-            BotStat.incrementReplays();
-        }
+        replayResults.put(taskInfo.taskId(), result);
+        BotStat.incrementReplays();
         return result;
     }
 
