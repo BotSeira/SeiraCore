@@ -136,7 +136,8 @@ public final class RankGuessGameService {
                 previousGuess == null ? GuessStatus.RECORDED : GuessStatus.UPDATED,
                 guess,
                 multipliers,
-                game.getMultipliersString(multipliers)
+                game.getMultipliersString(multipliers),
+                game.guesses.size()
         );
 
         return GuessResponse.of(guessResult, message);
@@ -368,7 +369,7 @@ public final class RankGuessGameService {
 
     public record GuessResponse(GuessResult guessResult, String message) {
         public static GuessResponse ofStatus(GuessStatus status) {
-            return new GuessResponse(new GuessResult(status, 0, null, null), null);
+            return new GuessResponse(new GuessResult(status, 0, null, null, 0), null);
         }
 
         public static GuessResponse of(GuessResult guessResult, String message) {
@@ -376,7 +377,7 @@ public final class RankGuessGameService {
         }
     }
 
-    public record GuessResult(GuessStatus status, long rank, List<ScoreMultiplier> multipliers, String multiplierString) {
+    public record GuessResult(GuessStatus status, long rank, List<ScoreMultiplier> multipliers, String multiplierString, int guessCount) {
 
     }
 

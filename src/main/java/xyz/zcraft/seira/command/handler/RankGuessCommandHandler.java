@@ -217,7 +217,8 @@ public final class RankGuessCommandHandler {
                     at(ctx)
                             + "已" + (result.status() == RankGuessGameService.GuessStatus.UPDATED ? "更新" : "记录") + "你的猜测："
                             + "`#" + String.format(Locale.US, "%,d", rank) + "`"
-                            + " " + result.multiplierString()
+                            + " " + result.multiplierString() + "\n\n"
+                            + "目前已经有 `" + result.guessCount() + "` 个猜测~"
             );
         };
         ctx.sendReply(message);
