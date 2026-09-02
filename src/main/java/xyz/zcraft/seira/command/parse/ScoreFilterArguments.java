@@ -10,7 +10,7 @@ import java.util.regex.Pattern;
 /** Parses score-list filters and converts aliases to oStella's compact filter syntax. */
 public final class ScoreFilterArguments {
     private static final Pattern FILTER_PATTERN = Pattern.compile(
-            "(?i)^(acc(?:uracy)?|combo|pp|time|length|len|star|stars|sr|bpm|miss|misses|score|mod|mods|rank"
+            "(?i)^(acc(?:uracy)?|combo|pp|time|length|len|star|stars|sr|bpm|miss|misses|score|mod|mods|rank|replay"
                     + "|title|artist|mapper|genre|language|video|storyboard|fullcombo)"
                     + "(>=|<=|!=|!~|>|<|=|~)(.+)$"
     );
@@ -76,7 +76,7 @@ public final class ScoreFilterArguments {
             if (value.isBlank()) {
                 throw new IllegalArgumentException(field + " 不能为空");
             }
-        } else if (Set.of("video", "storyboard", "fullcombo").contains(field)) {
+        } else if (Set.of("video", "storyboard", "fullcombo", "replay").contains(field)) {
             if (!Set.of("=", "!=").contains(operator)) {
                 throw new IllegalArgumentException(field + " 仅支持 =、!=");
             }
@@ -120,6 +120,7 @@ public final class ScoreFilterArguments {
             case "video" -> "video";
             case "storyboard" -> "storyboard";
             case "fullcombo" -> "fullcombo";
+            case "replay" -> "replay";
             default -> throw new IllegalArgumentException("未知字段 " + value);
         };
     }
@@ -136,6 +137,8 @@ public final class ScoreFilterArguments {
             case "sb", "storyboard" -> "storyboard=true";
             case "!sb", "!storyboard" -> "storyboard=false";
             case "fc", "fullcombo" -> "fullcombo=true";
+            case "replay" -> "replay=true";
+            case "!replay" -> "replay=false";
             case "!fc", "!fullcombo" -> "fullcombo=false";
             default -> null;
         };
