@@ -195,9 +195,6 @@ public final class RankGuessGameService {
         game.round = round;
         game.guessingStartedAt = clock.instant();
 
-        weights.recordScore(reservation.groupId(), round.scoreId());
-        weights.recordUser(reservation.groupId(), round.userId());
-
         return game;
     }
 
@@ -343,6 +340,9 @@ public final class RankGuessGameService {
                 .comparingDouble(Standing::points).reversed()
                 .thenComparingDouble(Standing::error)
                 .thenComparingLong(Standing::sequence));
+
+        weights.recordScore(groupId, game.round.scoreId());
+        weights.recordUser(groupId, game.round.userId());
 
         return new EndResult(
                 EndStatus.FINISHED,
