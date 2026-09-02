@@ -10,9 +10,9 @@ public class RankGuessWeights {
     private static final Gson GSON = new Gson();
 
     private static final int RECENT_USER_LIMIT = 5;
-    private static final double WISH_WEIGHT = 2.0;
-    private static final double RECENT_USER_WEIGHT = 0.75;
-    private static final double SCORE_REPEAT_FACTOR = 0.75;
+    private static final double WISH_WEIGHT = 2.5;
+    private static final double RECENT_USER_WEIGHT = 0.7;
+    private static final double SCORE_REPEAT_FACTOR = 0.7;
 
     private final Map<String, GroupState> groups = new ConcurrentHashMap<>();
 
