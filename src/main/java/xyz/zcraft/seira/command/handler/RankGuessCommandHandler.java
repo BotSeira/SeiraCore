@@ -123,14 +123,14 @@ public final class RankGuessCommandHandler {
             return;
         }
 
-        if ("weight".equalsIgnoreCase(argument)) {
-            if (ctx.argumentCount() != 1) {
-                ctx.sendReply(PendingMessage.ofString(USAGE));
-                return;
-            }
-            weight(ctx);
-            return;
-        }
+//        if ("weight".equalsIgnoreCase(argument)) {
+//            if (ctx.argumentCount() != 1) {
+//                ctx.sendReply(PendingMessage.ofString(USAGE));
+//                return;
+//            }
+//            weight(ctx);
+//            return;
+//        }
 
         Long rank;
 
