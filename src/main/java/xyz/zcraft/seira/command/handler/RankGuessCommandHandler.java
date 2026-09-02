@@ -14,6 +14,7 @@ import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.rankguess.RankGuessGame;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
+import xyz.zcraft.seira.rankguess.WishResult;
 
 import java.util.List;
 import java.util.Locale;
@@ -26,7 +27,7 @@ import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class RankGuessCommandHandler {
     private static final Logger LOG = LogManager.getLogger(RankGuessCommandHandler.class);
-    private static final String USAGE = "用法：/rg start | /rg group | /rg #Rank | /rg end";
+    private static final String USAGE = "用法：/rg start | /rg group | /rg #Rank | /rg end | /rg wish";
     private static final Pattern RANK_PATTERN = Pattern.compile("^#?(\\d+)[wk]?$");
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
@@ -112,8 +113,16 @@ public final class RankGuessCommandHandler {
             end(ctx, false);
             return;
         }
+        if ("wish".equalsIgnoreCase(argument)) {
+            if (ctx.argumentCount() != 1) {
+                ctx.sendReply(PendingMessage.ofString(USAGE));
+                return;
+            }
+            wish(ctx);
+            return;
+        }
 
-        Long rank = null;
+        Long rank;
 
         if (resolver.looksLikeMention(argument)) {
             final UserRefResolution userRefResolution = resolver.resolveUserRefArgument(argument);
@@ -134,6 +143,24 @@ public final class RankGuessCommandHandler {
         }
 
         guess(ctx, rank);
+    }
+
+    private void wish(Context ctx) {
+        final Long boundUid = UserDataStore.findBoundUid(ctx.senderUserId());
+
+        if (boundUid == null) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "由于未绑定，无法进行许愿喵~"));
+            return;
+        }
+
+        final WishResult wish = games.wish(ctx.groupId(), boundUid);
+
+        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + switch (wish) {
+            case SUCCESS -> "小星听到你的愿望啦！";
+            case ALREADY_WISHED -> "已经许过愿了喵~";
+            case RECENTLY_PICKED -> "最近已经被抽到过了喵~";
+            case null -> "发生了一些不好的事情...";
+        }));
     }
 
     private void start(Context ctx, boolean fromGroup) {
@@ -162,7 +189,7 @@ public final class RankGuessCommandHandler {
                             ctx.sendReply(PendingMessage.ofMarkdownRaw("本群没有绑定的用户，无法开始游戏喵"));
                             return;
                         }
-                        randomScore = APIHelper.getRandomScoreFromUsers(uids);
+                        randomScore = APIHelper.getRandomScoreFromUsers(uids, games.generateWeights(ctx.groupId()));
                     } else {
                         randomScore = APIHelper.getRandomScore();
                     }

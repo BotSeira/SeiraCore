@@ -1,5 +1,6 @@
 package xyz.zcraft.seira.rankguess;
 
+import com.google.gson.JsonObject;
 import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.osu.model.Score;
@@ -16,6 +17,7 @@ public final class RankGuessGameService {
     private static final Duration END_PROTECTION_DURATION = Duration.ofMinutes(3);
 
     private final Map<String, RankGuessGame> games = new HashMap<>();
+    private final RankGuessWeights weights = new RankGuessWeights();
     private final Clock clock;
 
     public RankGuessGameService() {
@@ -30,117 +32,8 @@ public final class RankGuessGameService {
         return Math.abs(Math.log10(guess) - Math.log10(actualRank));
     }
 
-    public synchronized Reservation reserve(String groupId, String starterUserId) {
-        if (games.containsKey(groupId)) {
-            return null;
-        }
-
-        Reservation reservation = new Reservation(groupId, UUID.randomUUID());
-        games.put(groupId, new RankGuessGame(reservation.token(), starterUserId));
-        return reservation;
-    }
-
-    public synchronized RankGuessGame activate(Reservation reservation, Round round) {
-        if (round == null) {
-            throw new IllegalArgumentException("Round must not be null");
-        }
-        RankGuessGame game = games.get(reservation.groupId());
-        if (game == null || !game.token.equals(reservation.token())) {
-            return null;
-        }
-
-        game.round = round;
-        game.guessingStartedAt = clock.instant();
-
-        return game;
-    }
-
-    public synchronized void cancel(Reservation reservation) {
-        RankGuessGame game = games.get(reservation.groupId());
-        if (game != null && game.token.equals(reservation.token())) {
-            games.remove(reservation.groupId());
-        }
-    }
-
-    public synchronized Set<String> activeGroupIds() {
-        return Set.copyOf(games.keySet());
-    }
-
-    public synchronized GuessResponse guess(String groupId, String senderUserId, long guess) {
-        if (guess <= 0) {
-            throw new IllegalArgumentException("Rank must be positive");
-        }
-
-        RankGuessGame game = games.get(groupId);
-        if (game == null) {
-            return GuessResponse.ofStatus(GuessStatus.NO_GAME);
-        }
-        if (game.round == null) {
-            return GuessResponse.ofStatus(GuessStatus.STARTING);
-        }
-
-        final int guessNumber = game.guessCount.incrementAndGet();
-
-        LinkedList<ScoreMultiplier> multipliers = new LinkedList<>();
-
-        for (RankGuessGame.Hint hint : game.getRevealedHints()) {
-            multipliers.add(new ScoreMultiplier.HintMultiplier(hint));
-        }
-
-        if (guessNumber == 1) {
-            multipliers.add(new ScoreMultiplier.FirstGuessMultiplier());
-        } else {
-            multipliers.add(new ScoreMultiplier.OrderMultiplier(guessNumber));
-        }
-
-        String message = null;
-
-        List<Guess> otherGuesses = game.guesses.entrySet().stream()
-                .filter(entry -> !Objects.equals(entry.getKey(), senderUserId))
-                .map(Map.Entry::getValue)
-                .toList();
-
-        long closestGuess = otherGuesses.stream()
-                .mapToLong(Guess::rank)
-                .boxed()
-                .min(Comparator.comparingLong(previous -> Math.abs(previous - guess)))
-                .orElse(-1L);
-
-        if (closestGuess != -1) {
-            double absoluteDifference = Math.abs(closestGuess - guess);
-            double relativeDifference = absoluteDifference
-                    / (double) Math.max(closestGuess, guess);
-
-            boolean copied =
-                    (absoluteDifference <= 100 && relativeDifference <= 0.01)
-                            || Math.abs(
-                            Math.log10(closestGuess)
-                                    - Math.log10(guess)
-                    ) < 0.005;
-
-            final int i = game.guesses.size();
-
-            if (i >= 10 && !game.copyPunishmentReduced) {
-                game.copyPunishmentReduced = true;
-                message = "提示：由于本次游戏参与人数较多，所有猜测的抄袭惩罚已降至 `-2.5%` ~";
-            }
-
-            if (copied) {
-                multipliers.add(new ScoreMultiplier.CopyPunishmentMultiplier());
-            }
-        }
-
-        Guess previousGuess = game.guesses.put(senderUserId, new Guess(guess, game.nextSequence++, multipliers));
-
-        final GuessResult guessResult = new GuessResult(
-                previousGuess == null ? GuessStatus.RECORDED : GuessStatus.UPDATED,
-                guess,
-                multipliers,
-                game.getMultipliersString(multipliers),
-                game.guesses.size()
-        );
-
-        return GuessResponse.of(game, guessResult, message);
+    public JsonObject generateWeights(String groupId) {
+        return weights.generateWeights(groupId);
     }
 
     // TODO This is so messed up. Need to rewrite in the future.
@@ -243,9 +136,9 @@ public final class RankGuessGameService {
     }
 
     private static EnumMap<RankGuessGame.Hint.HintStrength, Double> strengthWeights(double progress) {
-        double[] first =  {50, 35, 15,  0, 0};
+        double[] first = {50, 35, 15, 0, 0};
         double[] middle = {10, 30, 45, 15, 0};
-        double[] late =   { 0,  5, 40, 55, 0};
+        double[] late = {0, 5, 40, 55, 0};
 
         double phase = progress <= 0.5 ? progress * 2 : (progress - 0.5) * 2;
 
@@ -259,6 +152,141 @@ public final class RankGuessGameService {
             weights.put(strengths[i], from[i] + (to[i] - from[i]) * phase);
         }
         return weights;
+    }
+
+    @NotNull
+    public static String getGlobalRankRange(long l) {
+        String range;
+
+        if (l <= 10_000) {
+            range = "#1 - #10k";
+        } else if (l <= 50_000) {
+            range = "#10k - #50k";
+        } else if (l <= 200_000) {
+            range = "#50k - #200k";
+        } else if (l <= 500_000) {
+            range = "#200k - #500k";
+        } else {
+            range = ">#500k";
+        }
+
+        return range;
+    }
+
+    public synchronized Reservation reserve(String groupId, String starterUserId) {
+        if (games.containsKey(groupId)) {
+            return null;
+        }
+
+        Reservation reservation = new Reservation(groupId, UUID.randomUUID());
+        games.put(groupId, new RankGuessGame(reservation.token(), starterUserId));
+        return reservation;
+    }
+
+    public synchronized RankGuessGame activate(Reservation reservation, Round round) {
+        if (round == null) {
+            throw new IllegalArgumentException("Round must not be null");
+        }
+        RankGuessGame game = games.get(reservation.groupId());
+        if (game == null || !game.token.equals(reservation.token())) {
+            return null;
+        }
+
+        game.round = round;
+        game.guessingStartedAt = clock.instant();
+
+        weights.recordScore(reservation.groupId(), round.scoreId());
+        weights.recordUser(reservation.groupId(), round.userId());
+
+        return game;
+    }
+
+    public synchronized void cancel(Reservation reservation) {
+        RankGuessGame game = games.get(reservation.groupId());
+        if (game != null && game.token.equals(reservation.token())) {
+            games.remove(reservation.groupId());
+        }
+    }
+
+    public synchronized Set<String> activeGroupIds() {
+        return Set.copyOf(games.keySet());
+    }
+
+    public synchronized GuessResponse guess(String groupId, String senderUserId, long guess) {
+        if (guess <= 0) {
+            throw new IllegalArgumentException("Rank must be positive");
+        }
+
+        RankGuessGame game = games.get(groupId);
+        if (game == null) {
+            return GuessResponse.ofStatus(GuessStatus.NO_GAME);
+        }
+        if (game.round == null) {
+            return GuessResponse.ofStatus(GuessStatus.STARTING);
+        }
+
+        final int guessNumber = game.guessCount.incrementAndGet();
+
+        LinkedList<ScoreMultiplier> multipliers = new LinkedList<>();
+
+        for (RankGuessGame.Hint hint : game.getRevealedHints()) {
+            multipliers.add(new ScoreMultiplier.HintMultiplier(hint));
+        }
+
+        if (guessNumber == 1) {
+            multipliers.add(new ScoreMultiplier.FirstGuessMultiplier());
+        } else {
+            multipliers.add(new ScoreMultiplier.OrderMultiplier(guessNumber));
+        }
+
+        String message = null;
+
+        List<Guess> otherGuesses = game.guesses.entrySet().stream()
+                .filter(entry -> !Objects.equals(entry.getKey(), senderUserId))
+                .map(Map.Entry::getValue)
+                .toList();
+
+        long closestGuess = otherGuesses.stream()
+                .mapToLong(Guess::rank)
+                .boxed()
+                .min(Comparator.comparingLong(previous -> Math.abs(previous - guess)))
+                .orElse(-1L);
+
+        if (closestGuess != -1) {
+            double absoluteDifference = Math.abs(closestGuess - guess);
+            double relativeDifference = absoluteDifference
+                    / (double) Math.max(closestGuess, guess);
+
+            boolean copied =
+                    (absoluteDifference <= 100 && relativeDifference <= 0.01)
+                            || Math.abs(
+                            Math.log10(closestGuess)
+                                    - Math.log10(guess)
+                    ) < 0.005;
+
+            final int i = game.guesses.size();
+
+            if (i >= 10 && !game.copyPunishmentReduced) {
+                game.copyPunishmentReduced = true;
+                message = "提示：由于本次游戏参与人数较多，所有猜测的抄袭惩罚已降至 `-2.5%` ~";
+            }
+
+            if (copied) {
+                multipliers.add(new ScoreMultiplier.CopyPunishmentMultiplier());
+            }
+        }
+
+        Guess previousGuess = game.guesses.put(senderUserId, new Guess(guess, game.nextSequence++, multipliers));
+
+        final GuessResult guessResult = new GuessResult(
+                previousGuess == null ? GuessStatus.RECORDED : GuessStatus.UPDATED,
+                guess,
+                multipliers,
+                game.getMultipliersString(multipliers),
+                game.guesses.size()
+        );
+
+        return GuessResponse.of(game, guessResult, message);
     }
 
     public synchronized EndResult end(String groupId, String senderUserId, boolean admin, boolean force) {
@@ -310,6 +338,10 @@ public final class RankGuessGameService {
                 EndStatus.FINISHED,
                 new FinishedRound(game.round, List.copyOf(standings))
         );
+    }
+
+    public WishResult wish(String groupId, Long boundUid) {
+        return weights.tryWish(groupId, boundUid);
     }
 
     public enum GuessStatus {
@@ -370,7 +402,7 @@ public final class RankGuessGameService {
         }
     }
 
-    public record GuessResponse(RankGuessGame game, GuessResult guessResult,  String message) {
+    public record GuessResponse(RankGuessGame game, GuessResult guessResult, String message) {
         public static GuessResponse ofStatus(GuessStatus status) {
             return new GuessResponse(null, new GuessResult(status, 0, null, null, 0), null);
         }
@@ -380,7 +412,8 @@ public final class RankGuessGameService {
         }
     }
 
-    public record GuessResult(GuessStatus status, long rank, List<ScoreMultiplier> multipliers, String multiplierString, int guessCount) {
+    public record GuessResult(GuessStatus status, long rank, List<ScoreMultiplier> multipliers, String multiplierString,
+                              int guessCount) {
 
     }
 
@@ -546,24 +579,5 @@ public final class RankGuessGameService {
 
             return hints;
         }
-    }
-
-    @NotNull
-    public static String getGlobalRankRange(long l) {
-        String range;
-
-        if (l <= 10_000) {
-            range = "#1 - #10k";
-        } else if (l <= 50_000) {
-            range = "#10k - #50k";
-        } else if (l <= 200_000) {
-            range = "#50k - #200k";
-        } else if (l <= 500_000) {
-            range = "#200k - #500k";
-        } else {
-            range = ">#500k";
-        }
-
-        return range;
     }
 }

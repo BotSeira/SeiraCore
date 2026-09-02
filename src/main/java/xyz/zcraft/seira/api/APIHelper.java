@@ -564,7 +564,7 @@ public class APIHelper {
         }
     }
 
-    public static RandomScore getRandomScoreFromUsers(List<Long> uids) {
+    public static RandomScore getRandomScoreFromUsers(List<Long> uids, JsonObject weights) {
         try {
             JsonObject body = new JsonObject();
             final JsonArray uidsArray = new JsonArray();
@@ -573,6 +573,7 @@ public class APIHelper {
             }
 
             body.add("uids", uidsArray);
+            body.add("weight_factor", weights);
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/scores/random/users"))

@@ -117,7 +117,7 @@ public final class ReplyFactory {
 
     public PendingMessage boMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                at(ctx) + "B" + response.getScoreIds().size() + "查询完成\n" +
+                at(ctx)  + "查询完成，共" + response.getScoreIds().size() + "个成绩\n" +
                         "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()),
                 buttons().boButtons(response.getUserId())
         );
