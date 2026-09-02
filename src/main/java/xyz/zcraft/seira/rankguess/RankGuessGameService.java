@@ -225,6 +225,16 @@ public final class RankGuessGameService {
             return GuessResponse.ofStatus(GuessStatus.STARTING);
         }
 
+        final Guess previousGuess = game.guesses.get(senderUserId);
+
+        if (previousGuess != null) {
+            final long l = (System.currentTimeMillis() - previousGuess.timestamp()) / 1000;
+
+            if (l < 20) {
+                return GuessResponse.ofStatus(GuessStatus.TOO_SOON);
+            }
+        }
+
         final int guessNumber = game.guessCount.incrementAndGet();
 
         LinkedList<ScoreMultiplier> multipliers = new LinkedList<>();
@@ -276,7 +286,7 @@ public final class RankGuessGameService {
             }
         }
 
-        Guess previousGuess = game.guesses.put(senderUserId, new Guess(guess, game.nextSequence++, multipliers));
+        game.guesses.put(senderUserId, Guess.of(guess, game.nextSequence++, multipliers));
 
         final GuessResult guessResult = new GuessResult(
                 previousGuess == null ? GuessStatus.RECORDED : GuessStatus.UPDATED,
@@ -348,6 +358,7 @@ public final class RankGuessGameService {
         NO_GAME,
         STARTING,
         RECORDED,
+        TOO_SOON,
         UPDATED
     }
 

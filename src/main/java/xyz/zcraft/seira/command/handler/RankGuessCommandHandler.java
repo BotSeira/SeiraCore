@@ -113,12 +113,22 @@ public final class RankGuessCommandHandler {
             end(ctx, false);
             return;
         }
+
         if ("wish".equalsIgnoreCase(argument)) {
             if (ctx.argumentCount() != 1) {
                 ctx.sendReply(PendingMessage.ofString(USAGE));
                 return;
             }
             wish(ctx);
+            return;
+        }
+
+        if ("weight".equalsIgnoreCase(argument)) {
+            if (ctx.argumentCount() != 1) {
+                ctx.sendReply(PendingMessage.ofString(USAGE));
+                return;
+            }
+            weight(ctx);
             return;
         }
 
@@ -143,6 +153,11 @@ public final class RankGuessCommandHandler {
         }
 
         guess(ctx, rank);
+    }
+
+    private void weight(Context ctx) {
+        final String string = games.generateWeights(ctx.groupId()).toString();
+        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "目前本群权重:\n```json\n" + string + "\n```"));
     }
 
     private void wish(Context ctx) {
@@ -324,6 +339,7 @@ public final class RankGuessCommandHandler {
         PendingMessage message = switch (result.status()) {
             case NO_GAME -> PendingMessage.ofString("本群当前没有进行中的 Rank Guess 喵");
             case STARTING -> PendingMessage.ofString("回放仍在渲染，请等待视频发送后再猜测喵");
+            case TOO_SOON -> PendingMessage.ofString("距离上次猜测不足20秒，无法修改猜测喵");
             case UPDATED, RECORDED -> PendingMessage.ofMarkdownRaw(
                     at(ctx)
                             + "已" + (result.status() == RankGuessGameService.GuessStatus.UPDATED ? "更新" : "记录") + "你的猜测："
