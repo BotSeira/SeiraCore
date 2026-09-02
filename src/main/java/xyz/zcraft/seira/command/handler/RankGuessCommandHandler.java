@@ -305,12 +305,12 @@ public final class RankGuessCommandHandler {
 
                         final var hint = hints.removeFirst();
 
-                        String hintContent = "> 提示: " + hint.content();
+                        String hintContent = "__猜Rank提示：__\n" + hint.content();
 
                         if (!hints.isEmpty()) {
                             hintContent += "\n" + "> 下一个提示将在 30 秒后揭晓~";
                         } else {
-                            hintContent += "\n" + "> 所有提示已经揭晓!游戏将在 1 分钟后自动结束~";
+                            hintContent += "\n" + "> 所有提示已经揭晓啦！游戏将在 1 分钟后自动结束~";
                         }
 
                         if (ctx.sendMessage(PendingMessage.ofMarkdownRaw(hintContent))) {
