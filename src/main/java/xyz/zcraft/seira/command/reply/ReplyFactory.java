@@ -604,7 +604,7 @@ public final class ReplyFactory {
                             > /bma <谱面ID或快捷查询> [Mod] - 分析谱面PP构成和类型
                             > /ms <谱面集ID或快捷查询> - 获取谱面集
                             > /r [成绩ID或快捷查询] [[mm:ss]-[mm:ss]] - 生成成绩高光视频或指定片段
-                            > /rg <start/group/#Rank/end> - 在群聊中进行猜 Rank 游戏
+                            > /rg <start/group/#Rank/end/wish> - 在群聊中进行猜 Rank 游戏
                             > /lb <谱面ID> [玩家ID列表] - 获取指定谱面排行榜
                             > /watch add <玩家ID/用户名/@用户> [分钟] - 监视群友的新成绩
                             > /wx start <UID列表> <谱面ID列表> - 监视指定玩家在指定谱面的成绩
