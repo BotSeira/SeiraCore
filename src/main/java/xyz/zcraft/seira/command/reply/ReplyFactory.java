@@ -495,26 +495,38 @@ public final class ReplyFactory {
 
             sb.append("\n");
 
+            boolean collapsed = false;
+
             sb.append("> 好友←→ (").append(mutual.size()).append(")\n>");
-            for (User p : mutual) {
-                sb.append(getFriendItem(p)).append(" ");
-            }
+            collapsed |= appendFriends(ctx, mutual, sb);
 
             sb.append("\n> 仅关注→ (").append(onlyFollowed.size()).append(")\n>");
-            for (User p : onlyFollowed) {
-                sb.append(getFriendItem(p)).append(" ");
-            }
+            collapsed |= appendFriends(ctx, onlyFollowed, sb);
 
             sb.append("\n> 仅粉丝← (");
             sb.append(onlyFollower.size()).append(" 已知");
             if (all) sb.append(" 共 ").append(self.getFollowerCount() - allMutualCount);
             sb.append(")\n>");
+            collapsed |= appendFriends(ctx, onlyFollower, sb);
 
-            for (User p : onlyFollower) {
-                sb.append(getFriendItem(p)).append(" ");
+            if (ctx.inGroup() && collapsed) {
+                sb.append("\n部分结果已折叠，如需查看完整结果请在私聊中使用指令~");
             }
 
             return sb.toString().trim();
+        }
+
+        private static boolean appendFriends(Context ctx, List<User> onlyFollowed, StringBuilder sb) {
+            int count = 0;
+            for (User p : onlyFollowed) {
+                if (count >= 20 && ctx.inGroup()) {
+                    sb.append("\n...剩余").append(onlyFollowed.size() - count).append("个");
+                    return true;
+                }
+                sb.append(getFriendItem(p)).append(" ");
+                count++;
+            }
+            return false;
         }
 
         private static String getFriendItem(User u) {
