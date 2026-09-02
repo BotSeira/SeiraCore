@@ -17,7 +17,7 @@ public final class RankGuessGameService {
     private static final Duration END_PROTECTION_DURATION = Duration.ofMinutes(3);
 
     private final Map<String, RankGuessGame> games = new HashMap<>();
-    private final RankGuessWeights weights = new RankGuessWeights();
+    private final RankGuessWeights weights;
     private final Clock clock;
 
     public RankGuessGameService() {
@@ -25,7 +25,16 @@ public final class RankGuessGameService {
     }
 
     RankGuessGameService(Clock clock) {
+        this(clock, new RankGuessWeights());
+    }
+
+    RankGuessGameService(Clock clock, RankGuessWeights weights) {
         this.clock = clock;
+        this.weights = weights;
+    }
+
+    public void saveWeights() {
+        weights.saveToFile();
     }
 
     static double logarithmicError(long guess, long actualRank) {
@@ -341,8 +350,7 @@ public final class RankGuessGameService {
                 .thenComparingDouble(Standing::error)
                 .thenComparingLong(Standing::sequence));
 
-        weights.recordScore(groupId, game.round.scoreId());
-        weights.recordUser(groupId, game.round.userId());
+        weights.recordRound(groupId, game.round.userId(), game.round.scoreId());
 
         return new EndResult(
                 EndStatus.FINISHED,

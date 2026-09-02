@@ -216,6 +216,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
             return;
         }
         stop();
+        rankGuessGameService.saveWeights();
         cos.close();
     }
 
