@@ -63,8 +63,9 @@ public final class RankGuessCommandHandler {
             } else if (argument.endsWith("k")) {
                 multiplier = 1000;
             }
-            return base * multiplier;
-        } catch (NumberFormatException _) {
+
+            return Math.multiplyExact(base, multiplier);
+        } catch (NumberFormatException | ArithmeticException _) {
             return null;
         }
     }
@@ -351,6 +352,11 @@ public final class RankGuessCommandHandler {
         ctx.sendReply(message);
         if (response.message() != null && !response.message().isBlank()) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(response.message()));
+        }
+
+        if (result.status() != RankGuessGameService.GuessStatus.UPDATED
+                && result.status() != RankGuessGameService.GuessStatus.RECORDED) {
+            return;
         }
 
         if (rank == response.game().getRound().actualRank()) {

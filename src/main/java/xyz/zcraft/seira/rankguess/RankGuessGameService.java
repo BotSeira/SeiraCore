@@ -49,7 +49,7 @@ public final class RankGuessGameService {
             RankGuessGame.Hint selected = selectWeightedByStrength(
                     candidates,
                     result.size(),
-                    remaining.size() + result.size(),
+                    Math.min(remaining.size() + result.size(), maxCount),
                     random
             );
             result.add(selected);
@@ -138,7 +138,7 @@ public final class RankGuessGameService {
     private static EnumMap<RankGuessGame.Hint.HintStrength, Double> strengthWeights(double progress) {
         double[] first = {50, 35, 15, 0, 0};
         double[] middle = {10, 30, 45, 15, 0};
-        double[] late = {0, 5, 40, 55, 0};
+        double[] late = {0, 10, 40, 50, 0};
 
         double phase = progress <= 0.5 ? progress * 2 : (progress - 0.5) * 2;
 
