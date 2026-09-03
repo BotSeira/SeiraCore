@@ -5,6 +5,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.seira.db.UserDataStore;
 
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
@@ -21,8 +22,8 @@ public class RankGuessWeights {
 
     private static final int RECENT_USER_LIMIT = 5;
     private static final double WISH_WEIGHT = 2.5;
-    private static final double RECENT_USER_WEIGHT = 0.7;
-    private static final double SCORE_REPEAT_FACTOR = 0.7;
+    private static final double RECENT_USER_WEIGHT = 0.25;
+    private static final double SCORE_REPEAT_FACTOR = 0.4;
 
     private final Map<String, GroupState> groups = new ConcurrentHashMap<>();
     private final Path store;
@@ -239,6 +240,43 @@ public class RankGuessWeights {
         synchronized (state) {
             return Map.copyOf(state.scoreRecords);
         }
+    }
+
+    public record Probability(
+            double weight,
+            double chance
+    ){}
+
+    public Probability getProbability(String groupId, long boundUid) {
+        final GroupState state = getGroup(groupId);
+
+        final Map<Long, Double> users = new HashMap<>();
+
+        double weight;
+
+        synchronized (state) {
+            for (Long wishedId : state.userWishes) {
+                users.put(wishedId, WISH_WEIGHT);
+            }
+
+            for (Long pickedId : state.userRecords) {
+                users.put(pickedId, RECENT_USER_WEIGHT);
+            }
+        }
+
+        weight = users.getOrDefault(boundUid, 1.0);
+
+        double accumulation = 0;
+
+        for (Long l : UserDataStore.findBoundUidsByGroup(groupId)) {
+            accumulation += users.getOrDefault(l, 1.0);
+        }
+
+        if (accumulation == 0) throw new IllegalStateException("Error calculating probability for " + groupId + " " + boundUid);
+
+        double chance = weight / accumulation;
+
+        return new Probability(weight, chance);
     }
 
     private static class GroupState {

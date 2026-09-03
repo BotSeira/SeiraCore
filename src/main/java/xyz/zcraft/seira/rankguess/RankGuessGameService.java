@@ -436,6 +436,10 @@ public final class RankGuessGameService {
         return rankGuessGame.guesses.size();
     }
 
+    public RankGuessWeights.Probability getProbabilityFor(String groupId, Long boundUid) {
+        return weights.getProbability(groupId, boundUid);
+    }
+
     public enum GameStatus {
         NO_GAME,
         STARTING,
