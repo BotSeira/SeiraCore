@@ -564,6 +564,30 @@ public class APIHelper {
         }
     }
 
+    public static String getRandomScoreWeight(Long userId) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/scores/random/users/" + userId + "/weights"))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            if (codeNotOk(response.statusCode())) {
+                throw parseHttpError(response.body(), response.statusCode(), "获取成绩权重失败");
+            }
+
+            RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
+            ensureApiSuccess(payload, "获取成绩权重失败");
+
+            return payload.getData().getAsString();
+        } catch (IOException e) {
+            throw requestFailure(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("成绩权重请求被中断", e);
+        }
+    }
+
     public static RandomScore getRandomScoreFromUsers(List<Long> uids, JsonObject weights) {
         try {
             JsonObject body = new JsonObject();

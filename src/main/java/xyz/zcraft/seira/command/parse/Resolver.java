@@ -195,8 +195,8 @@ public final class Resolver {
                 index = 1L;
             }
 
-            if (index < 1 || index > 100) {
-                return new ShortcutTarget(null, null, null, null, "快捷指令索引无效，请输入 1-100 之间的数字。例如: rs5");
+            if (index < 1 || index > 200) {
+                return new ShortcutTarget(null, null, null, null, "快捷指令索引无效，请输入 1-200 之间的数字。例如: rs5");
             }
 
             if (userRef == null) {

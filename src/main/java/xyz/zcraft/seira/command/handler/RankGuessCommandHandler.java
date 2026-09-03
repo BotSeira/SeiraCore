@@ -190,8 +190,19 @@ public final class RankGuessCommandHandler {
     }
 
     private void weight(Context ctx) {
-        final String string = games.generateWeights(ctx.groupId()).toString();
-        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "目前本群权重:\n```json\n" + string + "\n```"));
+        StringBuilder reply = new StringBuilder();
+        final String groupWeight = games.generateWeights(ctx.groupId()).toString();
+        reply.append(at(ctx)).append("目前本群权重:\n```json\n").append(groupWeight).append("\n```\n");
+
+        final Long boundUid = UserDataStore.findBoundUid(ctx.senderUserId());
+        if (boundUid != null) {
+            final String randomScoreWeight = APIHelper.getRandomScoreWeight(boundUid);
+
+            reply.append("你的成绩权重:\n>").append(randomScoreWeight).append("\n");
+        }
+
+
+        ctx.sendReply(PendingMessage.ofMarkdownRaw(reply.toString().trim()));
     }
 
     private void statistics(Context ctx, boolean allGroups) {
