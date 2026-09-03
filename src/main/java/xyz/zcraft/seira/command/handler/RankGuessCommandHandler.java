@@ -549,8 +549,8 @@ public final class RankGuessCommandHandler {
             );
 
             double rawRating = averageScoreRate * 0.50
-                    + statistics.winRate() * 0.20
-                    + statistics.topTwentyRate() * 0.30;
+                    + statistics.winRate() * 0.10
+                    + statistics.topTwentyRate() * 0.40;
 
             double confidence = 1.0 - Math.exp(-statistics.participation() / 10.0);
 
