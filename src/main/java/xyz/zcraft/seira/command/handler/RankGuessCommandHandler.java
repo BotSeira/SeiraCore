@@ -463,7 +463,7 @@ public final class RankGuessCommandHandler {
             case FORBIDDEN -> PendingMessage.ofString(
                     "开始猜测后的3分钟内，仅发起者和机器人管理员可以结束游戏喵"
             );
-            case FINISHED -> replyFactory.rankGuessResultMessage(ctx, result.round());
+            case FINISHED -> replyFactory.rankGuessResultMessage(ctx, result.round(), result.recorded());
         };
 
         if (!ctx.sendReply(message).success()) {

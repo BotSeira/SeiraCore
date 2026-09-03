@@ -75,7 +75,7 @@ public final class ReplyFactory {
         return new Buttons(configSupplier.get().seira().directUrl());
     }
 
-    public PendingMessage rankGuessResultMessage(Context ctx, FinishedRound result) {
+    public PendingMessage rankGuessResultMessage(Context ctx, FinishedRound result, boolean recorded) {
         RankGuessGameService.Round round = result.round();
         String rank = String.format(Locale.US, "%,d", round.actualRank());
         String pp = round.pp() == null
@@ -86,9 +86,15 @@ public final class ReplyFactory {
                 .map(e -> "(" + at(e) + ")")
                 .orElse("");
 
-        StringBuilder content = new StringBuilder()
-                .append("本轮猜测结束~\n")
-                .append("> 玩家：`%s` %s\n".formatted(round.randomScore().user().getUsername(), userAt))
+        StringBuilder content = new StringBuilder("本轮猜测结束");
+
+        if (recorded) {
+            content.append("，战绩已记录~\n");
+        } else {
+            content.append("，由于参与人数过少，战绩不会记录~\n");
+        }
+
+        content.append("> 玩家：`%s` %s\n".formatted(round.randomScore().user().getUsername(), userAt))
                 .append("> 实际Rank：`#%s` (%s)\n".formatted(rank, cmd("/u " + round.userId(), String.valueOf(round.userId()))))
                 .append("> 成绩PP：`%s` (%s)\n".formatted(pp, cmd("/s " + round.scoreId(), String.valueOf(round.scoreId()))))
                 .append("\n猜测排行榜：\n");

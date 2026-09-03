@@ -21,7 +21,7 @@ import static xyz.zcraft.seira.rankguess.RankGuessGame.COPY_PUNISHMENT_THRESHOLD
 public final class RankGuessGameService {
     public static final int SCORING_VERSION = 1;
     private static final Duration END_PROTECTION_DURATION = Duration.ofMinutes(3);
-
+    private static final int MIN_PARTICIPANT_TO_RECORD = 4;
     private final Map<String, RankGuessGame> games = new HashMap<>();
     private final RankGuessWeights weights;
     private final Clock clock;
@@ -45,28 +45,8 @@ public final class RankGuessGameService {
         this.recordWriter = Objects.requireNonNull(recordWriter);
     }
 
-    public void saveWeights() {
-        weights.saveToFile();
-    }
-
     static double logarithmicError(long guess, long actualRank) {
         return Math.abs(Math.log10(guess) - Math.log10(actualRank));
-    }
-
-    public JsonObject generateWeights(String groupId) {
-        return weights.generateWeights(groupId);
-    }
-
-    public String getRevealedHintsString(String groupId) {
-        final RankGuessGame rankGuessGame = games.get(groupId);
-        if (rankGuessGame == null) {
-            return null;
-        }
-        StringBuilder sb = new StringBuilder();
-        for (RankGuessGame.Hint revealedHint : rankGuessGame.getRevealedHints()) {
-            sb.append(revealedHint.content()).append("\n");
-        }
-        return sb.toString().trim();
     }
 
     // TODO This is so messed up. Need to rewrite in the future.
@@ -206,6 +186,26 @@ public final class RankGuessGameService {
         return range;
     }
 
+    public void saveWeights() {
+        weights.saveToFile();
+    }
+
+    public JsonObject generateWeights(String groupId) {
+        return weights.generateWeights(groupId);
+    }
+
+    public String getRevealedHintsString(String groupId) {
+        final RankGuessGame rankGuessGame = games.get(groupId);
+        if (rankGuessGame == null) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (RankGuessGame.Hint revealedHint : rankGuessGame.getRevealedHints()) {
+            sb.append(revealedHint.content()).append("\n");
+        }
+        return sb.toString().trim();
+    }
+
     public synchronized Reservation reserve(String groupId, String starterUserId) {
         return reserve(groupId, starterUserId, false);
     }
@@ -333,16 +333,16 @@ public final class RankGuessGameService {
     public synchronized EndResult end(String groupId, String senderUserId, boolean admin, boolean force) {
         RankGuessGame game = games.get(groupId);
         if (game == null) {
-            return new EndResult(EndStatus.NO_GAME, null);
+            return new EndResult(EndStatus.NO_GAME, null, false);
         }
         if (game.round == null) {
-            return new EndResult(EndStatus.STARTING, null);
+            return new EndResult(EndStatus.STARTING, null, false);
         }
         if (!force
                 && clock.instant().isBefore(game.guessingStartedAt.plus(END_PROTECTION_DURATION))
                 && !Objects.equals(game.starterUserId, senderUserId)
                 && !admin) {
-            return new EndResult(EndStatus.FORBIDDEN, null);
+            return new EndResult(EndStatus.FORBIDDEN, null, false);
         }
 
         List<Standing> standings = new ArrayList<>(game.guesses.size());
@@ -377,15 +377,21 @@ public final class RankGuessGameService {
                 game.token, groupId, game.fromGroup, game.guessingStartedAt, clock.instant(),
                 SCORING_VERSION, game.round, standings
         );
-        // Keep the game available for retry if recording fails; no history should advance before commit.
-        recordWriter.accept(finished);
+
+        final boolean shouldRecord = game.guesses.size() >= MIN_PARTICIPANT_TO_RECORD;
+
+        if (shouldRecord) {
+            recordWriter.accept(finished);
+        }
+
         games.remove(groupId);
         game.markEnded();
         weights.recordRound(groupId, game.round.userId(), game.round.scoreId());
 
         return new EndResult(
                 EndStatus.FINISHED,
-                finished
+                finished,
+                shouldRecord
         );
     }
 
@@ -509,7 +515,7 @@ public final class RankGuessGameService {
 
     }
 
-    public record EndResult(EndStatus status, FinishedRound round) {
+    public record EndResult(EndStatus status, FinishedRound round, boolean recorded) {
     }
 
     public record Round(long userId, long scoreId, int bestIndex, long actualRank, Double pp, RandomScore randomScore) {
