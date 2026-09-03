@@ -29,7 +29,7 @@ import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class RankGuessCommandHandler {
     private static final Logger LOG = LogManager.getLogger(RankGuessCommandHandler.class);
-    private static final String USAGE = "用法：/rg start | /rg group | /rg #Rank | /rg end | /rg wish | /rg stats [all]";
+    private static final String USAGE = "用法：/rg start|group|#Rank|end|wish|stats|lb";
     private static final Pattern RANK_PATTERN = Pattern.compile("^#?(\\d+)[wk]?$");
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
