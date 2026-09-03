@@ -559,7 +559,7 @@ public final class RankGuessCommandHandler {
 
         private static double standardRating(double ratingRaw) {
             double z = 2 * ratingRaw - 1;
-            double p = 1.2;
+            double p = 1.15;
 
             return 1 + Math.copySign(Math.pow(Math.abs(z), p), z);
         }
@@ -571,12 +571,12 @@ public final class RankGuessCommandHandler {
 
             double rawRating = getRatingRaw(statistics);
 
-            if (rawRating >= 0.85) return "SS";
-            if (rawRating >= 0.77) return "S";
-            if (rawRating >= 0.69) return "A";
-            if (rawRating >= 0.59) return "B";
-            if (rawRating >= 0.47) return "C";
-            if (rawRating >= 0.35) return "D";
+            if (rawRating >= 0.83) return "SS";
+            if (rawRating >= 0.75) return "S";
+            if (rawRating >= 0.67) return "A";
+            if (rawRating >= 0.57) return "B";
+            if (rawRating >= 0.45) return "C";
+            if (rawRating >= 0.33) return "D";
             return "F";
         }
     }
