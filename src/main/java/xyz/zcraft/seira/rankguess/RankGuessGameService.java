@@ -296,14 +296,14 @@ public final class RankGuessGameService {
             }
         }
 
+        game.guesses.put(senderUserId, Guess.of(guess, game.nextSequence++, multipliers));
+
         final int i = game.guesses.size();
 
         if (i >= COPY_PUNISHMENT_THRESHOLD && !game.copyPunishmentReduced) {
             game.copyPunishmentReduced = true;
             message = "提示：由于本次游戏参与人数较多，所有猜测的抄袭惩罚已降至 `-2.5%` ~";
         }
-
-        game.guesses.put(senderUserId, Guess.of(guess, game.nextSequence++, multipliers));
 
         final GuessResult guessResult = new GuessResult(
                 previousGuess == null ? GuessStatus.RECORDED : GuessStatus.UPDATED,
