@@ -28,6 +28,8 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
+import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
+
 public class Router {
     private static final Logger LOG = LogManager.getLogger(Router.class);
 
@@ -169,7 +171,7 @@ public class Router {
                     LOG.info("Routing {} message : {}", groupMessage ? "group" : "private", context.rawContent());
                     dispatch(context);
                 } catch (Exception e) {
-                    context.sendReply(PendingMessage.ofString("处理指令时发生错误，请稍后再试。"));
+                    context.sendReply(PendingMessage.ofMarkdownRaw(at(context) + "处理指令时发生错误，请稍后再试。"));
                     LOG.error("Failed to process inbound message {}", messageId, e);
                 }
             });
