@@ -559,7 +559,7 @@ public final class RankGuessCommandHandler {
 
         private static double standardRating(double ratingRaw) {
             double z = 2 * ratingRaw - 1;
-            double p = 1.15;
+            double p = 1.25;
 
             return 1 + Math.copySign(Math.pow(Math.abs(z), p), z);
         }
