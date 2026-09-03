@@ -1,6 +1,7 @@
 package xyz.zcraft.seira.rankguess;
 
 import lombok.Getter;
+import xyz.zcraft.seira.bot.data.MessageReference;
 
 import java.time.Instant;
 import java.util.*;
@@ -20,6 +21,9 @@ public final class RankGuessGame {
     public long nextSequence;
     @Getter
     private volatile boolean ended = false;
+
+    @Getter
+    public MessageReference videoRef = null;
 
     RankGuessGame(UUID token, String starterUserId, boolean fromGroup) {
         this.token = token;
@@ -53,7 +57,7 @@ public final class RankGuessGame {
         } else if (multiplier instanceof RankGuessGameService.ScoreMultiplier.OrderMultiplier orderMultiplier) {
             return Math.max(-0.10, 0.00 - (orderMultiplier.getOrder() - 2) * 0.01);
         } else if (multiplier instanceof RankGuessGameService.ScoreMultiplier.CopyPunishmentMultiplier) {
-            if (guessCount.get() >= COPY_PUNISHMENT_THRESHOLD) {
+            if (guesses.size() >= COPY_PUNISHMENT_THRESHOLD) {
                 return -0.025;
             } else {
                 return -0.05;

@@ -4,6 +4,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.data.RandomScore;
+import xyz.zcraft.seira.bot.data.MessageReference;
+import xyz.zcraft.seira.data.SendResult;
 import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.db.RankGuessRecordStore;
 import xyz.zcraft.seira.bot.data.PendingMessage;
@@ -78,7 +80,7 @@ public final class RankGuessCommandHandler {
         }
 
         if (ctx.argumentCount() == 0) {
-            ctx.sendReply(PendingMessage.ofString(USAGE));
+            currentStatus(ctx);
             return;
         }
 
@@ -165,6 +167,26 @@ public final class RankGuessCommandHandler {
         }
 
         guess(ctx, rank);
+    }
+
+    private void currentStatus(Context ctx) {
+        final RankGuessGameService.GameStatus status = games.getStatus(ctx.groupId());
+        if (status == RankGuessGameService.GameStatus.NO_GAME) {
+            ctx.sendReply(PendingMessage.ofString("目前本群没有进行中的猜 Rank 游戏喵！可以使用 /rg group 或 /rg start 开始游戏喵~"));
+            return;
+        }
+
+        final MessageReference videoMessageRef = games.getVideoMessageRef(ctx.groupId());
+
+        if (status == RankGuessGameService.GameStatus.STARTING || videoMessageRef == null) {
+            ctx.sendReply(PendingMessage.ofString("游戏即将开始，稍等片刻喵~"));
+            return;
+        }
+
+        String reply = "本群猜 Rank 正火热进行中🔥🔥🔥" +
+                "\n目前已经有 " + games.getParticipantCount(ctx.groupId()) + " 个参与者~";
+
+        ctx.sendReply(PendingMessage.ofString(reply).ref(games.getVideoMessageRef(ctx.groupId())));
     }
 
     private void weight(Context ctx) {
@@ -298,7 +320,8 @@ public final class RankGuessCommandHandler {
                         return;
                     }
 
-                    boolean videoSent = ctx.sendReply(taskCoordinator.replayVideoMessage(replay)).success();
+                    final SendResult sendResult = ctx.sendReply(taskCoordinator.replayVideoMessage(replay));
+                    boolean videoSent = sendResult.success();
                     if (!videoSent) {
                         taskCoordinator.removeReplayResult(renderTask.taskId());
                         ctx.sendReply(PendingMessage.ofMarkdownRaw("由于回放发送失败，本轮游戏已取消~"));
@@ -306,7 +329,7 @@ public final class RankGuessCommandHandler {
                     }
 
                     taskCoordinator.removeReplayResult(renderTask.taskId());
-                    var game = games.activate(reservation, round);
+                    var game = games.activate(reservation, round, MessageReference.of(sendResult.sentMessage()));
 
                     if (game == null) {
                         ctx.sendReply(PendingMessage.ofMarkdownRaw("无法开始游戏，请稍后再试喵"));

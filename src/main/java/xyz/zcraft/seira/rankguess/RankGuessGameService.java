@@ -6,6 +6,7 @@ import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.osu.model.Score;
 import xyz.zcraft.osu.model.UserExtended;
 import xyz.zcraft.seira.api.data.RandomScore;
+import xyz.zcraft.seira.bot.data.MessageReference;
 import xyz.zcraft.seira.db.RankGuessRecordStore;
 
 import java.time.Clock;
@@ -54,6 +55,18 @@ public final class RankGuessGameService {
 
     public JsonObject generateWeights(String groupId) {
         return weights.generateWeights(groupId);
+    }
+
+    public String getRevealedHintsString(String groupId) {
+        final RankGuessGame rankGuessGame = games.get(groupId);
+        if (rankGuessGame == null) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (RankGuessGame.Hint revealedHint : rankGuessGame.getRevealedHints()) {
+            sb.append(revealedHint.content()).append("\n");
+        }
+        return sb.toString().trim();
     }
 
     // TODO This is so messed up. Need to rewrite in the future.
@@ -207,7 +220,7 @@ public final class RankGuessGameService {
         return reservation;
     }
 
-    public synchronized RankGuessGame activate(Reservation reservation, Round round) {
+    public synchronized RankGuessGame activate(Reservation reservation, Round round, MessageReference videoRef) {
         if (round == null) {
             throw new IllegalArgumentException("Round must not be null");
         }
@@ -217,6 +230,7 @@ public final class RankGuessGameService {
         }
 
         game.round = round;
+        game.videoRef = videoRef;
         game.guessingStartedAt = clock.instant();
 
         return game;
@@ -385,6 +399,40 @@ public final class RankGuessGameService {
 
             end(s, null, true, true);
         });
+    }
+
+    public GameStatus getStatus(String s) {
+        final RankGuessGame rankGuessGame = games.get(s);
+        if (rankGuessGame == null) {
+            return GameStatus.NO_GAME;
+        }
+        if (rankGuessGame.getRound() == null) {
+            return GameStatus.STARTING;
+        }
+        return GameStatus.RUNNING;
+    }
+
+    public MessageReference getVideoMessageRef(String s) {
+        final RankGuessGame rankGuessGame = games.get(s);
+        if (rankGuessGame == null || rankGuessGame.getRound() == null || rankGuessGame.getVideoRef() == null) {
+            return null;
+        }
+
+        return rankGuessGame.getVideoRef();
+    }
+
+    public int getParticipantCount(String groupId) {
+        final RankGuessGame rankGuessGame = games.get(groupId);
+        if (rankGuessGame == null) {
+            return 0;
+        }
+        return rankGuessGame.guesses.size();
+    }
+
+    public enum GameStatus {
+        NO_GAME,
+        STARTING,
+        RUNNING
     }
 
     public enum GuessStatus {

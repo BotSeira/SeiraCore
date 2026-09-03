@@ -186,6 +186,10 @@ public final class TaskCoordinator {
             message.setMsgSeq(messageSeqCounter.getAndIncrement());
         }
 
+        if (pendingMsg.getMessageReference() != null) {
+            message.setMessageReference(pendingMsg.getMessageReference());
+        }
+
         if (pendingMsg instanceof MDMessage md) {
             message.setMsgType(PendingMessage.MSG_TYPE_MARKDOWN);
             message.setMarkdown(new Gson().toJsonTree(Map.of("content", md.getMarkdown())).getAsJsonObject());
