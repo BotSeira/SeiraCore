@@ -299,6 +299,8 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
 
     @Override
     public void requestStop() {
+        rankGuessGameService.stopAll();
+
         RealtimeServiceInterruptionNotifier.NotificationResult result = interruptionNotifier.notifyGroups(
                 watchService.activeTransientGroupIds(),
                 rankGuessGameService.activeGroupIds(),

@@ -379,6 +379,14 @@ public final class RankGuessGameService {
         return weights.tryWish(groupId, boundUid);
     }
 
+    public void stopAll() {
+        games.forEach((s, g) -> {
+            if (g.isEnded()) return;
+
+            end(s, null, true, true);
+        });
+    }
+
     public enum GuessStatus {
         NO_GAME,
         STARTING,
