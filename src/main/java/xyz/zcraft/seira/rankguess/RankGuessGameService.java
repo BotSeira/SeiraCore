@@ -400,7 +400,7 @@ public final class RankGuessGameService {
     }
 
     public void stopAll() {
-        games.forEach((s, g) -> {
+        Map.copyOf(games).forEach((s, g) -> {
             if (g.isEnded()) return;
 
             end(s, null, true, true);
