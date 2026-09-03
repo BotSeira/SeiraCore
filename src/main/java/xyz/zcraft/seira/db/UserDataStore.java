@@ -15,7 +15,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Locale;
 import java.util.Set;
 
 public final class UserDataStore {
@@ -334,6 +333,28 @@ public final class UserDataStore {
         } catch (SQLException e) {
             throw new RuntimeException("Failed to clear group member", e);
         }
+    }
+
+    public static List<String> findAllGroupMembers(String groupId) {
+        SqliteDatabase.ensureInitialized();
+        String sql = """
+                SELECT open_id
+                FROM group_members
+                WHERE group_id = ?;
+        """;
+        List<String> groupMembers = new LinkedList<>();
+        try (Connection connection = SqliteDatabase.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, groupId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    groupMembers.add(resultSet.getString("open_id"));
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to query group members", e);
+        }
+        return groupMembers;
     }
 
     public static List<Long> findBoundUidsByGroup(String groupId) {

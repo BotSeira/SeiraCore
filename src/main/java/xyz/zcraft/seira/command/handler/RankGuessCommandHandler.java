@@ -5,22 +5,21 @@ import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.data.RandomScore;
 import xyz.zcraft.seira.bot.data.MessageReference;
-import xyz.zcraft.seira.data.SendResult;
-import xyz.zcraft.seira.db.UserDataStore;
-import xyz.zcraft.seira.db.RankGuessRecordStore;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.parse.UserRefResolution;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
+import xyz.zcraft.seira.data.SendResult;
 import xyz.zcraft.seira.data.UserRef;
+import xyz.zcraft.seira.db.RankGuessRecordStore;
+import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.rankguess.RankGuessGame;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
 import xyz.zcraft.seira.rankguess.WishResult;
 
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
@@ -90,6 +89,16 @@ public final class RankGuessCommandHandler {
                 statistics(ctx, false);
             } else if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
                 statistics(ctx, true);
+            } else {
+                ctx.sendReply(PendingMessage.ofString(USAGE));
+            }
+            return;
+        }
+        if ("lb".equalsIgnoreCase(argument)) {
+            if (ctx.argumentCount() == 1) {
+                leaderboard(ctx, false);
+            } else if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
+                leaderboard(ctx, true);
             } else {
                 ctx.sendReply(PendingMessage.ofString(USAGE));
             }
@@ -206,46 +215,88 @@ public final class RankGuessCommandHandler {
     }
 
     private void statistics(Context ctx, boolean allGroups) {
+        final Long boundUid = UserDataStore.findBoundUid(ctx.senderUserId());
         try {
-            RankGuessRecordStore.Statistics statistics = RankGuessRecordStore.getStatistics(
+            RankGuessRecordStore.Statistics.Personal statistics = RankGuessRecordStore.getPersonalStatistics(
                     ctx.senderUserId(),
-                    allGroups ? null : ctx.groupId()
+                    allGroups ? null : ctx.groupId(),
+                    null
             );
 
-            ctx.sendReply(replyFactory.rankGuessStatisticsMessage(ctx, statistics, allGroups, getRank(statistics)));
+            final Rank rank = Rank.from(statistics);
+
+            Long groupGameCount = boundUid == null ? null : RankGuessRecordStore.getGroupGameCount(ctx.groupId(), null);
+            Long pickedTimes = boundUid == null ? null : RankGuessRecordStore.getPickedTimes(boundUid, ctx.groupId());
+
+            ctx.sendReply(replyFactory.rankGuessStatisticsMessage(ctx, statistics, allGroups, rank, pickedTimes, groupGameCount));
         } catch (RuntimeException e) {
             LOG.error("Failed to query rank guess statistics", e);
             ctx.sendReply(PendingMessage.ofString("战绩查询失败，请稍后重试喵。"));
         }
     }
 
-    private String getRank(RankGuessRecordStore.Statistics statistics) {
-        if (statistics.participation() < 3) {
-            return "?";
+    private void leaderboard(Context ctx, boolean all) {
+        try {
+            final List<String> allGroupMembers = UserDataStore.findAllGroupMembers(ctx.groupId());
+            final Map<String, Rank> ranks = new HashMap<>();
+
+            for (String openId : allGroupMembers) {
+                if (!RankGuessRecordStore.canBeRanked(openId, ctx.groupId())) {
+                    continue;
+                }
+
+                ranks.put(
+                        openId,
+                        Rank.from(
+                                RankGuessRecordStore.getPersonalStatistics(
+                                        openId, ctx.groupId(), null
+                                )
+                        )
+                );
+            }
+
+            final List<Map.Entry<String, Rank>> groupRanks = ranks.entrySet().stream()
+                    .sorted(Comparator.comparingDouble(entry -> entry.getValue().rating()))
+                    .toList()
+                    .reversed();
+
+            StringBuilder reply = new StringBuilder();
+
+            if (all) {
+                reply.append(at(ctx)).append("本群猜 Rank 战绩排行：\n");
+                for (int i = 0; i < groupRanks.size(); i++) {
+                    final Map.Entry<String, Rank> aRank = groupRanks.get(i);
+                    reply.append("> __\\#").append(i + 1).append("__ ").append(at(aRank.getKey())).append(" (%.2f)".formatted(aRank.getValue().rating())).append("\n");
+                }
+            } else {
+                if (!RankGuessRecordStore.canBeRanked(ctx.senderUserId(), ctx.groupId()) || !ranks.containsKey(ctx.senderUserId())) {
+                    reply.append(at(ctx)).append("你还未在本群参加过猜 Rank，或参与次数不足喵~");
+                } else {
+                    int placement = 0;
+                    for (int i = 0; i < groupRanks.size(); i++) {
+                        if (groupRanks.get(i).getKey().equals(ctx.senderUserId())) {
+                            placement = i + 1;
+                            break;
+                        }
+                    }
+                    reply.append(at(ctx)).append("你在本群猜 Rank 战绩排行第 __").append(placement).append("__ 名！\n");
+                    reply.append("以下是你附近的玩家：\n");
+                    for (int i = Math.max(0, placement - 1 - 2); i < groupRanks.size() && i < placement - 1 + 3; i++) {
+                        final Map.Entry<String, Rank> aRank = groupRanks.get(i);
+                        reply.append("> __\\#").append(i + 1).append("__ ").append(at(aRank.getKey()))
+                                .append(" (%.2f) (%+.3f)".formatted(
+                                        aRank.getValue().rating(),
+                                        groupRanks.get(placement - 1).getValue().rating() - aRank.getValue().rating())
+                                ).append("\n");
+                    }
+                }
+            }
+
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(reply.toString().trim()));
+        } catch (RuntimeException e) {
+            LOG.error("Failed to query rank guess statistics", e);
+            ctx.sendReply(PendingMessage.ofString("战绩查询失败，请稍后重试喵。"));
         }
-
-        double averageScoreRate = Math.clamp(
-                statistics.averageScore() / 1000.0,
-                0.0, 1.0
-        );
-
-        double rawRating =
-                averageScoreRate * 0.50
-                        + statistics.winRate() * 0.20
-                        + statistics.topTwentyRate() * 0.30;
-
-        double confidence = 1.0 - Math.exp(-statistics.participation() / 10.0);
-
-        double rating = 0.50 * (1.0 - confidence) + rawRating * confidence;
-
-
-        if (rating >= 0.90) return "SS";
-        if (rating >= 0.82) return "S";
-        if (rating >= 0.74) return "A";
-        if (rating >= 0.64) return "B";
-        if (rating >= 0.52) return "C";
-        if (rating >= 0.40) return "D";
-        return "F";
     }
 
     private void wish(Context ctx) {
@@ -479,6 +530,53 @@ public final class RankGuessCommandHandler {
 
         if (!ctx.sendReply(message).success()) {
             ctx.sendMessage(message);
+        }
+    }
+
+    public record Rank(double rating, double ratingRaw, String rank) {
+        public static Rank from(RankGuessRecordStore.Statistics.Personal statistics) {
+            final double pendingRatingRaw = getRatingRaw(statistics);
+            final double pendingRating = standardRating(pendingRatingRaw);
+            final String pendingRank = getRankText(statistics);
+
+            return new Rank(pendingRating, pendingRatingRaw, pendingRank);
+        }
+
+        private static double getRatingRaw(RankGuessRecordStore.Statistics.Personal statistics) {
+            double averageScoreRate = Math.clamp(
+                    statistics.averageScore() / 1000.0,
+                    0.0, 1.0
+            );
+
+            double rawRating = averageScoreRate * 0.50
+                    + statistics.winRate() * 0.20
+                    + statistics.topTwentyRate() * 0.30;
+
+            double confidence = 1.0 - Math.exp(-statistics.participation() / 10.0);
+
+            return 0.50 * (1.0 - confidence) + rawRating * confidence;
+        }
+
+        private static double standardRating(double ratingRaw) {
+            ratingRaw = Math.clamp(ratingRaw, 0.0, 1.0);
+
+            return 1 + Math.pow(2 * ratingRaw - 1, 3);
+        }
+
+        private static String getRankText(RankGuessRecordStore.Statistics.Personal statistics) {
+            if (statistics.participation() < 3) {
+                return "?";
+            }
+
+            double rawRating = getRatingRaw(statistics);
+
+            if (rawRating >= 0.90) return "SS";
+            if (rawRating >= 0.82) return "S";
+            if (rawRating >= 0.74) return "A";
+            if (rawRating >= 0.64) return "B";
+            if (rawRating >= 0.52) return "C";
+            if (rawRating >= 0.40) return "D";
+            return "F";
         }
     }
 }
