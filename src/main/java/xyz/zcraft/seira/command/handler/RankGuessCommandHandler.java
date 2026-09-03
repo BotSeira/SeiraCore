@@ -228,12 +228,21 @@ public final class RankGuessCommandHandler {
                     null
             );
 
-            final Rank rank = Rank.from(statistics);
+            RankGuessRecordStore.Statistics.Personal recentStatistics = RankGuessRecordStore.getRecentPersonalStatistics(
+                    ctx.senderUserId(),
+                    allGroups ? null : ctx.groupId(),
+                    null,
+                    Rank.RECENT_GAME_LIMIT
+            );
+
+            final Rank rank = Rank.from(recentStatistics);
 
             Long groupGameCount = boundUid == null ? null : RankGuessRecordStore.getGroupGameCount(ctx.groupId(), null);
             Long pickedTimes = boundUid == null ? null : RankGuessRecordStore.getPickedTimes(boundUid, ctx.groupId());
 
-            ctx.sendReply(replyFactory.rankGuessStatisticsMessage(ctx, statistics, allGroups, rank, pickedTimes, groupGameCount));
+            ctx.sendReply(replyFactory.rankGuessStatisticsMessage(
+                    ctx, statistics, recentStatistics, allGroups, rank, pickedTimes, groupGameCount
+            ));
         } catch (RuntimeException e) {
             LOG.error("Failed to query rank guess statistics", e);
             ctx.sendReply(PendingMessage.ofString("战绩查询失败，请稍后重试喵。"));
@@ -253,8 +262,8 @@ public final class RankGuessCommandHandler {
                 ranks.put(
                         openId,
                         Rank.from(
-                                RankGuessRecordStore.getPersonalStatistics(
-                                        openId, ctx.groupId(), null
+                                RankGuessRecordStore.getRecentPersonalStatistics(
+                                        openId, ctx.groupId(), null, Rank.RECENT_GAME_LIMIT
                                 )
                         )
                 );
@@ -539,6 +548,8 @@ public final class RankGuessCommandHandler {
     }
 
     public record Rank(double rating, double ratingRaw, String rank) {
+        public static final int RECENT_GAME_LIMIT = 10;
+
         public static Rank from(RankGuessRecordStore.Statistics.Personal statistics) {
             final double pendingRatingRaw = getRatingRaw(statistics);
             final double pendingRating = standardRating(pendingRatingRaw);
@@ -557,6 +568,8 @@ public final class RankGuessCommandHandler {
                     + statistics.winRate() * 0.10
                     + statistics.topTwentyRate() * 0.40;
 
+            rawRating *= 1.1;
+
             double confidence = 1.0 - Math.exp(-statistics.participation() / 10.0);
 
             return 0.50 * (1.0 - confidence) + rawRating * confidence;
@@ -564,13 +577,13 @@ public final class RankGuessCommandHandler {
 
         private static double standardRating(double ratingRaw) {
             double z = 2 * ratingRaw - 1;
-            double p = 1.25;
+            double p = 1.1;
 
             return 1 + Math.copySign(Math.pow(Math.abs(z), p), z);
         }
 
         private static String getRankText(RankGuessRecordStore.Statistics.Personal statistics) {
-            if (statistics.participation() < 3) {
+            if (statistics.participation() < 5) {
                 return "?";
             }
 

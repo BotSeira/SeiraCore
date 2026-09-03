@@ -125,6 +125,7 @@ public final class ReplyFactory {
 
     public PendingMessage rankGuessStatisticsMessage(
             Context ctx, RankGuessRecordStore.Statistics.Personal statistics,
+            RankGuessRecordStore.Statistics.Personal recentStatistics,
             boolean allGroups, RankGuessCommandHandler.Rank rank,
             Long pickedTimes, Long groupGameCount
     ) {
@@ -133,24 +134,35 @@ public final class ReplyFactory {
             return PendingMessage.ofMarkdownRaw(at(ctx) + "你在" + scope + "还没有已结算的猜 Rank 战绩喵~");
         }
 
-        String rankText = "?".equals(rank.rank()) ? "" : "根据你的总体表现，可以给到一个 `%s` 喵！\n".formatted(rank.rank());
+        String rankText = "?".equals(rank.rank()) ? "" : "根据你最近 %d 场的表现，可以给到一个 `%s` 喵！\n"
+                .formatted(RankGuessCommandHandler.Rank.RECENT_GAME_LIMIT, rank.rank());
         String groupCountText = "";
         if (!allGroups && pickedTimes != null && groupGameCount != null) {
             groupCountText = "> 被猜次数：`%d`，占本群：`%.3f%%`\n".formatted(pickedTimes, (double) pickedTimes / groupGameCount * 100);
         }
         return PendingMessage.ofMarkdownRaw(at(ctx) + String.format(Locale.ROOT, """
-                        你的猜 Rank 战绩（%s）
+                        你的猜 Rank 战绩（%s，括号为近 %d 场）
                         > 总参与数：`%d`，Rating：`%.2f`
-                        > 获胜数：`%d`，胜率：`%.2f%%`
-                        > 前20%%次数：`%d`，达成率：`%.2f%%`
-                        > 平均分：`%.2f`，最高分：`%.2f`
-                        > 总得分：`%.2f`，平均名次：`%.2f`
+                        > 获胜数：`%d`（`%d`）
+                        > 胜率：`%.2f%%`（`%.2f%%`）
+                        > 前20%%：`%d`（`%d`）
+                        > 前20%%达成率：`%.2f%%`（`%.2f%%`）
+                        > 平均分：`%.2f`（`%.2f`）
+                        > 最高分：`%.2f`（`%.2f`）
+                        > 平均名次：`%.2f`（`%.2f`）
+                        > 总得分：`%.2f`
                         %s%s
-                        """, scope, statistics.participation(), rank.rating(),
-                statistics.wins(), statistics.winRate() * 100,
-                statistics.topTwentyCount(), statistics.topTwentyRate() * 100,
-                statistics.averageScore(), statistics.highestScore(), statistics.totalScore(),
-                statistics.averagePlacement(), groupCountText, rankText).strip());
+                        """,
+                scope, RankGuessCommandHandler.Rank.RECENT_GAME_LIMIT,
+                statistics.participation(), rank.rating(),
+                statistics.wins(), recentStatistics.wins(),
+                statistics.winRate() * 100, recentStatistics.winRate() * 100,
+                statistics.topTwentyCount(), recentStatistics.topTwentyCount(),
+                statistics.topTwentyRate() * 100, recentStatistics.topTwentyRate() * 100,
+                statistics.averageScore(), recentStatistics.averageScore(),
+                statistics.highestScore(), recentStatistics.highestScore(),
+                statistics.averagePlacement(), statistics.totalScore(),
+                recentStatistics.averagePlacement(), groupCountText, rankText).strip());
     }
 
     public PendingMessage boMessage(Context ctx, Response<?> response) {

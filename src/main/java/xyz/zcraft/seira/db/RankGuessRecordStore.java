@@ -146,6 +146,21 @@ public class RankGuessRecordStore {
     }
 
     public static Statistics.Personal getPersonalStatistics(String userId, String groupId, Integer scoringVersion) {
+        return getPersonalStatistics(userId, groupId, scoringVersion, null);
+    }
+
+    public static Statistics.Personal getRecentPersonalStatistics(
+            String userId, String groupId, Integer scoringVersion, int gameLimit
+    ) {
+        if (gameLimit < 1) {
+            throw new IllegalArgumentException("gameLimit must be positive");
+        }
+        return getPersonalStatistics(userId, groupId, scoringVersion, gameLimit);
+    }
+
+    private static Statistics.Personal getPersonalStatistics(
+            String userId, String groupId, Integer scoringVersion, Integer gameLimit
+    ) {
         requireText(userId, "userId");
         if (groupId != null) requireText(groupId, "groupId");
         if (scoringVersion != null && scoringVersion < 1) {
@@ -153,20 +168,24 @@ public class RankGuessRecordStore {
         }
         String sql = """
                 SELECT COUNT(*) AS participation,
-                       COALESCE(SUM(CASE WHEN r.placement = 1 THEN 1 ELSE 0 END), 0) AS wins,
-                       COALESCE(SUM(CASE WHEN g.participant_count >= ?
-                           AND r.placement <= (g.participant_count + 4) / 5 THEN 1 ELSE 0 END), 0) AS top_twenty,
-                       COALESCE(SUM(CASE WHEN g.participant_count >= ? THEN 1 ELSE 0 END), 0) AS top_twenty_eligible,
-                       COALESCE(SUM(r.final_score), 0) AS total_score,
-                       COALESCE(AVG(r.final_score), 0) AS average_score,
-                       COALESCE(MAX(r.final_score), 0) AS highest_score,
-                       COALESCE(AVG(r.placement), 0) AS average_placement
-                FROM rank_guess_results r
-                JOIN rank_guess_games g ON g.round_id = r.round_id
-                WHERE r.user_id = ?
+                       COALESCE(SUM(CASE WHEN recent.placement = 1 THEN 1 ELSE 0 END), 0) AS wins,
+                       COALESCE(SUM(CASE WHEN recent.participant_count >= ?
+                           AND recent.placement <= (recent.participant_count + 4) / 5 THEN 1 ELSE 0 END), 0) AS top_twenty,
+                       COALESCE(SUM(CASE WHEN recent.participant_count >= ? THEN 1 ELSE 0 END), 0) AS top_twenty_eligible,
+                       COALESCE(SUM(recent.final_score), 0) AS total_score,
+                       COALESCE(AVG(recent.final_score), 0) AS average_score,
+                       COALESCE(MAX(recent.final_score), 0) AS highest_score,
+                       COALESCE(AVG(recent.placement), 0) AS average_placement
+                FROM (
+                    SELECT r.placement, r.final_score, g.participant_count
+                    FROM rank_guess_results r
+                    JOIN rank_guess_games g ON g.round_id = r.round_id
+                    WHERE r.user_id = ?
                 """;
         if (groupId != null) sql += " AND g.group_id = ?";
         if (scoringVersion != null) sql += " AND g.scoring_version = ?";
+        if (gameLimit != null) sql += " ORDER BY g.ended_at DESC, g.round_id DESC LIMIT ?";
+        sql += ") recent";
         try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setInt(1, TOP_TWENTY_MIN_PARTICIPANTS);
@@ -174,7 +193,8 @@ public class RankGuessRecordStore {
             statement.setString(3, userId);
             int index = 4;
             if (groupId != null) statement.setString(index++, groupId);
-            if (scoringVersion != null) statement.setInt(index, scoringVersion);
+            if (scoringVersion != null) statement.setInt(index++, scoringVersion);
+            if (gameLimit != null) statement.setInt(index, gameLimit);
             try (ResultSet result = statement.executeQuery()) {
                 result.next();
                 return new Statistics.Personal(

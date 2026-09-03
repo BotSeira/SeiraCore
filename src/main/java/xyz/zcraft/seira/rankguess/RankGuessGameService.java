@@ -20,7 +20,7 @@ import static xyz.zcraft.seira.rankguess.RankGuessGame.COPY_PUNISHMENT_THRESHOLD
 
 public final class RankGuessGameService {
     public static final int SCORING_VERSION = 1;
-    public static final int MIN_GAMES_TO_RANK = 3;
+    public static final int MIN_GAMES_TO_RANK = 10;
     private static final Duration END_PROTECTION_DURATION = Duration.ofMinutes(3);
     private static final int MIN_PARTICIPANT_TO_RECORD = 3;
     private final Map<String, RankGuessGame> games = new HashMap<>();
