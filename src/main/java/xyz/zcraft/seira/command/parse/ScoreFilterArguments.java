@@ -7,7 +7,9 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Parses score-list filters and converts aliases to oStella's compact filter syntax. */
+/**
+ * Parses score-list filters and converts aliases to oStella's compact filter syntax.
+ */
 public final class ScoreFilterArguments {
     private static final Pattern FILTER_PATTERN = Pattern.compile(
             "(?i)^(acc(?:uracy)?|combo|pp|time|length|len|star|stars|sr|bpm|miss|misses|score|mod|mods|rank|replay"

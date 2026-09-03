@@ -7,19 +7,19 @@ import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.osu.model.*;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.data.*;
-import xyz.zcraft.seira.command.handler.RankGuessCommandHandler;
-import xyz.zcraft.seira.services.BindingService;
-import xyz.zcraft.seira.db.UserDataStore;
-import xyz.zcraft.seira.db.RankGuessRecordStore;
 import xyz.zcraft.seira.bot.data.Button;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
+import xyz.zcraft.seira.command.handler.RankGuessCommandHandler;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.BindingConfig;
 import xyz.zcraft.seira.data.UploadedImage;
+import xyz.zcraft.seira.db.RankGuessRecordStore;
+import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.rankguess.FinishedRound;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
 import xyz.zcraft.seira.rankguess.Standing;
+import xyz.zcraft.seira.services.BindingService;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.services.DailyLuck;
 import xyz.zcraft.seira.util.VersionInfo;
@@ -135,18 +135,18 @@ public final class ReplyFactory {
 
         String rankText = "?".equals(rank.rank()) ? "" : "根据你的总体表现，可以给到一个 `%s` 喵！\n".formatted(rank.rank());
         String groupCountText = "";
-        if (allGroups && pickedTimes != null && groupGameCount != null) {
-            groupCountText = "> 被猜次数：`%d`，占本群：`%.3f%%`".formatted(pickedTimes, (double) pickedTimes / groupGameCount * 100);
+        if (!allGroups && pickedTimes != null && groupGameCount != null) {
+            groupCountText = "> 被猜次数：`%d`，占本群：`%.3f%%`\n".formatted(pickedTimes, (double) pickedTimes / groupGameCount * 100);
         }
         return PendingMessage.ofMarkdownRaw(at(ctx) + String.format(Locale.ROOT, """
-                你的猜 Rank 战绩（%s）
-                > 总参与数：`%d`，Rating：`%.2f`
-                > 获胜数：`%d`，胜率：`%.2f%%`
-                > 前20%%次数：`%d`，达成率：`%.2f%%`
-                > 平均分：`%.2f`，最高分：`%.2f`
-                > 总得分：`%.2f`，平均名次：`%.2f`
-                %s%s
-                """, scope, statistics.participation(), rank.rating(),
+                        你的猜 Rank 战绩（%s）
+                        > 总参与数：`%d`，Rating：`%.2f`
+                        > 获胜数：`%d`，胜率：`%.2f%%`
+                        > 前20%%次数：`%d`，达成率：`%.2f%%`
+                        > 平均分：`%.2f`，最高分：`%.2f`
+                        > 总得分：`%.2f`，平均名次：`%.2f`
+                        %s%s
+                        """, scope, statistics.participation(), rank.rating(),
                 statistics.wins(), statistics.winRate() * 100,
                 statistics.topTwentyCount(), statistics.topTwentyRate() * 100,
                 statistics.averageScore(), statistics.highestScore(), statistics.totalScore(),
@@ -155,7 +155,7 @@ public final class ReplyFactory {
 
     public PendingMessage boMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                at(ctx)  + "查询完成，共" + response.getScoreIds().size() + "个成绩\n" +
+                at(ctx) + "查询完成，共" + response.getScoreIds().size() + "个成绩\n" +
                         "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()),
                 buttons().boButtons(response.getUserId())
         );

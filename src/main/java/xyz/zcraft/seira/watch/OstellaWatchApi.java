@@ -36,6 +36,28 @@ public class OstellaWatchApi implements WatchApi {
         this.gson = gson;
     }
 
+    private static void ensureSuccessfulResponse(JsonObject root, String action) {
+        if (root == null || !root.has("success") || !root.get("success").getAsBoolean()) {
+            String message = root != null && root.has("message") && !root.get("message").isJsonNull()
+                    ? root.get("message").getAsString()
+                    : "未知错误";
+            throw new IllegalStateException(action + "失败: " + message);
+        }
+    }
+
+    private static void ensureSuccessfulStatus(int statusCode, Object body, String action) {
+        if (statusCode >= 200 && statusCode < 300) {
+            return;
+        }
+        String detail = body instanceof byte[] bytes
+                ? new String(bytes, StandardCharsets.UTF_8)
+                : String.valueOf(body);
+        if (detail.length() > 500) {
+            detail = detail.substring(0, 500);
+        }
+        throw new IllegalStateException(action + "失败: HTTP " + statusCode + " " + detail);
+    }
+
     @Override
     public Map<Long, List<RecentScore>> getRecentScores(Collection<Long> userIds, int limit) {
         JsonObject body = new JsonObject();
@@ -103,27 +125,5 @@ public class OstellaWatchApi implements WatchApi {
         } catch (IOException e) {
             throw new RuntimeException("无法连接 oStella", e);
         }
-    }
-
-    private static void ensureSuccessfulResponse(JsonObject root, String action) {
-        if (root == null || !root.has("success") || !root.get("success").getAsBoolean()) {
-            String message = root != null && root.has("message") && !root.get("message").isJsonNull()
-                    ? root.get("message").getAsString()
-                    : "未知错误";
-            throw new IllegalStateException(action + "失败: " + message);
-        }
-    }
-
-    private static void ensureSuccessfulStatus(int statusCode, Object body, String action) {
-        if (statusCode >= 200 && statusCode < 300) {
-            return;
-        }
-        String detail = body instanceof byte[] bytes
-                ? new String(bytes, StandardCharsets.UTF_8)
-                : String.valueOf(body);
-        if (detail.length() > 500) {
-            detail = detail.substring(0, 500);
-        }
-        throw new IllegalStateException(action + "失败: HTTP " + statusCode + " " + detail);
     }
 }

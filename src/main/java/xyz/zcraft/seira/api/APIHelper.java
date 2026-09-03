@@ -9,9 +9,9 @@ import org.jetbrains.annotations.Nullable;
 import xyz.zcraft.osu.model.*;
 import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.api.data.*;
+import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.command.parse.ShortcutTarget;
-import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
@@ -505,8 +505,8 @@ public class APIHelper {
     }
 
     public static ReplayTaskInfo createReplayRenderTask(ShortcutTarget target,
-                                                         TimeDurationParser.TimeRange timeRange,
-                                                         QqUploadRequest qqUpload) {
+                                                        TimeDurationParser.TimeRange timeRange,
+                                                        QqUploadRequest qqUpload) {
         return createReplayTask(target, timeRange, qqUpload);
     }
 
@@ -636,7 +636,7 @@ public class APIHelper {
     }
 
     public static ReplayTaskInfo createBeatmapPreviewTask(ShortcutTarget target, String mods, String auth,
-                                                           QqUploadRequest qqUpload) {
+                                                          QqUploadRequest qqUpload) {
         long beatmapId = lookupBeatmap(target, auth);
         JsonObject body = new JsonObject();
         if (mods != null && !mods.isBlank()) {
@@ -655,7 +655,7 @@ public class APIHelper {
     }
 
     public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget beatmapTarget, String[] scoreTargets, String auth,
-                                                           QqUploadRequest qqUpload) {
+                                                          QqUploadRequest qqUpload) {
         scoreTargets = scoreTargets == null ? new String[0] : scoreTargets;
 
         if (beatmapTarget.isLocalScore()) {
@@ -689,8 +689,8 @@ public class APIHelper {
     }
 
     private static ReplayTaskInfo createReplayTask(ShortcutTarget target,
-                                                    TimeDurationParser.TimeRange timeRange,
-                                                    QqUploadRequest qqUpload) {
+                                                   TimeDurationParser.TimeRange timeRange,
+                                                   QqUploadRequest qqUpload) {
         String scoreId = lookupScoreId(target);
 
         if (timeRange == null) {

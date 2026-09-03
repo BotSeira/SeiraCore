@@ -4,15 +4,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -43,6 +35,23 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
             thread.setDaemon(true);
             return thread;
         });
+    }
+
+    private static Duration requirePositive(Duration duration) {
+        if (duration == null || duration.isZero() || duration.isNegative()) {
+            throw new IllegalArgumentException("pollInterval must be positive");
+        }
+        return duration;
+    }
+
+    private static void requireIdentifier(String value, String name) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(name + " must not be blank");
+        }
+    }
+
+    private static RoomWatchView view(WatchEntry entry) {
+        return new RoomWatchView(entry.version, entry.roomId, entry.roomName);
     }
 
     public void start() {
@@ -274,23 +283,6 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
         }
     }
 
-    private static Duration requirePositive(Duration duration) {
-        if (duration == null || duration.isZero() || duration.isNegative()) {
-            throw new IllegalArgumentException("pollInterval must be positive");
-        }
-        return duration;
-    }
-
-    private static void requireIdentifier(String value, String name) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(name + " must not be blank");
-        }
-    }
-
-    private static RoomWatchView view(WatchEntry entry) {
-        return new RoomWatchView(entry.version, entry.roomId, entry.roomName);
-    }
-
     @Override
     public void close() {
         if (closed.compareAndSet(false, true)) {
@@ -298,12 +290,8 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
         }
     }
 
-    private static final class WatchEntry {
-        private final MultiplayerRoomVersion version;
-        private final long roomId;
-        private final String roomName;
-        private final Set<Long> sentPlaylistItemIds;
-
+    private record WatchEntry(MultiplayerRoomVersion version, long roomId, String roomName,
+                              Set<Long> sentPlaylistItemIds) {
         private WatchEntry(
                 MultiplayerRoomVersion version,
                 long roomId,

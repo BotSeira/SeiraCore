@@ -1,8 +1,8 @@
 package xyz.zcraft.seira.command.parse;
 
 import xyz.zcraft.seira.api.data.SearchQuery;
-import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.data.UserRef;
+import xyz.zcraft.seira.db.UserDataStore;
 
 import java.util.*;
 import java.util.regex.MatchResult;

@@ -4,7 +4,9 @@ import java.util.Map;
 
 import static java.util.Map.entry;
 
-/** Human-readable names for QQ's documented built-in face IDs. */
+/**
+ * Human-readable names for QQ's documented built-in face IDs.
+ */
 public final class QqFaceNames {
     private static final Map<String, String> NAMES = Map.<String, String>ofEntries(
             entry("0", "惊讶"), entry("1", "撇嘴"), entry("2", "色"), entry("3", "发呆"),
@@ -78,7 +80,8 @@ public final class QqFaceNames {
             entry("346", "你真棒棒"), entry("347", "大展宏兔"), entry("348", "福萝卜")
     );
 
-    private QqFaceNames() {}
+    private QqFaceNames() {
+    }
 
     public static String describe(String id) {
         if (id == null || id.isBlank()) return "[表情]";

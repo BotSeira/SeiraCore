@@ -17,6 +17,10 @@ public final class DcsCommandHandler {
         this.bridgeService = Objects.requireNonNull(bridgeService);
     }
 
+    private static void usage(Context ctx) {
+        ctx.sendReply(PendingMessage.ofString(USAGE));
+    }
+
     public void handleDcs(Context ctx) {
         if (!ctx.inGroup()) {
             ctx.sendReply(PendingMessage.ofString("/dcs 仅支持在群聊中使用。"));
@@ -69,9 +73,5 @@ public final class DcsCommandHandler {
         ctx.sendReply(PendingMessage.ofString(
                 removed ? "Discord 消息同步已解除。" : "当前群聊尚未开启 Discord 消息同步。"
         ));
-    }
-
-    private static void usage(Context ctx) {
-        ctx.sendReply(PendingMessage.ofString(USAGE));
     }
 }

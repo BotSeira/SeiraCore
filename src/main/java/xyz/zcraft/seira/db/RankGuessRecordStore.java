@@ -11,7 +11,9 @@ import static xyz.zcraft.seira.rankguess.RankGuessGameService.MIN_GAMES_TO_RANK;
 public class RankGuessRecordStore {
     public static final int TOP_TWENTY_MIN_PARTICIPANTS = 1;
 
-    /** Returns false when this round has already been saved. All rows are committed together. */
+    /**
+     * Returns false when this round has already been saved. All rows are committed together.
+     */
     public static boolean save(FinishedRound finished) {
         validate(finished);
         String gameSql = """
@@ -79,7 +81,7 @@ public class RankGuessRecordStore {
         String sql = """
                 SELECT COUNT(*)
                 FROM rank_guess_games g
-                WHERE g.target_score_id = ?
+                WHERE g.target_user_id = ?
                 """;
         if (groupId != null) sql += " AND g.group_id = ?";
         try (Connection connection = SqliteDatabase.getConnection();
@@ -187,28 +189,6 @@ public class RankGuessRecordStore {
         }
     }
 
-    public static class Statistics {
-        public record Personal(
-                long participation, long wins, long topTwentyCount, long topTwentyEligibleParticipation,
-                double totalScore, double averageScore, double highestScore, double averagePlacement
-        ) {
-            public double winRate() {
-                return participation == 0 ? 0 : wins / (double) participation;
-            }
-
-            public double topTwentyRate() {
-                return topTwentyEligibleParticipation == 0 ? 0
-                        : topTwentyCount / (double) topTwentyEligibleParticipation;
-            }
-        }
-    }
-
-    public static final class RecordSaveException extends RuntimeException {
-        public RecordSaveException(String message, Throwable cause) {
-            super(message, cause);
-        }
-    }
-
     private static void validate(FinishedRound finished) {
         Objects.requireNonNull(finished, "finished");
         Objects.requireNonNull(finished.id(), "id");
@@ -240,11 +220,11 @@ public class RankGuessRecordStore {
                      group_id          TEXT NOT NULL,
                      source_mode       TEXT NOT NULL
                                        CHECK (source_mode IN ('random', 'group')),
-
+                
                      target_user_id    INTEGER NOT NULL,
                      target_score_id   INTEGER NOT NULL,
                      actual_rank       INTEGER NOT NULL CHECK (actual_rank > 0),
-
+                
                      started_at        INTEGER NOT NULL,
                      ended_at          INTEGER NOT NULL,
                      participant_count INTEGER NOT NULL CHECK (participant_count >= 0),
@@ -255,13 +235,13 @@ public class RankGuessRecordStore {
                 CREATE TABLE IF NOT EXISTS rank_guess_results (
                      round_id          TEXT NOT NULL,
                      user_id           TEXT NOT NULL,
-
+                
                      guessed_rank      INTEGER NOT NULL CHECK (guessed_rank > 0),
                      placement         INTEGER NOT NULL CHECK (placement > 0),
                      raw_score         REAL NOT NULL,
                      multiplier        REAL NOT NULL,
                      final_score       REAL NOT NULL,
-
+                
                      PRIMARY KEY (round_id, user_id),
                      FOREIGN KEY (round_id) REFERENCES rank_guess_games(round_id)
                  );
@@ -279,6 +259,28 @@ public class RankGuessRecordStore {
             statement.execute(rgResultSql);
             statement.execute(rgResultIndex);
             statement.execute(rgGameIndex);
+        }
+    }
+
+    public static class Statistics {
+        public record Personal(
+                long participation, long wins, long topTwentyCount, long topTwentyEligibleParticipation,
+                double totalScore, double averageScore, double highestScore, double averagePlacement
+        ) {
+            public double winRate() {
+                return participation == 0 ? 0 : wins / (double) participation;
+            }
+
+            public double topTwentyRate() {
+                return topTwentyEligibleParticipation == 0 ? 0
+                        : topTwentyCount / (double) topTwentyEligibleParticipation;
+            }
+        }
+    }
+
+    public static final class RecordSaveException extends RuntimeException {
+        public RecordSaveException(String message, Throwable cause) {
+            super(message, cause);
         }
     }
 }

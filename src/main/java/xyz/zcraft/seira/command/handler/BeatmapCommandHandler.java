@@ -6,12 +6,14 @@ import xyz.zcraft.seira.api.data.SearchQuery;
 import xyz.zcraft.seira.api.data.SearchResultItem;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.data.PendingMessage;
-import xyz.zcraft.seira.command.*;
+import xyz.zcraft.seira.command.Context;
+import xyz.zcraft.seira.command.TargetHistory;
+import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
-import xyz.zcraft.seira.command.reply.CommandUsage;
-import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.command.parse.ShortcutTarget;
 import xyz.zcraft.seira.command.parse.TargetResolution;
+import xyz.zcraft.seira.command.reply.CommandUsage;
+import xyz.zcraft.seira.command.reply.ReplyFactory;
 
 import java.util.List;
 import java.util.function.Function;
@@ -302,9 +304,9 @@ public final class BeatmapCommandHandler {
             return;
         }
         taskCoordinator.runApiRequest(ctx, "Search Beatmapset", () -> {
-                    Response<List<SearchResultItem>> searchResponse = APIHelper.searchBeatmapSetResponse(searchQuery);
-                    ctx.sendReply(replyFactory.searchMessage(ctx, searchResponse, searchQuery));
-                });
+            Response<List<SearchResultItem>> searchResponse = APIHelper.searchBeatmapSetResponse(searchQuery);
+            ctx.sendReply(replyFactory.searchMessage(ctx, searchResponse, searchQuery));
+        });
     }
 
 }

@@ -9,21 +9,21 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 @Getter
 public final class RankGuessGame {
+    public static final int COPY_PUNISHMENT_THRESHOLD = 8;
     public final UUID token;
     public final String starterUserId;
     public final boolean fromGroup;
     public final Map<String, Guess> guesses = new LinkedHashMap<>();
-    public boolean copyPunishmentReduced = false;
     public final AtomicInteger guessCount = new AtomicInteger(0);
     private final List<Hint> revealedHints = new ArrayList<>();
+    public boolean copyPunishmentReduced = false;
     public RankGuessGameService.Round round;
     public Instant guessingStartedAt;
     public long nextSequence;
     @Getter
-    private volatile boolean ended = false;
-
-    @Getter
     public MessageReference videoRef = null;
+    @Getter
+    private volatile boolean ended = false;
 
     RankGuessGame(UUID token, String starterUserId, boolean fromGroup) {
         this.token = token;
@@ -50,7 +50,6 @@ public final class RankGuessGame {
         return List.copyOf(revealedHints);
     }
 
-    public static final int COPY_PUNISHMENT_THRESHOLD = 8;
     public double getMultiplierDelta(RankGuessGameService.ScoreMultiplier multiplier) {
         if (multiplier instanceof RankGuessGameService.ScoreMultiplier.FirstGuessMultiplier) {
             return 0.05;

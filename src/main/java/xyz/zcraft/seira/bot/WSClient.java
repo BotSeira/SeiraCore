@@ -64,6 +64,16 @@ public class WSClient extends WebSocketClient {
         LOG.info("QQ Gateway WebSocket Client created");
     }
 
+    private static String firstText(JsonObject object, String... names) {
+        for (String name : names) {
+            if (object.has(name) && !object.get(name).isJsonNull()) {
+                String value = object.get(name).getAsString();
+                if (!value.isBlank()) return value;
+            }
+        }
+        return "QQ用户";
+    }
+
     @Override
     public void onOpen(ServerHandshake handshake) {
         LOG.info("Gateway connected");
@@ -227,16 +237,6 @@ public class WSClient extends WebSocketClient {
         return normalized.startsWith(selfAt)
                 ? normalized.substring(selfAt.length()).stripLeading()
                 : normalized;
-    }
-
-    private static String firstText(JsonObject object, String... names) {
-        for (String name : names) {
-            if (object.has(name) && !object.get(name).isJsonNull()) {
-                String value = object.get(name).getAsString();
-                if (!value.isBlank()) return value;
-            }
-        }
-        return "QQ用户";
     }
 
     private void sendIdentify() {

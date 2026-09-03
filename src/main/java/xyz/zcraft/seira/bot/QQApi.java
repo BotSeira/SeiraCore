@@ -34,7 +34,7 @@ public class QQApi {
     private static final long MAX_MEDIA_SIZE = 200L * 1024 * 1024;
     private static final Gson gson = new Gson();
     private static final Logger LOG = LogManager.getLogger(QQApi.class);
-
+    private static final Gson GSON = new Gson();
 
     public static String getWSSEndpoint(AccessToken accessToken) {
         try {
@@ -108,8 +108,6 @@ public class QQApi {
             throw requestFailure(e);
         }
     }
-
-    private static final Gson GSON = new  Gson();
 
     public static String buildMessageJson(Message message) {
         final JsonObject asJsonObject = new Gson().toJsonTree(message).getAsJsonObject();

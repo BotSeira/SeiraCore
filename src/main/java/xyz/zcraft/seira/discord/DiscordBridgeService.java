@@ -13,28 +13,16 @@ import net.dv8tion.jda.api.utils.FileUpload;
 import net.dv8tion.jda.api.utils.messages.MessageCreateBuilder;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.seira.db.UserDataStore;
+import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.seira.bot.MessageSender;
-import xyz.zcraft.seira.bot.data.Attachment;
-import xyz.zcraft.seira.bot.data.FileInfo;
-import xyz.zcraft.seira.bot.data.MDMessage;
-import xyz.zcraft.seira.bot.data.Message;
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.*;
 import xyz.zcraft.seira.config.BridgeConfig;
 import xyz.zcraft.seira.config.DiscordConfig;
 import xyz.zcraft.seira.config.DiscordProxyConfig;
+import xyz.zcraft.seira.db.UserDataStore;
 
 import java.net.URI;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -69,6 +57,187 @@ public final class DiscordBridgeService implements AutoCloseable {
                 Thread.ofPlatform().daemon().name("seira-discord-bridge-", 0).factory()
         );
         UserDataStore.findAllDiscordBridges().forEach(mapping -> mappings.put(mapping.groupId(), mapping));
+    }
+
+    private static List<BridgeAttachment> collectDiscordAttachments(MessageReceivedEvent event) {
+        List<BridgeAttachment> attachments = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (String url : BridgeFormatter.findImageUrls(event.getMessage().getContentDisplay())) {
+            if (seen.add(url)) {
+                attachments.add(new BridgeAttachment(
+                        filenameFromUrl(url), List.of(url), url, isGifUrl(url)
+                ));
+            }
+        }
+        event.getMessage().getAttachments().forEach(item -> {
+            if (seen.add(item.getUrl())) {
+                attachments.add(new BridgeAttachment(
+                        item.getFileName(), distinct(item.getUrl(), item.getProxyUrl()), null,
+                        "image/gif".equalsIgnoreCase(item.getContentType())
+                ));
+            }
+        });
+        for (MessageEmbed embed : event.getMessage().getEmbeds()) {
+            if (embed.getType() == EmbedType.GIFV && embed.getVideoInfo() != null) {
+                List<String> candidates = gifCandidates(embed);
+                String key = candidates.isEmpty() ? null : candidates.getFirst();
+                if (key != null && seen.add(key)) {
+                    attachments.add(new BridgeAttachment("discord-gif.gif", candidates, embed.getUrl(), true));
+                }
+                continue;
+            }
+            MessageEmbed.ImageInfo image = embed.getImage();
+            if (image != null && seen.add(image.getUrl())) {
+                attachments.add(new BridgeAttachment(
+                        "embed-image", distinct(image.getUrl(), image.getProxyUrl()), embed.getUrl(), false
+                ));
+            }
+        }
+        event.getMessage().getStickers().forEach(sticker -> {
+            if (seen.add(sticker.getIconUrl())) {
+                attachments.add(new BridgeAttachment(
+                        sticker.getName(), List.of(sticker.getIconUrl()), null,
+                        sticker.getIconUrl().toLowerCase(Locale.ROOT).contains(".gif")
+                ));
+            }
+        });
+        event.getMessage().getMentions().getCustomEmojis().forEach(emoji -> {
+            if (seen.add(emoji.getImageUrl())) {
+                attachments.add(new BridgeAttachment(
+                        "emoji-" + emoji.getName(), List.of(emoji.getImageUrl()), null, emoji.isAnimated()
+                ));
+            }
+        });
+        return List.copyOf(attachments);
+    }
+
+    private static String filenameFromUrl(String value) {
+        try {
+            String path = URI.create(value).getPath();
+            if (path != null && path.lastIndexOf('/') < path.length() - 1) {
+                return path.substring(path.lastIndexOf('/') + 1);
+            }
+        } catch (IllegalArgumentException ignored) {
+            // The downloader will report malformed URLs if one reaches it.
+        }
+        return "discord-image";
+    }
+
+    private static boolean isGifUrl(String value) {
+        try {
+            String path = URI.create(value).getPath();
+            return path != null && path.toLowerCase(Locale.ROOT).endsWith(".gif");
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
+    }
+
+    static List<String> gifCandidates(MessageEmbed embed) {
+        LinkedHashSet<String> candidates = new LinkedHashSet<>();
+        MessageEmbed.VideoInfo video = embed.getVideoInfo();
+        if (video != null) {
+            addDerivedGif(candidates, video.getUrl());
+            addDerivedGif(candidates, video.getProxyUrl());
+            add(candidates, video.getUrl());
+            add(candidates, video.getProxyUrl());
+        }
+        MessageEmbed.ImageInfo image = embed.getImage();
+        if (image != null) {
+            add(candidates, image.getUrl());
+            add(candidates, image.getProxyUrl());
+        }
+        return List.copyOf(candidates);
+    }
+
+    static String deriveTenorGifUrl(String mediaUrl) {
+        if (mediaUrl == null || mediaUrl.isBlank()) return null;
+        try {
+            URI uri = URI.create(mediaUrl);
+            String host = uri.getHost();
+            String path = uri.getRawPath();
+            if (host == null || path == null || !host.toLowerCase(Locale.ROOT)
+                    .matches("media[0-9]*\\.tenor\\.(com|co)")) {
+                return replaceVideoExtension(mediaUrl);
+            }
+            String[] segments = path.split("/");
+            for (int index = 0; index < segments.length; index++) {
+                if (segments[index].endsWith("AAAPo")) {
+                    segments[index] = segments[index].substring(0, segments[index].length() - 5) + "AAAAC";
+                }
+            }
+            String rebuilt = String.join("/", segments);
+            int dot = rebuilt.lastIndexOf('.');
+            if (dot > rebuilt.lastIndexOf('/')) rebuilt = rebuilt.substring(0, dot) + ".gif";
+            String query = uri.getRawQuery() == null ? "" : "?" + uri.getRawQuery();
+            return uri.getScheme() + "://" + uri.getRawAuthority() + rebuilt + query;
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private static String replaceVideoExtension(String value) {
+        int queryIndex = value.indexOf('?');
+        String path = queryIndex < 0 ? value : value.substring(0, queryIndex);
+        String query = queryIndex < 0 ? "" : value.substring(queryIndex);
+        String lower = path.toLowerCase(Locale.ROOT);
+        if (!lower.endsWith(".mp4") && !lower.endsWith(".webm")) return null;
+        return path.substring(0, path.lastIndexOf('.')) + ".gif" + query;
+    }
+
+    private static void addDerivedGif(Set<String> target, String value) {
+        add(target, deriveTenorGifUrl(value));
+    }
+
+    private static void add(Set<String> target, String value) {
+        if (value != null && !value.isBlank()) target.add(value);
+    }
+
+    private static List<String> distinct(String... values) {
+        LinkedHashSet<String> result = new LinkedHashSet<>();
+        for (String value : values) add(result, value);
+        return List.copyOf(result);
+    }
+
+    private static int qqFileType(String contentType) {
+        if (contentType == null) return PendingMessage.FILE_TYPE_FILE;
+        if (contentType.startsWith("image/")) return PendingMessage.FILE_TYPE_IMAGE;
+        if (contentType.startsWith("video/")) return PendingMessage.FILE_TYPE_VIDEO;
+        if (contentType.startsWith("audio/")) return PendingMessage.FILE_TYPE_VOICE;
+        return PendingMessage.FILE_TYPE_FILE;
+    }
+
+    private static String commandMediaContentType(int fileType, byte[] data) {
+        return MediaFormat.detectContentType(data).orElse(switch (fileType) {
+            case PendingMessage.FILE_TYPE_IMAGE -> "image/png";
+            case PendingMessage.FILE_TYPE_VIDEO -> "video/mp4";
+            case PendingMessage.FILE_TYPE_VOICE -> "audio/ogg";
+            default -> "application/octet-stream";
+        });
+    }
+
+    private static void replaceBody(StringBuilder target, String value) {
+        target.setLength(0);
+        target.append(value);
+    }
+
+    private static boolean isDcsCommand(String text) {
+        if (text == null) return false;
+        String normalized = text.stripLeading().toLowerCase(Locale.ROOT);
+        return normalized.equals("/dcs") || normalized.startsWith("/dcs ");
+    }
+
+    private static String displayFilename(String value) {
+        return value == null || value.isBlank() ? "media" : value;
+    }
+
+    private static String firstUrl(List<String> values) {
+        return values == null || values.isEmpty() ? "" : values.getFirst();
+    }
+
+    private static void appendLine(StringBuilder target, String value) {
+        if (value == null || value.isBlank()) return;
+        if (!target.isEmpty() && target.charAt(target.length() - 1) != '\n') target.append('\n');
+        target.append(value);
     }
 
     public void start() {
@@ -131,7 +300,9 @@ public final class DiscordBridgeService implements AutoCloseable {
                 .execute(() -> relayQqToDiscord(mapping, message));
     }
 
-    /** Relays the portable part of a QQ command result to the mapped Discord channel. */
+    /**
+     * Relays the portable part of a QQ command result to the mapped Discord channel.
+     */
     public void acceptQqCommandReply(String groupId, PendingMessage message) {
         DiscordBridgeMapping mapping = mappings.get(groupId);
         if (mapping == null || message == null) return;
@@ -365,6 +536,45 @@ public final class DiscordBridgeService implements AutoCloseable {
         workers.shutdownNow();
     }
 
+    public record BindResult(boolean success, String message, String guildName, String channelName) {
+        static BindResult success(String guildName, String channelName) {
+            return new BindResult(true, "", guildName, channelName);
+        }
+
+        static BindResult failed(String message) {
+            return new BindResult(false, message, "", "");
+        }
+    }
+
+    private record PreparedQqMedia(DownloadedMedia media, FileInfo uploaded) {
+    }
+
+    private static final class SerialExecutor implements Executor {
+        private final Queue<Runnable> tasks = new ArrayDeque<>();
+        private final Executor executor;
+        private Runnable active;
+
+        private SerialExecutor(Executor executor) {
+            this.executor = executor;
+        }
+
+        @Override
+        public synchronized void execute(@NotNull Runnable command) {
+            tasks.offer(() -> {
+                try {
+                    command.run();
+                } finally {
+                    scheduleNext();
+                }
+            });
+            if (active == null) scheduleNext();
+        }
+
+        private synchronized void scheduleNext() {
+            if ((active = tasks.poll()) != null) executor.execute(active);
+        }
+    }
+
     private final class DiscordListener extends ListenerAdapter {
         @Override
         public void onReady(ReadyEvent event) {
@@ -394,226 +604,6 @@ public final class DiscordBridgeService implements AutoCloseable {
             for (String groupId : groups) {
                 queue("discord:" + groupId).execute(() -> relayDiscordToQq(groupId, incoming));
             }
-        }
-    }
-
-    private static List<BridgeAttachment> collectDiscordAttachments(MessageReceivedEvent event) {
-        List<BridgeAttachment> attachments = new ArrayList<>();
-        Set<String> seen = new HashSet<>();
-        for (String url : BridgeFormatter.findImageUrls(event.getMessage().getContentDisplay())) {
-            if (seen.add(url)) {
-                attachments.add(new BridgeAttachment(
-                        filenameFromUrl(url), List.of(url), url, isGifUrl(url)
-                ));
-            }
-        }
-        event.getMessage().getAttachments().forEach(item -> {
-            if (seen.add(item.getUrl())) {
-                attachments.add(new BridgeAttachment(
-                        item.getFileName(), distinct(item.getUrl(), item.getProxyUrl()), null,
-                        "image/gif".equalsIgnoreCase(item.getContentType())
-                ));
-            }
-        });
-        for (MessageEmbed embed : event.getMessage().getEmbeds()) {
-            if (embed.getType() == EmbedType.GIFV && embed.getVideoInfo() != null) {
-                List<String> candidates = gifCandidates(embed);
-                String key = candidates.isEmpty() ? null : candidates.getFirst();
-                if (key != null && seen.add(key)) {
-                    attachments.add(new BridgeAttachment("discord-gif.gif", candidates, embed.getUrl(), true));
-                }
-                continue;
-            }
-            MessageEmbed.ImageInfo image = embed.getImage();
-            if (image != null && seen.add(image.getUrl())) {
-                attachments.add(new BridgeAttachment(
-                        "embed-image", distinct(image.getUrl(), image.getProxyUrl()), embed.getUrl(), false
-                ));
-            }
-        }
-        event.getMessage().getStickers().forEach(sticker -> {
-            if (seen.add(sticker.getIconUrl())) {
-                attachments.add(new BridgeAttachment(
-                        sticker.getName(), List.of(sticker.getIconUrl()), null,
-                        sticker.getIconUrl().toLowerCase(Locale.ROOT).contains(".gif")
-                ));
-            }
-        });
-        event.getMessage().getMentions().getCustomEmojis().forEach(emoji -> {
-            if (seen.add(emoji.getImageUrl())) {
-                attachments.add(new BridgeAttachment(
-                        "emoji-" + emoji.getName(), List.of(emoji.getImageUrl()), null, emoji.isAnimated()
-                ));
-            }
-        });
-        return List.copyOf(attachments);
-    }
-
-    private static String filenameFromUrl(String value) {
-        try {
-            String path = URI.create(value).getPath();
-            if (path != null && path.lastIndexOf('/') < path.length() - 1) {
-                return path.substring(path.lastIndexOf('/') + 1);
-            }
-        } catch (IllegalArgumentException ignored) {
-            // The downloader will report malformed URLs if one reaches it.
-        }
-        return "discord-image";
-    }
-
-    private static boolean isGifUrl(String value) {
-        try {
-            String path = URI.create(value).getPath();
-            return path != null && path.toLowerCase(Locale.ROOT).endsWith(".gif");
-        } catch (IllegalArgumentException ignored) {
-            return false;
-        }
-    }
-
-    static List<String> gifCandidates(MessageEmbed embed) {
-        LinkedHashSet<String> candidates = new LinkedHashSet<>();
-        MessageEmbed.VideoInfo video = embed.getVideoInfo();
-        if (video != null) {
-            addDerivedGif(candidates, video.getUrl());
-            addDerivedGif(candidates, video.getProxyUrl());
-            add(candidates, video.getUrl());
-            add(candidates, video.getProxyUrl());
-        }
-        MessageEmbed.ImageInfo image = embed.getImage();
-        if (image != null) {
-            add(candidates, image.getUrl());
-            add(candidates, image.getProxyUrl());
-        }
-        return List.copyOf(candidates);
-    }
-
-    static String deriveTenorGifUrl(String mediaUrl) {
-        if (mediaUrl == null || mediaUrl.isBlank()) return null;
-        try {
-            URI uri = URI.create(mediaUrl);
-            String host = uri.getHost();
-            String path = uri.getRawPath();
-            if (host == null || path == null || !host.toLowerCase(Locale.ROOT)
-                    .matches("media[0-9]*\\.tenor\\.(com|co)")) {
-                return replaceVideoExtension(mediaUrl);
-            }
-            String[] segments = path.split("/");
-            for (int index = 0; index < segments.length; index++) {
-                if (segments[index].endsWith("AAAPo")) {
-                    segments[index] = segments[index].substring(0, segments[index].length() - 5) + "AAAAC";
-                }
-            }
-            String rebuilt = String.join("/", segments);
-            int dot = rebuilt.lastIndexOf('.');
-            if (dot > rebuilt.lastIndexOf('/')) rebuilt = rebuilt.substring(0, dot) + ".gif";
-            String query = uri.getRawQuery() == null ? "" : "?" + uri.getRawQuery();
-            return uri.getScheme() + "://" + uri.getRawAuthority() + rebuilt + query;
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
-    }
-
-    private static String replaceVideoExtension(String value) {
-        int queryIndex = value.indexOf('?');
-        String path = queryIndex < 0 ? value : value.substring(0, queryIndex);
-        String query = queryIndex < 0 ? "" : value.substring(queryIndex);
-        String lower = path.toLowerCase(Locale.ROOT);
-        if (!lower.endsWith(".mp4") && !lower.endsWith(".webm")) return null;
-        return path.substring(0, path.lastIndexOf('.')) + ".gif" + query;
-    }
-
-    private static void addDerivedGif(Set<String> target, String value) {
-        add(target, deriveTenorGifUrl(value));
-    }
-
-    private static void add(Set<String> target, String value) {
-        if (value != null && !value.isBlank()) target.add(value);
-    }
-
-    private static List<String> distinct(String... values) {
-        LinkedHashSet<String> result = new LinkedHashSet<>();
-        for (String value : values) add(result, value);
-        return List.copyOf(result);
-    }
-
-    private static int qqFileType(String contentType) {
-        if (contentType == null) return PendingMessage.FILE_TYPE_FILE;
-        if (contentType.startsWith("image/")) return PendingMessage.FILE_TYPE_IMAGE;
-        if (contentType.startsWith("video/")) return PendingMessage.FILE_TYPE_VIDEO;
-        if (contentType.startsWith("audio/")) return PendingMessage.FILE_TYPE_VOICE;
-        return PendingMessage.FILE_TYPE_FILE;
-    }
-
-    private static String commandMediaContentType(int fileType, byte[] data) {
-        return MediaFormat.detectContentType(data).orElse(switch (fileType) {
-            case PendingMessage.FILE_TYPE_IMAGE -> "image/png";
-            case PendingMessage.FILE_TYPE_VIDEO -> "video/mp4";
-            case PendingMessage.FILE_TYPE_VOICE -> "audio/ogg";
-            default -> "application/octet-stream";
-        });
-    }
-
-    private static void replaceBody(StringBuilder target, String value) {
-        target.setLength(0);
-        target.append(value);
-    }
-
-    private static boolean isDcsCommand(String text) {
-        if (text == null) return false;
-        String normalized = text.stripLeading().toLowerCase(Locale.ROOT);
-        return normalized.equals("/dcs") || normalized.startsWith("/dcs ");
-    }
-
-    private static String displayFilename(String value) {
-        return value == null || value.isBlank() ? "media" : value;
-    }
-
-    private static String firstUrl(List<String> values) {
-        return values == null || values.isEmpty() ? "" : values.getFirst();
-    }
-
-    private static void appendLine(StringBuilder target, String value) {
-        if (value == null || value.isBlank()) return;
-        if (!target.isEmpty() && target.charAt(target.length() - 1) != '\n') target.append('\n');
-        target.append(value);
-    }
-
-    public record BindResult(boolean success, String message, String guildName, String channelName) {
-        static BindResult success(String guildName, String channelName) {
-            return new BindResult(true, "", guildName, channelName);
-        }
-
-        static BindResult failed(String message) {
-            return new BindResult(false, message, "", "");
-        }
-    }
-
-    private record PreparedQqMedia(DownloadedMedia media, FileInfo uploaded) {
-    }
-
-    private static final class SerialExecutor implements Executor {
-        private final Queue<Runnable> tasks = new ArrayDeque<>();
-        private final Executor executor;
-        private Runnable active;
-
-        private SerialExecutor(Executor executor) {
-            this.executor = executor;
-        }
-
-        @Override
-        public synchronized void execute(Runnable command) {
-            tasks.offer(() -> {
-                try {
-                    command.run();
-                } finally {
-                    scheduleNext();
-                }
-            });
-            if (active == null) scheduleNext();
-        }
-
-        private synchronized void scheduleNext() {
-            if ((active = tasks.poll()) != null) executor.execute(active);
         }
     }
 }

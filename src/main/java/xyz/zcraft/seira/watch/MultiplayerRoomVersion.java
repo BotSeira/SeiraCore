@@ -12,10 +12,6 @@ public enum MultiplayerRoomVersion {
         this.value = value;
     }
 
-    public String value() {
-        return value;
-    }
-
     public static MultiplayerRoomVersion parse(String value) {
         if (value == null) {
             return null;
@@ -25,5 +21,9 @@ public enum MultiplayerRoomVersion {
             case "stable" -> STABLE;
             default -> null;
         };
+    }
+
+    public String value() {
+        return value;
     }
 }

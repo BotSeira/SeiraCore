@@ -12,8 +12,8 @@ import java.nio.file.Path;
 import java.util.LinkedList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class BotStat {
     private static final Path STAT_FILE = Path.of("data", "bot-stat.json");

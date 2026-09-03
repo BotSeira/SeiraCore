@@ -291,6 +291,11 @@ public class CosService implements AutoCloseable {
         return result;
     }
 
+    @Override
+    public void close() {
+        client.shutdown();
+    }
+
     private record ImageDimensions(int width, int height) {
     }
 
@@ -327,11 +332,6 @@ public class CosService implements AutoCloseable {
         private boolean isExpired(long now) {
             return uploadedAt < now - CACHE_TTL_MILLIS;
         }
-    }
-
-    @Override
-    public void close() {
-        client.shutdown();
     }
 
 }

@@ -5,8 +5,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
-import xyz.zcraft.seira.db.UserDataStore;
-import xyz.zcraft.seira.services.BindingService;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.*;
@@ -15,12 +13,14 @@ import xyz.zcraft.seira.command.parse.CommandParser;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.config.AppConfig;
+import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.discord.DiscordBridgeService;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
+import xyz.zcraft.seira.services.BindingService;
 import xyz.zcraft.seira.util.AdminRegistry;
 import xyz.zcraft.seira.util.OsuAuthHelper;
-import xyz.zcraft.seira.watch.ScoreWatchService;
 import xyz.zcraft.seira.watch.MultiplayerRoomWatchService;
+import xyz.zcraft.seira.watch.ScoreWatchService;
 
 import java.util.Optional;
 import java.util.Set;
@@ -32,7 +32,8 @@ import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public class Router {
     private static final Logger LOG = LogManager.getLogger(Router.class);
-
+    @Getter
+    private static volatile Context lastContext = null;
     private final Supplier<AppConfig> configSupplier;
     private final TaskCoordinator taskCoordinator;
     private final OsuAuthHelper authHelper;
@@ -123,6 +124,61 @@ public class Router {
         );
     }
 
+    private static CommandRegistry createCommandRegistry(
+            BindingCommandHandler bindingCommands,
+            ScoreCommandHandler scoreCommands,
+            BeatmapCommandHandler beatmapCommands,
+            SocialCommandHandler socialCommands,
+            ReplayCommandHandler replayCommands,
+            GeneralCommandHandler generalCommands,
+            WatchCommandHandler watchCommands,
+            SpecificScoreWatchCommandHandler specificScoreWatchCommands,
+            MultiplayerRoomWatchCommandHandler multiplayerRoomWatchCommands,
+            DcsCommandHandler dcsCommands,
+            RankGuessCommandHandler rankGuessCommands
+    ) {
+        return CommandRegistry.builder()
+                .register(bindingCommands::handleBind, "bind")
+                .register(bindingCommands::handleUnbind, "unbind")
+                .register(bindingCommands::handleClearHistory, "clearhistory")
+                .register(scoreCommands::handleBo, "bp", "bo")
+                .register(beatmapCommands::handleDaily, "daily")
+                .register(socialCommands::handleMp, "mp")
+                .register(ctx -> scoreCommands.handleRs(ctx, true), "rs")
+                .register(ctx -> scoreCommands.handleRs(ctx, false), "rp")
+                .register(scoreCommands::handleTb, "tb")
+                .register(beatmapCommands::handleM, "m")
+                .register(beatmapCommands::handleBma, "bma")
+                .register(beatmapCommands::handleAp, "ap")
+                .register(beatmapCommands::handleBpv, "bpv")
+                .register(beatmapCommands::handleBgp, "bgp")
+                .register(ctx -> socialCommands.handleF(ctx, !ctx.inGroup()), "f")
+                .register(ctx -> socialCommands.handleF(ctx, true), "fall")
+                .register(socialCommands::handleFclear, "fclear")
+                .register(beatmapCommands::handleDl, "dl")
+                .register(scoreCommands::handleS, "s")
+                .register(scoreCommands::handleSa, "sa")
+                .register(scoreCommands::handleMa, "ma")
+                .register(replayCommands::handleR, "r")
+                .register(replayCommands::handleRsc, "rsc")
+                .register(beatmapCommands::handleMs, "ms")
+                .register(beatmapCommands::handleSms, "sms")
+                .register(socialCommands::handleLb, "lb")
+                .register(generalCommands::handleStat, "stat")
+                .register(generalCommands::handleU, "u")
+                .register(generalCommands::handleLuck, "luck")
+                .register(replayCommands::handleRstat, "rstat")
+                .register(generalCommands::handleInspect, "inspect")
+                .register(generalCommands::handleHelp, "help")
+                .register(generalCommands::handleFaq, "faq")
+                .register(watchCommands::handleWatch, "watch")
+                .register(specificScoreWatchCommands::handleWx, "wx")
+                .register(multiplayerRoomWatchCommands::handleMpWatch, "mpwatch", "mpw")
+                .register(dcsCommands::handleDcs, "dcs")
+                .register(rankGuessCommands::handleRankGuess, "rg")
+                .build();
+    }
+
     public void onPrivateMessageReceived(String userId, String messageId, String rawContent) {
         handleMessageReceived(userId, null, userId, messageId, rawContent, false);
     }
@@ -181,9 +237,6 @@ public class Router {
         }
     }
 
-    @Getter
-    private static volatile Context lastContext = null;
-
     private void dispatch(Context ctx) {
         lastContext = ctx;
         commandMetric.run();
@@ -192,61 +245,6 @@ public class Router {
             return;
         }
         commandRegistry.dispatch(ctx, unknownCommand);
-    }
-
-    private static CommandRegistry createCommandRegistry(
-            BindingCommandHandler bindingCommands,
-            ScoreCommandHandler scoreCommands,
-            BeatmapCommandHandler beatmapCommands,
-            SocialCommandHandler socialCommands,
-            ReplayCommandHandler replayCommands,
-            GeneralCommandHandler generalCommands,
-            WatchCommandHandler watchCommands,
-            SpecificScoreWatchCommandHandler specificScoreWatchCommands,
-            MultiplayerRoomWatchCommandHandler multiplayerRoomWatchCommands,
-            DcsCommandHandler dcsCommands,
-            RankGuessCommandHandler rankGuessCommands
-    ) {
-        return CommandRegistry.builder()
-                .register(bindingCommands::handleBind, "bind")
-                .register(bindingCommands::handleUnbind, "unbind")
-                .register(bindingCommands::handleClearHistory, "clearhistory")
-                .register(scoreCommands::handleBo, "bp", "bo")
-                .register(beatmapCommands::handleDaily, "daily")
-                .register(socialCommands::handleMp, "mp")
-                .register(ctx -> scoreCommands.handleRs(ctx, true), "rs")
-                .register(ctx -> scoreCommands.handleRs(ctx, false), "rp")
-                .register(scoreCommands::handleTb, "tb")
-                .register(beatmapCommands::handleM, "m")
-                .register(beatmapCommands::handleBma, "bma")
-                .register(beatmapCommands::handleAp, "ap")
-                .register(beatmapCommands::handleBpv, "bpv")
-                .register(beatmapCommands::handleBgp, "bgp")
-                .register(ctx -> socialCommands.handleF(ctx, !ctx.inGroup()), "f")
-                .register(ctx -> socialCommands.handleF(ctx, true), "fall")
-                .register(socialCommands::handleFclear, "fclear")
-                .register(beatmapCommands::handleDl, "dl")
-                .register(scoreCommands::handleS, "s")
-                .register(scoreCommands::handleSa, "sa")
-                .register(scoreCommands::handleMa, "ma")
-                .register(replayCommands::handleR, "r")
-                .register(replayCommands::handleRsc, "rsc")
-                .register(beatmapCommands::handleMs, "ms")
-                .register(beatmapCommands::handleSms, "sms")
-                .register(socialCommands::handleLb, "lb")
-                .register(generalCommands::handleStat, "stat")
-                .register(generalCommands::handleU, "u")
-                .register(generalCommands::handleLuck, "luck")
-                .register(replayCommands::handleRstat, "rstat")
-                .register(generalCommands::handleInspect, "inspect")
-                .register(generalCommands::handleHelp, "help")
-                .register(generalCommands::handleFaq, "faq")
-                .register(watchCommands::handleWatch, "watch")
-                .register(specificScoreWatchCommands::handleWx, "wx")
-                .register(multiplayerRoomWatchCommands::handleMpWatch, "mpwatch", "mpw")
-                .register(dcsCommands::handleDcs, "dcs")
-                .register(rankGuessCommands::handleRankGuess, "rg")
-                .build();
     }
 
     @SuppressWarnings("unused")

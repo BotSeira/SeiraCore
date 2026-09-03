@@ -37,13 +37,12 @@ public class RankGuessWeights {
         loadFromFile();
     }
 
-    private static class GroupState {
-        private final Map<Long, Integer> scoreRecords = new HashMap<>();
-        private final LinkedList<Long> userRecords = new LinkedList<>();
-        private final Set<Long> userWishes = new HashSet<>();
-    }
-
-    private record GroupSnapshot(Map<Long, Integer> scoreRecords, List<Long> userRecords, Set<Long> userWishes) {
+    private static void recordUser(GroupState state, long userId) {
+        state.userRecords.add(userId);
+        if (state.userRecords.size() > RECENT_USER_LIMIT) {
+            state.userRecords.removeFirst();
+        }
+        state.userWishes.remove(userId);
     }
 
     private void loadFromFile() {
@@ -161,14 +160,6 @@ public class RankGuessWeights {
         saveToFile();
     }
 
-    private static void recordUser(GroupState state, long userId) {
-        state.userRecords.add(userId);
-        if (state.userRecords.size() > RECENT_USER_LIMIT) {
-            state.userRecords.removeFirst();
-        }
-        state.userWishes.remove(userId);
-    }
-
     public boolean recentPicked(String groupId, long userId) {
         final GroupState state = getGroup(groupId);
 
@@ -248,5 +239,14 @@ public class RankGuessWeights {
         synchronized (state) {
             return Map.copyOf(state.scoreRecords);
         }
+    }
+
+    private static class GroupState {
+        private final Map<Long, Integer> scoreRecords = new HashMap<>();
+        private final LinkedList<Long> userRecords = new LinkedList<>();
+        private final Set<Long> userWishes = new HashSet<>();
+    }
+
+    private record GroupSnapshot(Map<Long, Integer> scoreRecords, List<Long> userRecords, Set<Long> userWishes) {
     }
 }

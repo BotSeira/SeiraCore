@@ -3,7 +3,8 @@ package xyz.zcraft.seira.data;
 import lombok.Getter;
 
 public class UserRef {
-    private UserRef() {}
+    private UserRef() {
+    }
 
     public static class ByUid extends UserRef {
         @Getter

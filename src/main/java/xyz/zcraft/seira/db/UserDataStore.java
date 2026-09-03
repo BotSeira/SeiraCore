@@ -8,14 +8,7 @@ import xyz.zcraft.seira.util.OsuAuthHelper;
 import xyz.zcraft.seira.watch.SpecificScoreWatchState;
 
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 public final class UserDataStore {
     private static final Logger LOG = LogManager.getLogger(UserDataStore.class);
@@ -338,10 +331,10 @@ public final class UserDataStore {
     public static List<String> findAllGroupMembers(String groupId) {
         SqliteDatabase.ensureInitialized();
         String sql = """
-                SELECT open_id
-                FROM group_members
-                WHERE group_id = ?;
-        """;
+                        SELECT open_id
+                        FROM group_members
+                        WHERE group_id = ?;
+                """;
         List<String> groupMembers = new LinkedList<>();
         try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {

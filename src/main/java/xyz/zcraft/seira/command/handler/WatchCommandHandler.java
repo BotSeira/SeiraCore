@@ -2,12 +2,12 @@ package xyz.zcraft.seira.command.handler;
 
 import xyz.zcraft.osu.model.User;
 import xyz.zcraft.seira.api.APIHelper;
-import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
+import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.watch.ScoreWatchService;
 import xyz.zcraft.seira.watch.WatchTarget;
 import xyz.zcraft.seira.watch.WatchView;
@@ -40,18 +40,52 @@ public final class WatchCommandHandler {
         this.targetResolver = this::resolveTarget;
     }
 
-    WatchCommandHandler(
-            Resolver resolver,
-            TaskCoordinator taskCoordinator,
-            ScoreWatchService watchService,
-            Predicate<String> adminAuthorizer,
-            BiFunction<String, String, WatchTarget> targetResolver
-    ) {
-        this.resolver = Objects.requireNonNull(resolver);
-        this.taskCoordinator = Objects.requireNonNull(taskCoordinator);
-        this.watchService = watchService;
-        this.adminAuthorizer = Objects.requireNonNull(adminAuthorizer);
-        this.targetResolver = Objects.requireNonNull(targetResolver);
+    private static User findUserById(long userId) {
+        return APIHelper.getUsers(List.of(userId)).stream()
+                .filter(user -> user.getId() == userId)
+                .findFirst()
+                .orElseThrow(() -> new ResolutionException("未找到指定的玩家。"));
+    }
+
+    private static PendingMessage removedMessage(WatchView removed) {
+        return PendingMessage.ofMarkdownRaw(
+                removed == null
+                        ? "当前群聊中没有该用户的监视任务。"
+                        : displayTarget(removed.target()) + " 的监视已移除。"
+        );
+    }
+
+    private static Integer parseDurationMinutes(String value) {
+        if (value == null || !value.matches("\\d+")) {
+            return null;
+        }
+        try {
+            int minutes = Integer.parseInt(value);
+            return minutes >= 1 && minutes <= MAX_DURATION_MINUTES ? minutes : null;
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private static String displayTarget(WatchTarget target) {
+        return target.username() + "(<qqbot-at-user id=\"" + target.qqOpenId() + "\" />)";
+    }
+
+    private static String formatRemaining(Duration duration) {
+        long totalSeconds = Math.max(1, (duration.toMillis() + 999) / 1000);
+        long minutes = totalSeconds / 60;
+        long seconds = totalSeconds % 60;
+        if (minutes == 0) {
+            return seconds + "秒";
+        }
+        if (seconds == 0) {
+            return minutes + "分钟";
+        }
+        return minutes + "分" + seconds + "秒";
+    }
+
+    private static void usage(Context ctx) {
+        ctx.sendReply(PendingMessage.ofString(USAGE));
     }
 
     public void handleWatch(Context ctx) {
@@ -195,53 +229,5 @@ public final class WatchCommandHandler {
                 .orElseThrow(() -> new ResolutionException("指定的玩家不在当前群聊中，或尚未在本群完成绑定。"));
         UserDataStore.storeUserInfo(user.getId(), user.getUsername());
         return new WatchTarget(user.getId(), user.getUsername(), qqOpenId);
-    }
-
-    private static User findUserById(long userId) {
-        return APIHelper.getUsers(List.of(userId)).stream()
-                .filter(user -> user.getId() == userId)
-                .findFirst()
-                .orElseThrow(() -> new ResolutionException("未找到指定的玩家。"));
-    }
-
-    private static PendingMessage removedMessage(WatchView removed) {
-        return PendingMessage.ofMarkdownRaw(
-                removed == null
-                        ? "当前群聊中没有该用户的监视任务。"
-                        : displayTarget(removed.target()) + " 的监视已移除。"
-        );
-    }
-
-    private static Integer parseDurationMinutes(String value) {
-        if (value == null || !value.matches("\\d+")) {
-            return null;
-        }
-        try {
-            int minutes = Integer.parseInt(value);
-            return minutes >= 1 && minutes <= MAX_DURATION_MINUTES ? minutes : null;
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
-    }
-
-    private static String displayTarget(WatchTarget target) {
-        return target.username() + "(<qqbot-at-user id=\"" + target.qqOpenId() + "\" />)";
-    }
-
-    private static String formatRemaining(Duration duration) {
-        long totalSeconds = Math.max(1, (duration.toMillis() + 999) / 1000);
-        long minutes = totalSeconds / 60;
-        long seconds = totalSeconds % 60;
-        if (minutes == 0) {
-            return seconds + "秒";
-        }
-        if (seconds == 0) {
-            return minutes + "分钟";
-        }
-        return minutes + "分" + seconds + "秒";
-    }
-
-    private static void usage(Context ctx) {
-        ctx.sendReply(PendingMessage.ofString(USAGE));
     }
 }

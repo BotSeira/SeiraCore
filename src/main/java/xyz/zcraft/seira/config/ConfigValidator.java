@@ -4,7 +4,9 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Validates configuration once at the application boundary. */
+/**
+ * Validates configuration once at the application boundary.
+ */
 public final class ConfigValidator {
     private ConfigValidator() {
     }

@@ -4,25 +4,20 @@ import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.config.Configurator;
-import xyz.zcraft.seira.db.SqliteDatabase;
-import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.route.Router;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.RuntimeConfig;
-import xyz.zcraft.seira.util.AdminRegistry;
+import xyz.zcraft.seira.db.SqliteDatabase;
 import xyz.zcraft.seira.services.BotStat;
+import xyz.zcraft.seira.util.AdminRegistry;
 import xyz.zcraft.seira.watch.WatchView;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
@@ -68,6 +63,152 @@ public final class ConsoleCommandProcessor {
         this.runtimeControl = Objects.requireNonNull(runtimeControl);
     }
 
+    static List<String> rootCommands() {
+        return ROOT_COMMANDS;
+    }
+
+    static List<String> subcommands(String command) {
+        return SUBCOMMANDS.getOrDefault(command.toLowerCase(Locale.ROOT), List.of());
+    }
+
+    private static String formatCacheControl(ConsoleRuntimeControl.CacheControlResult result) {
+        StringBuilder output = new StringBuilder(result.operation().toLowerCase(Locale.ROOT))
+                .append(' ').append(result.type().toLowerCase(Locale.ROOT)).append(' ').append(result.id());
+        for (ConsoleRuntimeControl.CacheNodeResult node : result.nodes()) {
+            output.append("\n  ").append(node.node()).append(": ").append(node.status());
+            if (node.path() != null) output.append(" | path=").append(node.path());
+            if (node.sizeBytes() != null) output.append(" | size=").append(formatBytes(node.sizeBytes()));
+            if (node.modifiedAt() != null) output.append(" | modified=").append(node.modifiedAt());
+            if (node.message() != null) output.append(" | ").append(node.message());
+        }
+        return output.toString();
+    }
+
+    private static ConsoleResult exact(
+            ConsoleInputParser.ParsedInput input,
+            int size,
+            java.util.function.Supplier<ConsoleResult> action,
+            String usage
+    ) {
+        return input.size() == size ? action.get() : ConsoleResult.failure(usage);
+    }
+
+    private static String formatWatches(String groupId, List<WatchView> watches) {
+        if (watches.isEmpty()) {
+            return "Group " + groupId + ": no active watches.";
+        }
+        StringBuilder output = new StringBuilder("Group " + groupId + " (" + watches.size() + "):");
+        watches.forEach(watch -> output.append("\n  ")
+                .append(watch.target().username())
+                .append(" | UID ").append(watch.target().userId())
+                .append(" | QQ ").append(watch.target().qqOpenId())
+                .append(" | remaining ").append(formatDuration(watch.remaining())));
+        return output.toString();
+    }
+
+    private static String formatQueryResult(SqliteDatabase.QueryResult result) {
+        StringBuilder output = new StringBuilder();
+        output.append(result.columns().stream().map(ConsoleCommandProcessor::cell).reduce(
+                (left, right) -> left + " | " + right
+        ).orElse("(no columns)"));
+        for (List<String> row : result.rows()) {
+            output.append('\n').append(row.stream().map(ConsoleCommandProcessor::cell).reduce(
+                    (left, right) -> left + " | " + right
+            ).orElse(""));
+        }
+        output.append("\nReturned ").append(result.rows().size()).append(" row(s)");
+        if (result.truncated()) {
+            output.append(" (result truncated)");
+        }
+        return output.toString();
+    }
+
+    private static String cell(String value) {
+        if (value == null) {
+            return "NULL";
+        }
+        String normalized = value.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ');
+        return normalized.length() <= MAX_CELL_LENGTH
+                ? normalized
+                : normalized.substring(0, MAX_CELL_LENGTH - 1) + "...";
+    }
+
+    private static long positiveLong(String value, String name) {
+        try {
+            long parsed = Long.parseLong(value);
+            if (parsed > 0) {
+                return parsed;
+            }
+        } catch (NumberFormatException ignored) {
+        }
+        throw new IllegalArgumentException(name + " must be a positive integer.");
+    }
+
+    private static String formatDuration(Duration duration) {
+        if (duration == null || duration.isNegative()) {
+            return "unknown";
+        }
+        long seconds = duration.toSeconds();
+        long days = seconds / 86_400;
+        long hours = seconds % 86_400 / 3_600;
+        long minutes = seconds % 3_600 / 60;
+        long remainingSeconds = seconds % 60;
+        if (days > 0) {
+            return "%dd %02dh %02dm".formatted(days, hours, minutes);
+        }
+        if (hours > 0) {
+            return "%dh %02dm %02ds".formatted(hours, minutes, remainingSeconds);
+        }
+        if (minutes > 0) {
+            return "%dm %02ds".formatted(minutes, remainingSeconds);
+        }
+        return remainingSeconds + "s";
+    }
+
+    private static String formatBytes(long bytes) {
+        if (bytes < 1024) {
+            return bytes + " B";
+        }
+        double value = bytes;
+        String[] units = {"KiB", "MiB", "GiB", "TiB"};
+        int unit = -1;
+        do {
+            value /= 1024.0;
+            unit++;
+        } while (value >= 1024 && unit < units.length - 1);
+        return String.format(Locale.ROOT, "%.1f %s", value, units[unit]);
+    }
+
+    private static String blankAs(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private static String version() {
+        Package currentPackage = ConsoleCommandProcessor.class.getPackage();
+        String implementation = currentPackage == null ? null : currentPackage.getImplementationVersion();
+        if (implementation != null && !implementation.isBlank()) {
+            return implementation;
+        }
+        Properties properties = new Properties();
+        try (InputStream input = ConsoleCommandProcessor.class.getResourceAsStream("/version.properties")) {
+            if (input != null) {
+                properties.load(input);
+                return properties.getProperty("version", "development");
+            }
+        } catch (IOException ignored) {
+        }
+        return "development";
+    }
+
+    private static String rootMessage(Throwable error) {
+        Throwable cursor = error;
+        while (cursor.getCause() != null) {
+            cursor = cursor.getCause();
+        }
+        String message = cursor.getMessage();
+        return message == null || message.isBlank() ? cursor.getClass().getSimpleName() : message;
+    }
+
     public ConsoleResult execute(String line) {
         try {
             ConsoleInputParser.ParsedInput input = ConsoleInputParser.parse(line);
@@ -102,14 +243,6 @@ public final class ConsoleCommandProcessor {
         }
     }
 
-    static List<String> rootCommands() {
-        return ROOT_COMMANDS;
-    }
-
-    static List<String> subcommands(String command) {
-        return SUBCOMMANDS.getOrDefault(command.toLowerCase(Locale.ROOT), List.of());
-    }
-
     private ConsoleResult help(ConsoleInputParser.ParsedInput input) {
         if (input.size() > 2) {
             return ConsoleResult.failure("Usage: help [command]");
@@ -135,7 +268,7 @@ public final class ConsoleCommandProcessor {
                       log <show|level>                   Inspect or change the runtime log level
                       inspect                            Show the last dispatched message context
                       stop confirm                       Gracefully stop SeiraCore
-
+                    
                     Aliases: ? (help), stat (status), shutdown/exit/quit (stop)
                     Use 'help <command>' for examples and safety notes.
                     """.stripTrailing());
@@ -195,7 +328,8 @@ public final class ConsoleCommandProcessor {
                     panel edit <panel-id> <path-to-json>
                     Manage command panels to be displayed on QQ platform.""";
             case "inspect" -> "inspect\nShows IDs and parsed command data from the last dispatched QQ message.";
-            case "stop", "shutdown", "exit", "quit" -> "stop confirm\nGracefully stops the gateway and all application services.";
+            case "stop", "shutdown", "exit", "quit" ->
+                    "stop confirm\nGracefully stops the gateway and all application services.";
             default -> null;
         };
         return detail == null
@@ -367,11 +501,16 @@ public final class ConsoleCommandProcessor {
             return ConsoleResult.failure("Usage: panel <list|delete|get|create|edit> [args]");
         }
         return switch (input.value(1).toLowerCase(Locale.ROOT)) {
-            case "list" -> input.size() == 3 ? runtimeControl.listPanels(input.value(2)) : ConsoleResult.failure("Usage: panel list <c2c/group>");
-            case "delete" -> input.size() == 3 ? runtimeControl.deletePanel(input.value(2)) : ConsoleResult.failure("Usage: panel delete <panel-id>");
-            case "get" -> input.size() == 3 ? runtimeControl.getPanel(input.value(2)) : ConsoleResult.failure("Usage: panel get <panel-id>");
-            case "create" -> input.size() == 4 ? runtimeControl.createPanel(input.value(2), input.value(3)) : ConsoleResult.failure("Usage: panel create <c2c/group> <path-to-json>");
-            case "edit" -> input.size() == 4 ? runtimeControl.editPanel(input.value(2), input.value(3)) : ConsoleResult.failure("Usage: panel edit <panel_id> <path-to-json>");
+            case "list" ->
+                    input.size() == 3 ? runtimeControl.listPanels(input.value(2)) : ConsoleResult.failure("Usage: panel list <c2c/group>");
+            case "delete" ->
+                    input.size() == 3 ? runtimeControl.deletePanel(input.value(2)) : ConsoleResult.failure("Usage: panel delete <panel-id>");
+            case "get" ->
+                    input.size() == 3 ? runtimeControl.getPanel(input.value(2)) : ConsoleResult.failure("Usage: panel get <panel-id>");
+            case "create" ->
+                    input.size() == 4 ? runtimeControl.createPanel(input.value(2), input.value(3)) : ConsoleResult.failure("Usage: panel create <c2c/group> <path-to-json>");
+            case "edit" ->
+                    input.size() == 4 ? runtimeControl.editPanel(input.value(2), input.value(3)) : ConsoleResult.failure("Usage: panel edit <panel_id> <path-to-json>");
             default -> ConsoleResult.failure("Usage: panel <list|delete|get|create|edit> [args]");
         };
     }
@@ -485,7 +624,8 @@ public final class ConsoleCommandProcessor {
         }
         return switch (input.value(1).toLowerCase(Locale.ROOT)) {
             case "status" -> input.size() == 2 ? watchStatus() : ConsoleResult.failure("Usage: watch status");
-            case "list" -> input.size() <= 3 ? listWatches(input) : ConsoleResult.failure("Usage: watch list [group-id]");
+            case "list" ->
+                    input.size() <= 3 ? listWatches(input) : ConsoleResult.failure("Usage: watch list [group-id]");
             case "poll" -> input.size() == 2 ? pollWatches() : ConsoleResult.failure("Usage: watch poll");
             case "remove" -> removeWatch(input);
             case "clear" -> clearWatches(input);
@@ -584,19 +724,6 @@ public final class ConsoleCommandProcessor {
         return ConsoleResult.success(formatCacheControl(runtimeControl.controlCache(operation, type, id)));
     }
 
-    private static String formatCacheControl(ConsoleRuntimeControl.CacheControlResult result) {
-        StringBuilder output = new StringBuilder(result.operation().toLowerCase(Locale.ROOT))
-                .append(' ').append(result.type().toLowerCase(Locale.ROOT)).append(' ').append(result.id());
-        for (ConsoleRuntimeControl.CacheNodeResult node : result.nodes()) {
-            output.append("\n  ").append(node.node()).append(": ").append(node.status());
-            if (node.path() != null) output.append(" | path=").append(node.path());
-            if (node.sizeBytes() != null) output.append(" | size=").append(formatBytes(node.sizeBytes()));
-            if (node.modifiedAt() != null) output.append(" | modified=").append(node.modifiedAt());
-            if (node.message() != null) output.append(" | ").append(node.message());
-        }
-        return output.toString();
-    }
-
     private ConsoleResult log(ConsoleInputParser.ParsedInput input) {
         if (input.size() == 2 && "show".equalsIgnoreCase(input.value(1))) {
             return ConsoleResult.success("Root log level: " + LogManager.getRootLogger().getLevel());
@@ -648,131 +775,6 @@ public final class ConsoleCommandProcessor {
         }
         CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS).execute(runtimeControl::requestStop);
         return ConsoleResult.success("Graceful shutdown requested.");
-    }
-
-    private static ConsoleResult exact(
-            ConsoleInputParser.ParsedInput input,
-            int size,
-            java.util.function.Supplier<ConsoleResult> action,
-            String usage
-    ) {
-        return input.size() == size ? action.get() : ConsoleResult.failure(usage);
-    }
-
-    private static String formatWatches(String groupId, List<WatchView> watches) {
-        if (watches.isEmpty()) {
-            return "Group " + groupId + ": no active watches.";
-        }
-        StringBuilder output = new StringBuilder("Group " + groupId + " (" + watches.size() + "):");
-        watches.forEach(watch -> output.append("\n  ")
-                .append(watch.target().username())
-                .append(" | UID ").append(watch.target().userId())
-                .append(" | QQ ").append(watch.target().qqOpenId())
-                .append(" | remaining ").append(formatDuration(watch.remaining())));
-        return output.toString();
-    }
-
-    private static String formatQueryResult(SqliteDatabase.QueryResult result) {
-        StringBuilder output = new StringBuilder();
-        output.append(result.columns().stream().map(ConsoleCommandProcessor::cell).reduce(
-                (left, right) -> left + " | " + right
-        ).orElse("(no columns)"));
-        for (List<String> row : result.rows()) {
-            output.append('\n').append(row.stream().map(ConsoleCommandProcessor::cell).reduce(
-                    (left, right) -> left + " | " + right
-            ).orElse(""));
-        }
-        output.append("\nReturned ").append(result.rows().size()).append(" row(s)");
-        if (result.truncated()) {
-            output.append(" (result truncated)");
-        }
-        return output.toString();
-    }
-
-    private static String cell(String value) {
-        if (value == null) {
-            return "NULL";
-        }
-        String normalized = value.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ');
-        return normalized.length() <= MAX_CELL_LENGTH
-                ? normalized
-                : normalized.substring(0, MAX_CELL_LENGTH - 1) + "...";
-    }
-
-    private static long positiveLong(String value, String name) {
-        try {
-            long parsed = Long.parseLong(value);
-            if (parsed > 0) {
-                return parsed;
-            }
-        } catch (NumberFormatException ignored) {
-        }
-        throw new IllegalArgumentException(name + " must be a positive integer.");
-    }
-
-    private static String formatDuration(Duration duration) {
-        if (duration == null || duration.isNegative()) {
-            return "unknown";
-        }
-        long seconds = duration.toSeconds();
-        long days = seconds / 86_400;
-        long hours = seconds % 86_400 / 3_600;
-        long minutes = seconds % 3_600 / 60;
-        long remainingSeconds = seconds % 60;
-        if (days > 0) {
-            return "%dd %02dh %02dm".formatted(days, hours, minutes);
-        }
-        if (hours > 0) {
-            return "%dh %02dm %02ds".formatted(hours, minutes, remainingSeconds);
-        }
-        if (minutes > 0) {
-            return "%dm %02ds".formatted(minutes, remainingSeconds);
-        }
-        return remainingSeconds + "s";
-    }
-
-    private static String formatBytes(long bytes) {
-        if (bytes < 1024) {
-            return bytes + " B";
-        }
-        double value = bytes;
-        String[] units = {"KiB", "MiB", "GiB", "TiB"};
-        int unit = -1;
-        do {
-            value /= 1024.0;
-            unit++;
-        } while (value >= 1024 && unit < units.length - 1);
-        return String.format(Locale.ROOT, "%.1f %s", value, units[unit]);
-    }
-
-    private static String blankAs(String value, String fallback) {
-        return value == null || value.isBlank() ? fallback : value;
-    }
-
-    private static String version() {
-        Package currentPackage = ConsoleCommandProcessor.class.getPackage();
-        String implementation = currentPackage == null ? null : currentPackage.getImplementationVersion();
-        if (implementation != null && !implementation.isBlank()) {
-            return implementation;
-        }
-        Properties properties = new Properties();
-        try (InputStream input = ConsoleCommandProcessor.class.getResourceAsStream("/version.properties")) {
-            if (input != null) {
-                properties.load(input);
-                return properties.getProperty("version", "development");
-            }
-        } catch (IOException ignored) {
-        }
-        return "development";
-    }
-
-    private static String rootMessage(Throwable error) {
-        Throwable cursor = error;
-        while (cursor.getCause() != null) {
-            cursor = cursor.getCause();
-        }
-        String message = cursor.getMessage();
-        return message == null || message.isBlank() ? cursor.getClass().getSimpleName() : message;
     }
 
     public record ConsoleResult(boolean success, String message) {

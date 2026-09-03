@@ -44,6 +44,30 @@ public final class TaskCoordinator {
         this.discordBridgeService = java.util.Objects.requireNonNull(discordBridgeService);
     }
 
+    static String resolveErrorMessage(Exception exception) {
+        Throwable cursor = exception;
+        while (cursor != null) {
+            switch (cursor) {
+                case ApiRequestException e -> {
+                    return ApiRequestException.getDefaultMessage(e.getErrorCode());
+                }
+                case ClosedChannelException _ -> {
+                    return "oStella API 无法连接，请稍后再试。";
+                }
+                case ResolutionException e -> {
+                    return e.getMessage();
+                }
+                case ReplayRenderException e -> {
+                    return e.getMessage();
+                }
+                default -> {
+                }
+            }
+            cursor = cursor.getCause();
+        }
+        return "请求处理失败，请稍后再试。";
+    }
+
     public CommandReplyChannel openReplyChannel(
             String targetId,
             String messageId,
@@ -148,7 +172,9 @@ public final class TaskCoordinator {
         });
     }
 
-    /** Waits for an image renderer and returns a sendable message without sending it. */
+    /**
+     * Waits for an image renderer and returns a sendable message without sending it.
+     */
     private PendingMessage waitForImage(
             Context ctx,
             Supplier<Response<Base64Bytes>> creator,
@@ -288,29 +314,5 @@ public final class TaskCoordinator {
             return sendReply(message);
         }
 
-    }
-
-    static String resolveErrorMessage(Exception exception) {
-        Throwable cursor = exception;
-        while (cursor != null) {
-            switch (cursor) {
-                case ApiRequestException e -> {
-                    return ApiRequestException.getDefaultMessage(e.getErrorCode());
-                }
-                case ClosedChannelException _ -> {
-                    return "oStella API 无法连接，请稍后再试。";
-                }
-                case ResolutionException e -> {
-                    return e.getMessage();
-                }
-                case ReplayRenderException e -> {
-                    return e.getMessage();
-                }
-                default -> {
-                }
-            }
-            cursor = cursor.getCause();
-        }
-        return "请求处理失败，请稍后再试。";
     }
 }

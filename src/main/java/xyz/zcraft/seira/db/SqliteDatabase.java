@@ -68,9 +68,6 @@ public class SqliteDatabase {
         }
     }
 
-    public record QueryResult(List<String> columns, List<List<String>> rows, boolean truncated) {
-    }
-
     public static QueryResult queryReadOnly(String sql, int maxRows) {
         SqliteDatabase.ensureInitialized();
         if (sql == null || sql.isBlank()) {
@@ -141,5 +138,8 @@ public class SqliteDatabase {
                 "table_info", "table_xinfo", "table_list", "index_list", "index_info",
                 "index_xinfo", "foreign_key_list", "database_list", "compile_options"
         ).contains(name);
+    }
+
+    public record QueryResult(List<String> columns, List<List<String>> rows, boolean truncated) {
     }
 }

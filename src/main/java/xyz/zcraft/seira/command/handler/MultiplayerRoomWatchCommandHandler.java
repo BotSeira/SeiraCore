@@ -4,13 +4,13 @@ import xyz.zcraft.osu.model.MultiplayerRoom;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.Response;
-import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.command.TaskCoordinator;
-import xyz.zcraft.seira.watch.MultiplayerRoomWatchService;
+import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.watch.MultiplayerRoomVersion;
+import xyz.zcraft.seira.watch.MultiplayerRoomWatchService;
 import xyz.zcraft.seira.watch.RoomWatchView;
 
 import java.util.Locale;
@@ -38,6 +38,53 @@ public final class MultiplayerRoomWatchCommandHandler {
     ) {
         this.taskCoordinator = Objects.requireNonNull(taskCoordinator);
         this.watchService = Objects.requireNonNull(watchService);
+    }
+
+    static RoomTarget parseRoomTarget(String value, String explicitVersion) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String normalized = value.trim();
+        String numeric = normalized;
+        MultiplayerRoomVersion inferredVersion = null;
+        Matcher lazerMatcher = LAZER_ROOM_URL.matcher(normalized);
+        Matcher stableMatcher = STABLE_ROOM_URL.matcher(normalized);
+        if (lazerMatcher.matches()) {
+            numeric = lazerMatcher.group(1);
+            inferredVersion = MultiplayerRoomVersion.LAZER;
+        } else if (stableMatcher.matches()) {
+            numeric = stableMatcher.group(1);
+            inferredVersion = MultiplayerRoomVersion.STABLE;
+        } else if (!normalized.matches("\\d+")) {
+            return null;
+        }
+
+        MultiplayerRoomVersion requestedVersion = explicitVersion == null
+                ? null
+                : MultiplayerRoomVersion.parse(explicitVersion);
+        if (explicitVersion != null && requestedVersion == null) {
+            return null;
+        }
+        if (inferredVersion != null && requestedVersion != null && inferredVersion != requestedVersion) {
+            return null;
+        }
+        MultiplayerRoomVersion version = inferredVersion != null
+                ? inferredVersion
+                : requestedVersion == null ? MultiplayerRoomVersion.LAZER : requestedVersion;
+        try {
+            long roomId = Long.parseLong(numeric);
+            return roomId > 0 ? new RoomTarget(roomId, version) : null;
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private static String formatRoom(RoomWatchView view) {
+        return view.version().value() + " 多人房间“" + view.roomName() + "” (#" + view.roomId() + ")";
+    }
+
+    private static void usage(Context ctx) {
+        ctx.sendReply(PendingMessage.ofString(USAGE));
     }
 
     public void handleMpWatch(Context ctx) {
@@ -139,53 +186,6 @@ public final class MultiplayerRoomWatchCommandHandler {
                         ? "你当前没有在本群启动多人房间监视。"
                         : "你当前正在监视" + formatRoom(view) + "。"
         ));
-    }
-
-    static RoomTarget parseRoomTarget(String value, String explicitVersion) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        String normalized = value.trim();
-        String numeric = normalized;
-        MultiplayerRoomVersion inferredVersion = null;
-        Matcher lazerMatcher = LAZER_ROOM_URL.matcher(normalized);
-        Matcher stableMatcher = STABLE_ROOM_URL.matcher(normalized);
-        if (lazerMatcher.matches()) {
-            numeric = lazerMatcher.group(1);
-            inferredVersion = MultiplayerRoomVersion.LAZER;
-        } else if (stableMatcher.matches()) {
-            numeric = stableMatcher.group(1);
-            inferredVersion = MultiplayerRoomVersion.STABLE;
-        } else if (!normalized.matches("\\d+")) {
-            return null;
-        }
-
-        MultiplayerRoomVersion requestedVersion = explicitVersion == null
-                ? null
-                : MultiplayerRoomVersion.parse(explicitVersion);
-        if (explicitVersion != null && requestedVersion == null) {
-            return null;
-        }
-        if (inferredVersion != null && requestedVersion != null && inferredVersion != requestedVersion) {
-            return null;
-        }
-        MultiplayerRoomVersion version = inferredVersion != null
-                ? inferredVersion
-                : requestedVersion == null ? MultiplayerRoomVersion.LAZER : requestedVersion;
-        try {
-            long roomId = Long.parseLong(numeric);
-            return roomId > 0 ? new RoomTarget(roomId, version) : null;
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
-    }
-
-    private static String formatRoom(RoomWatchView view) {
-        return view.version().value() + " 多人房间“" + view.roomName() + "” (#" + view.roomId() + ")";
-    }
-
-    private static void usage(Context ctx) {
-        ctx.sendReply(PendingMessage.ofString(USAGE));
     }
 
     record RoomTarget(long roomId, MultiplayerRoomVersion version) {

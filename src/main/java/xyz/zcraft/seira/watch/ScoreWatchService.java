@@ -6,15 +6,7 @@ import org.apache.logging.log4j.Logger;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -59,6 +51,47 @@ public final class ScoreWatchService implements AutoCloseable {
             thread.setDaemon(true);
             return thread;
         });
+    }
+
+    private static List<RecentScore> scoresAfter(List<RecentScore> scores, Long lastScoreId) {
+        if (scores.isEmpty()) {
+            return List.of();
+        }
+        if (lastScoreId == null) {
+            return List.copyOf(scores);
+        }
+        for (int index = 0; index < scores.size(); index++) {
+            if (scores.get(index).scoreId() == lastScoreId) {
+                return List.copyOf(scores.subList(0, index));
+            }
+        }
+        return List.copyOf(scores);
+    }
+
+    private static WatchView view(WatchEntry entry, Instant now) {
+        Duration remaining = Duration.between(now, entry.expiresAt);
+        return new WatchView(entry.target, remaining.isNegative() ? Duration.ZERO : remaining);
+    }
+
+    private static Duration requirePositive(Duration duration, String name) {
+        if (duration == null || duration.isZero() || duration.isNegative()) {
+            throw new IllegalArgumentException(name + " must be positive");
+        }
+        return duration;
+    }
+
+    private static Set<Long> requirePositiveIds(Set<Long> ids, String name) {
+        if (ids == null || ids.isEmpty()) {
+            throw new IllegalArgumentException(name + " must not be empty");
+        }
+        LinkedHashSet<Long> result = new LinkedHashSet<>();
+        for (Long id : ids) {
+            if (id == null || id <= 0) {
+                throw new IllegalArgumentException(name + " must contain only positive IDs");
+            }
+            result.add(id);
+        }
+        return Set.copyOf(result);
     }
 
     public void start() {
@@ -176,7 +209,9 @@ public final class ScoreWatchService implements AutoCloseable {
         }
     }
 
-    /** Returns groups whose temporary score watches will be lost when this process stops. */
+    /**
+     * Returns groups whose temporary score watches will be lost when this process stops.
+     */
     public Set<String> activeTransientGroupIds() {
         synchronized (lock) {
             removeExpiredLocked(clock.instant());
@@ -396,47 +431,6 @@ public final class ScoreWatchService implements AutoCloseable {
         emptyGroups.forEach(watchesByGroup::remove);
     }
 
-    private static List<RecentScore> scoresAfter(List<RecentScore> scores, Long lastScoreId) {
-        if (scores.isEmpty()) {
-            return List.of();
-        }
-        if (lastScoreId == null) {
-            return List.copyOf(scores);
-        }
-        for (int index = 0; index < scores.size(); index++) {
-            if (scores.get(index).scoreId() == lastScoreId) {
-                return List.copyOf(scores.subList(0, index));
-            }
-        }
-        return List.copyOf(scores);
-    }
-
-    private static WatchView view(WatchEntry entry, Instant now) {
-        Duration remaining = Duration.between(now, entry.expiresAt);
-        return new WatchView(entry.target, remaining.isNegative() ? Duration.ZERO : remaining);
-    }
-
-    private static Duration requirePositive(Duration duration, String name) {
-        if (duration == null || duration.isZero() || duration.isNegative()) {
-            throw new IllegalArgumentException(name + " must be positive");
-        }
-        return duration;
-    }
-
-    private static Set<Long> requirePositiveIds(Set<Long> ids, String name) {
-        if (ids == null || ids.isEmpty()) {
-            throw new IllegalArgumentException(name + " must not be empty");
-        }
-        LinkedHashSet<Long> result = new LinkedHashSet<>();
-        for (Long id : ids) {
-            if (id == null || id <= 0) {
-                throw new IllegalArgumentException(name + " must contain only positive IDs");
-            }
-            result.add(id);
-        }
-        return Set.copyOf(result);
-    }
-
     @Override
     public void close() {
         if (closed.compareAndSet(false, true)) {
@@ -459,11 +453,7 @@ public final class ScoreWatchService implements AutoCloseable {
     private record WatchRef(String groupId, WatchEntry entry) {
     }
 
-    private static final class SpecificWatchEntry {
-        private final Set<Long> userIds;
-        private final Set<Long> beatmapIds;
-        private final Map<Long, Long> lastScoreIds;
-
+    private record SpecificWatchEntry(Set<Long> userIds, Set<Long> beatmapIds, Map<Long, Long> lastScoreIds) {
         private SpecificWatchEntry(Set<Long> userIds, Set<Long> beatmapIds, Map<Long, Long> lastScoreIds) {
             this.userIds = userIds;
             this.beatmapIds = beatmapIds;

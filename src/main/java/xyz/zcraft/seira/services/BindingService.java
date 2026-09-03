@@ -13,16 +13,13 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 
-/** Owns the OAuth callback server and its pending binding requests. */
+/**
+ * Owns the OAuth callback server and its pending binding requests.
+ */
 public final class BindingService implements AutoCloseable {
     private static final Logger LOG = LogManager.getLogger(BindingService.class);
     private static final Duration TASK_TTL = Duration.ofMinutes(20);
