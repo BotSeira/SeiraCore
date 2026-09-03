@@ -544,13 +544,13 @@ public final class RankGuessCommandHandler {
 
         private static double getRatingRaw(RankGuessRecordStore.Statistics.Personal statistics) {
             double averageScoreRate = Math.clamp(
-                    statistics.averageScore() / 1000.0,
+                    statistics.averageScore() / 950.0,
                     0.0, 1.0
             );
 
-            double rawRating = averageScoreRate * 0.40
-                    + statistics.winRate() * 0.15
-                    + statistics.topTwentyRate() * 0.45;
+            double rawRating = averageScoreRate * 0.50
+                    + statistics.winRate() * 0.10
+                    + statistics.topTwentyRate() * 0.40;
 
             double confidence = 1.0 - Math.exp(-statistics.participation() / 10.0);
 
