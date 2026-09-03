@@ -6,7 +6,7 @@ import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.data.FriendEntry;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.Response;
-import xyz.zcraft.seira.binding.UserDataStore;
+import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.*;
 import xyz.zcraft.seira.command.parse.Resolver;

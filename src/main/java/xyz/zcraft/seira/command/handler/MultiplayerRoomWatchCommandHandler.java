@@ -4,7 +4,7 @@ import xyz.zcraft.osu.model.MultiplayerRoom;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.Response;
-import xyz.zcraft.seira.binding.UserDataStore;
+import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.ResolutionException;
@@ -86,7 +86,7 @@ public final class MultiplayerRoomWatchCommandHandler {
         }
 
         taskCoordinator.runApiRequest(ctx, "Start Multiplayer Room Watch", () -> {
-            if (!ctx.sendMessage(PendingMessage.ofString("正在尝试启动多人房间监视……"))) {
+            if (!ctx.sendMessage(PendingMessage.ofString("正在尝试启动多人房间监视……")).success()) {
                 ctx.sendReply(PendingMessage.ofString(
                         "由于缺少主动消息权限，无法启动监视！权限配置请见：https://docs.seira.top/overview/use.html#extra-permission"
                 ));

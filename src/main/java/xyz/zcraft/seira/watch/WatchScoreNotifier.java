@@ -29,6 +29,6 @@ public final class WatchScoreNotifier {
         Message message = new Message();
         message.setMsgType(PendingMessage.MSG_TYPE_MEDIA);
         message.setMedia(media);
-        return messageSender.sendGroupMessage(groupId, message);
+        return messageSender.sendGroupMessage(groupId, message) != null;
     }
 }

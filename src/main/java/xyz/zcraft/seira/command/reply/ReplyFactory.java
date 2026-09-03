@@ -7,8 +7,9 @@ import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.osu.model.*;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.data.*;
-import xyz.zcraft.seira.binding.BindingService;
-import xyz.zcraft.seira.binding.UserDataStore;
+import xyz.zcraft.seira.services.BindingService;
+import xyz.zcraft.seira.db.UserDataStore;
+import xyz.zcraft.seira.db.RankGuessRecordStore;
 import xyz.zcraft.seira.bot.data.Button;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
@@ -113,6 +114,30 @@ public final class ReplyFactory {
         }
 
         return PendingMessage.ofMarkdownRaw(content.toString().trim());
+    }
+
+    public PendingMessage rankGuessStatisticsMessage(
+            Context ctx, RankGuessRecordStore.Statistics statistics, boolean allGroups, String rank
+    ) {
+        String scope = allGroups ? "全部群聊" : "本群";
+        if (statistics.participation() == 0) {
+            return PendingMessage.ofMarkdownRaw(at(ctx) + "你在" + scope + "还没有已结算的猜 Rank 战绩喵~");
+        }
+
+        String rankText = "?".equals(rank) ? "" : "根据你的总体表现，可以给到一个 `%s` 喵！".formatted(rank);
+        return PendingMessage.ofMarkdownRaw(at(ctx) + String.format(Locale.ROOT, """
+                你的猜 Rank 战绩（%s）
+                > 总参与数：`%d`
+                > 获胜数：`%d`，胜率：`%.2f%%`
+                > 前20%%次数：`%d`，达成率：`%.2f%%`
+                > 平均分：`%.2f`，最高分：`%.2f`
+                > 总得分：`%.2f`，平均名次：`%.2f`
+                
+                %s
+                """, scope, statistics.participation(), statistics.wins(), statistics.winRate() * 100,
+                statistics.topTwentyCount(), statistics.topTwentyRate() * 100,
+                statistics.averageScore(), statistics.highestScore(), statistics.totalScore(),
+                statistics.averagePlacement(), rankText).strip());
     }
 
     public PendingMessage boMessage(Context ctx, Response<?> response) {
@@ -616,7 +641,7 @@ public final class ReplyFactory {
                             > /bma <谱面ID或快捷查询> [Mod] - 分析谱面PP构成和类型
                             > /ms <谱面集ID或快捷查询> - 获取谱面集
                             > /r [成绩ID或快捷查询] [[mm:ss]-[mm:ss]] - 生成成绩高光视频或指定片段
-                            > /rg <start/group/#Rank/end/wish> - 在群聊中进行猜 Rank 游戏
+                            > /rg <start/group/#Rank/end/wish/stats [all]> - 猜 Rank 游戏与个人战绩
                             > /lb <谱面ID> [玩家ID列表] - 获取指定谱面排行榜
                             > /watch add <玩家ID/用户名/@用户> [分钟] - 监视群友的新成绩
                             > /wx start <UID列表> <谱面ID列表> - 监视指定玩家在指定谱面的成绩

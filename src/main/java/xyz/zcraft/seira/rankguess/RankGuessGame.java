@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class RankGuessGame {
     public final UUID token;
     public final String starterUserId;
+    public final boolean fromGroup;
     public final Map<String, Guess> guesses = new LinkedHashMap<>();
     public boolean copyPunishmentReduced = false;
     public final AtomicInteger guessCount = new AtomicInteger(0);
@@ -20,9 +21,10 @@ public final class RankGuessGame {
     @Getter
     private volatile boolean ended = false;
 
-    RankGuessGame(UUID token, String starterUserId) {
+    RankGuessGame(UUID token, String starterUserId, boolean fromGroup) {
         this.token = token;
         this.starterUserId = starterUserId;
+        this.fromGroup = fromGroup;
     }
 
     public void markEnded() {
@@ -44,13 +46,14 @@ public final class RankGuessGame {
         return List.copyOf(revealedHints);
     }
 
+    public static final int COPY_PUNISHMENT_THRESHOLD = 8;
     public double getMultiplierDelta(RankGuessGameService.ScoreMultiplier multiplier) {
         if (multiplier instanceof RankGuessGameService.ScoreMultiplier.FirstGuessMultiplier) {
             return 0.05;
         } else if (multiplier instanceof RankGuessGameService.ScoreMultiplier.OrderMultiplier orderMultiplier) {
             return Math.max(-0.10, 0.00 - (orderMultiplier.getOrder() - 2) * 0.01);
         } else if (multiplier instanceof RankGuessGameService.ScoreMultiplier.CopyPunishmentMultiplier) {
-            if (guessCount.get() >= 10) {
+            if (guessCount.get() >= COPY_PUNISHMENT_THRESHOLD) {
                 return -0.025;
             } else {
                 return -0.05;
@@ -82,7 +85,7 @@ public final class RankGuessGame {
                     .append(": ")
                     .append(String.format(
                             Locale.US,
-                            "%+.0f%%",
+                            "%+.2f%%",
                             this.getMultiplierDelta(multiplier) * 100
                     ))
                     .append("\n");

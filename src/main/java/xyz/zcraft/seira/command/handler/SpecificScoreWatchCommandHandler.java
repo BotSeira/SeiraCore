@@ -54,7 +54,7 @@ public final class SpecificScoreWatchCommandHandler {
         }
 
         taskCoordinator.runApiRequest(ctx, "Start Specific Score Watch", () -> {
-            if (!ctx.sendMessage(PendingMessage.ofString("正在尝试启动指定谱面成绩监视……"))) {
+            if (!ctx.sendMessage(PendingMessage.ofString("正在尝试启动指定谱面成绩监视……")).success()) {
                 ctx.sendReply(PendingMessage.ofString(
                         "由于缺少主动消息权限，无法启动监视！权限配置请见：https://docs.seira.top/overview/use.html#extra-permission"
                 ));

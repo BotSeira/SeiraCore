@@ -2,7 +2,7 @@ package xyz.zcraft.seira.command.handler;
 
 import xyz.zcraft.osu.model.User;
 import xyz.zcraft.seira.api.APIHelper;
-import xyz.zcraft.seira.binding.UserDataStore;
+import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.ResolutionException;
@@ -104,7 +104,7 @@ public final class WatchCommandHandler {
             WatchTarget target = targetResolver.apply(ctx.groupId(), targetArgument);
             final boolean b = ctx.sendMessage(PendingMessage.ofMarkdownRaw(
                     at(ctx) + "正在尝试添加监视..."
-            ));
+            )).success();
             if (!b) {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw("由于缺少主动消息权限，无法添加监视！权限配置请见[这里](https://docs.seira.top/overview/use.html#extra-permission)~"));
                 return;

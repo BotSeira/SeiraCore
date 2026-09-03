@@ -1,7 +1,7 @@
 package xyz.zcraft.seira.command.handler;
 
-import xyz.zcraft.seira.binding.BindingService;
-import xyz.zcraft.seira.binding.UserDataStore;
+import xyz.zcraft.seira.services.BindingService;
+import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.reply.ReplyFactory;

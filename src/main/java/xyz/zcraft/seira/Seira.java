@@ -6,7 +6,6 @@ import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.config.Configurator;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.ConfigLoader;
-import xyz.zcraft.seira.runtime.SeiraApplication;
 
 import java.io.IOException;
 

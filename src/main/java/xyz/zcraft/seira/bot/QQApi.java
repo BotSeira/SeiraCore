@@ -73,7 +73,7 @@ public class QQApi {
         );
     }
 
-    public static void sendPrivateMessage(AccessToken accessToken, String openId, Message message) {
+    public static SentMessage sendPrivateMessage(AccessToken accessToken, String openId, Message message) {
         try {
             final var request = newRequestBuilder(accessToken)
                     .uri(URI.create(ENDPOINT + "/v2/users/" + openId + "/messages"))
@@ -84,12 +84,14 @@ public class QQApi {
             if (send.statusCode() != 200) {
                 throw new RuntimeException("Failed to send private message to " + openId + " " + send.body());
             }
+
+            return GSON.fromJson(send.body(), SentMessage.class);
         } catch (IOException | InterruptedException e) {
             throw requestFailure(e);
         }
     }
 
-    public static void sendGroupMessage(AccessToken accessToken, String groupId, Message message) {
+    public static SentMessage sendGroupMessage(AccessToken accessToken, String groupId, Message message) {
         try {
             final var request = newRequestBuilder(accessToken)
                     .uri(URI.create(ENDPOINT + "/v2/groups/" + groupId + "/messages"))
@@ -100,10 +102,14 @@ public class QQApi {
             if (send.statusCode() != 200) {
                 throw new RuntimeException("Failed to send group message to " + groupId + " " + send.body());
             }
+
+            return GSON.fromJson(send.body(), SentMessage.class);
         } catch (IOException | InterruptedException e) {
             throw requestFailure(e);
         }
     }
+
+    private static final Gson GSON = new  Gson();
 
     public static String buildMessageJson(Message message) {
         final JsonObject asJsonObject = new Gson().toJsonTree(message).getAsJsonObject();

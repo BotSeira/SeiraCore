@@ -4,13 +4,14 @@ import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.config.Configurator;
-import xyz.zcraft.seira.binding.UserDataStore;
+import xyz.zcraft.seira.db.SqliteDatabase;
+import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.route.Router;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.RuntimeConfig;
-import xyz.zcraft.seira.security.AdminRegistry;
+import xyz.zcraft.seira.util.AdminRegistry;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.watch.WatchView;
 
@@ -469,8 +470,8 @@ public final class ConsoleCommandProcessor {
         }
 
         boolean sent = switch (targetType) {
-            case "group" -> messenger.sendGroupText(targetId, content);
-            case "private" -> messenger.sendPrivateText(targetId, content);
+            case "group" -> messenger.sendGroupText(targetId, content) != null;
+            case "private" -> messenger.sendPrivateText(targetId, content) != null;
             default -> throw new IllegalArgumentException("Message type must be 'group' or 'private'.");
         };
         return sent
@@ -671,7 +672,7 @@ public final class ConsoleCommandProcessor {
         return output.toString();
     }
 
-    private static String formatQueryResult(UserDataStore.QueryResult result) {
+    private static String formatQueryResult(SqliteDatabase.QueryResult result) {
         StringBuilder output = new StringBuilder();
         output.append(result.columns().stream().map(ConsoleCommandProcessor::cell).reduce(
                 (left, right) -> left + " | " + right

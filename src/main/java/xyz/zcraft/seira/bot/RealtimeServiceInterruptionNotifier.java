@@ -30,7 +30,7 @@ public final class RealtimeServiceInterruptionNotifier {
 
         int sent = 0;
         for (Map.Entry<String, LinkedHashSet<String>> entry : servicesByGroup.entrySet()) {
-            if (sender.sendGroupText(entry.getKey(), message(entry.getValue()))) {
+            if (sender.sendGroupText(entry.getKey(), message(entry.getValue())) != null) {
                 sent++;
             }
         }

@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.binding;
+package xyz.zcraft.seira.services;
 
 import io.javalin.Javalin;
 import io.javalin.http.Context;

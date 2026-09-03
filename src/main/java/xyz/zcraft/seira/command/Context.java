@@ -1,6 +1,7 @@
 package xyz.zcraft.seira.command;
 
 import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.data.SendResult;
 
 import java.util.Objects;
 
@@ -64,22 +65,22 @@ public record Context(
     /**
      * Sends a passive reply associated with the message that invoked this command.
      */
-    public boolean sendReply(PendingMessage message) {
+    public SendResult sendReply(PendingMessage message) {
         return requireReplies().sendReply(Objects.requireNonNull(message, "message"));
     }
 
-    public boolean sendReply(String message) {
+    public SendResult sendReply(String message) {
         return requireReplies().sendReply(PendingMessage.ofString(message));
     }
 
     /**
      * Sends an active message to the same user or group, without an inbound message reference.
      */
-    public boolean sendMessage(PendingMessage message) {
+    public SendResult sendMessage(PendingMessage message) {
         return requireReplies().sendProactive(Objects.requireNonNull(message, "message"));
     }
 
-    public boolean sendQueueNotice(PendingMessage message) {
+    public SendResult sendQueueNotice(PendingMessage message) {
         return requireReplies().sendQueueNotice(Objects.requireNonNull(message, "message"));
     }
 

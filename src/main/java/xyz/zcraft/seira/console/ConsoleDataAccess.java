@@ -1,9 +1,9 @@
 package xyz.zcraft.seira.console;
 
-import xyz.zcraft.seira.binding.UserDataStore;
+import xyz.zcraft.seira.db.SqliteDatabase;
 
 public interface ConsoleDataAccess {
-    UserDataStore.QueryResult query(String sql, int maxRows);
+    SqliteDatabase.QueryResult query(String sql, int maxRows);
 
     int boundUsers();
 

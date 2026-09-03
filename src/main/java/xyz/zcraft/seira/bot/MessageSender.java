@@ -7,6 +7,8 @@ import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.bot.data.Message;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.api.data.QqUploadRequest;
+import xyz.zcraft.seira.bot.data.SentMessage;
+import xyz.zcraft.seira.data.SendResult;
 import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.services.CosService;
 import xyz.zcraft.seira.util.TokenManager;
@@ -25,23 +27,21 @@ public class MessageSender {
         this.cos = cos;
     }
 
-    public boolean sendPrivateMessage(String userId, Message message) {
+    public SentMessage sendPrivateMessage(String userId, Message message) {
         try {
-            QQApi.sendPrivateMessage(tokenManager.getToken(), userId, message);
-            return true;
+            return QQApi.sendPrivateMessage(tokenManager.getToken(), userId, message);
         } catch (RuntimeException e) {
             LOG.error("Failed to send message to private {}", userId, e);
-            return false;
+            return null;
         }
     }
 
-    public boolean sendGroupMessage(String groupId, Message message) {
+    public SentMessage sendGroupMessage(String groupId, Message message) {
         try {
-            QQApi.sendGroupMessage(tokenManager.getToken(), groupId, message);
-            return true;
+            return QQApi.sendGroupMessage(tokenManager.getToken(), groupId, message);
         } catch (RuntimeException e) {
             LOG.error("Failed to send message to group {}", groupId, e);
-            return false;
+            return null;
         }
     }
 
@@ -133,21 +133,21 @@ public class MessageSender {
         }
     }
 
-    public boolean sendPrivateText(String userId, String content) {
+    public SentMessage sendPrivateText(String userId, String content) {
         Message message = new Message();
         message.setMsgType(PendingMessage.MSG_TYPE_TEXT);
         message.setContent(content);
         return sendPrivateMessage(userId, message);
     }
 
-    public boolean sendGroupText(String groupId, String content) {
+    public SentMessage sendGroupText(String groupId, String content) {
         Message message = new Message();
         message.setMsgType(PendingMessage.MSG_TYPE_TEXT);
         message.setContent(content);
         return sendGroupMessage(groupId, message);
     }
 
-    public boolean sendGroupMarkdown(String groupId, String content) {
+    public SentMessage sendGroupMarkdown(String groupId, String content) {
         Message message = new Message();
         message.setMsgType(PendingMessage.MSG_TYPE_MARKDOWN);
         message.setMarkdown(new Gson().toJsonTree(Map.of("content", content)).getAsJsonObject());

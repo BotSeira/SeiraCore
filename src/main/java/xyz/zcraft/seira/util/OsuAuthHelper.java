@@ -4,7 +4,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.api.OsuAuthApi;
 import xyz.zcraft.seira.api.data.OsuToken;
-import xyz.zcraft.seira.binding.UserDataStore;
+import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.config.BindingConfig;
 
 public class OsuAuthHelper {

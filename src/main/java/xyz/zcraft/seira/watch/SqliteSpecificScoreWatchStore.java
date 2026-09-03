@@ -1,6 +1,6 @@
 package xyz.zcraft.seira.watch;
 
-import xyz.zcraft.seira.binding.UserDataStore;
+import xyz.zcraft.seira.db.UserDataStore;
 
 import java.util.List;
 

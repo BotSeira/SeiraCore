@@ -36,4 +36,7 @@ public class Message {
 
     @SerializedName("is_wakeup")
     private Boolean isWakeup;
+
+    @SerializedName("message_reference")
+    private MessageReference messageReference;
 }

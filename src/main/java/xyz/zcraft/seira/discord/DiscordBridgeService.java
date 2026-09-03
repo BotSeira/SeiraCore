@@ -13,7 +13,7 @@ import net.dv8tion.jda.api.utils.FileUpload;
 import net.dv8tion.jda.api.utils.messages.MessageCreateBuilder;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.seira.binding.UserDataStore;
+import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.Attachment;
 import xyz.zcraft.seira.bot.data.FileInfo;
@@ -291,7 +291,7 @@ public final class DiscordBridgeService implements AutoCloseable {
         Message outbound = new Message();
         outbound.setMsgType(PendingMessage.MSG_TYPE_MEDIA);
         outbound.setMedia(item.uploaded());
-        if (!qqSender.sendGroupMessage(groupId, outbound)) {
+        if (qqSender.sendGroupMessage(groupId, outbound) == null) {
             qqSender.sendGroupText(groupId, "[媒体发送到 QQ 失败: " + item.media().filename() + "]");
         }
     }

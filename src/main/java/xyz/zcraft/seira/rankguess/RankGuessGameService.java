@@ -6,19 +6,25 @@ import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.osu.model.Score;
 import xyz.zcraft.osu.model.UserExtended;
 import xyz.zcraft.seira.api.data.RandomScore;
+import xyz.zcraft.seira.db.RankGuessRecordStore;
 
 import java.time.Clock;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Consumer;
 import java.util.random.RandomGenerator;
 
+import static xyz.zcraft.seira.rankguess.RankGuessGame.COPY_PUNISHMENT_THRESHOLD;
+
 public final class RankGuessGameService {
+    public static final int SCORING_VERSION = 1;
     private static final Duration END_PROTECTION_DURATION = Duration.ofMinutes(3);
 
     private final Map<String, RankGuessGame> games = new HashMap<>();
     private final RankGuessWeights weights;
     private final Clock clock;
+    private final Consumer<FinishedRound> recordWriter;
 
     public RankGuessGameService() {
         this(Clock.systemUTC());
@@ -29,8 +35,13 @@ public final class RankGuessGameService {
     }
 
     RankGuessGameService(Clock clock, RankGuessWeights weights) {
+        this(clock, weights, RankGuessRecordStore::save);
+    }
+
+    RankGuessGameService(Clock clock, RankGuessWeights weights, Consumer<FinishedRound> recordWriter) {
         this.clock = clock;
         this.weights = weights;
+        this.recordWriter = Objects.requireNonNull(recordWriter);
     }
 
     public void saveWeights() {
@@ -183,12 +194,16 @@ public final class RankGuessGameService {
     }
 
     public synchronized Reservation reserve(String groupId, String starterUserId) {
+        return reserve(groupId, starterUserId, false);
+    }
+
+    public synchronized Reservation reserve(String groupId, String starterUserId, boolean fromGroup) {
         if (games.containsKey(groupId)) {
             return null;
         }
 
         Reservation reservation = new Reservation(groupId, UUID.randomUUID());
-        games.put(groupId, new RankGuessGame(reservation.token(), starterUserId));
+        games.put(groupId, new RankGuessGame(reservation.token(), starterUserId, fromGroup));
         return reservation;
     }
 
@@ -270,26 +285,22 @@ public final class RankGuessGameService {
 
         if (closestGuess != -1) {
             double absoluteDifference = Math.abs(closestGuess - guess);
-            double relativeDifference = absoluteDifference
-                    / (double) Math.max(closestGuess, guess);
+            double relativeDifference = absoluteDifference / (double) Math.max(closestGuess, guess);
 
             boolean copied =
                     (absoluteDifference <= 100 && relativeDifference <= 0.01)
-                            || Math.abs(
-                            Math.log10(closestGuess)
-                                    - Math.log10(guess)
-                    ) < 0.005;
-
-            final int i = game.guesses.size();
-
-            if (i >= 10 && !game.copyPunishmentReduced) {
-                game.copyPunishmentReduced = true;
-                message = "提示：由于本次游戏参与人数较多，所有猜测的抄袭惩罚已降至 `-2.5%` ~";
-            }
+                            || Math.abs(Math.log10(closestGuess) - Math.log10(guess)) < 0.005;
 
             if (copied) {
                 multipliers.add(new ScoreMultiplier.CopyPunishmentMultiplier());
             }
+        }
+
+        final int i = game.guesses.size();
+
+        if (i >= COPY_PUNISHMENT_THRESHOLD && !game.copyPunishmentReduced) {
+            game.copyPunishmentReduced = true;
+            message = "提示：由于本次游戏参与人数较多，所有猜测的抄袭惩罚已降至 `-2.5%` ~";
         }
 
         game.guesses.put(senderUserId, Guess.of(guess, game.nextSequence++, multipliers));
@@ -320,8 +331,6 @@ public final class RankGuessGameService {
             return new EndResult(EndStatus.FORBIDDEN, null);
         }
 
-        games.remove(groupId);
-        game.markEnded();
         List<Standing> standings = new ArrayList<>(game.guesses.size());
         for (Map.Entry<String, Guess> entry : game.guesses.entrySet()) {
             Guess guess = entry.getValue();
@@ -350,11 +359,19 @@ public final class RankGuessGameService {
                 .thenComparingDouble(Standing::error)
                 .thenComparingLong(Standing::sequence));
 
+        FinishedRound finished = new FinishedRound(
+                game.token, groupId, game.fromGroup, game.guessingStartedAt, clock.instant(),
+                SCORING_VERSION, game.round, standings
+        );
+        // Keep the game available for retry if recording fails; no history should advance before commit.
+        recordWriter.accept(finished);
+        games.remove(groupId);
+        game.markEnded();
         weights.recordRound(groupId, game.round.userId(), game.round.scoreId());
 
         return new EndResult(
                 EndStatus.FINISHED,
-                new FinishedRound(game.round, List.copyOf(standings))
+                finished
         );
     }
 

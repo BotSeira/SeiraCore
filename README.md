@@ -47,6 +47,11 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 
 <img width="400"  alt="image" src="https://github.com/user-attachments/assets/c1caf387-381c-442f-99da-5b4257657576" />
 
+每局结算后自动保存战绩。在群内使用 `/rg stats` 查询自己的本群战绩，使用 `/rg stats all` 查询自己的全部群聊战绩。
+统计包括参与数、获胜数、胜率、前 20% 次数和达成率、平均分、最高分、总得分及平均名次。
+每人每局只统计最终猜测，获胜按最终排行榜第一名计算；前 20% 名额向上取整，仅统计至少 5 人参与的对局，达成率以这些对局为分母。
+战绩与用户绑定共用配置中的 SQLite 数据库，分数采用最终结算得分；历史未记录的对局不会自动补入。
+
 ### 查询群友的排行榜！
 
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/cbc361a4-61e0-440d-908e-f1d52009373e" />
@@ -85,7 +90,7 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 | `/ma`           | `/ma [id/locId/rsN/boN] [n/#n]`                    | 获取指定或最近目标成绩的Miss分析；省略目标时用`#n`指定Miss                      |
 | `/u`            | `/u [uid/username/@user]`                          | 获取指定用户信息                                                                |
 | `/r`            | `/r [id/locId/rsN/boN] [[mm:ss]-[mm:ss]]`          | 生成并发送指定或最近目标的回放视频。省略范围时自动识别高光，使用`-`渲染整个回放 |
-| `/rg`           | `/rg <start/group/#Rank/end/wish>`                 | 在群聊中开始、参与或结束猜 Rank 游戏                                            |
+| `/rg`           | `/rg <start/group/#Rank/end/wish/stats [all]>`     | 猜 Rank 游戏及个人战绩查询                                                     |
 | `/rsc`          | `/rsc [id/locId/rsN/boN] [+<id1>,<id2>...]`        | 生成并发送指定或最近目标的成绩同屏回放视频；追加用户和范围顺序不限              |
 | `/rstat`        | `/rstat [id]`                                      | 获取视频生成进度                                                                |
 | `/ms`           | `/ms <id/rsN/boN>`                                 | 获取指定谱面集信息                                                              |

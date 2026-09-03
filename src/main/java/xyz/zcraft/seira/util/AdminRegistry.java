@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.security;
+package xyz.zcraft.seira.util;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;

@@ -164,7 +164,7 @@ public final class ReplayCommandHandler {
             PendingMessage video = replayResult.qqFile() != null
                     ? PendingMessage.ofUploadedVideo(replayResult.qqFile(), replayResult.videoUrl())
                     : PendingMessage.ofVideoUrl(replayResult.videoUrl());
-            if (ctx.sendReply(video)) {
+            if (ctx.sendReply(video).success()) {
                 replayResults.remove(jobId);
             }
             return;

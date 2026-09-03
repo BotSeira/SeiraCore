@@ -4,7 +4,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.data.RandomScore;
-import xyz.zcraft.seira.binding.UserDataStore;
+import xyz.zcraft.seira.db.UserDataStore;
+import xyz.zcraft.seira.db.RankGuessRecordStore;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.TaskCoordinator;
@@ -27,7 +28,7 @@ import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class RankGuessCommandHandler {
     private static final Logger LOG = LogManager.getLogger(RankGuessCommandHandler.class);
-    private static final String USAGE = "用法：/rg start | /rg group | /rg #Rank | /rg end | /rg wish";
+    private static final String USAGE = "用法：/rg start | /rg group | /rg #Rank | /rg end | /rg wish | /rg stats [all]";
     private static final Pattern RANK_PATTERN = Pattern.compile("^#?(\\d+)[wk]?$");
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
@@ -82,6 +83,16 @@ public final class RankGuessCommandHandler {
         }
 
         String argument = ctx.argument(0);
+        if ("stats".equalsIgnoreCase(argument)) {
+            if (ctx.argumentCount() == 1) {
+                statistics(ctx, false);
+            } else if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
+                statistics(ctx, true);
+            } else {
+                ctx.sendReply(PendingMessage.ofString(USAGE));
+            }
+            return;
+        }
         if ("start".equalsIgnoreCase(argument)) {
             if (ctx.argumentCount() == 2) {
                 final String arg = ctx.argument(1);
@@ -161,6 +172,49 @@ public final class RankGuessCommandHandler {
         ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "目前本群权重:\n```json\n" + string + "\n```"));
     }
 
+    private void statistics(Context ctx, boolean allGroups) {
+        try {
+            RankGuessRecordStore.Statistics statistics = RankGuessRecordStore.getStatistics(
+                    ctx.senderUserId(),
+                    allGroups ? null : ctx.groupId()
+            );
+
+            ctx.sendReply(replyFactory.rankGuessStatisticsMessage(ctx, statistics, allGroups, getRank(statistics)));
+        } catch (RuntimeException e) {
+            LOG.error("Failed to query rank guess statistics", e);
+            ctx.sendReply(PendingMessage.ofString("战绩查询失败，请稍后重试喵。"));
+        }
+    }
+
+    private String getRank(RankGuessRecordStore.Statistics statistics) {
+        if (statistics.participation() < 3) {
+            return "?";
+        }
+
+        double averageScoreRate = Math.clamp(
+                statistics.averageScore() / 1000.0,
+                0.0, 1.0
+        );
+
+        double rawRating =
+                averageScoreRate * 0.50
+                        + statistics.winRate() * 0.20
+                        + statistics.topTwentyRate() * 0.30;
+
+        double confidence = 1.0 - Math.exp(-statistics.participation() / 10.0);
+
+        double rating = 0.50 * (1.0 - confidence) + rawRating * confidence;
+
+
+        if (rating >= 0.90) return "SS";
+        if (rating >= 0.82) return "S";
+        if (rating >= 0.74) return "A";
+        if (rating >= 0.64) return "B";
+        if (rating >= 0.52) return "C";
+        if (rating >= 0.40) return "D";
+        return "F";
+    }
+
     private void wish(Context ctx) {
         final Long boundUid = UserDataStore.findBoundUid(ctx.senderUserId());
 
@@ -180,7 +234,7 @@ public final class RankGuessCommandHandler {
     }
 
     private void start(Context ctx, boolean fromGroup) {
-        RankGuessGameService.Reservation reservation = games.reserve(ctx.groupId(), ctx.senderUserId());
+        RankGuessGameService.Reservation reservation = games.reserve(ctx.groupId(), ctx.senderUserId(), fromGroup);
         if (reservation == null) {
             ctx.sendReply(PendingMessage.ofString("本群已有一轮 Rank Guess 正在进行。"));
             return;
@@ -192,7 +246,7 @@ public final class RankGuessCommandHandler {
                 "Rank Guess Render",
                 () -> {
                     final PendingMessage message = PendingMessage.ofMarkdownRaw(at(ctx) + "正在选定随机成绩...");
-                    final boolean activeMessageEnabled = ctx.sendMessage(message);
+                    final boolean activeMessageEnabled = ctx.sendMessage(message).success();
                     if (!activeMessageEnabled) {
                         ctx.sendReply(message);
                     }
@@ -244,7 +298,7 @@ public final class RankGuessCommandHandler {
                         return;
                     }
 
-                    boolean videoSent = ctx.sendReply(taskCoordinator.replayVideoMessage(replay));
+                    boolean videoSent = ctx.sendReply(taskCoordinator.replayVideoMessage(replay)).success();
                     if (!videoSent) {
                         taskCoordinator.removeReplayResult(renderTask.taskId());
                         ctx.sendReply(PendingMessage.ofMarkdownRaw("由于回放发送失败，本轮游戏已取消~"));
@@ -277,7 +331,7 @@ public final class RankGuessCommandHandler {
                     } else {
                         result.append("\n").append("> 第一个提示将在 1 分钟后揭晓~");
                     }
-                    boolean startMessageSent = ctx.sendReply(PendingMessage.ofMarkdownRaw(result.toString().trim()));
+                    boolean startMessageSent = ctx.sendReply(PendingMessage.ofMarkdownRaw(result.toString().trim())).success();
 
                     if (!activeMessageEnabled) {
                         if (startMessageSent) {
@@ -287,6 +341,8 @@ public final class RankGuessCommandHandler {
                     }
 
                     boolean firstHint = true;
+
+                    StringBuilder hintString = new StringBuilder();
 
                     while (!hints.isEmpty() && !game.isEnded()) {
                         try {
@@ -305,7 +361,9 @@ public final class RankGuessCommandHandler {
 
                         final var hint = hints.removeFirst();
 
-                        String hintContent = "__猜Rank提示：__\n" + hint.content();
+                        hintString.insert(0, "- " + hint.content() + "\n");
+
+                        String hintContent = "__猜Rank提示：__\n" + hintString;
 
                         if (!hints.isEmpty()) {
                             hintContent += "\n" + "> 下一个提示将在 30 秒后揭晓~";
@@ -313,7 +371,7 @@ public final class RankGuessCommandHandler {
                             hintContent += "\n" + "> 所有提示已经揭晓啦！游戏将在 1 分钟后自动结束~";
                         }
 
-                        if (ctx.sendMessage(PendingMessage.ofMarkdownRaw(hintContent))) {
+                        if (ctx.sendMessage(PendingMessage.ofMarkdownRaw(hintContent)).success()) {
                             game.revealHint(hint);
                         }
                     }
@@ -366,9 +424,15 @@ public final class RankGuessCommandHandler {
     }
 
     private void end(Context ctx, boolean force) {
-        RankGuessGameService.EndResult result = games.end(
-                ctx.groupId(), ctx.senderUserId(), adminAuthorizer.test(ctx.senderUserId()), force
-        );
+        RankGuessGameService.EndResult result;
+        try {
+            result = games.end(ctx.groupId(), ctx.senderUserId(), adminAuthorizer.test(ctx.senderUserId()), force);
+        } catch (RankGuessRecordStore.RecordSaveException e) {
+            LOG.error("Failed to record rank guess round in group {}", ctx.groupId(), e);
+            PendingMessage failure = PendingMessage.ofString("战绩保存失败，本轮尚未结算，请稍后使用 /rg end 重试喵。");
+            if (!ctx.sendReply(failure).success()) ctx.sendMessage(failure);
+            return;
+        }
 
         PendingMessage message = switch (result.status()) {
             case NO_GAME -> PendingMessage.ofString("本群当前没有进行中的 Rank Guess 喵");
@@ -379,7 +443,7 @@ public final class RankGuessCommandHandler {
             case FINISHED -> replyFactory.rankGuessResultMessage(ctx, result.round());
         };
 
-        if (!ctx.sendReply(message)) {
+        if (!ctx.sendReply(message).success()) {
             ctx.sendMessage(message);
         }
     }

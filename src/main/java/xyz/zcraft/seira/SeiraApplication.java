@@ -1,20 +1,21 @@
-package xyz.zcraft.seira.runtime;
+package xyz.zcraft.seira;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.core.config.Configurator;
-import xyz.zcraft.seira.binding.BindingService;
-import xyz.zcraft.seira.binding.UserDataStore;
+import xyz.zcraft.seira.services.BindingService;
 import xyz.zcraft.seira.bot.QQBot;
 import xyz.zcraft.seira.console.ConsoleCommandProcessor;
 import xyz.zcraft.seira.console.JLineConsole;
 import xyz.zcraft.seira.console.UserDataConsoleAccess;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.RuntimeConfig;
-import xyz.zcraft.seira.security.AdminRegistry;
+import xyz.zcraft.seira.db.SqliteDatabase;
+import xyz.zcraft.seira.util.AdminRegistry;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.services.DailyLuck;
+import xyz.zcraft.seira.util.ApplicationExecutors;
 
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -31,7 +32,7 @@ public final class SeiraApplication implements AutoCloseable {
 
     public SeiraApplication(AppConfig config) {
         Objects.requireNonNull(config, "config");
-        UserDataStore.init(config.seira().sqlitePath());
+        SqliteDatabase.init(config.seira().sqlitePath());
         RuntimeConfig createdRuntimeConfig = new RuntimeConfig(config);
         AdminRegistry createdAdmins = new AdminRegistry(config.seira().adminIds());
         createdRuntimeConfig.addReloadListener(result -> {
