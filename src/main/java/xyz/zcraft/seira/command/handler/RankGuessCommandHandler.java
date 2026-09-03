@@ -560,7 +560,7 @@ public final class RankGuessCommandHandler {
 
         private static double getRatingRaw(RankGuessRecordStore.Statistics.Personal statistics) {
             double averageScoreRate = Math.clamp(
-                    statistics.averageScore() / 950.0,
+                    statistics.averageScore() / 900.0,
                     0.0, 1.0
             );
 
@@ -589,12 +589,12 @@ public final class RankGuessCommandHandler {
 
             double rawRating = getRatingRaw(statistics);
 
-            if (rawRating >= 0.83) return "SS";
-            if (rawRating >= 0.75) return "S";
-            if (rawRating >= 0.67) return "A";
-            if (rawRating >= 0.57) return "B";
-            if (rawRating >= 0.45) return "C";
-            if (rawRating >= 0.33) return "D";
+            if (rawRating >= 0.82) return "SS";
+            if (rawRating >= 0.74) return "S";
+            if (rawRating >= 0.66) return "A";
+            if (rawRating >= 0.56) return "B";
+            if (rawRating >= 0.44) return "C";
+            if (rawRating >= 0.32) return "D";
             return "F";
         }
     }

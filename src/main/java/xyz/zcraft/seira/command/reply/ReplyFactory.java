@@ -161,8 +161,8 @@ public final class ReplyFactory {
                 statistics.topTwentyRate() * 100, recentStatistics.topTwentyRate() * 100,
                 statistics.averageScore(), recentStatistics.averageScore(),
                 statistics.highestScore(), recentStatistics.highestScore(),
-                statistics.averagePlacement(), statistics.totalScore(),
-                recentStatistics.averagePlacement(), groupCountText, rankText).strip());
+                statistics.averagePlacement(), recentStatistics.averagePlacement(),
+                statistics.totalScore(), groupCountText, rankText).strip());
     }
 
     public PendingMessage boMessage(Context ctx, Response<?> response) {
