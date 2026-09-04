@@ -20,10 +20,10 @@ public class RankGuessWeights {
     private static final Logger LOG = LogManager.getLogger(RankGuessWeights.class);
     private static final Path WEIGHTS_FILE = Path.of("data", "rank-guess-weights.json");
 
-    private static final int RECENT_USER_LIMIT = 5;
+    private static final int RECENT_USER_LIMIT = 8;
     private static final double WISH_WEIGHT = 2.5;
     private static final double RECENT_USER_WEIGHT = 0.25;
-    private static final double SCORE_REPEAT_FACTOR = 0.4;
+    private static final double SCORE_REPEAT_FACTOR = 0.25;
 
     private final Map<String, GroupState> groups = new ConcurrentHashMap<>();
     private final Path store;
