@@ -6,7 +6,7 @@
 
     <groupId>com.github.BotSeira</groupId>
     <artifactId>SeiraCore</artifactId>
-    <version>1.11.5</version>
+    <version>1.11.6</version>
 
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
