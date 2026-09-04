@@ -2,6 +2,9 @@ package xyz.zcraft.seira.rankguess;
 
 import lombok.Getter;
 import xyz.zcraft.seira.bot.data.MessageReference;
+import xyz.zcraft.seira.rankguess.data.Guess;
+import xyz.zcraft.seira.rankguess.data.Round;
+import xyz.zcraft.seira.rankguess.data.ScoreMultiplier;
 
 import java.time.Instant;
 import java.util.*;
@@ -17,7 +20,7 @@ public final class RankGuessGame {
     public final AtomicInteger guessCount = new AtomicInteger(0);
     private final List<Hint> revealedHints = new ArrayList<>();
     public boolean copyPunishmentReduced = false;
-    public RankGuessGameService.Round round;
+    public Round round;
     public Instant guessingStartedAt;
     public long nextSequence;
     @Getter
@@ -50,24 +53,24 @@ public final class RankGuessGame {
         return List.copyOf(revealedHints);
     }
 
-    public double getMultiplierDelta(RankGuessGameService.ScoreMultiplier multiplier) {
-        if (multiplier instanceof RankGuessGameService.ScoreMultiplier.FirstGuessMultiplier) {
+    public double getMultiplierDelta(ScoreMultiplier multiplier) {
+        if (multiplier instanceof ScoreMultiplier.FirstGuessMultiplier) {
             return 0.05;
-        } else if (multiplier instanceof RankGuessGameService.ScoreMultiplier.OrderMultiplier orderMultiplier) {
+        } else if (multiplier instanceof ScoreMultiplier.OrderMultiplier orderMultiplier) {
             return Math.max(-0.10, 0.00 - (orderMultiplier.getOrder() - 2) * 0.01);
-        } else if (multiplier instanceof RankGuessGameService.ScoreMultiplier.CopyPunishmentMultiplier) {
+        } else if (multiplier instanceof ScoreMultiplier.CopyPunishmentMultiplier) {
             if (guesses.size() >= COPY_PUNISHMENT_THRESHOLD) {
                 return -0.025;
             } else {
                 return -0.05;
             }
-        } else if (multiplier instanceof RankGuessGameService.ScoreMultiplier.HintMultiplier hintMultiplier) {
+        } else if (multiplier instanceof ScoreMultiplier.HintMultiplier hintMultiplier) {
             return -hintMultiplier.getHint().strength().penalty();
         }
         return 0;
     }
 
-    public String getMultipliersString(List<RankGuessGameService.ScoreMultiplier> multipliers) {
+    public String getMultipliersString(List<ScoreMultiplier> multipliers) {
         if (multipliers == null || multipliers.isEmpty()) {
             return "倍率: `x1.00`\n";
         }
@@ -82,7 +85,7 @@ public final class RankGuessGame {
                 .append(String.format(Locale.US, "%.2f", 1 + sum))
                 .append("`\n");
 
-        for (RankGuessGameService.ScoreMultiplier multiplier : multipliers) {
+        for (ScoreMultiplier multiplier : multipliers) {
             builder.append("> ")
                     .append(multiplier.getReason())
                     .append(": ")

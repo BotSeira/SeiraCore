@@ -1,7 +1,7 @@
 package xyz.zcraft.seira.db;
 
-import xyz.zcraft.seira.rankguess.FinishedRound;
-import xyz.zcraft.seira.rankguess.Standing;
+import xyz.zcraft.seira.rankguess.data.FinishedRound;
+import xyz.zcraft.seira.rankguess.data.Standing;
 
 import java.sql.*;
 import java.util.Objects;

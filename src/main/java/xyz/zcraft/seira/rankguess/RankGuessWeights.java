@@ -169,22 +169,22 @@ public class RankGuessWeights {
         }
     }
 
-    public WishResult tryWish(String groupId, long userId) {
+    public RankGuessGameService.WishResult tryWish(String groupId, long userId) {
         final GroupState state = getGroup(groupId);
 
         synchronized (state) {
             if (state.userWishes.contains(userId)) {
-                return WishResult.ALREADY_WISHED;
+                return RankGuessGameService.WishResult.ALREADY_WISHED;
             }
 
             if (state.userRecords.contains(userId)) {
-                return WishResult.RECENTLY_PICKED;
+                return RankGuessGameService.WishResult.RECENTLY_PICKED;
             }
 
             state.userWishes.add(userId);
         }
         saveToFile();
-        return WishResult.SUCCESS;
+        return RankGuessGameService.WishResult.SUCCESS;
     }
 
     public JsonObject generateWeights(String groupId) {

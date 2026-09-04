@@ -15,9 +15,8 @@ import xyz.zcraft.seira.data.SendResult;
 import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.db.RankGuessRecordStore;
 import xyz.zcraft.seira.db.UserDataStore;
-import xyz.zcraft.seira.rankguess.RankGuessGame;
-import xyz.zcraft.seira.rankguess.RankGuessGameService;
-import xyz.zcraft.seira.rankguess.WishResult;
+import xyz.zcraft.seira.rankguess.*;
+import xyz.zcraft.seira.rankguess.data.*;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -321,7 +320,7 @@ public final class RankGuessCommandHandler {
             return;
         }
 
-        final WishResult wish = games.wish(ctx.groupId(), boundUid);
+        final RankGuessGameService.WishResult wish = games.wish(ctx.groupId(), boundUid);
 
         ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + switch (wish) {
             case SUCCESS -> "小星听到你的愿望啦！";
@@ -332,7 +331,7 @@ public final class RankGuessCommandHandler {
     }
 
     private void start(Context ctx, boolean fromGroup) {
-        RankGuessGameService.Reservation reservation = games.reserve(ctx.groupId(), ctx.senderUserId(), fromGroup);
+        Reservation reservation = games.reserve(ctx.groupId(), ctx.senderUserId(), fromGroup);
         if (reservation == null) {
             ctx.sendReply(PendingMessage.ofString("本群已有一轮 Rank Guess 正在进行。"));
             return;
@@ -362,7 +361,7 @@ public final class RankGuessCommandHandler {
                         randomScore = APIHelper.getRandomScore();
                     }
 
-                    RankGuessGameService.Round round = RankGuessGameService.Round.from(randomScore);
+                    Round round = Round.from(randomScore);
 
                     String content = at(ctx);
 
@@ -420,7 +419,7 @@ public final class RankGuessCommandHandler {
                         result.append("\n").append("__Tip: 这是一位群友的成绩喵~__").append("\n");
                     }
 
-                    var hints = RankGuessGameService.prepareHints(round.getNormalHints(), 4);
+                    var hints = HintUtil.prepareHints(round.getNormalHints(), 4);
 
                     if (!activeMessageEnabled) {
                         result.append("\n").append("> 提示: ");
@@ -492,8 +491,8 @@ public final class RankGuessCommandHandler {
     }
 
     private void guess(Context ctx, long rank) {
-        RankGuessGameService.GuessResponse response = games.guess(ctx.groupId(), ctx.senderUserId(), rank);
-        final RankGuessGameService.GuessResult result = response.guessResult();
+        GuessResponse response = games.guess(ctx.groupId(), ctx.senderUserId(), rank);
+        final GuessResult result = response.guessResult();
         PendingMessage message = switch (result.status()) {
             case NO_GAME -> PendingMessage.ofString("本群当前没有进行中的 Rank Guess 喵");
             case STARTING -> PendingMessage.ofString("回放仍在渲染，请等待视频发送后再猜测喵");
@@ -523,7 +522,7 @@ public final class RankGuessCommandHandler {
     }
 
     private void end(Context ctx, boolean force) {
-        RankGuessGameService.EndResult result;
+        EndResult result;
         try {
             result = games.end(ctx.groupId(), ctx.senderUserId(), adminAuthorizer.test(ctx.senderUserId()), force);
         } catch (RankGuessRecordStore.RecordSaveException e) {

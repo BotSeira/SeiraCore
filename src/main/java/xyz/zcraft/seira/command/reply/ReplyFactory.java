@@ -16,9 +16,9 @@ import xyz.zcraft.seira.config.BindingConfig;
 import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.db.RankGuessRecordStore;
 import xyz.zcraft.seira.db.UserDataStore;
-import xyz.zcraft.seira.rankguess.FinishedRound;
-import xyz.zcraft.seira.rankguess.RankGuessGameService;
-import xyz.zcraft.seira.rankguess.Standing;
+import xyz.zcraft.seira.rankguess.data.FinishedRound;
+import xyz.zcraft.seira.rankguess.data.Round;
+import xyz.zcraft.seira.rankguess.data.Standing;
 import xyz.zcraft.seira.services.BindingService;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.services.DailyLuck;
@@ -77,7 +77,7 @@ public final class ReplyFactory {
     }
 
     public PendingMessage rankGuessResultMessage(Context ctx, FinishedRound result, boolean recorded) {
-        RankGuessGameService.Round round = result.round();
+        Round round = result.round();
         String rank = String.format(Locale.US, "%,d", round.actualRank());
         String pp = round.pp() == null
                 ? "未知"
