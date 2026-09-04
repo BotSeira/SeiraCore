@@ -95,7 +95,7 @@ public final class TaskCoordinator {
             action.run();
             return true;
         } catch (Exception e) {
-            ctx.sendReply(PendingMessage.ofString(resolveErrorMessage(e)));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + resolveErrorMessage(e)));
             String message = e.getMessage();
             if (e instanceof ApiRequestException apiException) {
                 message += " - " + apiException.getDefaultMessage();

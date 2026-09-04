@@ -51,7 +51,7 @@ public final class RankGuessCommandHandler {
     }
 
     private static Long parseRank(String argument) {
-        final Matcher matcher = RANK_PATTERN.matcher(argument);
+        final Matcher matcher = RANK_PATTERN.matcher(argument.replace(",",""));
         if (!matcher.matches()) {
             return null;
         }
@@ -234,7 +234,7 @@ public final class RankGuessCommandHandler {
                     Rank.RECENT_GAME_LIMIT
             );
 
-            final Rank rank = Rank.from(recentStatistics);
+            final Rank rank = Rank.from(recentStatistics, statistics);
 
             Long groupGameCount = boundUid == null ? null : RankGuessRecordStore.getGroupGameCount(ctx.groupId(), null);
             Long pickedTimes = boundUid == null ? null : RankGuessRecordStore.getPickedTimes(boundUid, ctx.groupId());
@@ -258,14 +258,20 @@ public final class RankGuessCommandHandler {
                     continue;
                 }
 
-                ranks.put(
+                RankGuessRecordStore.Statistics.Personal statistics = RankGuessRecordStore.getPersonalStatistics(
                         openId,
-                        Rank.from(
-                                RankGuessRecordStore.getRecentPersonalStatistics(
-                                        openId, ctx.groupId(), null, Rank.RECENT_GAME_LIMIT
-                                )
-                        )
+                        ctx.groupId(),
+                        null
                 );
+
+                RankGuessRecordStore.Statistics.Personal recentStatistics = RankGuessRecordStore.getRecentPersonalStatistics(
+                        openId,
+                        ctx.groupId(),
+                        null,
+                        Rank.RECENT_GAME_LIMIT
+                );
+
+                ranks.put(openId, Rank.from(recentStatistics, statistics));
             }
 
             final List<Map.Entry<String, Rank>> groupRanks = ranks.entrySet().stream()
@@ -543,58 +549,6 @@ public final class RankGuessCommandHandler {
 
         if (!ctx.sendReply(message).success()) {
             ctx.sendMessage(message);
-        }
-    }
-
-    public record Rank(double rating, double ratingRaw, String rank) {
-        public static final int RECENT_GAME_LIMIT = 10;
-
-        public static Rank from(RankGuessRecordStore.Statistics.Personal statistics) {
-            final double pendingRatingRaw = getRatingRaw(statistics);
-            final double pendingRating = standardRating(pendingRatingRaw);
-            final String pendingRank = getRankText(statistics);
-
-            return new Rank(pendingRating, pendingRatingRaw, pendingRank);
-        }
-
-        private static double getRatingRaw(RankGuessRecordStore.Statistics.Personal statistics) {
-            double averageScoreRate = Math.clamp(
-                    statistics.averageScore() / 900.0,
-                    0.0, 1.0
-            );
-
-            double rawRating = averageScoreRate * 0.50
-                    + statistics.winRate() * 0.15
-                    + statistics.topTwentyRate() * 0.35;
-
-            rawRating *= 1.05;
-
-            double confidence = 1.0 - Math.exp(-statistics.participation() / 10.0);
-
-            return 0.50 * (1.0 - confidence) + rawRating * confidence;
-        }
-
-        private static double standardRating(double ratingRaw) {
-            double z = 2 * ratingRaw - 1;
-            double p = 1.1;
-
-            return 1 + Math.copySign(Math.pow(Math.abs(z), p), z);
-        }
-
-        private static String getRankText(RankGuessRecordStore.Statistics.Personal statistics) {
-            if (statistics.participation() < 5) {
-                return "?";
-            }
-
-            double rawRating = getRatingRaw(statistics);
-
-            if (rawRating >= 0.82) return "SS";
-            if (rawRating >= 0.72) return "S";
-            if (rawRating >= 0.62) return "A";
-            if (rawRating >= 0.52) return "B";
-            if (rawRating >= 0.44) return "C";
-            if (rawRating >= 0.32) return "D";
-            return "F";
         }
     }
 }

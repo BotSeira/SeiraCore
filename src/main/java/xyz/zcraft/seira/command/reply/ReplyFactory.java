@@ -10,13 +10,13 @@ import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.bot.data.Button;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
-import xyz.zcraft.seira.command.handler.RankGuessCommandHandler;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.BindingConfig;
 import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.db.RankGuessRecordStore;
 import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.rankguess.data.FinishedRound;
+import xyz.zcraft.seira.rankguess.data.Rank;
 import xyz.zcraft.seira.rankguess.data.Round;
 import xyz.zcraft.seira.rankguess.data.Standing;
 import xyz.zcraft.seira.services.BindingService;
@@ -126,7 +126,7 @@ public final class ReplyFactory {
     public PendingMessage rankGuessStatisticsMessage(
             Context ctx, RankGuessRecordStore.Statistics.Personal statistics,
             RankGuessRecordStore.Statistics.Personal recentStatistics,
-            boolean allGroups, RankGuessCommandHandler.Rank rank,
+            boolean allGroups, Rank rank,
             Long pickedTimes, Long groupGameCount
     ) {
         String scope = allGroups ? "全部群聊" : "本群";
@@ -135,7 +135,7 @@ public final class ReplyFactory {
         }
 
         String rankText = "?".equals(rank.rank()) ? "" : "根据你最近 %d 场的表现，可以给到一个 `%s` 喵！\n"
-                .formatted(RankGuessCommandHandler.Rank.RECENT_GAME_LIMIT, rank.rank());
+                .formatted(Rank.RECENT_GAME_LIMIT, rank.rank());
         String groupCountText = "";
         if (!allGroups && pickedTimes != null && groupGameCount != null) {
             groupCountText = "> 被猜次数：`%d`，占本群：`%.3f%%`\n".formatted(pickedTimes, (double) pickedTimes / groupGameCount * 100);
@@ -153,7 +153,7 @@ public final class ReplyFactory {
                         > 总得分：`%.2f`
                         %s%s
                         """,
-                scope, RankGuessCommandHandler.Rank.RECENT_GAME_LIMIT,
+                scope, Rank.RECENT_GAME_LIMIT,
                 statistics.participation(), rank.rating(),
                 statistics.wins(), recentStatistics.wins(),
                 statistics.winRate() * 100, recentStatistics.winRate() * 100,
