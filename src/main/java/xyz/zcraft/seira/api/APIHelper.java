@@ -564,11 +564,15 @@ public class APIHelper {
         }
     }
 
-    public static String getRandomScoreWeight(Long userId) {
+    public static String getRandomScoreWeight(Long userId, JsonObject weights) {
         try {
+            JsonObject body = new JsonObject();
+
+            body.add("weight_factor", weights);
+
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/scores/random/users/" + userId + "/weights"))
-                    .GET()
+                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                     .build();
 
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());

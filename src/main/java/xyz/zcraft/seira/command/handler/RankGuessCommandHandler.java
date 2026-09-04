@@ -212,9 +212,9 @@ public final class RankGuessCommandHandler {
         reply.append(at(ctx)).append("目前你在本群权重为 `%.2f`\n".formatted(probability.weight()));
         reply.append("在本群 `%d` 名玩家中，你被选中的概率为 `%.3f%%`\n".formatted(totalPlayer, probability.chance() * 100));
 
-        final String randomScoreWeight = APIHelper.getRandomScoreWeight(boundUid);
+        final String randomScoreWeight = APIHelper.getRandomScoreWeight(boundUid, games.generateWeights(ctx.groupId()));
 
-        reply.append("你的成绩权重：\n>").append(randomScoreWeight).append("\n");
+        reply.append("你的成绩在本群权重：\n>").append(randomScoreWeight).append("\n");
 
         ctx.sendReply(PendingMessage.ofMarkdownRaw(reply.toString().trim()));
     }
@@ -590,9 +590,9 @@ public final class RankGuessCommandHandler {
             double rawRating = getRatingRaw(statistics);
 
             if (rawRating >= 0.82) return "SS";
-            if (rawRating >= 0.74) return "S";
-            if (rawRating >= 0.66) return "A";
-            if (rawRating >= 0.56) return "B";
+            if (rawRating >= 0.72) return "S";
+            if (rawRating >= 0.62) return "A";
+            if (rawRating >= 0.52) return "B";
             if (rawRating >= 0.44) return "C";
             if (rawRating >= 0.32) return "D";
             return "F";
