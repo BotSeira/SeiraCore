@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.security;
+package xyz.zcraft.seira.util;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -14,7 +14,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-/** Combines administrators declared in config with administrators added from the console. */
+/**
+ * Combines administrators declared in config with administrators added from the console.
+ */
 public final class AdminRegistry {
     public static final Path DEFAULT_STORE = Path.of("data", "console-admins.txt");
 
@@ -22,8 +24,8 @@ public final class AdminRegistry {
 
     private final Path store;
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
-    private Set<String> configured = Set.of();
     private final Set<String> persisted = new LinkedHashSet<>();
+    private Set<String> configured = Set.of();
 
     public AdminRegistry(Collection<String> configured) {
         this(configured, DEFAULT_STORE);
@@ -33,6 +35,18 @@ public final class AdminRegistry {
         this.store = store.toAbsolutePath().normalize();
         replaceConfigured(configured);
         loadPersisted();
+    }
+
+    private static String validate(String openId) {
+        if (openId == null || openId.isBlank()) {
+            throw new IllegalArgumentException("Administrator ID must not be blank");
+        }
+        String normalized = openId.trim();
+        if (normalized.length() > 256 || normalized.chars().anyMatch(Character::isWhitespace)
+                || normalized.chars().anyMatch(Character::isISOControl)) {
+            throw new IllegalArgumentException("Administrator ID contains invalid characters");
+        }
+        return normalized;
     }
 
     public boolean isAdmin(String openId) {
@@ -156,18 +170,6 @@ public final class AdminRegistry {
             LOG.error("Failed to persist console administrators", e);
             throw new IllegalStateException("Failed to persist console administrators", e);
         }
-    }
-
-    private static String validate(String openId) {
-        if (openId == null || openId.isBlank()) {
-            throw new IllegalArgumentException("Administrator ID must not be blank");
-        }
-        String normalized = openId.trim();
-        if (normalized.length() > 256 || normalized.chars().anyMatch(Character::isWhitespace)
-                || normalized.chars().anyMatch(Character::isISOControl)) {
-            throw new IllegalArgumentException("Administrator ID contains invalid characters");
-        }
-        return normalized;
     }
 
     public enum AddResult {

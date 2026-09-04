@@ -4,8 +4,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.api.OsuAuthApi;
 import xyz.zcraft.seira.api.data.OsuToken;
-import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.config.BindingConfig;
+import xyz.zcraft.seira.db.UserDataStore;
 
 public class OsuAuthHelper {
     private static final Logger LOG = LogManager.getLogger();

@@ -5,8 +5,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
-import xyz.zcraft.seira.binding.UserDataStore;
-import xyz.zcraft.seira.binding.BindingService;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.*;
@@ -15,12 +13,14 @@ import xyz.zcraft.seira.command.parse.CommandParser;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.config.AppConfig;
+import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.discord.DiscordBridgeService;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
-import xyz.zcraft.seira.security.AdminRegistry;
+import xyz.zcraft.seira.services.BindingService;
+import xyz.zcraft.seira.util.AdminRegistry;
 import xyz.zcraft.seira.util.OsuAuthHelper;
-import xyz.zcraft.seira.watch.ScoreWatchService;
 import xyz.zcraft.seira.watch.MultiplayerRoomWatchService;
+import xyz.zcraft.seira.watch.ScoreWatchService;
 
 import java.util.Optional;
 import java.util.Set;
@@ -28,9 +28,12 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
+import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
+
 public class Router {
     private static final Logger LOG = LogManager.getLogger(Router.class);
-
+    @Getter
+    private static volatile Context lastContext = null;
     private final Supplier<AppConfig> configSupplier;
     private final TaskCoordinator taskCoordinator;
     private final OsuAuthHelper authHelper;
@@ -93,10 +96,10 @@ public class Router {
                 new MultiplayerRoomWatchCommandHandler(taskCoordinator, multiplayerRoomWatchService);
         DcsCommandHandler dcsCommands = new DcsCommandHandler(discordBridgeService);
         RankGuessCommandHandler rankGuessCommands = new RankGuessCommandHandler(
-                taskCoordinator, replyFactory, rankGuessGameService, admins::isAdmin
+                taskCoordinator, replyFactory, rankGuessGameService, resolver, admins::isAdmin
         );
         this.unknownCommand = generalCommands::handleUnknown;
-        this.commandParser = new CommandParser(resolver::preProcess);
+        this.commandParser = new CommandParser(resolver::sanitize);
         this.commandRegistry = createCommandRegistry(
                 bindingCommands,
                 scoreCommands,
@@ -119,77 +122,6 @@ public class Router {
                 admins::isAdmin,
                 unknownCommand
         );
-    }
-
-    public void onPrivateMessageReceived(String userId, String messageId, String rawContent) {
-        handleMessageReceived(userId, null, userId, messageId, rawContent, false);
-    }
-
-    public void onGroupMessageReceived(String groupId, String senderUserId, String messageId, String rawContent) {
-        handleMessageReceived(groupId, groupId, senderUserId, messageId, rawContent, true);
-    }
-
-    private void handleMessageReceived(String targetId, String groupId, String userId, String messageId, String rawContent, boolean groupMessage) {
-        LOG.info("Received {} message : {}", groupMessage ? "group" : "private", rawContent);
-        AtomicInteger messageSeqCounter = new AtomicInteger(1);
-        try {
-            final boolean group = groupMessage && groupId != null && !groupId.isBlank();
-            if (group && userId != null && !userId.isBlank()) {
-                UserDataStore.upsertGroupMember(groupId, userId);
-            }
-
-            rawContent = rawContent == null ? "" : rawContent.trim();
-
-            AppConfig config = configSupplier.get();
-            final String selfAt = "<@" + config.qq().selfId() + ">";
-            if (rawContent.startsWith(selfAt)) {
-                rawContent = rawContent.substring(selfAt.length()).trim();
-            }
-
-            CommandParser.ParseResult parseResult = commandParser.parse(
-                    rawContent, userId, groupId, messageId
-            );
-            if (parseResult.status() == CommandParser.ParseResult.Status.IGNORED) {
-                return;
-            }
-
-            CommandReplyChannel replies = taskCoordinator.openReplyChannel(
-                    targetId,
-                    messageId,
-                    groupMessage,
-                    config.seira().queueMessageInGroup()
-            );
-            if (parseResult.status() == CommandParser.ParseResult.Status.EMPTY_COMMAND) {
-                replies.sendReply(PendingMessage.ofString("请输入指令。使用/help获取帮助。"));
-                return;
-            }
-
-            Context context = parseResult.context().withReplies(replies);
-            commandExecutor.execute(() -> {
-                try {
-                    dispatch(context);
-                } catch (Exception e) {
-                    context.sendReply(PendingMessage.ofString("处理指令时发生错误，请稍后再试。"));
-                    LOG.error("Failed to process inbound message {}", messageId, e);
-                }
-            });
-        } catch (Exception e) {
-            taskCoordinator.sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString("处理指令时发生错误，请稍后再试。"), messageSeqCounter);
-            LOG.error("Failed to process inbound message {}", messageId, e);
-        }
-    }
-
-    @Getter
-    private static volatile Context lastContext = null;
-
-    private void dispatch(Context ctx) {
-        lastContext = ctx;
-        commandMetric.run();
-        if (ctx.command().startsWith("debug.")) {
-            debugRoutes.routeDebug(ctx);
-            return;
-        }
-        commandRegistry.dispatch(ctx, unknownCommand);
     }
 
     private static CommandRegistry createCommandRegistry(
@@ -241,10 +173,78 @@ public class Router {
                 .register(generalCommands::handleFaq, "faq")
                 .register(watchCommands::handleWatch, "watch")
                 .register(specificScoreWatchCommands::handleWx, "wx")
-                .register(multiplayerRoomWatchCommands::handleMpWatch, "mpwatch")
+                .register(multiplayerRoomWatchCommands::handleMpWatch, "mpwatch", "mpw")
                 .register(dcsCommands::handleDcs, "dcs")
                 .register(rankGuessCommands::handleRankGuess, "rg")
                 .build();
+    }
+
+    public void onPrivateMessageReceived(String userId, String messageId, String rawContent) {
+        handleMessageReceived(userId, null, userId, messageId, rawContent, false);
+    }
+
+    public void onGroupMessageReceived(String groupId, String senderUserId, String messageId, String rawContent) {
+        handleMessageReceived(groupId, groupId, senderUserId, messageId, rawContent, true);
+    }
+
+    private void handleMessageReceived(String targetId, String groupId, String userId, String messageId, String rawContent, boolean groupMessage) {
+        AtomicInteger messageSeqCounter = new AtomicInteger(1);
+        try {
+            final boolean group = groupMessage && groupId != null && !groupId.isBlank();
+            if (group && userId != null && !userId.isBlank()) {
+                UserDataStore.upsertGroupMember(groupId, userId);
+            }
+
+            rawContent = rawContent == null ? "" : rawContent.trim();
+
+            AppConfig config = configSupplier.get();
+            final String selfAt = "<@" + config.qq().selfId() + ">";
+            if (rawContent.startsWith(selfAt)) {
+                rawContent = rawContent.substring(selfAt.length()).trim();
+            }
+
+            CommandParser.ParseResult parseResult = commandParser.parse(
+                    rawContent, userId, groupId, messageId
+            );
+            if (parseResult.status() == CommandParser.ParseResult.Status.IGNORED) {
+                return;
+            }
+
+            CommandReplyChannel replies = taskCoordinator.openReplyChannel(
+                    targetId,
+                    messageId,
+                    groupMessage,
+                    config.seira().queueMessageInGroup()
+            );
+            if (parseResult.status() == CommandParser.ParseResult.Status.EMPTY_COMMAND) {
+                replies.sendReply(PendingMessage.ofString("请输入指令。使用/help获取帮助。"));
+                return;
+            }
+
+            Context context = parseResult.context().withReplies(replies);
+            commandExecutor.execute(() -> {
+                try {
+                    LOG.info("Routing {} message : {}", groupMessage ? "group" : "private", context.rawContent());
+                    dispatch(context);
+                } catch (Exception e) {
+                    context.sendReply(PendingMessage.ofMarkdownRaw(at(context) + "处理指令时发生错误，请稍后再试。"));
+                    LOG.error("Failed to process inbound message {}", messageId, e);
+                }
+            });
+        } catch (Exception e) {
+            taskCoordinator.sendOutboundMessage(targetId, messageId, groupMessage, PendingMessage.ofString("处理指令时发生错误，请稍后再试。"), messageSeqCounter);
+            LOG.error("Failed to process inbound message {}", messageId, e);
+        }
+    }
+
+    private void dispatch(Context ctx) {
+        lastContext = ctx;
+        commandMetric.run();
+        if (ctx.command().startsWith("debug.")) {
+            debugRoutes.routeDebug(ctx);
+            return;
+        }
+        commandRegistry.dispatch(ctx, unknownCommand);
     }
 
     @SuppressWarnings("unused")

@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.binding;
+package xyz.zcraft.seira.db;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -7,49 +7,14 @@ import xyz.zcraft.seira.discord.DiscordBridgeMapping;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 import xyz.zcraft.seira.watch.SpecificScoreWatchState;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Locale;
-import java.util.Set;
+import java.util.*;
 
 public final class UserDataStore {
     private static final Logger LOG = LogManager.getLogger(UserDataStore.class);
-    private static final Object INIT_LOCK = new Object();
-
-    private static volatile String jdbcUrl;
-    private static volatile Path initializedDbPath;
-
-    public static void init(String sqlitePath) {
-        synchronized (INIT_LOCK) {
-            if (jdbcUrl != null && initializedDbPath != null && Files.exists(initializedDbPath)) {
-                return;
-            }
-            try {
-                Path dbPath = Path.of(sqlitePath).toAbsolutePath().normalize();
-                Path parent = dbPath.getParent();
-                if (parent != null) {
-                    Files.createDirectories(parent);
-                }
-                jdbcUrl = "jdbc:sqlite:" + dbPath;
-                initializedDbPath = dbPath;
-                createTablesIfNeeded();
-                LOG.info("SQLite binding store initialized at {}", dbPath);
-            } catch (Exception e) {
-                throw new IllegalStateException("Failed to initialize sqlite store: " + sqlitePath, e);
-            }
-        }
-    }
 
     public static void bind(String openId, long osuUid) {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         long now = System.currentTimeMillis();
         String sql = """
                 INSERT INTO user_bindings(open_id, osu_uid, created_at, updated_at)
@@ -58,7 +23,7 @@ public final class UserDataStore {
                     osu_uid = excluded.osu_uid,
                     updated_at = excluded.updated_at
                 """;
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+        try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, openId);
             statement.setLong(2, osuUid);
@@ -71,7 +36,7 @@ public final class UserDataStore {
     }
 
     public static void storeToken(String openId, OsuToken token) {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         String sql = """
                 INSERT INTO token_store(open_id, access_token, refresh_token, expires_in, refreshed_at)
                 VALUES(?, ?, ?, ?, ?)
@@ -81,7 +46,7 @@ public final class UserDataStore {
                     expires_in = excluded.expires_in,
                     refreshed_at = excluded.refreshed_at
                 """;
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+        try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, openId);
             statement.setString(2, token.accessToken());
@@ -95,12 +60,12 @@ public final class UserDataStore {
     }
 
     public static void removeToken(String openId) {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         String sql = """
                 DELETE FROM token_store
                 WHERE open_id = ?
                 """;
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+        try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, openId);
             statement.executeUpdate();
@@ -110,14 +75,14 @@ public final class UserDataStore {
     }
 
     public static void storeUserInfo(long osuId, String username) {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         String sql = """
                 INSERT INTO user_info(uid, username)
                 VALUES(?, ?)
                 ON CONFLICT(uid) DO UPDATE SET
                     username = excluded.username
                 """;
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+        try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setLong(1, osuId);
             statement.setString(2, username);
@@ -128,12 +93,12 @@ public final class UserDataStore {
     }
 
     public static Optional<String> findUsername(long osuId) {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         String sql = """
                         SELECT username FROM user_info
                         WHERE uid = ?
                 """;
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+        try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setLong(1, osuId);
             final ResultSet resultSet = statement.executeQuery();
@@ -147,9 +112,9 @@ public final class UserDataStore {
     }
 
     public static Long findBoundUid(String openId) {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         String sql = "SELECT osu_uid FROM user_bindings WHERE open_id = ?";
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+        try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, openId);
             try (ResultSet resultSet = statement.executeQuery()) {
@@ -164,9 +129,9 @@ public final class UserDataStore {
     }
 
     public static OsuToken findOsuToken(String openId) {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         String sql = "SELECT access_token, refresh_token, expires_in, refreshed_at FROM token_store WHERE open_id = ?";
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+        try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, openId);
             try (ResultSet resultSet = statement.executeQuery()) {
@@ -186,10 +151,10 @@ public final class UserDataStore {
     }
 
     public static List<OsuAuthHelper.TokenStore> getAllOsuTokens() {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         List<OsuAuthHelper.TokenStore> tokens = new LinkedList<>();
         String sql = "SELECT open_id, access_token, refresh_token, expires_in, refreshed_at FROM token_store";
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+        try (Connection connection = SqliteDatabase.getConnection();
              Statement statement = connection.createStatement();
              final ResultSet rs = statement.executeQuery(sql)) {
             while (rs.next()) {
@@ -212,10 +177,10 @@ public final class UserDataStore {
     }
 
     public static List<Long> findFollower(long uid) {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         List<Long> followers = new ArrayList<>();
         String sql = "SELECT self FROM user_follows WHERE followed = ?";
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+        try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setLong(1, uid);
             try (ResultSet resultSet = statement.executeQuery()) {
@@ -231,13 +196,13 @@ public final class UserDataStore {
     }
 
     public static void storeFollowed(long selfId, long followed) {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         String sql = """
                 INSERT INTO user_follows(self, followed)
                 VALUES(?, ?)
                 ON CONFLICT(self, followed) DO NOTHING
                 """;
-        try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
+        try (Connection connection = SqliteDatabase.getConnection()) {
             PreparedStatement statement = connection.prepareStatement(sql);
             statement.setLong(1, selfId);
             statement.setLong(2, followed);
@@ -248,13 +213,13 @@ public final class UserDataStore {
     }
 
     public static void removeFollowed(long selfId, long followed) {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         String sql = """
                 DELETE FROM user_follows
                 WHERE self = ?
                 AND followed = ?;
                 """;
-        try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
+        try (Connection connection = SqliteDatabase.getConnection()) {
             PreparedStatement statement = connection.prepareStatement(sql);
             statement.setLong(1, selfId);
             statement.setLong(2, followed);
@@ -265,12 +230,12 @@ public final class UserDataStore {
     }
 
     public static int clearFollowed(long selfId) {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         String sql = """
                 DELETE FROM user_follows
                 WHERE self = ?;
                 """;
-        try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
+        try (Connection connection = SqliteDatabase.getConnection()) {
             PreparedStatement statement = connection.prepareStatement(sql);
             statement.setLong(1, selfId);
             return statement.executeUpdate();
@@ -281,13 +246,13 @@ public final class UserDataStore {
 
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public static boolean haveFollowed(long selfId, long followed) {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         String sql = """
                 SELECT * FROM user_follows
                 WHERE self = ?
                 AND followed = ?;
                 """;
-        try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
+        try (Connection connection = SqliteDatabase.getConnection()) {
             PreparedStatement statement = connection.prepareStatement(sql);
             statement.setLong(1, selfId);
             statement.setLong(2, followed);
@@ -301,10 +266,10 @@ public final class UserDataStore {
     }
 
     public static boolean unbind(String openId) {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         String bindingSql = "DELETE FROM user_bindings WHERE open_id = ?";
         String tokenSql = "DELETE FROM token_store WHERE open_id = ?";
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+        try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement bindingStatement = connection.prepareStatement(bindingSql);
              PreparedStatement tokenStatement = connection.prepareStatement(tokenSql)) {
             connection.setAutoCommit(false);
@@ -332,7 +297,7 @@ public final class UserDataStore {
     }
 
     public static void upsertGroupMember(String groupId, String openId) {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         long now = System.currentTimeMillis();
         String sql = """
                 INSERT INTO group_members(group_id, open_id, updated_at)
@@ -340,7 +305,7 @@ public final class UserDataStore {
                 ON CONFLICT(group_id, open_id) DO UPDATE SET
                     updated_at = excluded.updated_at
                 """;
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+        try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, groupId);
             statement.setString(2, openId);
@@ -352,9 +317,9 @@ public final class UserDataStore {
     }
 
     public static int clearGroupMember(String openId) {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         String sql = "DELETE FROM group_members WHERE open_id = ?";
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+        try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, openId);
             return statement.executeUpdate();
@@ -363,8 +328,30 @@ public final class UserDataStore {
         }
     }
 
+    public static List<String> findAllGroupMembers(String groupId) {
+        SqliteDatabase.ensureInitialized();
+        String sql = """
+                        SELECT open_id
+                        FROM group_members
+                        WHERE group_id = ?;
+                """;
+        List<String> groupMembers = new LinkedList<>();
+        try (Connection connection = SqliteDatabase.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, groupId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    groupMembers.add(resultSet.getString("open_id"));
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to query group members", e);
+        }
+        return groupMembers;
+    }
+
     public static List<Long> findBoundUidsByGroup(String groupId) {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         String sql = """
                 SELECT DISTINCT ub.osu_uid
                 FROM group_members gm
@@ -374,7 +361,7 @@ public final class UserDataStore {
                 ORDER BY ub.osu_uid
                 """;
         List<Long> uids = new ArrayList<>();
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+        try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, groupId);
             try (ResultSet resultSet = statement.executeQuery()) {
@@ -389,9 +376,9 @@ public final class UserDataStore {
     }
 
     public static boolean isGroupMember(String groupId, String openId) {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         String sql = "SELECT 1 FROM group_members WHERE group_id = ? AND open_id = ?";
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+        try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, groupId);
             statement.setString(2, openId);
@@ -404,7 +391,7 @@ public final class UserDataStore {
     }
 
     public static Optional<String> findGroupOpenIdByUid(String groupId, long osuUid) {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         String sql = """
                 SELECT gm.open_id
                 FROM group_members gm
@@ -415,7 +402,7 @@ public final class UserDataStore {
                 ORDER BY gm.updated_at DESC
                 LIMIT 1
                 """;
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+        try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, groupId);
             statement.setLong(2, osuUid);
@@ -430,7 +417,7 @@ public final class UserDataStore {
     }
 
     public static void upsertDiscordBridge(DiscordBridgeMapping mapping) {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         String sql = """
                 INSERT INTO discord_bridges(group_id, guild_id, channel_id, updated_at)
                 VALUES(?, ?, ?, ?)
@@ -439,7 +426,7 @@ public final class UserDataStore {
                     channel_id = excluded.channel_id,
                     updated_at = excluded.updated_at
                 """;
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+        try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, mapping.groupId());
             statement.setString(2, mapping.guildId());
@@ -452,9 +439,9 @@ public final class UserDataStore {
     }
 
     public static boolean removeDiscordBridge(String groupId) {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         String sql = "DELETE FROM discord_bridges WHERE group_id = ?";
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+        try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, groupId);
             return statement.executeUpdate() > 0;
@@ -464,10 +451,10 @@ public final class UserDataStore {
     }
 
     public static List<DiscordBridgeMapping> findAllDiscordBridges() {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         String sql = "SELECT group_id, guild_id, channel_id FROM discord_bridges ORDER BY group_id";
         List<DiscordBridgeMapping> mappings = new ArrayList<>();
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+        try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql);
              ResultSet resultSet = statement.executeQuery()) {
             while (resultSet.next()) {
@@ -484,7 +471,7 @@ public final class UserDataStore {
     }
 
     public static void saveSpecificScoreWatch(SpecificScoreWatchState state) {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         String upsertWatch = """
                 INSERT INTO specific_score_watches(group_id, updated_at)
                 VALUES(?, ?)
@@ -500,7 +487,7 @@ public final class UserDataStore {
                 INSERT INTO specific_score_watch_beatmaps(group_id, beatmap_id)
                 VALUES(?, ?)
                 """;
-        try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
+        try (Connection connection = SqliteDatabase.getConnection()) {
             connection.setAutoCommit(false);
             try (PreparedStatement watchStatement = connection.prepareStatement(upsertWatch);
                  PreparedStatement deleteUsersStatement = connection.prepareStatement(deleteUsers);
@@ -546,8 +533,8 @@ public final class UserDataStore {
     }
 
     public static boolean removeSpecificScoreWatch(String groupId) {
-        ensureInitialized();
-        try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
+        SqliteDatabase.ensureInitialized();
+        try (Connection connection = SqliteDatabase.getConnection()) {
             connection.setAutoCommit(false);
             try (PreparedStatement users = connection.prepareStatement(
                     "DELETE FROM specific_score_watch_users WHERE group_id = ?");
@@ -573,13 +560,13 @@ public final class UserDataStore {
     }
 
     public static void updateSpecificScoreWatchCursor(String groupId, long userId, long scoreId) {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         String sql = """
                 UPDATE specific_score_watch_users
                 SET last_score_id = ?
                 WHERE group_id = ? AND user_id = ?
                 """;
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+        try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setLong(1, scoreId);
             statement.setString(2, groupId);
@@ -593,7 +580,7 @@ public final class UserDataStore {
     }
 
     public static List<SpecificScoreWatchState> findAllSpecificScoreWatches() {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
         Map<String, Set<Long>> usersByGroup = new LinkedHashMap<>();
         Map<String, Set<Long>> beatmapsByGroup = new LinkedHashMap<>();
         Map<String, Map<Long, Long>> cursorsByGroup = new LinkedHashMap<>();
@@ -608,7 +595,7 @@ public final class UserDataStore {
                 FROM specific_score_watch_beatmaps
                 ORDER BY group_id, beatmap_id
                 """;
-        try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
+        try (Connection connection = SqliteDatabase.getConnection()) {
             try (Statement statement = connection.createStatement();
                  ResultSet resultSet = statement.executeQuery(groupsSql)) {
                 while (resultSet.next()) {
@@ -658,10 +645,10 @@ public final class UserDataStore {
     }
 
     public static int countBoundUser() {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
 
         String sql = "SELECT COUNT(*) AS count FROM user_bindings";
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+        try (Connection connection = SqliteDatabase.getConnection();
              Statement statement = connection.createStatement()) {
             try (ResultSet resultSet = statement.executeQuery(sql)) {
                 if (resultSet.next()) {
@@ -676,10 +663,10 @@ public final class UserDataStore {
     }
 
     public static int countGroups() {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
 
         String sql = "SELECT COUNT(DISTINCT group_id) AS count FROM group_members";
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+        try (Connection connection = SqliteDatabase.getConnection();
              Statement statement = connection.createStatement()) {
             try (ResultSet resultSet = statement.executeQuery(sql)) {
                 if (resultSet.next()) {
@@ -694,9 +681,9 @@ public final class UserDataStore {
     }
 
     public static String executeQueryOrEdit(String sql) {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
 
-        try (Connection c = DriverManager.getConnection(jdbcUrl);
+        try (Connection c = SqliteDatabase.getConnection();
              Statement stmt = c.createStatement()) {
 
             // This method should be invoked only in debug context.
@@ -735,80 +722,8 @@ public final class UserDataStore {
         }
     }
 
-    public static QueryResult queryReadOnly(String sql, int maxRows) {
-        ensureInitialized();
-        if (sql == null || sql.isBlank()) {
-            throw new IllegalArgumentException("SQL query must not be blank");
-        }
-        if (maxRows < 1 || maxRows > 200) {
-            throw new IllegalArgumentException("maxRows must be between 1 and 200");
-        }
-
-        String statementSql = sql.strip();
-        if (statementSql.endsWith(";")) {
-            statementSql = statementSql.substring(0, statementSql.length() - 1).stripTrailing();
-        }
-        if (statementSql.contains(";")) {
-            throw new IllegalArgumentException("Multiple SQL statements are not allowed");
-        }
-        String normalized = statementSql.toLowerCase(Locale.ROOT);
-        String keyword = normalized.split("\\s+", 2)[0];
-        if (!List.of("select", "with", "pragma", "explain").contains(keyword)) {
-            throw new IllegalArgumentException("Only SELECT, WITH, PRAGMA and EXPLAIN queries are allowed");
-        }
-        if ("pragma".equals(keyword) && !isAllowedReadOnlyPragma(normalized)) {
-            throw new IllegalArgumentException("This PRAGMA is not allowed in the read-only console");
-        }
-
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
-             Statement queryOnly = connection.createStatement();
-             Statement statement = connection.createStatement()) {
-            queryOnly.execute("PRAGMA query_only = ON");
-            statement.setMaxRows(maxRows + 1);
-            statement.setQueryTimeout(10);
-            // SQL is intentionally accepted from the trusted local console. The
-            // SQLite connection is query-only and the result size is bounded.
-            //noinspection SqlSourceToSinkFlow
-            try (ResultSet resultSet = statement.executeQuery(statementSql)) {
-                ResultSetMetaData metadata = resultSet.getMetaData();
-                int columnCount = metadata.getColumnCount();
-                List<String> columns = new ArrayList<>(columnCount);
-                for (int index = 1; index <= columnCount; index++) {
-                    columns.add(metadata.getColumnLabel(index));
-                }
-
-                List<List<String>> rows = new ArrayList<>();
-                boolean truncated = false;
-                while (resultSet.next()) {
-                    if (rows.size() == maxRows) {
-                        truncated = true;
-                        break;
-                    }
-                    List<String> row = new ArrayList<>(columnCount);
-                    for (int index = 1; index <= columnCount; index++) {
-                        row.add(resultSet.getString(index));
-                    }
-                    rows.add(List.copyOf(row));
-                }
-                return new QueryResult(List.copyOf(columns), List.copyOf(rows), truncated);
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to execute read-only SQL query", e);
-        }
-    }
-
-    private static boolean isAllowedReadOnlyPragma(String normalizedSql) {
-        String pragma = normalizedSql.substring("pragma".length()).stripLeading();
-        int separator = pragma.indexOf('(');
-        String name = (separator >= 0 ? pragma.substring(0, separator) : pragma).strip();
-        return List.of(
-                "table_info", "table_xinfo", "table_list", "index_list", "index_info",
-                "index_xinfo", "foreign_key_list", "database_list", "compile_options"
-        ).contains(name);
-    }
-
     public static List<Long> findAllUsers() {
-        ensureInitialized();
+        SqliteDatabase.ensureInitialized();
 
         List<Long> result = new LinkedList<>();
 
@@ -820,7 +735,7 @@ public final class UserDataStore {
         };
 
         for (String sql : queries) {
-            try (Connection connection = DriverManager.getConnection(jdbcUrl);
+            try (Connection connection = SqliteDatabase.getConnection();
                  Statement statement = connection.createStatement();
                  ResultSet rs = statement.executeQuery(sql)) {
                 while (rs.next()) {
@@ -835,7 +750,7 @@ public final class UserDataStore {
         return result.stream().distinct().toList();
     }
 
-    private static void createTablesIfNeeded() throws SQLException {
+    public static void createTablesIfNeeded(Connection connection) throws SQLException {
         String bindingSql = """
                 CREATE TABLE IF NOT EXISTS user_bindings (
                     open_id TEXT NOT NULL,
@@ -917,8 +832,7 @@ public final class UserDataStore {
                     PRIMARY KEY(group_id, beatmap_id)
                 )
                 """;
-        try (Connection connection = DriverManager.getConnection(jdbcUrl);
-             Statement statement = connection.createStatement()) {
+        try (Statement statement = connection.createStatement()) {
             statement.execute(bindingSql);
             statement.execute(groupMemberSql);
             statement.execute(tokenStoreSql);
@@ -931,15 +845,6 @@ public final class UserDataStore {
             statement.execute(specificScoreWatchUserSql);
             statement.execute(specificScoreWatchBeatmapSql);
         }
-    }
-
-    private static void ensureInitialized() {
-        if (jdbcUrl == null) {
-            throw new IllegalStateException("UserBindingStore is not initialized");
-        }
-    }
-
-    public record QueryResult(List<String> columns, List<List<String>> rows, boolean truncated) {
     }
 }
 

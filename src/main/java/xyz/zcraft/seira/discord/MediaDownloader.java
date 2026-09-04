@@ -5,11 +5,7 @@ import xyz.zcraft.seira.config.DiscordProxyConfig;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.Authenticator;
-import java.net.InetSocketAddress;
-import java.net.PasswordAuthentication;
-import java.net.ProxySelector;
-import java.net.URI;
+import java.net.*;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -36,6 +32,20 @@ final class MediaDownloader {
             }
         }
         this.client = builder.build();
+    }
+
+    private static String safeFilename(String suggested, URI uri, String contentType) {
+        String filename = suggested;
+        if (filename == null || filename.isBlank() || filename.startsWith("http://") || filename.startsWith("https://")) {
+            String path = uri.getPath();
+            filename = path == null ? "" : path.substring(path.lastIndexOf('/') + 1);
+        }
+        filename = filename.replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]", "_");
+        if (filename.isBlank() || filename.length() > 150) {
+            filename = "media" + MediaFormat.extensionFor(contentType);
+        }
+        if (!filename.contains(".")) filename += MediaFormat.extensionFor(contentType);
+        return filename;
     }
 
     DownloadedMedia download(String url, String suggestedFilename) throws IOException, InterruptedException {
@@ -83,19 +93,5 @@ final class MediaDownloader {
         String contentType = MediaFormat.normalizeContentType(data, declaredType);
         String filename = safeFilename(suggestedFilename, uri, contentType);
         return new DownloadedMedia(data, MediaFormat.normalizeFilename(filename, contentType), contentType, url);
-    }
-
-    private static String safeFilename(String suggested, URI uri, String contentType) {
-        String filename = suggested;
-        if (filename == null || filename.isBlank() || filename.startsWith("http://") || filename.startsWith("https://")) {
-            String path = uri.getPath();
-            filename = path == null ? "" : path.substring(path.lastIndexOf('/') + 1);
-        }
-        filename = filename == null ? "" : filename.replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]", "_");
-        if (filename.isBlank() || filename.length() > 150) {
-            filename = "media" + MediaFormat.extensionFor(contentType);
-        }
-        if (!filename.contains(".")) filename += MediaFormat.extensionFor(contentType);
-        return filename;
     }
 }

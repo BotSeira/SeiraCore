@@ -10,10 +10,8 @@ import xyz.zcraft.seira.api.data.Base64Bytes;
 import xyz.zcraft.seira.api.data.QqUploadRequest;
 import xyz.zcraft.seira.api.data.Response;
 import xyz.zcraft.seira.bot.MessageSender;
-import xyz.zcraft.seira.bot.data.FileInfo;
-import xyz.zcraft.seira.bot.data.MDMessage;
-import xyz.zcraft.seira.bot.data.Message;
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.*;
+import xyz.zcraft.seira.data.SendResult;
 import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.discord.DiscordBridgeService;
 import xyz.zcraft.seira.services.ApiRequestStats;
@@ -46,6 +44,30 @@ public final class TaskCoordinator {
         this.discordBridgeService = java.util.Objects.requireNonNull(discordBridgeService);
     }
 
+    static String resolveErrorMessage(Exception exception) {
+        Throwable cursor = exception;
+        while (cursor != null) {
+            switch (cursor) {
+                case ApiRequestException e -> {
+                    return ApiRequestException.getDefaultMessage(e.getErrorCode());
+                }
+                case ClosedChannelException _ -> {
+                    return "oStella API 无法连接，请稍后再试。";
+                }
+                case ResolutionException e -> {
+                    return e.getMessage();
+                }
+                case ReplayRenderException e -> {
+                    return e.getMessage();
+                }
+                default -> {
+                }
+            }
+            cursor = cursor.getCause();
+        }
+        return "请求处理失败，请稍后再试。";
+    }
+
     public CommandReplyChannel openReplyChannel(
             String targetId,
             String messageId,
@@ -73,7 +95,7 @@ public final class TaskCoordinator {
             action.run();
             return true;
         } catch (Exception e) {
-            ctx.sendReply(PendingMessage.ofString(resolveErrorMessage(e)));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + resolveErrorMessage(e)));
             String message = e.getMessage();
             if (e instanceof ApiRequestException apiException) {
                 message += " - " + apiException.getDefaultMessage();
@@ -97,10 +119,8 @@ public final class TaskCoordinator {
         }
 
         APIHelper.ReplayRenderResult result = APIHelper.waitReplayVideo(taskInfo.taskId());
-        if (result != null) {
-            replayResults.put(taskInfo.taskId(), result);
-            BotStat.incrementReplays();
-        }
+        replayResults.put(taskInfo.taskId(), result);
+        BotStat.incrementReplays();
         return result;
     }
 
@@ -146,13 +166,15 @@ public final class TaskCoordinator {
                 return;
             }
 
-            if (ctx.sendReply(replayVideoMessage(result))) {
+            if (ctx.sendReply(replayVideoMessage(result)).success()) {
                 removeReplayResult(taskInfo.taskId());
             }
         });
     }
 
-    /** Waits for an image renderer and returns a sendable message without sending it. */
+    /**
+     * Waits for an image renderer and returns a sendable message without sending it.
+     */
     private PendingMessage waitForImage(
             Context ctx,
             Supplier<Response<Base64Bytes>> creator,
@@ -182,12 +204,16 @@ public final class TaskCoordinator {
         );
     }
 
-    public boolean sendOutboundMessage(String targetId, String messageId, boolean groupMessage, PendingMessage pendingMsg, AtomicInteger messageSeqCounter) {
+    public SendResult sendOutboundMessage(String targetId, String messageId, boolean groupMessage, PendingMessage pendingMsg, AtomicInteger messageSeqCounter) {
         Message message = new Message();
         message.setMsgType(pendingMsg.getMsgType());
         message.setMsgId(messageId);
         if (messageSeqCounter != null) {
             message.setMsgSeq(messageSeqCounter.getAndIncrement());
+        }
+
+        if (pendingMsg.getMessageReference() != null) {
+            message.setMessageReference(pendingMsg.getMessageReference());
         }
 
         if (pendingMsg instanceof MDMessage md) {
@@ -234,21 +260,21 @@ public final class TaskCoordinator {
             }
         }
 
-        boolean sendResult;
+        SentMessage sentMessage;
         if (groupMessage) {
-            sendResult = messageSender.sendGroupMessage(targetId, message);
+            sentMessage = messageSender.sendGroupMessage(targetId, message);
         } else {
-            sendResult = messageSender.sendPrivateMessage(targetId, message);
+            sentMessage = messageSender.sendPrivateMessage(targetId, message);
         }
 
-        if (sendResult && groupMessage) {
+        if (sentMessage != null && groupMessage) {
             PendingMessage portableResult = uploadResult
                     ? pendingMsg
                     : PendingMessage.ofString("媒体文件上传失败");
             discordBridgeService.acceptQqCommandReply(targetId, portableResult);
         }
 
-        return uploadResult && sendResult;
+        return new SendResult(uploadResult && sentMessage != null, sentMessage);
     }
 
     private final class OutboundReplyChannel implements CommandReplyChannel {
@@ -271,46 +297,22 @@ public final class TaskCoordinator {
         }
 
         @Override
-        public synchronized boolean sendReply(PendingMessage message) {
+        public synchronized SendResult sendReply(PendingMessage message) {
             return sendOutboundMessage(targetId, messageId, groupMessage, message, passiveSequence);
         }
 
         @Override
-        public synchronized boolean sendProactive(PendingMessage message) {
+        public synchronized SendResult sendProactive(PendingMessage message) {
             return sendOutboundMessage(targetId, null, groupMessage, message, null);
         }
 
         @Override
-        public synchronized boolean sendQueueNotice(PendingMessage message) {
+        public synchronized SendResult sendQueueNotice(PendingMessage message) {
             if (groupMessage && !queueMessageInGroup) {
-                return true;
+                return new SendResult(true, null);
             }
             return sendReply(message);
         }
 
-    }
-
-    static String resolveErrorMessage(Exception exception) {
-        Throwable cursor = exception;
-        while (cursor != null) {
-            switch (cursor) {
-                case ApiRequestException e -> {
-                    return ApiRequestException.getDefaultMessage(e.getErrorCode());
-                }
-                case ClosedChannelException _ -> {
-                    return "oStella API 无法连接，请稍后再试。";
-                }
-                case ResolutionException e -> {
-                    return e.getMessage();
-                }
-                case ReplayRenderException e -> {
-                    return e.getMessage();
-                }
-                default -> {
-                }
-            }
-            cursor = cursor.getCause();
-        }
-        return "请求处理失败，请稍后再试。";
     }
 }

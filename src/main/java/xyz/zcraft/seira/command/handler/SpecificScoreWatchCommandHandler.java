@@ -23,6 +23,25 @@ public final class SpecificScoreWatchCommandHandler {
         this.watchService = Objects.requireNonNull(watchService);
     }
 
+    static Set<Long> parseIds(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        LinkedHashSet<Long> ids = new LinkedHashSet<>();
+        for (String part : value.split("[,，]", -1)) {
+            try {
+                long id = Long.parseLong(part.trim());
+                if (id <= 0) {
+                    return null;
+                }
+                ids.add(id);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return ids.isEmpty() ? null : Set.copyOf(ids);
+    }
+
     public void handleWx(Context ctx) {
         if (!ctx.inGroup()) {
             ctx.sendReply(PendingMessage.ofString("/wx 仅支持群聊使用。"));
@@ -54,7 +73,7 @@ public final class SpecificScoreWatchCommandHandler {
         }
 
         taskCoordinator.runApiRequest(ctx, "Start Specific Score Watch", () -> {
-            if (!ctx.sendMessage(PendingMessage.ofString("正在尝试启动指定谱面成绩监视……"))) {
+            if (!ctx.sendMessage(PendingMessage.ofString("正在尝试启动指定谱面成绩监视……")).success()) {
                 ctx.sendReply(PendingMessage.ofString(
                         "由于缺少主动消息权限，无法启动监视！权限配置请见：https://docs.seira.top/overview/use.html#extra-permission"
                 ));
@@ -81,24 +100,5 @@ public final class SpecificScoreWatchCommandHandler {
 
     private void usage(Context ctx) {
         ctx.sendReply(PendingMessage.ofString(USAGE));
-    }
-
-    static Set<Long> parseIds(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        LinkedHashSet<Long> ids = new LinkedHashSet<>();
-        for (String part : value.split("[,，]", -1)) {
-            try {
-                long id = Long.parseLong(part.trim());
-                if (id <= 0) {
-                    return null;
-                }
-                ids.add(id);
-            } catch (NumberFormatException e) {
-                return null;
-            }
-        }
-        return ids.isEmpty() ? null : Set.copyOf(ids);
     }
 }

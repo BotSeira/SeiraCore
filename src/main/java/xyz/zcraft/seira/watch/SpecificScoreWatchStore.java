@@ -10,26 +10,4 @@ public interface SpecificScoreWatchStore {
     boolean delete(String groupId);
 
     void updateLastScoreId(String groupId, long userId, long scoreId);
-
-    static SpecificScoreWatchStore none() {
-        return new SpecificScoreWatchStore() {
-            @Override
-            public List<SpecificScoreWatchState> loadAll() {
-                return List.of();
-            }
-
-            @Override
-            public void save(SpecificScoreWatchState state) {
-            }
-
-            @Override
-            public boolean delete(String groupId) {
-                return false;
-            }
-
-            @Override
-            public void updateLastScoreId(String groupId, long userId, long scoreId) {
-            }
-        };
-    }
 }

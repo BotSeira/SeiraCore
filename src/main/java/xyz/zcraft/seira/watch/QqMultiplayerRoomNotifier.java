@@ -29,7 +29,7 @@ public final class QqMultiplayerRoomNotifier implements MultiplayerRoomNotifier 
         Message message = new Message();
         message.setMsgType(PendingMessage.MSG_TYPE_MEDIA);
         message.setMedia(media);
-        return messageSender.sendGroupMessage(groupId, message);
+        return messageSender.sendGroupMessage(groupId, message) != null;
     }
 
     @Override
@@ -37,6 +37,6 @@ public final class QqMultiplayerRoomNotifier implements MultiplayerRoomNotifier 
         return messageSender.sendGroupText(
                 groupId,
                 "多人房间“" + snapshot.roomName() + "” (#" + snapshot.roomId() + ") 已结束，监视已自动停止。"
-        );
+        ) != null;
     }
 }

@@ -1,6 +1,10 @@
 package xyz.zcraft.seira.rankguess;
 
 import lombok.Getter;
+import xyz.zcraft.seira.bot.data.MessageReference;
+import xyz.zcraft.seira.rankguess.data.Guess;
+import xyz.zcraft.seira.rankguess.data.Round;
+import xyz.zcraft.seira.rankguess.data.ScoreMultiplier;
 
 import java.time.Instant;
 import java.util.*;
@@ -8,20 +12,26 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 @Getter
 public final class RankGuessGame {
+    public static final int COPY_PUNISHMENT_THRESHOLD = 8;
     public final UUID token;
     public final String starterUserId;
+    public final boolean fromGroup;
     public final Map<String, Guess> guesses = new LinkedHashMap<>();
     public final AtomicInteger guessCount = new AtomicInteger(0);
     private final List<Hint> revealedHints = new ArrayList<>();
-    public RankGuessGameService.Round round;
+    public boolean copyPunishmentReduced = false;
+    public Round round;
     public Instant guessingStartedAt;
     public long nextSequence;
     @Getter
-    private boolean ended = false;
+    public MessageReference videoRef = null;
+    @Getter
+    private volatile boolean ended = false;
 
-    RankGuessGame(UUID token, String starterUserId) {
+    RankGuessGame(UUID token, String starterUserId, boolean fromGroup) {
         this.token = token;
         this.starterUserId = starterUserId;
+        this.fromGroup = fromGroup;
     }
 
     public void markEnded() {
@@ -43,24 +53,24 @@ public final class RankGuessGame {
         return List.copyOf(revealedHints);
     }
 
-    public double getMultiplierDelta(RankGuessGameService.ScoreMultiplier multiplier) {
-        if (multiplier instanceof RankGuessGameService.ScoreMultiplier.FirstGuessMultiplier) {
+    public double getMultiplierDelta(ScoreMultiplier multiplier) {
+        if (multiplier instanceof ScoreMultiplier.FirstGuessMultiplier) {
             return 0.05;
-        } else if (multiplier instanceof RankGuessGameService.ScoreMultiplier.OrderMultiplier orderMultiplier) {
+        } else if (multiplier instanceof ScoreMultiplier.OrderMultiplier orderMultiplier) {
             return Math.max(-0.10, 0.00 - (orderMultiplier.getOrder() - 2) * 0.01);
-        } else if (multiplier instanceof RankGuessGameService.ScoreMultiplier.CopyPunishmentMultiplier) {
-            if (guessCount.get() >= 10) {
+        } else if (multiplier instanceof ScoreMultiplier.CopyPunishmentMultiplier) {
+            if (guesses.size() >= COPY_PUNISHMENT_THRESHOLD) {
                 return -0.025;
             } else {
                 return -0.05;
             }
-        } else if (multiplier instanceof RankGuessGameService.ScoreMultiplier.HintMultiplier hintMultiplier) {
+        } else if (multiplier instanceof ScoreMultiplier.HintMultiplier hintMultiplier) {
             return -hintMultiplier.getHint().strength().penalty();
         }
         return 0;
     }
 
-    public String getMultipliersString(List<RankGuessGameService.ScoreMultiplier> multipliers) {
+    public String getMultipliersString(List<ScoreMultiplier> multipliers) {
         if (multipliers == null || multipliers.isEmpty()) {
             return "倍率: `x1.00`\n";
         }
@@ -75,19 +85,26 @@ public final class RankGuessGame {
                 .append(String.format(Locale.US, "%.2f", 1 + sum))
                 .append("`\n");
 
-        for (RankGuessGameService.ScoreMultiplier multiplier : multipliers) {
+        for (ScoreMultiplier multiplier : multipliers) {
             builder.append("> ")
                     .append(multiplier.getReason())
                     .append(": ")
                     .append(String.format(
                             Locale.US,
-                            "%+.0f%%",
+                            "%+.2f%%",
                             this.getMultiplierDelta(multiplier) * 100
                     ))
                     .append("\n");
         }
 
         return builder.toString();
+    }
+
+    public double getNextMaxPoints() {
+        final double hintsMultiplier = -revealedHints.stream().mapToDouble(h -> h.strength().penalty()).sum();
+        final double orderMultiplier = Math.max(-0.10, 0.00 - (guessCount.get() - 2) * 0.01);
+
+        return 1000 * (1 + hintsMultiplier + orderMultiplier);
     }
 
     public record Hint(String content, String name, HintCategory category, HintStrength strength) {

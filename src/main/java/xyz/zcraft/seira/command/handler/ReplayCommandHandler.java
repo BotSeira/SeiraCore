@@ -3,13 +3,16 @@ package xyz.zcraft.seira.command.handler;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.data.PendingMessage;
-import xyz.zcraft.seira.command.*;
+import xyz.zcraft.seira.command.Context;
+import xyz.zcraft.seira.command.ReplayResultStore;
+import xyz.zcraft.seira.command.TargetHistory;
+import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
-import xyz.zcraft.seira.command.reply.CommandUsage;
-import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.command.parse.RscTarget;
 import xyz.zcraft.seira.command.parse.ShortcutTarget;
 import xyz.zcraft.seira.command.parse.TargetResolution;
+import xyz.zcraft.seira.command.reply.CommandUsage;
+import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
 import java.util.function.Function;
@@ -92,7 +95,7 @@ public final class ReplayCommandHandler {
         TargetResolution targetResolution = targetHistory.resolveOptionalTarget(
                 ctx,
                 resolver,
-                arg -> arg.startsWith("+") || TimeDurationParser.isTimeRange(arg)
+                arg -> arg.startsWith("+") || arg.startsWith("=")
         );
         ShortcutTarget target = targetResolution.target();
         if (target == null) {
@@ -106,13 +109,11 @@ public final class ReplayCommandHandler {
 
         String extraUidArg = null;
 
-        for (int i = targetResolution.consumedArgs(); i < ctx.args().length; i++) {
+        int i = targetResolution.consumedArgs();
+
+        if (i < ctx.args().length) {
             if (ctx.args()[i].startsWith("+") || ctx.args()[i].startsWith("=")) {
-                if (extraUidArg != null) {
-                    ctx.sendReply(PendingMessage.ofString(CommandUsage.RSC));
-                    return;
-                }
-                extraUidArg = ctx.args()[i];
+                extraUidArg = ctx.query().substring(Math.max(ctx.query().indexOf("+"), ctx.query().indexOf("=")));
             } else {
                 ctx.sendReply(PendingMessage.ofString(CommandUsage.RSC));
                 return;
@@ -127,7 +128,7 @@ public final class ReplayCommandHandler {
             return;
         }
 
-        String[] uidArray = rscTarget.uids();
+        String[] targetsArray = rscTarget.targets();
 
         targetHistory.rememberExplicitTarget(ctx, targetResolution);
 
@@ -136,7 +137,7 @@ public final class ReplayCommandHandler {
                 "Showcase Render",
                 qqUpload -> {
                     var task = APIHelper.createReplayShowcaseTask(
-                            target, uidArray, accessTokenProvider.apply(ctx.senderUserId()), qqUpload);
+                            target, targetsArray, accessTokenProvider.apply(ctx.senderUserId()), qqUpload);
                     videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
                     return task;
                 },
@@ -166,7 +167,7 @@ public final class ReplayCommandHandler {
             PendingMessage video = replayResult.qqFile() != null
                     ? PendingMessage.ofUploadedVideo(replayResult.qqFile(), replayResult.videoUrl())
                     : PendingMessage.ofVideoUrl(replayResult.videoUrl());
-            if (ctx.sendReply(video)) {
+            if (ctx.sendReply(video).success()) {
                 replayResults.remove(jobId);
             }
             return;

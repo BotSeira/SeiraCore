@@ -14,7 +14,7 @@ public final class WatchScoreNotifier {
     public WatchScoreNotifier(MessageSender messageSender) {
         this.messageSender = Objects.requireNonNull(messageSender);
     }
-    
+
     public boolean sendScore(String groupId, byte[] imageBytes) {
         String base64 = Base64.getEncoder().encodeToString(imageBytes);
         FileInfo media = messageSender.uploadGroupMediaBase64(
@@ -29,6 +29,6 @@ public final class WatchScoreNotifier {
         Message message = new Message();
         message.setMsgType(PendingMessage.MSG_TYPE_MEDIA);
         message.setMedia(media);
-        return messageSender.sendGroupMessage(groupId, message);
+        return messageSender.sendGroupMessage(groupId, message) != null;
     }
 }

@@ -2,13 +2,7 @@ package xyz.zcraft.seira.console;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.jline.reader.Candidate;
-import org.jline.reader.Completer;
-import org.jline.reader.EndOfFileException;
-import org.jline.reader.LineReader;
-import org.jline.reader.LineReaderBuilder;
-import org.jline.reader.ParsedLine;
-import org.jline.reader.UserInterruptException;
+import org.jline.reader.*;
 import org.jline.reader.impl.DefaultParser;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
@@ -21,7 +15,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Interactive local administration console backed by JLine. */
+/**
+ * Interactive local administration console backed by JLine.
+ */
 public final class JLineConsole implements AutoCloseable {
     private static final Logger LOG = LogManager.getLogger(JLineConsole.class);
     private static final String PROMPT = "seira> ";

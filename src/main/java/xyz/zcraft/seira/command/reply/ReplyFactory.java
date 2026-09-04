@@ -7,17 +7,19 @@ import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.osu.model.*;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.data.*;
-import xyz.zcraft.seira.binding.BindingService;
-import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.bot.data.Button;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.BindingConfig;
 import xyz.zcraft.seira.data.UploadedImage;
-import xyz.zcraft.seira.rankguess.FinishedRound;
-import xyz.zcraft.seira.rankguess.RankGuessGameService;
-import xyz.zcraft.seira.rankguess.Standing;
+import xyz.zcraft.seira.db.RankGuessRecordStore;
+import xyz.zcraft.seira.db.UserDataStore;
+import xyz.zcraft.seira.rankguess.data.FinishedRound;
+import xyz.zcraft.seira.rankguess.data.Rank;
+import xyz.zcraft.seira.rankguess.data.Round;
+import xyz.zcraft.seira.rankguess.data.Standing;
+import xyz.zcraft.seira.services.BindingService;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.services.DailyLuck;
 import xyz.zcraft.seira.util.VersionInfo;
@@ -64,7 +66,7 @@ public final class ReplyFactory {
         return PendingMessage.ofMarkdownRaw(
                 ("\n" + "## Replay上传成功~" + "\n" +
                         "> 成绩: " + cmd("/s " + info.scoreId(), String.valueOf(info.scoreId())) + "\n" +
-                        "> 铺面: " + cmd("/m " + info.beatmapId(), String.valueOf(info.beatmapId())) + "\n" +
+                        "> 谱面: " + cmd("/m " + info.beatmapId(), String.valueOf(info.beatmapId())) + "\n" +
                         "> 用户: " + cmd("/u " + info.userId(), info.username()) + "\n").trim(),
                 null
         );
@@ -74,15 +76,26 @@ public final class ReplyFactory {
         return new Buttons(configSupplier.get().seira().directUrl());
     }
 
-    public PendingMessage rankGuessResultMessage(FinishedRound result) {
-        RankGuessGameService.Round round = result.round();
+    public PendingMessage rankGuessResultMessage(Context ctx, FinishedRound result, boolean recorded) {
+        Round round = result.round();
         String rank = String.format(Locale.US, "%,d", round.actualRank());
         String pp = round.pp() == null
                 ? "未知"
                 : "%.1f".formatted(round.pp()) + "pp";
 
-        StringBuilder content = new StringBuilder()
-                .append("本轮猜测结束~\n")
+        String userAt = UserDataStore.findGroupOpenIdByUid(ctx.groupId(), round.userId())
+                .map(e -> "(" + at(e) + ")")
+                .orElse("");
+
+        StringBuilder content = new StringBuilder("本轮猜测结束");
+
+        if (recorded) {
+            content.append("，战绩已记录~\n");
+        } else {
+            content.append("，由于参与人数过少，战绩不会记录~\n");
+        }
+
+        content.append("> 玩家：`%s` %s\n".formatted(round.randomScore().user().getUsername(), userAt))
                 .append("> 实际Rank：`#%s` (%s)\n".formatted(rank, cmd("/u " + round.userId(), String.valueOf(round.userId()))))
                 .append("> 成绩PP：`%s` (%s)\n".formatted(pp, cmd("/s " + round.scoreId(), String.valueOf(round.scoreId()))))
                 .append("\n猜测排行榜：\n");
@@ -110,9 +123,51 @@ public final class ReplyFactory {
         return PendingMessage.ofMarkdownRaw(content.toString().trim());
     }
 
+    public PendingMessage rankGuessStatisticsMessage(
+            Context ctx, RankGuessRecordStore.Statistics.Personal statistics,
+            RankGuessRecordStore.Statistics.Personal recentStatistics,
+            boolean allGroups, Rank rank,
+            Long pickedTimes, Long groupGameCount
+    ) {
+        String scope = allGroups ? "全部群聊" : "本群";
+        if (statistics.participation() == 0) {
+            return PendingMessage.ofMarkdownRaw(at(ctx) + "你在" + scope + "还没有已结算的猜 Rank 战绩喵~");
+        }
+
+        String rankText = "?".equals(rank.rank()) ? "" : "根据你最近 %d 场的表现，可以给到一个 `%s` 喵！\n"
+                .formatted(Rank.RECENT_GAME_LIMIT, rank.rank());
+        String groupCountText = "";
+        if (!allGroups && pickedTimes != null && groupGameCount != null) {
+            groupCountText = "> 被猜次数：`%d`，占本群：`%.3f%%`\n".formatted(pickedTimes, (double) pickedTimes / groupGameCount * 100);
+        }
+        return PendingMessage.ofMarkdownRaw(at(ctx) + String.format(Locale.ROOT, """
+                        你的猜 Rank 战绩（%s，括号为近 %d 场）
+                        > 总参与数：`%d`，Rating：`%.2f`
+                        > 获胜数：`%d`（`%d`）
+                        > 胜率：`%.2f%%`（`%.2f%%`）
+                        > 前20%%：`%d`（`%d`）
+                        > 前20%%达成率：`%.2f%%`（`%.2f%%`）
+                        > 平均分：`%.2f`（`%.2f`）
+                        > 最高分：`%.2f`（`%.2f`）
+                        > 平均名次：`%.2f`（`%.2f`）
+                        > 总得分：`%.2f`
+                        %s%s
+                        """,
+                scope, Rank.RECENT_GAME_LIMIT,
+                statistics.participation(), rank.rating(),
+                statistics.wins(), recentStatistics.wins(),
+                statistics.winRate() * 100, recentStatistics.winRate() * 100,
+                statistics.topTwentyCount(), recentStatistics.topTwentyCount(),
+                statistics.topTwentyRate() * 100, recentStatistics.topTwentyRate() * 100,
+                statistics.averageScore(), recentStatistics.averageScore(),
+                statistics.highestScore(), recentStatistics.highestScore(),
+                statistics.averagePlacement(), recentStatistics.averagePlacement(),
+                statistics.totalScore(), groupCountText, rankText).strip());
+    }
+
     public PendingMessage boMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                at(ctx) + "B" + response.getScoreIds().size() + "查询完成\n" +
+                at(ctx) + "查询完成，共" + response.getScoreIds().size() + "个成绩\n" +
                         "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()),
                 buttons().boButtons(response.getUserId())
         );
@@ -490,26 +545,38 @@ public final class ReplyFactory {
 
             sb.append("\n");
 
+            boolean collapsed = false;
+
             sb.append("> 好友←→ (").append(mutual.size()).append(")\n>");
-            for (User p : mutual) {
-                sb.append(getFriendItem(p)).append(" ");
-            }
+            collapsed |= appendFriends(ctx, mutual, sb);
 
             sb.append("\n> 仅关注→ (").append(onlyFollowed.size()).append(")\n>");
-            for (User p : onlyFollowed) {
-                sb.append(getFriendItem(p)).append(" ");
-            }
+            collapsed |= appendFriends(ctx, onlyFollowed, sb);
 
             sb.append("\n> 仅粉丝← (");
             sb.append(onlyFollower.size()).append(" 已知");
             if (all) sb.append(" 共 ").append(self.getFollowerCount() - allMutualCount);
             sb.append(")\n>");
+            collapsed |= appendFriends(ctx, onlyFollower, sb);
 
-            for (User p : onlyFollower) {
-                sb.append(getFriendItem(p)).append(" ");
+            if (ctx.inGroup() && collapsed) {
+                sb.append("\n部分结果已折叠，如需查看完整结果请在私聊中使用指令~");
             }
 
             return sb.toString().trim();
+        }
+
+        private static boolean appendFriends(Context ctx, List<User> onlyFollowed, StringBuilder sb) {
+            int count = 0;
+            for (User p : onlyFollowed) {
+                if (count >= 20 && ctx.inGroup()) {
+                    sb.append("\n...剩余").append(onlyFollowed.size() - count).append("个");
+                    return true;
+                }
+                sb.append(getFriendItem(p)).append(" ");
+                count++;
+            }
+            return false;
         }
 
         private static String getFriendItem(User u) {
@@ -599,7 +666,7 @@ public final class ReplyFactory {
                             > /bma <谱面ID或快捷查询> [Mod] - 分析谱面PP构成和类型
                             > /ms <谱面集ID或快捷查询> - 获取谱面集
                             > /r [成绩ID或快捷查询] [[mm:ss]-[mm:ss]] - 生成成绩高光视频或指定片段
-                            > /rg <start/#Rank/end> - 在群聊中进行猜 Rank 游戏
+                            > /rg <start/group/#Rank/end/wish/stats [all]> - 猜 Rank 游戏与个人战绩
                             > /lb <谱面ID> [玩家ID列表] - 获取指定谱面排行榜
                             > /watch add <玩家ID/用户名/@用户> [分钟] - 监视群友的新成绩
                             > /wx start <UID列表> <谱面ID列表> - 监视指定玩家在指定谱面的成绩

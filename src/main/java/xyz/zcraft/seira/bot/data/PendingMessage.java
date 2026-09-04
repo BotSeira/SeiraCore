@@ -21,6 +21,7 @@ public class PendingMessage {
     private FileInfo uploadedMedia = null;
     private int fileType = -1;
     private boolean upload = true;
+    private MessageReference messageReference = null;
 
     public static PendingMessage ofString(String content) {
         final PendingMessage message = new PendingMessage();
@@ -87,6 +88,11 @@ public class PendingMessage {
 
     public PendingMessage doUpload(boolean upload) {
         this.upload = upload;
+        return this;
+    }
+
+    public PendingMessage ref(MessageReference reference) {
+        this.messageReference = reference;
         return this;
     }
 }

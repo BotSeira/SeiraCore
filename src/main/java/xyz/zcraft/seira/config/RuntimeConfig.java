@@ -35,43 +35,6 @@ public final class RuntimeConfig {
         this.loader = Objects.requireNonNull(loader, "loader");
     }
 
-    public AppConfig current() {
-        return current.get();
-    }
-
-    public List<String> pendingRestart() {
-        return pendingRestart;
-    }
-
-    public void addReloadListener(Consumer<ReloadResult> listener) {
-        listeners.add(Objects.requireNonNull(listener));
-    }
-
-    /** Reads and validates the source configuration without applying it. */
-    public AppConfig validateSource() {
-        return loader.get();
-    }
-
-    public synchronized ReloadResult reload() {
-        AppConfig previous = current.get();
-        AppConfig loaded = loader.get();
-        List<String> applied = appliedChanges(previous, loaded);
-        List<String> restartRequired = restartRequiredChanges(previous, loaded);
-        AppConfig effective = mergeReloadable(previous, loaded);
-
-        current.set(effective);
-        pendingRestart = List.copyOf(restartRequired);
-        ReloadResult result = new ReloadResult(effective, applied, pendingRestart);
-        for (Consumer<ReloadResult> listener : listeners) {
-            try {
-                listener.accept(result);
-            } catch (RuntimeException e) {
-                LOG.error("Runtime configuration listener failed", e);
-            }
-        }
-        return result;
-    }
-
     private static AppConfig mergeReloadable(AppConfig previous, AppConfig loaded) {
         SeiraConfig oldSeira = previous.seira();
         SeiraConfig newSeira = loaded.seira();
@@ -126,6 +89,45 @@ public final class RuntimeConfig {
         if (!Objects.equals(before, after)) {
             changed.add(name);
         }
+    }
+
+    public AppConfig current() {
+        return current.get();
+    }
+
+    public List<String> pendingRestart() {
+        return pendingRestart;
+    }
+
+    public void addReloadListener(Consumer<ReloadResult> listener) {
+        listeners.add(Objects.requireNonNull(listener));
+    }
+
+    /**
+     * Reads and validates the source configuration without applying it.
+     */
+    public AppConfig validateSource() {
+        return loader.get();
+    }
+
+    public synchronized ReloadResult reload() {
+        AppConfig previous = current.get();
+        AppConfig loaded = loader.get();
+        List<String> applied = appliedChanges(previous, loaded);
+        List<String> restartRequired = restartRequiredChanges(previous, loaded);
+        AppConfig effective = mergeReloadable(previous, loaded);
+
+        current.set(effective);
+        pendingRestart = List.copyOf(restartRequired);
+        ReloadResult result = new ReloadResult(effective, applied, pendingRestart);
+        for (Consumer<ReloadResult> listener : listeners) {
+            try {
+                listener.accept(result);
+            } catch (RuntimeException e) {
+                LOG.error("Runtime configuration listener failed", e);
+            }
+        }
+        return result;
     }
 
     public record ReloadResult(

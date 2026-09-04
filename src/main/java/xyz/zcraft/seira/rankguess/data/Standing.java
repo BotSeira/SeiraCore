@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.rankguess;
+package xyz.zcraft.seira.rankguess.data;
 
 public record Standing(
         String senderUserId,

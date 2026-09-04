@@ -47,6 +47,11 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 
 <img width="400"  alt="image" src="https://github.com/user-attachments/assets/c1caf387-381c-442f-99da-5b4257657576" />
 
+每局结算后自动保存战绩。在群内使用 `/rg stats` 查询自己的本群战绩，使用 `/rg stats all` 查询自己的全部群聊战绩。
+统计包括参与数、获胜数、胜率、前 20% 次数和达成率、平均分、最高分、总得分及平均名次。
+每人每局只统计最终猜测，获胜按最终排行榜第一名计算；前 20% 名额向上取整，仅统计至少 5 人参与的对局，达成率以这些对局为分母。
+战绩与用户绑定共用配置中的 SQLite 数据库，分数采用最终结算得分；历史未记录的对局不会自动补入。
+
 ### 查询群友的排行榜！
 
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/cbc361a4-61e0-440d-908e-f1d52009373e" />
@@ -65,43 +70,43 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 
 > 所有命令都以 `/` 开头。指令详情请见[文档](https://docs.seira.top/overview/commands.html)。
 
-| 命令            | 用法                                               | 结果                                                                            |
-|-----------------|----------------------------------------------------|---------------------------------------------------------------------------------|
-| `/bind`         | `/bind`                                            | 开始osu账号绑定流程                                                             |
-| `/unbind`       | `/unbind`                                          | 解除当前用户的osu账号绑定                                                       |
-| `/clearhistory` | `/clearhistory`                                    | 清除当前用户在群聊中的记录                                                      |
-| `/f`            | `/f`                                               | 获取好友列表                                                                    |
-| `/fall`         | `/fall`                                            | 获取全部好友列表                                                                |
-| `/fclear`       | `/fclear`                                          | 清除好友记录                                                                    |
-| `/bo`           | `/bo [n] [uid/username/@user] [filters...]`        | 获取最多200条最好成绩后过滤；省略n时返回第一个匹配成绩详情                      |
-| `/rs`           | `/rs [n] [uid/username/@user] [filters...]`        | 获取最多200条最近成绩后过滤；省略n时返回第一个匹配成绩详情                      |
-| `/rp`           | `/rp [n] [uid/username/@user] [filters...]`        | 获取最多200条最近通过成绩后过滤；省略n时返回第一个匹配成绩详情                  |
-| `/tb`           | `/tb [#days] [uid/username/@user]`                 | 获取近N天达成的BP（默认1天），并保留完整BP排名编号                              |
-| `/m`            | `/m <id/rsN/boN> [Mod]`                            | 获取指定谱面信息                                                                |
-| `/ap`           | `/ap <id/rsN/boN>`                                 | 获取指定谱面音频预览                                                            |
-| `/bgp`          | `/bgp <id/rsN/boN>`                                | 获取指定谱面背景预览                                                            |
-| `/s`            | `/s <id/locId/rsN/boN>`                            | 获取指定的在线或本地成绩图                                                      |
-| `/sa`           | `/sa <id/locId/rsN/boN>`                           | 获取指定成绩分析图                                                              |
-| `/ma`           | `/ma [id/locId/rsN/boN] [n/#n]`                    | 获取指定或最近目标成绩的Miss分析；省略目标时用`#n`指定Miss                      |
-| `/u`            | `/u [uid/username/@user]`                          | 获取指定用户信息                                                                |
-| `/r`            | `/r [id/locId/rsN/boN] [[mm:ss]-[mm:ss]]`          | 生成并发送指定或最近目标的回放视频。省略范围时自动识别高光，使用`-`渲染整个回放 |
-| `/rg`           | `/rg <start/#Rank/end>`                            | 在群聊中开始、参与或结束猜 Rank 游戏                                            |
-| `/rsc`          | `/rsc [id/locId/rsN/boN] [+<id1>,<id2>...]`        | 生成并发送指定或最近目标的成绩同屏回放视频；追加用户和范围顺序不限              |
-| `/rstat`        | `/rstat [id]`                                      | 获取视频生成进度                                                                |
-| `/ms`           | `/ms <id/rsN/boN>`                                 | 获取指定谱面集信息                                                              |
-| `/dl`           | `/dl <id/rsN/boN/mp>`                              | 获取指定谱面集的镜像下载链接                                                    |
-| `/sms`          | `/sms <query>`                                     | 搜索谱面集                                                                      |
-| `/lb`           | `/lb [id] [<uid1>,<uid2>...]`                      | 列出指定谱面排行或表现分排行                                                    |
-| `/daily`        | `/daily`                                           | 每日挑战信息                                                                    |
-| `/luck`         | `/luck`                                            | 今日人品                                                                        |
-| `/mp`           | `/mp`                                              | 多人房间列表                                                                    |
-| `/watch`        | `/watch add/del/list [目标]`                       | 添加/删除/列出监视任务                                                          |
-| `/mpwatch`      | `/mpwatch start/stop/status [目标]`                | 按群成员添加、停止或查看多人房间监视；`stop all` 可停止本群全部监视             |
-| `/wx`           | `/wx start <UID列表> <谱面ID列表>` / `/wx stop`    | 监视指定玩家在指定谱面取得的成绩，重启后自动恢复                                |
-| `/dcs`          | `/dcs start <guild-id>.<channel-id>` / `/dcs stop` | 开启或解除当前 QQ 群与 Discord 频道的双向消息同步                               |
-| `/stat`         | `/stat`                                            | 服务状态和统计信息文本                                                          |
-| `/inspect`      | `/inspect`                                         | 获取当前上下文信息                                                              |
-| `/help`         | `/help`                                            | 显示帮助信息                                                                    |
+| 命令            | 用法                                                    | 结果                                                                            |
+|-----------------|---------------------------------------------------------|---------------------------------------------------------------------------------|
+| `/bind`         | `/bind`                                                 | 开始osu账号绑定流程                                                             |
+| `/unbind`       | `/unbind`                                               | 解除当前用户的osu账号绑定                                                       |
+| `/clearhistory` | `/clearhistory`                                         | 清除当前用户在群聊中的记录                                                      |
+| `/f`            | `/f`                                                    | 获取好友列表                                                                    |
+| `/fall`         | `/fall`                                                 | 获取全部好友列表                                                                |
+| `/fclear`       | `/fclear`                                               | 清除好友记录                                                                    |
+| `/bo`           | `/bo [n] [uid/username/@user] [filters...]`             | 获取最多200条最好成绩后过滤；省略n时返回第一个匹配成绩详情                      |
+| `/rs`           | `/rs [n] [uid/username/@user] [filters...]`             | 获取最多200条最近成绩后过滤；省略n时返回第一个匹配成绩详情                      |
+| `/rp`           | `/rp [n] [uid/username/@user] [filters...]`             | 获取最多200条最近通过成绩后过滤；省略n时返回第一个匹配成绩详情                  |
+| `/tb`           | `/tb [#days] [uid/username/@user]`                      | 获取近N天达成的BP（默认1天），并保留完整BP排名编号                              |
+| `/m`            | `/m <id/rsN/boN> [Mod]`                                 | 获取指定谱面信息                                                                |
+| `/ap`           | `/ap <id/rsN/boN>`                                      | 获取指定谱面音频预览                                                            |
+| `/bgp`          | `/bgp <id/rsN/boN>`                                     | 获取指定谱面背景预览                                                            |
+| `/s`            | `/s <id/locId/rsN/boN>`                                 | 获取指定的在线或本地成绩图                                                      |
+| `/sa`           | `/sa <id/locId/rsN/boN>`                                | 获取指定成绩分析图                                                              |
+| `/ma`           | `/ma [id/locId/rsN/boN] [n/#n]`                         | 获取指定或最近目标成绩的Miss分析；省略目标时用`#n`指定Miss                      |
+| `/u`            | `/u [uid/username/@user]`                               | 获取指定用户信息                                                                |
+| `/r`            | `/r [id/locId/rsN/boN] [[mm:ss]-[mm:ss]]`               | 生成并发送指定或最近目标的回放视频。省略范围时自动识别高光，使用`-`渲染整个回放 |
+| `/rg`           | `/rg <start/group/#Rank/end/wish/stats [all]/lb [all]>` | 猜 Rank 游戏及个人战绩查询                                                      |
+| `/rsc`          | `/rsc [id/locId/rsN/boN] [+<id1>,<id2>...]`             | 生成并发送指定或最近目标的成绩同屏回放视频；追加用户和范围顺序不限              |
+| `/rstat`        | `/rstat [id]`                                           | 获取视频生成进度                                                                |
+| `/ms`           | `/ms <id/rsN/boN>`                                      | 获取指定谱面集信息                                                              |
+| `/dl`           | `/dl <id/rsN/boN/mp>`                                   | 获取指定谱面集的镜像下载链接                                                    |
+| `/sms`          | `/sms <query>`                                          | 搜索谱面集                                                                      |
+| `/lb`           | `/lb [id] [<uid1>,<uid2>...]`                           | 列出指定谱面排行或表现分排行                                                    |
+| `/daily`        | `/daily`                                                | 每日挑战信息                                                                    |
+| `/luck`         | `/luck`                                                 | 今日人品                                                                        |
+| `/mp`           | `/mp`                                                   | 多人房间列表                                                                    |
+| `/watch`        | `/watch add/del/list [目标]`                            | 添加/删除/列出监视任务                                                          |
+| `/mpwatch`      | `/mpwatch start/stop/status [目标]`                     | 按群成员添加、停止或查看多人房间监视；`stop all` 可停止本群全部监视             |
+| `/wx`           | `/wx start <UID列表> <谱面ID列表>` / `/wx stop`         | 监视指定玩家在指定谱面取得的成绩，重启后自动恢复                                |
+| `/dcs`          | `/dcs start <guild-id>.<channel-id>` / `/dcs stop`      | 开启或解除当前 QQ 群与 Discord 频道的双向消息同步                               |
+| `/stat`         | `/stat`                                                 | 服务状态和统计信息文本                                                          |
+| `/inspect`      | `/inspect`                                              | 获取当前上下文信息                                                              |
+| `/help`         | `/help`                                                 | 显示帮助信息                                                                    |
 
 部分指令会先回复“请求已加入队列，预计等待时间 X 秒”，待异步请求完成后再额外发送结果消息。
 

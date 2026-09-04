@@ -1,8 +1,8 @@
 package xyz.zcraft.seira.command.parse;
 
 import xyz.zcraft.seira.api.data.SearchQuery;
-import xyz.zcraft.seira.binding.UserDataStore;
 import xyz.zcraft.seira.data.UserRef;
+import xyz.zcraft.seira.db.UserDataStore;
 
 import java.util.*;
 import java.util.regex.MatchResult;
@@ -12,11 +12,14 @@ import java.util.regex.Pattern;
 public final class Resolver {
     private static final ArrayList<String> USER_MACRO_TYPES = new ArrayList<>(List.of("rs", "bo", "rp"));
 
-    public String preProcess(String rawContent) {
+    public String sanitize(String rawContent) {
         Matcher matcher = Patterns.USER_MACRO_PATTERN.matcher(rawContent);
         if (matcher.matches()) {
-            return "s " + rawContent;
+            rawContent = "s " + rawContent;
         }
+
+        // Add surrounding space to <@>
+        rawContent = Patterns.QQ_INLINE_AT_PATTERN.matcher(rawContent).replaceAll(r -> " " + r.group() + " ");
 
         return rawContent;
     }
@@ -83,17 +86,25 @@ public final class Resolver {
         if (mentionedUserId != null) {
             Long boundUid = resolveBoundUid(mentionedUserId);
             if (boundUid == null) {
-                return new UserRefResolution(null, "被@的用户还没有绑定玩家ID，请先让对方使用 /bind <玩家ID>");
+                return new UserRefResolution(null, "被@的用户还没有绑定玩家ID，请先让对方使用 /bind");
             }
             return new UserRefResolution(new UserRef.ByUid(boundUid), null);
         }
 
-        if (looksLikeMention(arg)) {
-            return new UserRefResolution(null, "@用户格式无效，请使用 @用户 后再输入指令。示例：/bo 5 @123456");
-        }
+//        if (looksLikeMention(arg)) {
+//            return new UserRefResolution(null, "@用户格式无效，请使用 @用户 后再输入指令。示例：/bo 5 @123456");
+//        }
 
         String username = arg == null ? "" : arg.trim();
-        return new UserRefResolution(username.isEmpty() ? null : new UserRef.ByUsername(username), null);
+        if (username.startsWith("@")) {
+            username = username.substring(1);
+        }
+
+        if (username.isEmpty()) {
+            return new UserRefResolution(null, null);
+        }
+
+        return new UserRefResolution(new UserRef.ByUsername(username), null);
     }
 
     public RscTarget resolveRscTarget(String groupId, String extraUidArg) {
@@ -102,7 +113,7 @@ public final class Resolver {
         if (extraUidArg == null || extraUidArg.trim().startsWith("+")) {
             List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(groupId);
             if (groupBoundUids.isEmpty()) {
-                return new RscTarget(null, "本群还没有已绑定的玩家，请先使用 /bind <玩家ID>");
+                return new RscTarget(null, "本群还没有已绑定的玩家，请先使用 /bind");
             }
             groupBoundUids.stream().map(String::valueOf).forEach(merged::add);
         }
@@ -117,10 +128,21 @@ public final class Resolver {
 
         String[] extraTokens = body.split(",");
         for (String token : extraTokens) {
-            if (!Patterns.RSC_TARGET_PATTERN.matcher(token.trim()).matches()) {
+            if (Patterns.RSC_TARGET_PATTERN.matcher(token.trim()).matches()) {
+                merged.add(token);
+            } else if (looksLikeMention(token)) {
+                final UserRefResolution userRefResolution = resolveUserRefArgument(token);
+                if (userRefResolution.errorMessage() != null) {
+                    return new RscTarget(null, "解析 " + token + " 时出错:" + userRefResolution.errorMessage());
+                }
+                if (userRefResolution.userRef() instanceof UserRef.ByUid ref) {
+                    merged.add("u" + ref.getUid());
+                } else if (userRefResolution.userRef() instanceof UserRef.ByUsername ref) {
+                    merged.add("@" + ref.getUsername());
+                }
+            } else {
                 return new RscTarget(null, "追加ID列表包含非法值。");
             }
-            merged.add(token.trim());
         }
 
         return new RscTarget(merged.toArray(String[]::new), null);
@@ -173,8 +195,8 @@ public final class Resolver {
                 index = 1L;
             }
 
-            if (index < 1 || index > 100) {
-                return new ShortcutTarget(null, null, null, null, "快捷指令索引无效，请输入 1-100 之间的数字。例如: rs5");
+            if (index < 1 || index > 200) {
+                return new ShortcutTarget(null, null, null, null, "快捷指令索引无效，请输入 1-200 之间的数字。例如: rs5");
             }
 
             if (userRef == null) {
@@ -268,12 +290,17 @@ public final class Resolver {
         }
     }
 
+    public boolean looksLikeUid(String arg) {
+        return Pattern.compile("^\\d+$").matcher(arg).matches();
+    }
+
     private static final class Patterns {
         private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo|rp|bp)(\\d+)?$");
         private static final Pattern SET_MACRO_PATTERN = Pattern.compile("^(\\d+)#(\\d+)$");
         private static final Pattern BEATMAP_MACRO_PATTERN = Pattern.compile("^m(\\d+)$");
         private static final Pattern LOCAL_SCORE_PATTERN = Pattern.compile("(?i)^loc[1-9]\\d*$");
         private static final Pattern QQ_AT_PATTERN = Pattern.compile("^<@([A-Z|0-9]{32})>$");
+        private static final Pattern QQ_INLINE_AT_PATTERN = Pattern.compile("(<@[A-Z|0-9]{32}>)");
         private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
         private static final Pattern SEARCH_PATTERN = Pattern.compile("^(?:#(\\d+) )?(.+)$");
         private static final Pattern RSC_TARGET_PATTERN = Pattern.compile("^[us]?\\d+$");

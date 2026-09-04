@@ -17,7 +17,9 @@ import java.io.Serializable;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Routes terminal log events through JLine so the active prompt can be redrawn safely. */
+/**
+ * Routes terminal log events through JLine so the active prompt can be redrawn safely.
+ */
 final class JLineLogBridge implements AutoCloseable {
     private static final String CONSOLE_APPENDER_NAME = "CONSOLE";
     private static final String JLINE_APPENDER_NAME = "JLINE_CONSOLE";

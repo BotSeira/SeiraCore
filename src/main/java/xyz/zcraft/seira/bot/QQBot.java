@@ -8,30 +8,22 @@ import xyz.zcraft.seira.bot.data.Panel;
 import xyz.zcraft.seira.bot.data.PanelItem;
 import xyz.zcraft.seira.bot.data.PanelRecord;
 import xyz.zcraft.seira.bot.data.QQUser;
-import xyz.zcraft.seira.binding.BindingService;
 import xyz.zcraft.seira.command.AttachmentHandler;
 import xyz.zcraft.seira.command.route.Router;
+import xyz.zcraft.seira.config.AppConfig;
+import xyz.zcraft.seira.config.RuntimeConfig;
 import xyz.zcraft.seira.console.ConsoleCommandProcessor;
 import xyz.zcraft.seira.console.ConsoleRuntimeControl;
 import xyz.zcraft.seira.console.OstellaCacheControlClient;
-import xyz.zcraft.seira.config.AppConfig;
-import xyz.zcraft.seira.config.RuntimeConfig;
 import xyz.zcraft.seira.discord.DiscordBridgeService;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
+import xyz.zcraft.seira.services.BindingService;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.services.CosService;
-import xyz.zcraft.seira.runtime.ApplicationExecutors;
-import xyz.zcraft.seira.security.AdminRegistry;
+import xyz.zcraft.seira.util.AdminRegistry;
+import xyz.zcraft.seira.util.ApplicationExecutors;
 import xyz.zcraft.seira.util.TokenManager;
-import xyz.zcraft.seira.watch.OstellaWatchApi;
-import xyz.zcraft.seira.watch.OstellaMultiplayerRoomWatchApi;
-import xyz.zcraft.seira.watch.MultiplayerRoomWatchService;
-import xyz.zcraft.seira.watch.QqMultiplayerRoomNotifier;
-import xyz.zcraft.seira.watch.SpecificScoreNotifier;
-import xyz.zcraft.seira.watch.WatchScoreNotifier;
-import xyz.zcraft.seira.watch.ScoreWatchService;
-import xyz.zcraft.seira.watch.SqliteSpecificScoreWatchStore;
-import xyz.zcraft.seira.watch.WatchView;
+import xyz.zcraft.seira.watch.*;
 
 import java.net.URI;
 import java.nio.file.Files;
@@ -216,6 +208,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
             return;
         }
         stop();
+        rankGuessGameService.saveWeights();
         cos.close();
     }
 
@@ -298,6 +291,8 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
 
     @Override
     public void requestStop() {
+        rankGuessGameService.stopAll();
+
         RealtimeServiceInterruptionNotifier.NotificationResult result = interruptionNotifier.notifyGroups(
                 watchService.activeTransientGroupIds(),
                 rankGuessGameService.activeGroupIds(),

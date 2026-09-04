@@ -163,7 +163,7 @@ public final class ScoreCommandHandler {
         UserRef targetUser = null;
         int startIndex = 0;
 
-        if (resolver.looksLikeMention(ctx.args()[0])) {
+        if (resolver.looksLikeMention(ctx.args()[0]) || resolver.looksLikeUid(ctx.args()[0])) {
             final UserRefResolution userRefResolution = resolver.resolveUserRefArgument(ctx.args()[0]);
             if (userRefResolution.errorMessage() != null) {
                 ctx.sendReply(PendingMessage.ofString(userRefResolution.errorMessage()));
@@ -207,7 +207,7 @@ public final class ScoreCommandHandler {
 
         int nextArg = 1;
         UserRef userRef;
-        if (nextArg < args.length && resolver.looksLikeMention(args[nextArg])) {
+        if (nextArg < args.length && (resolver.looksLikeMention(args[nextArg]) || resolver.looksLikeUid(args[nextArg]))) {
             UserRefResolution resolution = resolver.resolveUserRefArgument(args[nextArg]);
             if (resolution.errorMessage() != null) {
                 ctx.sendReply(PendingMessage.ofString(resolution.errorMessage()));

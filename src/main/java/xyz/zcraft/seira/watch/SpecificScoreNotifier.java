@@ -14,6 +14,6 @@ public final class SpecificScoreNotifier {
     }
 
     public boolean sendScoreId(String groupId, long scoreId) {
-        return messageSender.sendGroupMarkdown(groupId, "捕获到成绩 ID：" + cmd("/s " + scoreId, String.valueOf(scoreId)));
+        return messageSender.sendGroupMarkdown(groupId, "捕获到成绩 ID：" + cmd("/s " + scoreId, String.valueOf(scoreId))) != null;
     }
 }

@@ -1,6 +1,7 @@
 package xyz.zcraft.seira.command;
 
 import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.data.SendResult;
 
 /**
  * The outbound side of one command invocation.
@@ -10,9 +11,9 @@ import xyz.zcraft.seira.bot.data.PendingMessage;
  * not consume the passive reply sequence.</p>
  */
 public interface CommandReplyChannel {
-    boolean sendReply(PendingMessage message);
+    SendResult sendReply(PendingMessage message);
 
-    boolean sendProactive(PendingMessage message);
+    SendResult sendProactive(PendingMessage message);
 
-    boolean sendQueueNotice(PendingMessage message);
+    SendResult sendQueueNotice(PendingMessage message);
 }

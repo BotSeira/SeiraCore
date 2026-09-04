@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.runtime;
+package xyz.zcraft.seira.util;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -32,6 +32,22 @@ public final class ApplicationExecutors implements AutoCloseable {
             daemonThreadFactory("seira-attachment-")
     );
 
+    private static void awaitTermination(ExecutorService executor) {
+        try {
+            if (!executor.awaitTermination(SHUTDOWN_TIMEOUT.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+            LOG.warn("Interrupted while shutting down application executor");
+        }
+    }
+
+    private static ThreadFactory daemonThreadFactory(String prefix) {
+        return Thread.ofPlatform().daemon().name(prefix, 0).factory();
+    }
+
     public ExecutorService gatewayEvents() {
         return gatewayEvents;
     }
@@ -50,21 +66,5 @@ public final class ApplicationExecutors implements AutoCloseable {
         for (ExecutorService executor : List.of(attachmentDownloads, commandTasks, gatewayEvents)) {
             awaitTermination(executor);
         }
-    }
-
-    private static void awaitTermination(ExecutorService executor) {
-        try {
-            if (!executor.awaitTermination(SHUTDOWN_TIMEOUT.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS)) {
-                executor.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            executor.shutdownNow();
-            Thread.currentThread().interrupt();
-            LOG.warn("Interrupted while shutting down application executor");
-        }
-    }
-
-    private static ThreadFactory daemonThreadFactory(String prefix) {
-        return Thread.ofPlatform().daemon().name(prefix, 0).factory();
     }
 }

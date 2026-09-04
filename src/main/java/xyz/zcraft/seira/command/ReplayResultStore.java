@@ -9,6 +9,13 @@ import java.util.concurrent.ConcurrentMap;
 public final class ReplayResultStore {
     private final ConcurrentMap<String, APIHelper.ReplayRenderResult> results = new ConcurrentHashMap<>();
 
+    private static String requireTaskId(String taskId) {
+        if (taskId == null || taskId.isBlank()) {
+            throw new IllegalArgumentException("Task ID must not be blank");
+        }
+        return taskId;
+    }
+
     void put(String taskId, APIHelper.ReplayRenderResult result) {
         results.put(requireTaskId(taskId), Objects.requireNonNull(result));
     }
@@ -21,12 +28,5 @@ public final class ReplayResultStore {
         if (taskId != null && !taskId.isBlank()) {
             results.remove(taskId);
         }
-    }
-
-    private static String requireTaskId(String taskId) {
-        if (taskId == null || taskId.isBlank()) {
-            throw new IllegalArgumentException("Task ID must not be blank");
-        }
-        return taskId;
     }
 }

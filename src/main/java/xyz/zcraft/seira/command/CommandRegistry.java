@@ -1,10 +1,6 @@
 package xyz.zcraft.seira.command;
 
-import java.util.LinkedHashMap;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 public final class CommandRegistry {
     private final Map<String, CommandHandler> handlers;
@@ -15,6 +11,10 @@ public final class CommandRegistry {
 
     public static Builder builder() {
         return new Builder();
+    }
+
+    private static String normalize(String command) {
+        return Objects.requireNonNull(command, "command").trim().toLowerCase(Locale.ROOT);
     }
 
     public void dispatch(Context context, CommandHandler fallback) {
@@ -54,9 +54,5 @@ public final class CommandRegistry {
         public CommandRegistry build() {
             return new CommandRegistry(handlers);
         }
-    }
-
-    private static String normalize(String command) {
-        return Objects.requireNonNull(command, "command").trim().toLowerCase(Locale.ROOT);
     }
 }

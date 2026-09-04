@@ -9,9 +9,9 @@ import org.jetbrains.annotations.Nullable;
 import xyz.zcraft.osu.model.*;
 import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.api.data.*;
+import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.command.parse.ShortcutTarget;
-import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
@@ -138,7 +138,7 @@ public class APIHelper {
         return getBase64BytesResponse(
                 "/beatmaps/" + beatmapId + "/leaderboards",
                 "获取群排行失败",
-                GSON.toJsonTree(Map.of("uids", uids)).toString()
+                GSON.toJsonTree(Map.of("targets", uids)).toString()
         );
     }
 
@@ -146,7 +146,7 @@ public class APIHelper {
         return getBase64BytesResponse(
                 "/users/leaderboards",
                 "获取排行失败",
-                GSON.toJsonTree(Map.of("uids", uids)).toString()
+                GSON.toJsonTree(Map.of("targets", uids)).toString()
         );
     }
 
@@ -505,8 +505,8 @@ public class APIHelper {
     }
 
     public static ReplayTaskInfo createReplayRenderTask(ShortcutTarget target,
-                                                         TimeDurationParser.TimeRange timeRange,
-                                                         QqUploadRequest qqUpload) {
+                                                        TimeDurationParser.TimeRange timeRange,
+                                                        QqUploadRequest qqUpload) {
         return createReplayTask(target, timeRange, qqUpload);
     }
 
@@ -564,12 +564,83 @@ public class APIHelper {
         }
     }
 
+    public static String getRandomScoreWeight(Long userId, JsonObject weights) {
+        try {
+            JsonObject body = new JsonObject();
+
+            body.add("weight_factor", weights);
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/scores/random/users/" + userId + "/weights"))
+                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                    .build();
+
+            HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            if (codeNotOk(response.statusCode())) {
+                throw parseHttpError(response.body(), response.statusCode(), "获取成绩权重失败");
+            }
+
+            RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
+            ensureApiSuccess(payload, "获取成绩权重失败");
+
+            return payload.getData().getAsString();
+        } catch (IOException e) {
+            throw requestFailure(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("成绩权重请求被中断", e);
+        }
+    }
+
+    public static RandomScore getRandomScoreFromUsers(List<Long> uids, JsonObject weights) {
+        try {
+            JsonObject body = new JsonObject();
+            final JsonArray uidsArray = new JsonArray();
+            for (Long uid : uids) {
+                uidsArray.add(uid);
+            }
+
+            body.add("uids", uidsArray);
+            body.add("weight_factor", weights);
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/scores/random/users"))
+                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                    .build();
+
+            HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            if (codeNotOk(response.statusCode())) {
+                throw parseHttpError(response.body(), response.statusCode(), "获取随机成绩失败");
+            }
+
+            RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
+            ensureApiSuccess(payload, "获取随机成绩失败");
+            JsonObject data = requireDataObject(payload, "随机成绩响应缺少data");
+            if (!data.has("user") || !data.get("user").isJsonObject()
+                    || !data.has("score") || !data.get("score").isJsonObject()) {
+                throw new RuntimeException("随机成绩响应缺少用户或成绩数据");
+            }
+
+            return new RandomScore(
+                    GSON.fromJson(data.getAsJsonObject("user"), UserExtended.class),
+                    GSON.fromJson(data.getAsJsonObject("score"), Score.class),
+                    data.get("best_index").getAsInt(),
+                    data.get("diff").getAsString()
+            );
+        } catch (IOException e) {
+            throw requestFailure(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("随机成绩请求被中断", e);
+        }
+    }
+
     public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] ids, String auth) {
         return createReplayShowcaseTask(target, ids, auth, null);
     }
 
     public static ReplayTaskInfo createBeatmapPreviewTask(ShortcutTarget target, String mods, String auth,
-                                                           QqUploadRequest qqUpload) {
+                                                          QqUploadRequest qqUpload) {
         long beatmapId = lookupBeatmap(target, auth);
         JsonObject body = new JsonObject();
         if (mods != null && !mods.isBlank()) {
@@ -587,22 +658,22 @@ public class APIHelper {
         return getReplayTaskInfo(request);
     }
 
-    public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] ids, String auth,
-                                                           QqUploadRequest qqUpload) {
-        ids = ids == null ? new String[0] : ids;
+    public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget beatmapTarget, String[] scoreTargets, String auth,
+                                                          QqUploadRequest qqUpload) {
+        scoreTargets = scoreTargets == null ? new String[0] : scoreTargets;
 
-        if (target.isLocalScore()) {
-            ids = Stream.concat(Stream.of("s" + target.localScoreId()), Arrays.stream(ids))
+        if (beatmapTarget.isLocalScore()) {
+            scoreTargets = Stream.concat(Stream.of("s" + beatmapTarget.localScoreId()), Arrays.stream(scoreTargets))
                     .distinct()
                     .toArray(String[]::new);
         }
-        if (ids.length == 0) {
+        if (scoreTargets.length == 0) {
             throw new RuntimeException("同屏回放需要至少一个ID。");
         }
 
-        final long beatmapId = lookupBeatmap(target, auth);
+        final long beatmapId = lookupBeatmap(beatmapTarget, auth);
 
-        JsonObject body = GSON.toJsonTree(Map.of("ids", ids)).getAsJsonObject();
+        JsonObject body = GSON.toJsonTree(Map.of("ids", scoreTargets)).getAsJsonObject();
         if (qqUpload != null) {
             body.add("qqUpload", GSON.toJsonTree(qqUpload));
         }
@@ -622,8 +693,8 @@ public class APIHelper {
     }
 
     private static ReplayTaskInfo createReplayTask(ShortcutTarget target,
-                                                    TimeDurationParser.TimeRange timeRange,
-                                                    QqUploadRequest qqUpload) {
+                                                   TimeDurationParser.TimeRange timeRange,
+                                                   QqUploadRequest qqUpload) {
         String scoreId = lookupScoreId(target);
 
         if (timeRange == null) {
@@ -1001,6 +1072,33 @@ public class APIHelper {
             return lookupUser(byUsername.getUsername()).getContent().getId();
         }
         throw new ResolutionException("无法识别指定的玩家");
+    }
+
+    public static long getUserRank(UserRef userRef) {
+        long uid = resolveUid(userRef);
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/users/" + uid + "/rank"))
+                    .header("Content-Type", "application/json")
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw parseHttpError(send.body(), send.statusCode(), "获取玩家Rank失败");
+            }
+
+            final RawResponse response = GSON.fromJson(send.body(), RawResponse.class);
+            ensureApiSuccess(response, "获取玩家Rank失败");
+            final JsonObject data = requireDataObject(response, "获取玩家Rank响应缺少用户数据");
+            return data.get("global_rank").getAsLong();
+        } catch (IOException e) {
+            throw requestFailure(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("获取玩家Rank请求被中断", e);
+        }
     }
 
     public static Response<User> lookupUser(String username) {
