@@ -171,6 +171,7 @@ public final class TaskCoordinator {
             BiFunction<Context, APIHelper.ReplayTaskInfo, PendingMessage> taskMessageCreator
     ) {
         runApiRequest(ctx, requestType, () -> {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "正在获取谱面以及回放文件，请稍作等待喵..."));
             APIHelper.ReplayTaskInfo taskInfo = creator.apply(createVideoUploadRequest(ctx));
             ctx.sendReply(taskMessageCreator.apply(ctx, taskInfo));
 

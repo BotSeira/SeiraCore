@@ -46,7 +46,7 @@ public final class ScoreCommandHandler {
         return new TbArguments(days, args.length > targetIndex ? args[targetIndex] : null);
     }
 
-    public void handleBo(Context ctx) {
+    public void handleBp(Context ctx) {
         if (ctx.args().length == 0) {
             ShortcutTarget target = resolver.parseTarget("bo1", ctx.senderUserId());
             if (target.isError()) {
