@@ -246,7 +246,7 @@ public final class RankGuessGameService {
             rankType = EndResult.RankType.NOT_ENOUGH_PARTICIPANT;
         }
 
-        if (game.round.standard()) {
+        if (!game.round.standard()) {
             rankType = EndResult.RankType.NOT_A_STANDARD_GAME;
         }
 
