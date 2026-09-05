@@ -150,11 +150,13 @@ public final class RankGuessCommandHandler {
         }
 
         if ("weight".equalsIgnoreCase(argument)) {
-            if (ctx.argumentCount() != 1) {
+            if (ctx.argumentCount() == 1) {
+                weight(ctx, false);
+            } else if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
+                weight(ctx, true);
+            } else {
                 ctx.sendReply(PendingMessage.ofString(USAGE));
-                return;
             }
-            weight(ctx);
             return;
         }
 
@@ -201,7 +203,7 @@ public final class RankGuessCommandHandler {
         ctx.sendReply(PendingMessage.ofString(reply).ref(games.getVideoMessageRef(ctx.groupId())));
     }
 
-    private void weight(Context ctx) {
+    private void weight(Context ctx, boolean all) {
         final Long boundUid = UserDataStore.findBoundUid(ctx.senderUserId());
         if (boundUid == null) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "由于未绑定，无法查看权重喵~"));
@@ -215,7 +217,7 @@ public final class RankGuessCommandHandler {
         reply.append(at(ctx)).append("目前你在本群权重为 `%.2f`\n".formatted(probability.weight()));
         reply.append("在本群 `%d` 名玩家中，你被选中的概率为 `%.3f%%`\n".formatted(totalPlayer, probability.chance() * 100));
 
-        final String randomScoreWeight = APIHelper.getRandomScoreWeight(boundUid, games.generateWeights(ctx.groupId()));
+        final String randomScoreWeight = APIHelper.getRandomScoreWeight(boundUid, games.generateWeights(ctx.groupId()), all);
 
         reply.append("你的成绩在本群权重：\n>").append(randomScoreWeight).append("\n");
 
