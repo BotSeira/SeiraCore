@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 public final class ScoreFilterArguments {
     private static final Pattern FILTER_PATTERN = Pattern.compile(
             "(?i)^(acc(?:uracy)?|combo|pp|time|length|len|star|stars|sr|bpm|miss|misses|score|mod|mods|rank|replay"
-                    + "|title|artist|mapper|genre|language|video|storyboard|fullcombo)"
+                    + "|title|artist|mapper|genre|language|video|storyboard|fullcombo|ar|od|cs|hp)"
                     + "(>=|<=|!=|!~|>|<|=|~)(.+)$"
     );
     private static final Pattern MISS_SHORTHAND_PATTERN = Pattern.compile("(?i)^(!?)(\\d+)miss(?:es)?$");
@@ -112,6 +112,10 @@ public final class ScoreFilterArguments {
             case "bpm" -> "bpm";
             case "miss", "misses" -> "miss";
             case "score" -> "score";
+            case "ar" -> "ar";
+            case "od" -> "od";
+            case "cs" -> "cs";
+            case "hp" -> "hp";
             case "mod", "mods" -> "mod";
             case "rank" -> "rank";
             case "title" -> "title";
