@@ -237,30 +237,56 @@ public final class ScoreCommandHandler {
     }
 
     public void handleS(Context ctx) {
-        ShortcutTarget target;
+        var ref = new Object() {
+            ShortcutTarget target;
+        };
+
         if (ctx.args().length == 0) {
-            target = targetHistory.get(ctx.senderUserId());
+            ref.target = targetHistory.get(ctx.senderUserId());
         } else if (ctx.args().length <= 2) {
             TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
 
-            if (ctx.args().length != targetResolution.consumedArgs()) {
+            UserRef overrideUser = null;
+
+            if (ctx.args().length == targetResolution.consumedArgs() + 1) {
+                UserRefResolution resolution = resolver.resolveUserRefArgument(ctx.args()[targetResolution.consumedArgs()]);
+                if (resolution.errorMessage() != null) {
+                    ctx.sendReply(PendingMessage.ofString(resolution.errorMessage()));
+                    return;
+                }
+                if (resolution.userRef() == null) {
+                    ctx.sendReply(PendingMessage.ofString(CommandUsage.S));
+                    return;
+                }
+                overrideUser = resolution.userRef();
+            } else if (ctx.args().length != targetResolution.consumedArgs()) {
                 ctx.sendReply(PendingMessage.ofString(CommandUsage.S));
                 return;
             }
 
-            target = targetResolution.target();
+            ref.target = targetResolution.target();
 
-            if (target.isError()) {
-                ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+            if (ref.target.isError()) {
+                ctx.sendReply(PendingMessage.ofString(ref.target.errorMessage()));
                 return;
             }
 
-            targetHistory.put(ctx.senderUserId(), target);
+            if (overrideUser != null) {
+                ref.target = new ShortcutTarget(
+                        ref.target.explicitId(),
+                        overrideUser,
+                        ref.target.macroType(),
+                        ref.target.macroIndex(),
+                        ref.target.errorMessage()
+                );
+            }
+
+            targetHistory.put(ctx.senderUserId(), ref.target);
         } else {
-            target = null;
+            ref.target = null;
         }
 
-        if (target == null) {
+        if (ref.target == null) {
             ctx.sendReply(PendingMessage.ofString(CommandUsage.S));
             return;
         }
@@ -268,7 +294,7 @@ public final class ScoreCommandHandler {
         taskCoordinator.runImageRequest(
                 ctx,
                 "Score",
-                () -> APIHelper.getScoreResponse(target),
+                () -> APIHelper.getScoreResponse(ref.target),
                 replyFactory::scoreMessage
         );
     }
