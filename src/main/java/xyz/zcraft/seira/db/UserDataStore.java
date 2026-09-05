@@ -722,6 +722,29 @@ public final class UserDataStore {
         }
     }
 
+    public static List<String> findAllBoundOpenIds() {
+        SqliteDatabase.ensureInitialized();
+
+        List<String> result = new LinkedList<>();
+
+        String sql = """
+                SELECT open_id FROM user_bindings ub
+                """;
+
+        try (Connection connection = SqliteDatabase.getConnection();
+             Statement statement = connection.createStatement();
+             ResultSet rs = statement.executeQuery(sql)) {
+            while (rs.next()) {
+                String openId = rs.getString("open_id");
+                result.add(openId);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to query bound open IDs", e);
+        }
+
+        return result;
+    }
+
     public static List<Long> findAllUsers() {
         SqliteDatabase.ensureInitialized();
 

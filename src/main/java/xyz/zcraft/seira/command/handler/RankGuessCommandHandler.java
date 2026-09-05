@@ -15,7 +15,9 @@ import xyz.zcraft.seira.data.SendResult;
 import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.db.RankGuessRecordStore;
 import xyz.zcraft.seira.db.UserDataStore;
-import xyz.zcraft.seira.rankguess.*;
+import xyz.zcraft.seira.rankguess.HintUtil;
+import xyz.zcraft.seira.rankguess.RankGuessGame;
+import xyz.zcraft.seira.rankguess.RankGuessGameService;
 import xyz.zcraft.seira.rankguess.data.*;
 
 import java.util.*;
@@ -51,7 +53,7 @@ public final class RankGuessCommandHandler {
     }
 
     private static Long parseRank(String argument) {
-        final Matcher matcher = RANK_PATTERN.matcher(argument.replace(",",""));
+        final Matcher matcher = RANK_PATTERN.matcher(argument.replace(",", ""));
         if (!matcher.matches()) {
             return null;
         }
@@ -95,9 +97,11 @@ public final class RankGuessCommandHandler {
         }
         if ("lb".equalsIgnoreCase(argument)) {
             if (ctx.argumentCount() == 1) {
-                leaderboard(ctx, false);
+                leaderboard(ctx, LeaderboardType.SELF);
             } else if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
-                leaderboard(ctx, true);
+                leaderboard(ctx, LeaderboardType.FULL);
+            } else if (ctx.argumentCount() == 2 && "global".equalsIgnoreCase(ctx.argument(1))) {
+                leaderboard(ctx, LeaderboardType.GLOBAL);
             } else {
                 ctx.sendReply(PendingMessage.ofString(USAGE));
             }
@@ -248,12 +252,17 @@ public final class RankGuessCommandHandler {
         }
     }
 
-    private void leaderboard(Context ctx, boolean all) {
+    private void leaderboard(Context ctx, LeaderboardType type) {
         try {
-            final List<String> allGroupMembers = UserDataStore.findAllGroupMembers(ctx.groupId());
+            StringBuilder reply = new StringBuilder();
+
+            final List<String> allOpenIds = type == LeaderboardType.GLOBAL ?
+                    UserDataStore.findAllBoundOpenIds()
+                    : UserDataStore.findAllGroupMembers(ctx.groupId());
+
             final Map<String, Rank> ranks = new HashMap<>();
 
-            for (String openId : allGroupMembers) {
+            for (String openId : allOpenIds) {
                 if (!RankGuessRecordStore.canBeRanked(openId, ctx.groupId())) {
                     continue;
                 }
@@ -279,17 +288,22 @@ public final class RankGuessCommandHandler {
                     .toList()
                     .reversed();
 
-            StringBuilder reply = new StringBuilder();
-
-            if (all) {
-                reply.append(at(ctx)).append("本群猜 Rank 战绩排行：\n");
+            if (type == LeaderboardType.FULL) {
+                reply.append(at(ctx)).append("本群").append("猜 Rank 战绩排行：\n");
                 for (int i = 0; i < groupRanks.size(); i++) {
                     final Map.Entry<String, Rank> aRank = groupRanks.get(i);
-                    reply.append("> __\\#").append(i + 1).append("__ ").append(at(aRank.getKey())).append(" (%.2f)".formatted(aRank.getValue().rating())).append("\n");
+                    final String name = Optional.ofNullable(aRank.getKey())
+                            .map(UserDataStore::findBoundUid)
+                            .flatMap(UserDataStore::findUsername)
+                            .orElse("未知");
+                    reply.append("> __\\#").append(i + 1).append("__ ").append(name).append(" (%.2f)".formatted(aRank.getValue().rating())).append("\n");
                 }
-            } else {
-                if (!RankGuessRecordStore.canBeRanked(ctx.senderUserId(), ctx.groupId()) || !ranks.containsKey(ctx.senderUserId())) {
-                    reply.append(at(ctx)).append("你还未在本群参加过猜 Rank，或参与次数不足喵~");
+            } else if (type == LeaderboardType.SELF || type == LeaderboardType.GLOBAL) {
+                if (!RankGuessRecordStore.canBeRanked(ctx.senderUserId(), type == LeaderboardType.GLOBAL ? null : ctx.groupId())
+                        || !ranks.containsKey(ctx.senderUserId())) {
+                    reply.append(at(ctx)).append("你还未在")
+                            .append(type == LeaderboardType.GLOBAL ? "全局" : "本群")
+                            .append("参加过猜 Rank，或参与次数不足喵~");
                 } else {
                     int placement = 0;
                     for (int i = 0; i < groupRanks.size(); i++) {
@@ -298,11 +312,20 @@ public final class RankGuessCommandHandler {
                             break;
                         }
                     }
-                    reply.append(at(ctx)).append("你在本群猜 Rank 战绩排行第 __").append(placement).append("__ 名！\n");
+
+                    reply.append(at(ctx)).append("你在")
+                            .append(type == LeaderboardType.GLOBAL ? "全局" : "本群")
+                            .append("猜 Rank 战绩排行第 __")
+                            .append(placement).append("__ 名！\n");
+
                     reply.append("以下是你附近的玩家：\n");
                     for (int i = Math.max(0, placement - 1 - 2); i < groupRanks.size() && i < placement - 1 + 3; i++) {
                         final Map.Entry<String, Rank> aRank = groupRanks.get(i);
-                        reply.append("> __\\#").append(i + 1).append("__ ").append(at(aRank.getKey()))
+                        final String name = Optional.ofNullable(aRank.getKey())
+                                .map(UserDataStore::findBoundUid)
+                                .flatMap(UserDataStore::findUsername)
+                                .orElse("未知");
+                        reply.append("> __\\#").append(i + 1).append("__ ").append(name)
                                 .append(" (%.2f) (%+.3f)".formatted(
                                         aRank.getValue().rating(),
                                         groupRanks.get(placement - 1).getValue().rating() - aRank.getValue().rating())
@@ -550,5 +573,9 @@ public final class RankGuessCommandHandler {
         if (!ctx.sendReply(message).success()) {
             ctx.sendMessage(message);
         }
+    }
+
+    private enum LeaderboardType {
+        SELF, FULL, GLOBAL
     }
 }
