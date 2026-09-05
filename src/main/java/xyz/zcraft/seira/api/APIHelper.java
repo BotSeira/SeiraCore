@@ -571,7 +571,7 @@ public class APIHelper {
             body.add("weight_factor", weights);
 
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/scores/random/users/" + userId + "/weights?all" + all))
+                    .uri(URI.create(ENDPOINT + "/scores/random/users/" + userId + "/weights?all=" + all))
                     .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                     .build();
 
