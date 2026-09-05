@@ -243,6 +243,26 @@ public final class ScoreCommandHandler {
 
         if (ctx.args().length == 0) {
             ref.target = targetHistory.get(ctx.senderUserId());
+        } else if (ctx.args().length == 1 && resolver.looksLikeMention(ctx.args()[0])) {
+            UserRefResolution resolution = resolver.resolveUserRefArgument(ctx.args()[0]);
+            if (resolution.errorMessage() != null) {
+                ctx.sendReply(PendingMessage.ofString(resolution.errorMessage()));
+                return;
+            }
+            if (resolution.userRef() == null) {
+                ctx.sendReply(PendingMessage.ofString(CommandUsage.S));
+                return;
+            }
+
+            UserRef user = resolution.userRef();
+
+            ref.target = new ShortcutTarget(
+                    ref.target.explicitId(),
+                    user,
+                    ref.target.macroType(),
+                    ref.target.macroIndex(),
+                    ref.target.errorMessage()
+            );
         } else if (ctx.args().length <= 2) {
             TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
 
