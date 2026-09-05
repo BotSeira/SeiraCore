@@ -15,10 +15,7 @@ import xyz.zcraft.seira.config.BindingConfig;
 import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.db.RankGuessRecordStore;
 import xyz.zcraft.seira.db.UserDataStore;
-import xyz.zcraft.seira.rankguess.data.FinishedRound;
-import xyz.zcraft.seira.rankguess.data.Rank;
-import xyz.zcraft.seira.rankguess.data.Round;
-import xyz.zcraft.seira.rankguess.data.Standing;
+import xyz.zcraft.seira.rankguess.data.*;
 import xyz.zcraft.seira.services.BindingService;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.services.DailyLuck;
@@ -76,7 +73,7 @@ public final class ReplyFactory {
         return new Buttons(configSupplier.get().seira().directUrl());
     }
 
-    public PendingMessage rankGuessResultMessage(Context ctx, FinishedRound result, boolean recorded) {
+    public PendingMessage rankGuessResultMessage(Context ctx, FinishedRound result, EndResult.RankType rankType) {
         Round round = result.round();
         String rank = String.format(Locale.US, "%,d", round.actualRank());
         String pp = round.pp() == null
@@ -89,11 +86,15 @@ public final class ReplyFactory {
 
         StringBuilder content = new StringBuilder("本轮猜测结束");
 
-        if (recorded) {
-            content.append("，战绩已记录~\n");
-        } else {
-            content.append("，由于参与人数过少，战绩不会记录~\n");
+        if (rankType == EndResult.RankType.RANKED) {
+            content.append("，战绩已记录");
+        } else if (rankType == EndResult.RankType.NOT_ENOUGH_PARTICIPANT) {
+            content.append("，由于参与人数过少，战绩不会记录");
+        } else if (rankType == EndResult.RankType.NOT_A_STANDARD_GAME) {
+            content.append("，由于无主动消息权限，非完整游戏，战绩不会记录");
         }
+
+        content.append("~\n");
 
         content.append("> 玩家：`%s` %s\n".formatted(round.randomScore().user().getUsername(), userAt))
                 .append("> 实际Rank：`#%s` (%s)\n".formatted(rank, cmd("/u " + round.userId(), String.valueOf(round.userId()))))

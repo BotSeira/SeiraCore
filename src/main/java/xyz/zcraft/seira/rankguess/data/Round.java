@@ -8,14 +8,14 @@ import xyz.zcraft.seira.rankguess.RankGuessGameService;
 
 import java.util.LinkedList;
 
-public record Round(long userId, long scoreId, int bestIndex, long actualRank, Double pp, RandomScore randomScore) {
+public record Round(long userId, long scoreId, int bestIndex, long actualRank, Double pp, RandomScore randomScore, boolean standard) {
     public Round {
         if (userId <= 0 || scoreId <= 0 || actualRank <= 0) {
             throw new IllegalArgumentException("Rank Guess 数据必须包含有效的用户、成绩和排名");
         }
     }
 
-    public static Round from(RandomScore randomScore) {
+    public static Round from(RandomScore randomScore, boolean standard) {
         if (randomScore == null || randomScore.user() == null || randomScore.score() == null) {
             throw new IllegalArgumentException("随机成绩响应缺少用户或成绩数据");
         }
@@ -37,7 +37,8 @@ public record Round(long userId, long scoreId, int bestIndex, long actualRank, D
                 randomScore.bestIndex(),
                 randomScore.user().getStatistics().getGlobalRank(),
                 randomScore.score().getPp(),
-                randomScore
+                randomScore,
+                standard
         );
     }
 

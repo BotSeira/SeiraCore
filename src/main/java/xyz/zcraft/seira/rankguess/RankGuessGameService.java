@@ -72,18 +72,6 @@ public final class RankGuessGameService {
         return weights.generateWeights(groupId);
     }
 
-    public String getRevealedHintsString(String groupId) {
-        final RankGuessGame rankGuessGame = games.get(groupId);
-        if (rankGuessGame == null) {
-            return null;
-        }
-        StringBuilder sb = new StringBuilder();
-        for (RankGuessGame.Hint revealedHint : rankGuessGame.getRevealedHints()) {
-            sb.append(revealedHint.content()).append("\n");
-        }
-        return sb.toString().trim();
-    }
-
     public synchronized Reservation reserve(String groupId, String starterUserId, boolean fromGroup) {
         if (games.containsKey(groupId)) {
             return null;
@@ -207,16 +195,16 @@ public final class RankGuessGameService {
     public synchronized EndResult end(String groupId, String senderUserId, boolean admin, boolean force) {
         RankGuessGame game = games.get(groupId);
         if (game == null) {
-            return new EndResult(EndResult.EndStatus.NO_GAME, null, false);
+            return new EndResult(EndResult.EndStatus.NO_GAME, null, null);
         }
         if (game.round == null) {
-            return new EndResult(EndResult.EndStatus.STARTING, null, false);
+            return new EndResult(EndResult.EndStatus.STARTING, null, null);
         }
         if (!force
                 && clock.instant().isBefore(game.guessingStartedAt.plus(END_PROTECTION_DURATION))
                 && !Objects.equals(game.starterUserId, senderUserId)
                 && !admin) {
-            return new EndResult(EndResult.EndStatus.FORBIDDEN, null, false);
+            return new EndResult(EndResult.EndStatus.FORBIDDEN, null, null);
         }
 
         List<Standing> standings = new ArrayList<>(game.guesses.size());
@@ -252,9 +240,17 @@ public final class RankGuessGameService {
                 SCORING_VERSION, game.round, standings
         );
 
-        final boolean shouldRecord = game.guesses.size() >= MIN_PARTICIPANT_TO_RECORD;
+        EndResult.RankType rankType = EndResult.RankType.RANKED;
 
-        if (shouldRecord) {
+        if (game.guesses.size() < MIN_PARTICIPANT_TO_RECORD) {
+            rankType = EndResult.RankType.NOT_ENOUGH_PARTICIPANT;
+        }
+
+        if (game.round.standard()) {
+            rankType = EndResult.RankType.NOT_A_STANDARD_GAME;
+        }
+
+        if (rankType == EndResult.RankType.RANKED) {
             recordWriter.accept(finished);
         }
 
@@ -265,7 +261,7 @@ public final class RankGuessGameService {
         return new EndResult(
                 EndResult.EndStatus.FINISHED,
                 finished,
-                shouldRecord
+                rankType
         );
     }
 

@@ -119,6 +119,7 @@ public final class RankGuessGame {
         }
 
         public enum HintStrength {
+            NONE(0.00),
             WEAK(0.01),
             MEDIUM(0.02),
             STRONG(0.03),

@@ -393,7 +393,7 @@ public final class RankGuessCommandHandler {
                         randomScore = APIHelper.getRandomScore();
                     }
 
-                    Round round = Round.from(randomScore);
+                    Round round = Round.from(randomScore, activeMessageEnabled);
 
                     String content = at(ctx);
 
@@ -461,7 +461,10 @@ public final class RankGuessCommandHandler {
                     } else {
                         result.append("\n").append("> 第一个提示将在 1 分钟后揭晓~");
                     }
-                    boolean startMessageSent = ctx.sendReply(PendingMessage.ofMarkdownRaw(result.toString().trim())).success();
+
+                    boolean startMessageSent = ctx.sendReply(
+                            PendingMessage.ofMarkdownRaw(result.toString().trim())
+                    ).success();
 
                     if (!activeMessageEnabled) {
                         if (startMessageSent) {
@@ -489,16 +492,30 @@ public final class RankGuessCommandHandler {
                             return;
                         }
 
-                        final var hint = hints.removeFirst();
+                        boolean hasExactGuess = game.getGuesses().values().stream()
+                                .anyMatch(guess ->
+                                        guess.rank() == game.getRound().actualRank()
+                                );
+
+                        if (hasExactGuess) {
+                            String hintContent = "__猜Rank提示：__\n"
+                                    + "- 似乎已经有人精准命中了 Rank！游戏将在 30 秒后结束喵~\n"
+                                    + hintString;
+
+                            ctx.sendMessage(PendingMessage.ofMarkdownRaw(hintContent.trim()));
+                            break;
+                        }
+
+                        final RankGuessGame.Hint hint = hints.removeFirst();
 
                         hintString.insert(0, "- " + hint.content() + "\n");
 
                         String hintContent = "__猜Rank提示：__\n" + hintString;
 
                         if (!hints.isEmpty()) {
-                            hintContent += "\n" + "> 下一个提示将在 30 秒后揭晓~";
+                            hintContent += "\n> 下一个提示将在 30 秒后揭晓~";
                         } else {
-                            hintContent += "\n" + "> 所有提示已经揭晓啦！游戏将在 1 分钟后自动结束~";
+                            hintContent += "\n> 所有提示已经揭晓啦！游戏将在 30 秒后自动结束~";
                         }
 
                         if (ctx.sendMessage(PendingMessage.ofMarkdownRaw(hintContent)).success()) {
@@ -507,7 +524,7 @@ public final class RankGuessCommandHandler {
                     }
 
                     try {
-                        Thread.sleep(60 * 1000);
+                        Thread.sleep(30 * 1000);
                     } catch (InterruptedException _) {
                         Thread.currentThread().interrupt();
                     }
@@ -541,16 +558,6 @@ public final class RankGuessCommandHandler {
         if (response.message() != null && !response.message().isBlank()) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(response.message()));
         }
-
-        if (result.status() != RankGuessGameService.GuessStatus.UPDATED
-                && result.status() != RankGuessGameService.GuessStatus.RECORDED) {
-            return;
-        }
-
-        if (rank == response.game().getRound().actualRank()) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw("看来已经有人知晓了答案喵！游戏将会自动结束~"));
-            end(ctx, true);
-        }
     }
 
     private void end(Context ctx, boolean force) {
@@ -570,7 +577,7 @@ public final class RankGuessCommandHandler {
             case FORBIDDEN -> PendingMessage.ofString(
                     "开始猜测后的3分钟内，仅发起者和机器人管理员可以结束游戏喵"
             );
-            case FINISHED -> replyFactory.rankGuessResultMessage(ctx, result.round(), result.recorded());
+            case FINISHED -> replyFactory.rankGuessResultMessage(ctx, result.round(), result.rankType());
         };
 
         if (!ctx.sendReply(message).success()) {
