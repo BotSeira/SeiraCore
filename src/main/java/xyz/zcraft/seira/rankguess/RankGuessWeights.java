@@ -21,7 +21,6 @@ public class RankGuessWeights {
     private static final Path WEIGHTS_FILE = Path.of("data", "rank-guess-weights.json");
 
     private static final int RECENT_USER_LIMIT = 8;
-    private static final double WISH_WEIGHT = 2.5;
     private static final double RECENT_USER_WEIGHT = 0.25;
     private static final double SCORE_REPEAT_FACTOR = 0.25;
 
@@ -31,6 +30,14 @@ public class RankGuessWeights {
 
     public RankGuessWeights() {
         this(WEIGHTS_FILE);
+    }
+
+    private double getWishWeight(String groupId) {
+        int playerCount = UserDataStore.findBoundUidsByGroup(groupId).size();
+
+        final double value = 2.5 + playerCount / 15.0;
+
+        return Math.clamp(value, 2.5, 10.0);
     }
 
     RankGuessWeights(Path store) {
@@ -193,9 +200,11 @@ public class RankGuessWeights {
         final Map<Long, Double> users = new HashMap<>();
         final Map<Long, Double> scores = new HashMap<>();
 
+        final double wishWeight = getWishWeight(groupId);
+
         synchronized (state) {
             for (Long wishedId : state.userWishes) {
-                users.put(wishedId, WISH_WEIGHT);
+                users.put(wishedId, wishWeight);
             }
 
             for (Long pickedId : state.userRecords) {
@@ -254,9 +263,11 @@ public class RankGuessWeights {
 
         double weight;
 
+        final double wishWeight = getWishWeight(groupId);
+
         synchronized (state) {
             for (Long wishedId : state.userWishes) {
-                users.put(wishedId, WISH_WEIGHT);
+                users.put(wishedId, wishWeight);
             }
 
             for (Long pickedId : state.userRecords) {
