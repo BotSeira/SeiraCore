@@ -262,20 +262,22 @@ public final class RankGuessCommandHandler {
 
             final Map<String, Rank> ranks = new HashMap<>();
 
+            final String effectiveGroupId = type == LeaderboardType.GLOBAL ? null : ctx.groupId();
+
             for (String openId : allOpenIds) {
-                if (!RankGuessRecordStore.canBeRanked(openId, ctx.groupId())) {
+                if (!RankGuessRecordStore.canBeRanked(openId, effectiveGroupId)) {
                     continue;
                 }
 
                 RankGuessRecordStore.Statistics.Personal statistics = RankGuessRecordStore.getPersonalStatistics(
                         openId,
-                        ctx.groupId(),
+                        effectiveGroupId,
                         null
                 );
 
                 RankGuessRecordStore.Statistics.Personal recentStatistics = RankGuessRecordStore.getRecentPersonalStatistics(
                         openId,
-                        ctx.groupId(),
+                        effectiveGroupId,
                         null,
                         Rank.RECENT_GAME_LIMIT
                 );
@@ -299,7 +301,7 @@ public final class RankGuessCommandHandler {
                     reply.append("> __\\#").append(i + 1).append("__ ").append(name).append(" (%.2f)".formatted(aRank.getValue().rating())).append("\n");
                 }
             } else if (type == LeaderboardType.SELF || type == LeaderboardType.GLOBAL) {
-                if (!RankGuessRecordStore.canBeRanked(ctx.senderUserId(), type == LeaderboardType.GLOBAL ? null : ctx.groupId())
+                if (!RankGuessRecordStore.canBeRanked(ctx.senderUserId(), effectiveGroupId)
                         || !ranks.containsKey(ctx.senderUserId())) {
                     reply.append(at(ctx)).append("你还未在")
                             .append(type == LeaderboardType.GLOBAL ? "全局" : "本群")
