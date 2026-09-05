@@ -295,7 +295,8 @@ public final class ScoreCommandHandler {
                 ctx,
                 "Score",
                 () -> APIHelper.getScoreResponse(ref.target),
-                replyFactory::scoreMessage
+                replyFactory::scoreMessage,
+                "> Tips: 若要查找指定谱面上的成绩，请使用 /s __m__`bid`"
         );
     }
 

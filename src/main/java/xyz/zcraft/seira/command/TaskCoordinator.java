@@ -85,6 +85,10 @@ public final class TaskCoordinator {
      */
     @SuppressWarnings("UnusedReturnValue")
     public boolean runApiRequest(Context ctx, String requestType, Runnable action) {
+        return runApiRequest(ctx, requestType, action, null);
+    }
+
+    public boolean runApiRequest(Context ctx, String requestType, Runnable action, String errorNote) {
         long estimatedSeconds = apiRequestStats.estimateAndEnqueue(requestType);
         ctx.sendQueueNotice(PendingMessage.ofMarkdownRaw(
                 at(ctx) + "请求已加入队列，预计等待时间" + estimatedSeconds + "秒。"
@@ -95,7 +99,7 @@ public final class TaskCoordinator {
             action.run();
             return true;
         } catch (Exception e) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + resolveErrorMessage(e)));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw((at(ctx) + resolveErrorMessage(e) + (errorNote == null ? "" : "\n" + errorNote)).trim()));
             String message = e.getMessage();
             if (e instanceof ApiRequestException apiException) {
                 message += " - " + apiException.getDefaultMessage();
@@ -145,9 +149,19 @@ public final class TaskCoordinator {
             Supplier<Response<Base64Bytes>> creator,
             BiFunction<Context, Response<?>, PendingMessage> postProcessor
     ) {
+        runImageRequest(ctx, requestType, creator, postProcessor, null);
+    }
+
+    public void runImageRequest(
+            Context ctx,
+            String requestType,
+            Supplier<Response<Base64Bytes>> creator,
+            BiFunction<Context, Response<?>, PendingMessage> postProcessor,
+            String errorNote
+    ) {
         runApiRequest(ctx, requestType, () ->
-                ctx.sendReply(waitForImage(ctx, creator, postProcessor))
-        );
+                        ctx.sendReply(waitForImage(ctx, creator, postProcessor))
+                , errorNote);
     }
 
     public void runReplayRequest(
