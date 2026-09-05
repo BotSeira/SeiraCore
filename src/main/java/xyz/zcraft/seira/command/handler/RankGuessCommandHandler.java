@@ -320,8 +320,9 @@ public final class RankGuessCommandHandler {
                             .append("猜 Rank 战绩排行第 __")
                             .append(placement).append("__ 名！\n");
 
+                    final int WINDOW = type == LeaderboardType.GLOBAL ? 5 : 3;
                     reply.append("以下是你附近的玩家：\n");
-                    for (int i = Math.max(0, placement - 1 - 2); i < groupRanks.size() && i < placement - 1 + 3; i++) {
+                    for (int i = Math.max(0, placement - 1 - WINDOW); i < groupRanks.size() && i < placement + WINDOW; i++) {
                         final Map.Entry<String, Rank> aRank = groupRanks.get(i);
                         final String name = Optional.ofNullable(aRank.getKey())
                                 .map(UserDataStore::findBoundUid)
