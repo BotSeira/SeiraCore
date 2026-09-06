@@ -210,9 +210,11 @@ public final class RankGuessGameService {
         List<Standing> standings = new ArrayList<>(game.guesses.size());
         for (Map.Entry<String, Guess> entry : game.guesses.entrySet()) {
             Guess guess = entry.getValue();
-            double error = logarithmicError(guess.rank(), game.round.actualRank());
 
-            final double pointsRaw = Math.max(0, 1000 * (1 - error));
+            double error = logarithmicError(guess.rank(), game.round.actualRank());
+            double accuracy = Math.max(0, 1 - error);
+
+            double pointsRaw = 1000 * Math.pow(accuracy, 1.2);
 
             double finalMultiplier = 1;
             for (ScoreMultiplier multiplier : guess.multipliers()) {

@@ -209,6 +209,9 @@ public final class RankGuessCommandHandler {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "由于未绑定，无法查看权重喵~"));
             return;
         }
+
+        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "正在计算你的权重喵~\n> Tip: 第一次计算可能耗时较长"));
+
         StringBuilder reply = new StringBuilder();
 
         final var probability = games.getProbabilityFor(ctx.groupId(), boundUid);
@@ -219,7 +222,7 @@ public final class RankGuessCommandHandler {
 
         final String randomScoreWeight = APIHelper.getRandomScoreWeight(boundUid, games.generateWeights(ctx.groupId()), all);
 
-        reply.append("你的成绩在本群权重：\n>").append(randomScoreWeight).append("\n");
+        reply.append("你的成绩当前抽选概率：\n>").append(randomScoreWeight).append("\n");
 
         ctx.sendReply(PendingMessage.ofMarkdownRaw(reply.toString().trim()));
     }

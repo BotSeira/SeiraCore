@@ -98,7 +98,12 @@ public final class ReplyFactory {
 
         content.append("> 玩家：`%s` %s\n".formatted(round.randomScore().user().getUsername(), userAt))
                 .append("> 实际Rank：`#%s` (%s)\n".formatted(rank, cmd("/u " + round.userId(), String.valueOf(round.userId()))))
-                .append("> 成绩PP：`%s` (%s)\n".formatted(pp, cmd("/s " + round.scoreId(), String.valueOf(round.scoreId()))))
+                .append("> 成绩：`%s` (%s|%s)\n"
+                        .formatted(
+                                pp,
+                                "BP" + round.randomScore().bestIndex(),
+                                cmd("/s " + round.scoreId(), String.valueOf(round.scoreId()))
+                        ))
                 .append("\n猜测排行榜：\n");
 
         if (result.standings().isEmpty()) {
