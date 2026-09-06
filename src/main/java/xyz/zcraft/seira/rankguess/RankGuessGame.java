@@ -55,7 +55,7 @@ public final class RankGuessGame {
 
     public double getMultiplierDelta(ScoreMultiplier multiplier) {
         if (multiplier instanceof ScoreMultiplier.FirstGuessMultiplier) {
-            return 0.01;
+            return 0.02;
         } else if (multiplier instanceof ScoreMultiplier.OrderMultiplier orderMultiplier) {
             return Math.max(-0.05, 0.00 - (orderMultiplier.getOrder() - 2) * 0.005);
         } else if (multiplier instanceof ScoreMultiplier.CopyPunishmentMultiplier) {
@@ -112,12 +112,12 @@ public final class RankGuessGame {
         }
 
         public enum HintStrength {
-            NONE(0.00),
+            NONE(0.000),
             WEAK(0.005),
-            MEDIUM(0.01),
-            STRONG(0.02),
-            VERY_STRONG(0.03),
-            REVEALING(0.04);
+            MEDIUM(0.015),
+            STRONG(0.020),
+            VERY_STRONG(0.030),
+            REVEALING(0.040);
 
             private final double penalty;
 
