@@ -8,7 +8,8 @@ import xyz.zcraft.seira.rankguess.RankGuessGameService;
 
 import java.util.LinkedList;
 
-public record Round(long userId, long scoreId, int bestIndex, long actualRank, Double pp, RandomScore randomScore, boolean standard) {
+public record Round(long userId, long scoreId, int bestIndex, long actualRank, Double pp, RandomScore randomScore,
+                    boolean standard) {
     public Round {
         if (userId <= 0 || scoreId <= 0 || actualRank <= 0) {
             throw new IllegalArgumentException("Rank Guess 数据必须包含有效的用户、成绩和排名");
@@ -96,6 +97,17 @@ public record Round(long userId, long scoreId, int bestIndex, long actualRank, D
                 RankGuessGame.Hint.HintStrength.WEAK
         ));
 
+        String ppRange = RankGuessGameService.getPPRange(
+                score.getPp()
+        );
+
+        hints.add(new RankGuessGame.Hint(
+                "本成绩的PP范围为 `%s`".formatted(ppRange),
+                "成绩PP范围",
+                RankGuessGame.Hint.HintCategory.TARGET_SCORE,
+                RankGuessGame.Hint.HintStrength.REVEALING
+        ));
+
 //            if (score.getEndedAt() != null) {
 //                hints.add(new RankGuessGame.Hint(
 //                        "本成绩完成于 `%s`".formatted(score.getEndedAt()),
@@ -133,19 +145,26 @@ public record Round(long userId, long scoreId, int bestIndex, long actualRank, D
                     RankGuessGame.Hint.HintStrength.WEAK
             ));
 
-//                hints.add(new RankGuessGame.Hint(
-//                        "本玩家的总命中数约为 `%,d`".formatted(stats.getTotalHits()),
-//                        "总命中数",
-//                        RankGuessGame.Hint.HintCategory.ACTIVITY,
-//                        RankGuessGame.Hint.HintStrength.WEAK
-//                ));
+            hints.add(new RankGuessGame.Hint(
+                    "本玩家的总命中数约为 `%,d`".formatted(stats.getTotalHits()),
+                    "总命中数",
+                    RankGuessGame.Hint.HintCategory.ACTIVITY,
+                    RankGuessGame.Hint.HintStrength.WEAK
+            ));
 
-//                hints.add(new RankGuessGame.Hint(
-//                        "本玩家的历史最大连击为 `%d`".formatted(stats.getMaximumCombo()),
-//                        "最大连击",
-//                        RankGuessGame.Hint.HintCategory.ACTIVITY,
-//                        RankGuessGame.Hint.HintStrength.WEAK
-//                ));
+            hints.add(new RankGuessGame.Hint(
+                    "本玩家的平均准确率为 `%.2f%%`".formatted(stats.getAccuracy() * 100),
+                    "总准确率",
+                    RankGuessGame.Hint.HintCategory.ACTIVITY,
+                    RankGuessGame.Hint.HintStrength.WEAK
+            ));
+
+            hints.add(new RankGuessGame.Hint(
+                    "本玩家的历史最大连击为 `%d`".formatted(stats.getMaximumCombo()),
+                    "最大连击",
+                    RankGuessGame.Hint.HintCategory.ACTIVITY,
+                    RankGuessGame.Hint.HintStrength.WEAK
+            ));
 
             hints.add(new RankGuessGame.Hint(
                     "本玩家当前等级约为 `%.1f`".formatted(stats.getLevel().getCurrent() + stats.getLevel().getProgress() / 100.0),

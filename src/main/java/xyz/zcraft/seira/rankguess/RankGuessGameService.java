@@ -47,21 +47,34 @@ public final class RankGuessGameService {
 
     @NotNull
     public static String getGlobalRankRange(long l) {
-        String range;
-
         if (l <= 10_000) {
-            range = "#1 - #10k";
+            return "#1 - #10k";
         } else if (l <= 50_000) {
-            range = "#10k - #50k";
+            return "#10k - #50k";
         } else if (l <= 200_000) {
-            range = "#50k - #200k";
+            return "#50k - #200k";
         } else if (l <= 500_000) {
-            range = "#200k - #500k";
+            return "#200k - #500k";
         } else {
-            range = ">#500k";
+            return ">#500k";
         }
+    }
 
-        return range;
+    @NotNull
+    public static String getPPRange(double pp) {
+        if (pp <= 80) {
+            return "<80pp";
+        } else if (pp <= 150) {
+            return "80pp - 150pp";
+        } else if (pp <= 250) {
+            return "150pp - 250pp";
+        } else if (pp <= 350) {
+            return "250pp - 350pp";
+        } else if (pp <= 500) {
+            return "350pp - 500pp";
+        } else {
+            return ">500pp";
+        }
     }
 
     public void saveWeights() {
@@ -214,7 +227,7 @@ public final class RankGuessGameService {
             double error = logarithmicError(guess.rank(), game.round.actualRank());
             double accuracy = Math.max(0, 1 - error);
 
-            double pointsRaw = 1000 * Math.pow(accuracy, 1.2);
+            double pointsRaw = 1000 * Math.pow(accuracy, 1.25);
 
             double finalMultiplier = 1;
             for (ScoreMultiplier multiplier : guess.multipliers()) {
