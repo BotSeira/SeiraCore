@@ -227,7 +227,7 @@ public final class RankGuessGameService {
             double error = logarithmicError(guess.rank(), game.round.actualRank());
             double accuracy = Math.max(0, 1 - error);
 
-            double pointsRaw = 1000 * Math.pow(accuracy, 1.15);
+            double pointsRaw = 1000 * Math.pow(accuracy, 1.10);
 
             double finalMultiplier = 1;
             for (ScoreMultiplier multiplier : guess.multipliers()) {
