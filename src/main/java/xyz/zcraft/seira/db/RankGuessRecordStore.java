@@ -163,7 +163,7 @@ public class RankGuessRecordStore {
 
     private static Statistics.Personal getPersonalStatistics(
             String userId, String groupId, Integer scoringVersion, Integer gameLimit,
-             Integer minParticipants
+            Integer minParticipants
     ) {
         requireText(userId, "userId");
         if (groupId != null) requireText(groupId, "groupId");
@@ -191,10 +191,9 @@ public class RankGuessRecordStore {
         sql += ") recent";
         try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setInt(1, TOP_TWENTY_MIN_PARTICIPANTS);
-            statement.setInt(2, TOP_TWENTY_MIN_PARTICIPANTS);
-            statement.setString(3, userId);
-            int index = 4;
+            statement.setString(1, userId);
+            int index = 2;
+            if (minParticipants != null) statement.setInt(index++, minParticipants);
             if (groupId != null) statement.setString(index++, groupId);
             if (scoringVersion != null) statement.setInt(index++, scoringVersion);
             if (gameLimit != null) statement.setInt(index, gameLimit);
