@@ -145,21 +145,25 @@ public class RankGuessRecordStore {
         }
     }
 
-    public static Statistics.Personal getPersonalStatistics(String userId, String groupId, Integer scoringVersion) {
-        return getPersonalStatistics(userId, groupId, scoringVersion, null);
+    public static Statistics.Personal getPersonalStatistics(String userId, String groupId, Integer scoringVersion, Integer minParticipants) {
+        return getPersonalStatistics(userId, groupId, scoringVersion, null, minParticipants);
     }
 
     public static Statistics.Personal getRecentPersonalStatistics(
-            String userId, String groupId, Integer scoringVersion, int gameLimit
+            String userId, String groupId, Integer scoringVersion, int gameLimit, Integer minParticipants
     ) {
         if (gameLimit < 1) {
             throw new IllegalArgumentException("gameLimit must be positive");
         }
-        return getPersonalStatistics(userId, groupId, scoringVersion, gameLimit);
+        if (minParticipants != null && minParticipants < 1) {
+            throw new IllegalArgumentException("minParticipants must be positive");
+        }
+        return getPersonalStatistics(userId, groupId, scoringVersion, gameLimit, minParticipants);
     }
 
     private static Statistics.Personal getPersonalStatistics(
-            String userId, String groupId, Integer scoringVersion, Integer gameLimit
+            String userId, String groupId, Integer scoringVersion, Integer gameLimit,
+             Integer minParticipants
     ) {
         requireText(userId, "userId");
         if (groupId != null) requireText(groupId, "groupId");
@@ -169,9 +173,7 @@ public class RankGuessRecordStore {
         String sql = """
                 SELECT COUNT(*) AS participation,
                        COALESCE(SUM(CASE WHEN recent.placement = 1 THEN 1 ELSE 0 END), 0) AS wins,
-                       COALESCE(SUM(CASE WHEN recent.participant_count >= ?
-                           AND recent.placement <= (recent.participant_count + 4) / 5 THEN 1 ELSE 0 END), 0) AS top_twenty,
-                       COALESCE(SUM(CASE WHEN recent.participant_count >= ? THEN 1 ELSE 0 END), 0) AS top_twenty_eligible,
+                       COALESCE(SUM(CASE WHEN recent.placement <= (recent.participant_count + 4) / 5 THEN 1 ELSE 0 END), 0) AS top_twenty,
                        COALESCE(SUM(recent.final_score), 0) AS total_score,
                        COALESCE(AVG(recent.final_score), 0) AS average_score,
                        COALESCE(MAX(recent.final_score), 0) AS highest_score,
@@ -182,6 +184,7 @@ public class RankGuessRecordStore {
                     JOIN rank_guess_games g ON g.round_id = r.round_id
                     WHERE r.user_id = ?
                 """;
+        if (minParticipants != null) sql += " AND g.participant_count >= ?";
         if (groupId != null) sql += " AND g.group_id = ?";
         if (scoringVersion != null) sql += " AND g.scoring_version = ?";
         if (gameLimit != null) sql += " ORDER BY g.ended_at DESC, g.round_id DESC LIMIT ?";
@@ -199,7 +202,7 @@ public class RankGuessRecordStore {
                 result.next();
                 return new Statistics.Personal(
                         result.getLong("participation"), result.getLong("wins"),
-                        result.getLong("top_twenty"), result.getLong("top_twenty_eligible"),
+                        result.getLong("top_twenty"),
                         result.getDouble("total_score"), result.getDouble("average_score"),
                         result.getDouble("highest_score"), result.getDouble("average_placement")
                 );
@@ -284,7 +287,7 @@ public class RankGuessRecordStore {
 
     public static class Statistics {
         public record Personal(
-                long participation, long wins, long topTwentyCount, long topTwentyEligibleParticipation,
+                long participation, long wins, long topTwentyCount,
                 double totalScore, double averageScore, double highestScore, double averagePlacement
         ) {
             public double winRate() {
@@ -292,8 +295,8 @@ public class RankGuessRecordStore {
             }
 
             public double topTwentyRate() {
-                return topTwentyEligibleParticipation == 0 ? 0
-                        : topTwentyCount / (double) topTwentyEligibleParticipation;
+                return participation == 0 ? 0
+                        : topTwentyCount / (double) participation;
             }
         }
     }

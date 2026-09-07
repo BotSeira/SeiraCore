@@ -4,6 +4,7 @@ import xyz.zcraft.seira.db.RankGuessRecordStore;
 
 public record Rank(double rating, double ratingRaw, String rank) {
     public static final int RECENT_GAME_LIMIT = 10;
+    public static final int STATS_MIN_PARTICIPANTS = 3;
 
     public static Rank from(RankGuessRecordStore.Statistics.Personal recent,
                             RankGuessRecordStore.Statistics.Personal all) {

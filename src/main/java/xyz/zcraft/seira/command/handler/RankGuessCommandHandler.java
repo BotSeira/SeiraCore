@@ -166,7 +166,8 @@ public final class RankGuessCommandHandler {
             final UserRefResolution userRefResolution = resolver.resolveUserRefArgument(argument);
 
             if (userRefResolution.errorMessage() != null) {
-                ctx.sendReply(userRefResolution.errorMessage());
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + userRefResolution.errorMessage()));
+                return;
             }
 
             final UserRef userRef = userRefResolution.userRef();
@@ -233,14 +234,16 @@ public final class RankGuessCommandHandler {
             RankGuessRecordStore.Statistics.Personal statistics = RankGuessRecordStore.getPersonalStatistics(
                     ctx.senderUserId(),
                     allGroups ? null : ctx.groupId(),
-                    null
+                    null,
+                    Rank.STATS_MIN_PARTICIPANTS
             );
 
             RankGuessRecordStore.Statistics.Personal recentStatistics = RankGuessRecordStore.getRecentPersonalStatistics(
                     ctx.senderUserId(),
                     allGroups ? null : ctx.groupId(),
                     null,
-                    Rank.RECENT_GAME_LIMIT
+                    Rank.RECENT_GAME_LIMIT,
+                    Rank.STATS_MIN_PARTICIPANTS
             );
 
             final Rank rank = Rank.from(recentStatistics, statistics);
@@ -277,14 +280,16 @@ public final class RankGuessCommandHandler {
                 RankGuessRecordStore.Statistics.Personal statistics = RankGuessRecordStore.getPersonalStatistics(
                         openId,
                         effectiveGroupId,
-                        null
+                        null,
+                        Rank.STATS_MIN_PARTICIPANTS
                 );
 
                 RankGuessRecordStore.Statistics.Personal recentStatistics = RankGuessRecordStore.getRecentPersonalStatistics(
                         openId,
                         effectiveGroupId,
                         null,
-                        Rank.RECENT_GAME_LIMIT
+                        Rank.RECENT_GAME_LIMIT,
+                        Rank.STATS_MIN_PARTICIPANTS
                 );
 
                 ranks.put(openId, Rank.from(recentStatistics, statistics));

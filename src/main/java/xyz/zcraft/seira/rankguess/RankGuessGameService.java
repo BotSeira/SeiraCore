@@ -265,12 +265,10 @@ public final class RankGuessGameService {
             rankType = EndResult.RankType.NOT_A_STANDARD_GAME;
         }
 
-        if (rankType == EndResult.RankType.RANKED) {
-            recordWriter.accept(finished);
-        }
-
         games.remove(groupId);
         game.markEnded();
+
+        recordWriter.accept(finished);
         weights.recordRound(groupId, game.round.userId(), game.round.scoreId());
 
         return new EndResult(
