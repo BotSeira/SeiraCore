@@ -21,8 +21,8 @@ public class RankGuessWeights {
     private static final Path WEIGHTS_FILE = Path.of("data", "rank-guess-weights.json");
 
     private static final int RECENT_USER_LIMIT = 8;
-    private static final double RECENT_USER_WEIGHT = 0.25;
-    private static final double SCORE_REPEAT_FACTOR = 0.25;
+    private static final double RECENT_USER_WEIGHT = 0.10;
+    private static final double SCORE_REPEAT_FACTOR = 0.10;
 
     private final Map<String, GroupState> groups = new ConcurrentHashMap<>();
     private final Path store;
@@ -206,7 +206,7 @@ public class RankGuessWeights {
             }
 
             for (Long wishedId : state.scoreWishes) {
-                scores.put(wishedId, 10.0);
+                scores.put(wishedId, 7.50);
             }
 
             state.scoreRecords.forEach((scoreId, count) ->
