@@ -282,6 +282,10 @@ public final class RankGuessGameService {
         return weights.tryWish(groupId, boundUid);
     }
 
+    public WishResult wishScore(String groupId, Long scoreId) {
+        return weights.tryWishScore(groupId, scoreId);
+    }
+
     public void stopAll() {
         Map.copyOf(games).forEach((s, g) -> {
             if (g.isEnded()) return;

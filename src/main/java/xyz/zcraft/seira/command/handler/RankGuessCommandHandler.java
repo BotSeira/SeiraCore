@@ -9,6 +9,7 @@ import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
+import xyz.zcraft.seira.command.parse.ShortcutTarget;
 import xyz.zcraft.seira.command.parse.UserRefResolution;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.data.SendResult;
@@ -37,6 +38,7 @@ public final class RankGuessCommandHandler {
     private final RankGuessGameService games;
     private final Resolver resolver;
     private final Predicate<String> adminAuthorizer;
+    private final Pattern BP_PATTERN = Pattern.compile("^bp(\\d+)$");
 
     public RankGuessCommandHandler(
             TaskCoordinator taskCoordinator,
@@ -85,79 +87,89 @@ public final class RankGuessCommandHandler {
         }
 
         String argument = ctx.argument(0);
-        if ("stats".equalsIgnoreCase(argument)) {
-            if (ctx.argumentCount() == 1) {
-                statistics(ctx, false);
-            } else if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
-                statistics(ctx, true);
-            } else {
-                ctx.sendReply(PendingMessage.ofString(USAGE));
+
+        switch (argument.toLowerCase()) {
+            case "stats" -> {
+                if (ctx.argumentCount() == 1) {
+                    statistics(ctx, false);
+                } else if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
+                    statistics(ctx, true);
+                } else {
+                    ctx.sendReply(PendingMessage.ofString(USAGE));
+                }
+                return;
             }
-            return;
-        }
-        if ("lb".equalsIgnoreCase(argument)) {
-            if (ctx.argumentCount() == 1) {
-                leaderboard(ctx, LeaderboardType.SELF);
-            } else if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
-                leaderboard(ctx, LeaderboardType.FULL);
-            } else if (ctx.argumentCount() == 2 && "global".equalsIgnoreCase(ctx.argument(1))) {
-                leaderboard(ctx, LeaderboardType.GLOBAL);
-            } else {
-                ctx.sendReply(PendingMessage.ofString(USAGE));
+            case "lb" -> {
+                if (ctx.argumentCount() == 1) {
+                    leaderboard(ctx, LeaderboardType.SELF);
+                } else if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
+                    leaderboard(ctx, LeaderboardType.FULL);
+                } else if (ctx.argumentCount() == 2 && "global".equalsIgnoreCase(ctx.argument(1))) {
+                    leaderboard(ctx, LeaderboardType.GLOBAL);
+                } else {
+                    ctx.sendReply(PendingMessage.ofString(USAGE));
+                }
+                return;
             }
-            return;
-        }
-        if ("start".equalsIgnoreCase(argument)) {
-            if (ctx.argumentCount() == 2) {
-                final String arg = ctx.argument(1);
-                if ("group".equalsIgnoreCase(arg) || "g".equalsIgnoreCase(arg)) {
-                    start(ctx, true);
+            case "start" -> {
+                if (ctx.argumentCount() == 2) {
+                    final String arg = ctx.argument(1);
+                    if ("group".equalsIgnoreCase(arg) || "g".equalsIgnoreCase(arg)) {
+                        start(ctx, true);
+                        return;
+                    }
+                } else if (ctx.argumentCount() == 1) {
+                    start(ctx, false);
                     return;
                 }
-            } else if (ctx.argumentCount() == 1) {
-                start(ctx, false);
-                return;
-            }
 
-            ctx.sendReply(PendingMessage.ofString(USAGE));
-            return;
-        }
-        if ("group".equalsIgnoreCase(argument)) {
-            if (ctx.argumentCount() != 1) {
                 ctx.sendReply(PendingMessage.ofString(USAGE));
                 return;
             }
+            case "group" -> {
+                if (ctx.argumentCount() != 1) {
+                    ctx.sendReply(PendingMessage.ofString(USAGE));
+                    return;
+                }
 
-            start(ctx, true);
-            return;
-        }
-        if ("end".equalsIgnoreCase(argument)) {
-            if (ctx.argumentCount() != 1) {
-                ctx.sendReply(PendingMessage.ofString(USAGE));
+                start(ctx, true);
                 return;
             }
-            end(ctx, false);
-            return;
-        }
-
-        if ("wish".equalsIgnoreCase(argument)) {
-            if (ctx.argumentCount() != 1) {
-                ctx.sendReply(PendingMessage.ofString(USAGE));
+            case "end" -> {
+                if (ctx.argumentCount() != 1) {
+                    ctx.sendReply(PendingMessage.ofString(USAGE));
+                    return;
+                }
+                end(ctx, false);
                 return;
             }
-            wish(ctx);
-            return;
-        }
-
-        if ("weight".equalsIgnoreCase(argument)) {
-            if (ctx.argumentCount() == 1) {
-                weight(ctx, false);
-            } else if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
-                weight(ctx, true);
-            } else {
-                ctx.sendReply(PendingMessage.ofString(USAGE));
+            case "wish" -> {
+                if (ctx.argumentCount() == 1) {
+                    wish(ctx);
+                } else if (ctx.argumentCount() == 2) {
+                    final Matcher matcher = BP_PATTERN.matcher(ctx.argument(1).toLowerCase());
+                    if (matcher.matches()) {
+                        final int i = Integer.parseInt(matcher.group(1));
+                        if (i <= 0 || i > 200) {
+                            ctx.sendReply(PendingMessage.ofString(USAGE));
+                        }
+                        wishScore(ctx, i);
+                    }
+                } else {
+                    ctx.sendReply(PendingMessage.ofString(USAGE));
+                }
+                return;
             }
-            return;
+            case "weight" -> {
+                if (ctx.argumentCount() == 1) {
+                    weight(ctx, false);
+                } else if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
+                    weight(ctx, true);
+                } else {
+                    ctx.sendReply(PendingMessage.ofString(USAGE));
+                }
+                return;
+            }
         }
 
         Long rank;
@@ -342,7 +354,7 @@ public final class RankGuessCommandHandler {
                                 .map(UserDataStore::findBoundUid)
                                 .flatMap(UserDataStore::findUsername)
                                 .orElse("未知");
-                        reply.append("> __\\#").append(i + 1).append("__ ").append(name)
+                        reply.append("> __\\#").append(i + 1).append("__: ").append(name)
                                 .append(" (%.2f) (%+.3f)".formatted(
                                         aRank.getValue().rating(),
                                         groupRanks.get(placement - 1).getValue().rating() - aRank.getValue().rating())
@@ -367,6 +379,41 @@ public final class RankGuessCommandHandler {
         }
 
         final RankGuessGameService.WishResult wish = games.wish(ctx.groupId(), boundUid);
+
+        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + switch (wish) {
+            case SUCCESS -> "小星听到你的愿望啦！";
+            case ALREADY_WISHED -> "已经许过愿了喵~";
+            case RECENTLY_PICKED -> "最近已经被抽到过了喵~";
+            case null -> "发生了一些不好的事情...";
+        }));
+    }
+
+    private void wishScore(Context ctx, int index) {
+        final Long boundUid = UserDataStore.findBoundUid(ctx.senderUserId());
+
+        if (boundUid == null) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "由于未绑定，无法进行许愿喵~"));
+            return;
+        }
+
+        Long scoreId = null;
+
+        try {
+            scoreId = Long.parseLong(
+                    APIHelper.lookupScoreId(new ShortcutTarget(
+                            null, new UserRef.ByUid(boundUid), "bp", (long) index, null)
+                    )
+            );
+        } catch (Exception e) {
+            LOG.error("Failed to lookup score id", e);
+        }
+
+        if (scoreId == null) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "获取成绩失败，请稍后再试喵~"));
+            return;
+        }
+
+        final RankGuessGameService.WishResult wish = games.wishScore(ctx.groupId(), scoreId);
 
         ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + switch (wish) {
             case SUCCESS -> "小星听到你的愿望啦！";

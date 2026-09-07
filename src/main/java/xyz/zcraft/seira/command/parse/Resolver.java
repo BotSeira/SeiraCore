@@ -10,7 +10,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class Resolver {
-    private static final ArrayList<String> USER_MACRO_TYPES = new ArrayList<>(List.of("rs", "bo", "rp"));
+    private static final ArrayList<String> USER_MACRO_TYPES = new ArrayList<>(List.of("rs", "bp", "rp"));
 
     public String sanitize(String rawContent) {
         Matcher matcher = Patterns.USER_MACRO_PATTERN.matcher(rawContent);
@@ -180,10 +180,6 @@ public final class Resolver {
         Matcher userMatcher = Patterns.USER_MACRO_PATTERN.matcher(arg.trim());
         if (userMatcher.matches()) {
             String type = userMatcher.group(1).toLowerCase();
-
-            if (Objects.equals("bp", type)) {
-                type = "bo";
-            }
 
             if (!USER_MACRO_TYPES.contains(type)) {
                 return new ShortcutTarget(null, null, null, null, "未知的快捷查询");

@@ -171,11 +171,11 @@ public final class ReplyFactory {
                 statistics.totalScore(), groupCountText, rankText).strip());
     }
 
-    public PendingMessage boMessage(Context ctx, Response<?> response) {
+    public PendingMessage bpMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "查询完成，共" + response.getScoreIds().size() + "个成绩\n" +
                         "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()),
-                buttons().boButtons(response.getUserId())
+                buttons().bpButtons(response.getUserId())
         );
     }
 
@@ -201,7 +201,7 @@ public final class ReplyFactory {
                 at(ctx) + "今日BP查询完成\n" +
                         "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()) + "\n" +
                         "> 数量: " + response.getScoreIds().size(),
-                buttons().boButtons(response.getUserId())
+                buttons().bpButtons(response.getUserId())
         );
     }
 
@@ -784,7 +784,7 @@ public final class ReplyFactory {
             return rows;
         }
 
-        List<List<Button>> boButtons(String userId) {
+        List<List<Button>> bpButtons(String userId) {
             return Button.keyboard(
                     Button.row(
                             Button.command(1, "查询最好成绩", "/s bo1"),

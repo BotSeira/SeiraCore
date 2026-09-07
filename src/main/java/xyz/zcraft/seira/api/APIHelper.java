@@ -298,7 +298,7 @@ public class APIHelper {
         String query = "/beatmaps/lookup?";
         if (target.isMacro()) {
             switch (target.macroType().toLowerCase()) {
-                case "rs", "bo", "rp" -> {
+                case "rs", "bp", "rp" -> {
                     query += "&of=" + target.macroType() + "&u=" + resolveUid(target.userRef());
                     query += "&i=" + target.macroIndex();
                 }
@@ -379,7 +379,7 @@ public class APIHelper {
 
         return switch (target.macroType().toLowerCase()) {
             case "m" -> query + "?m=" + target.explicitId();
-            case "rs", "bo", "rp" ->
+            case "rs", "bp", "rp" ->
                     query + "?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + resolveUid(target.userRef());
             case "mp" -> query + "?of=mp";
             case null, default -> throw new ResolutionException("快捷查询格式错误。");
@@ -434,7 +434,7 @@ public class APIHelper {
 
     private static String getScoreQuery(ShortcutTarget target) {
         return switch (target.macroType().toLowerCase()) {
-            case "rs", "bo", "rp" ->
+            case "rs", "bp", "rp" ->
                     "/scores/lookup?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + resolveUid(target.userRef());
             case "m" -> "/scores/lookup?m=" + target.explicitId() + "&u=" + resolveUid(target.userRef());
             case "ms" ->
@@ -740,7 +740,7 @@ public class APIHelper {
         }
     }
 
-    private static String lookupScoreId(ShortcutTarget target) {
+    public static String lookupScoreId(ShortcutTarget target) {
         return lookupScoreId(target, List.of());
     }
 

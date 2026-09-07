@@ -45,14 +45,6 @@ public class RankGuessWeights {
         loadFromFile();
     }
 
-    private static void recordUser(GroupState state, long userId) {
-        state.userRecords.add(userId);
-        if (state.userRecords.size() > RECENT_USER_LIMIT) {
-            state.userRecords.removeFirst();
-        }
-        state.userWishes.remove(userId);
-    }
-
     private void loadFromFile() {
         if (!Files.exists(store)) {
             return;
@@ -92,6 +84,13 @@ public class RankGuessWeights {
                         }
                     }
                 }
+                if (snapshot.scoreWishes() != null) {
+                    for (Long scoreId : snapshot.scoreWishes()) {
+                        if (scoreId != null && scoreId > 0) {
+                            state.scoreWishes.add(scoreId);
+                        }
+                    }
+                }
                 restored.put(entry.getKey(), state);
             }
             groups.putAll(restored);
@@ -108,7 +107,7 @@ public class RankGuessWeights {
                 synchronized (state) {
                     snapshot.put(groupId, new GroupSnapshot(
                             new TreeMap<>(state.scoreRecords), List.copyOf(state.userRecords),
-                            new TreeSet<>(state.userWishes)));
+                            new TreeSet<>(state.userWishes), new TreeSet<>(state.scoreWishes)));
                 }
             });
             JsonObject data = new JsonObject();
@@ -141,39 +140,20 @@ public class RankGuessWeights {
         return groups.computeIfAbsent(groupId, _ -> new GroupState());
     }
 
-    public void recordScore(String groupId, long scoreId) {
-        final GroupState state = getGroup(groupId);
-
-        synchronized (state) {
-            state.scoreRecords.merge(scoreId, 1, Integer::sum);
-        }
-        saveToFile();
-    }
-
-    public void recordUser(String groupId, long userId) {
-        final GroupState state = getGroup(groupId);
-
-        synchronized (state) {
-            recordUser(state, userId);
-        }
-        saveToFile();
-    }
-
     public void recordRound(String groupId, long userId, long scoreId) {
         final GroupState state = getGroup(groupId);
         synchronized (state) {
             state.scoreRecords.merge(scoreId, 1, Integer::sum);
-            recordUser(state, userId);
+
+            state.userRecords.add(userId);
+            if (state.userRecords.size() > RECENT_USER_LIMIT) {
+                state.userRecords.removeFirst();
+            }
+            state.userWishes.remove(userId);
+
+            state.scoreWishes.remove(scoreId);
         }
         saveToFile();
-    }
-
-    public boolean recentPicked(String groupId, long userId) {
-        final GroupState state = getGroup(groupId);
-
-        synchronized (state) {
-            return state.userRecords.contains(userId);
-        }
     }
 
     public RankGuessGameService.WishResult tryWish(String groupId, long userId) {
@@ -189,6 +169,20 @@ public class RankGuessWeights {
             }
 
             state.userWishes.add(userId);
+        }
+        saveToFile();
+        return RankGuessGameService.WishResult.SUCCESS;
+    }
+
+    public RankGuessGameService.WishResult tryWishScore(String groupId, long scoreId) {
+        final GroupState state = getGroup(groupId);
+
+        synchronized (state) {
+            if (state.scoreWishes.contains(scoreId)) {
+                return RankGuessGameService.WishResult.ALREADY_WISHED;
+            }
+
+            state.scoreWishes.add(scoreId);
         }
         saveToFile();
         return RankGuessGameService.WishResult.SUCCESS;
@@ -211,6 +205,10 @@ public class RankGuessWeights {
                 users.put(pickedId, RECENT_USER_WEIGHT);
             }
 
+            for (Long wishedId : state.scoreWishes) {
+                scores.put(wishedId, 10.0);
+            }
+
             state.scoreRecords.forEach((scoreId, count) ->
                     scores.put(
                             scoreId,
@@ -225,30 +223,6 @@ public class RankGuessWeights {
         weights.add("scores", GSON.toJsonTree(scores));
 
         return weights;
-    }
-
-    public List<Long> getGroupWishes(String groupId) {
-        final GroupState state = getGroup(groupId);
-
-        synchronized (state) {
-            return List.copyOf(state.userWishes);
-        }
-    }
-
-    public List<Long> getGroupUserRecords(String groupId) {
-        final GroupState state = getGroup(groupId);
-
-        synchronized (state) {
-            return List.copyOf(state.userRecords);
-        }
-    }
-
-    public Map<Long, Integer> getGroupScoreRecords(String groupId) {
-        final GroupState state = getGroup(groupId);
-
-        synchronized (state) {
-            return Map.copyOf(state.scoreRecords);
-        }
     }
 
     public record Probability(
@@ -294,8 +268,12 @@ public class RankGuessWeights {
         private final Map<Long, Integer> scoreRecords = new HashMap<>();
         private final LinkedList<Long> userRecords = new LinkedList<>();
         private final Set<Long> userWishes = new HashSet<>();
+        private final Set<Long> scoreWishes = new HashSet<>();
     }
 
-    private record GroupSnapshot(Map<Long, Integer> scoreRecords, List<Long> userRecords, Set<Long> userWishes) {
+    private record GroupSnapshot(Map<Long, Integer> scoreRecords,
+                                 List<Long> userRecords,
+                                 Set<Long> userWishes,
+                                 Set<Long> scoreWishes) {
     }
 }

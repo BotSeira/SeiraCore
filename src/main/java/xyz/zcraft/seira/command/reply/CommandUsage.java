@@ -1,7 +1,7 @@
 package xyz.zcraft.seira.command.reply;
 
 public final class CommandUsage {
-    public static final String BO = "用法：/bo <个数> [玩家ID/用户名/@用户] [过滤条件 ...]";
+    public static final String BP = "用法：/bp <个数> [玩家ID/用户名/@用户] [过滤条件 ...]";
     public static final String NO_BIND = "你还没有绑定玩家ID，请先使用 /bind 绑定";
     public static final String REBIND = "由于发生了一个技术问题，使用此功能需要重新绑定。请使用 `/unbind` 解除绑定，再使用 `/bind` 重新绑定~";
     public static final String RS = "用法：/rs <个数> [玩家ID/用户名/@用户] [过滤条件 ...]";

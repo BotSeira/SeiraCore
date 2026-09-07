@@ -48,7 +48,7 @@ public final class ScoreCommandHandler {
 
     public void handleBp(Context ctx) {
         if (ctx.args().length == 0) {
-            ShortcutTarget target = resolver.parseTarget("bo1", ctx.senderUserId());
+            ShortcutTarget target = resolver.parseTarget("bp1", ctx.senderUserId());
             if (target.isError()) {
                 ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
                 return;
@@ -65,22 +65,22 @@ public final class ScoreCommandHandler {
 
         if (resolver.looksLikeMention(ctx.args()[0])) {
             if (ctx.args().length == 1 || (ctx.args().length > 1 && ScoreFilterArguments.looksLikeFilter(ctx.args()[1]))) {
-                handleFilteredSingleScore(ctx, "bo");
+                handleFilteredSingleScore(ctx, "bp");
                 return;
             }
         } else if (ScoreFilterArguments.looksLikeFilter(ctx.args()[0])) {
-            handleFilteredSingleScore(ctx, "bo");
+            handleFilteredSingleScore(ctx, "bp");
             return;
         }
 
-        ScoreListRequest request = parseScoreListRequest(ctx, CommandUsage.BO);
+        ScoreListRequest request = parseScoreListRequest(ctx, CommandUsage.BP);
         if (request == null) return;
 
         taskCoordinator.runImageRequest(
                 ctx,
                 "Best Scores",
                 () -> APIHelper.getBoNResponse(request.count(), request.userRef(), request.filters()),
-                replyFactory::boMessage
+                replyFactory::bpMessage
         );
     }
 
