@@ -256,7 +256,7 @@ public final class RankGuessCommandHandler {
             ));
         } catch (RuntimeException e) {
             LOG.error("Failed to query rank guess statistics", e);
-            ctx.sendReply(PendingMessage.ofString("战绩查询失败，请稍后重试喵。"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "战绩查询失败，请稍后重试喵。"));
         }
     }
 
@@ -301,14 +301,18 @@ public final class RankGuessCommandHandler {
                     .reversed();
 
             if (type == LeaderboardType.FULL) {
-                reply.append(at(ctx)).append("本群").append("猜 Rank 战绩排行：\n");
-                for (int i = 0; i < groupRanks.size(); i++) {
-                    final Map.Entry<String, Rank> aRank = groupRanks.get(i);
-                    final String name = Optional.ofNullable(aRank.getKey())
-                            .map(UserDataStore::findBoundUid)
-                            .flatMap(UserDataStore::findUsername)
-                            .orElse("未知");
-                    reply.append("> __\\#").append(i + 1).append("__ ").append(name).append(" (%.2f)".formatted(aRank.getValue().rating())).append("\n");
+                reply.append(at(ctx)).append("本群猜 Rank 战绩排行：\n");
+                if (groupRanks.isEmpty()) {
+                    reply.append("> (暂无玩家)");
+                } else {
+                    for (int i = 0; i < groupRanks.size(); i++) {
+                        final Map.Entry<String, Rank> aRank = groupRanks.get(i);
+                        final String name = Optional.ofNullable(aRank.getKey())
+                                .map(UserDataStore::findBoundUid)
+                                .flatMap(UserDataStore::findUsername)
+                                .orElse("未知");
+                        reply.append("> __\\#").append(i + 1).append("__ ").append(name).append(" (%.2f)".formatted(aRank.getValue().rating())).append("\n");
+                    }
                 }
             } else if (type == LeaderboardType.SELF || type == LeaderboardType.GLOBAL) {
                 if (!RankGuessRecordStore.canBeRanked(ctx.senderUserId(), effectiveGroupId)
@@ -350,7 +354,7 @@ public final class RankGuessCommandHandler {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(reply.toString().trim()));
         } catch (RuntimeException e) {
             LOG.error("Failed to query rank guess statistics", e);
-            ctx.sendReply(PendingMessage.ofString("战绩查询失败，请稍后重试喵。"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "战绩查询失败，请稍后重试喵。"));
         }
     }
 
