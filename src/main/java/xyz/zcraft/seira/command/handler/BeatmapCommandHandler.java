@@ -7,11 +7,10 @@ import xyz.zcraft.seira.api.data.SearchResultItem;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
-import xyz.zcraft.seira.command.TargetHistory;
+import xyz.zcraft.seira.command.target.CommandTargets;
+import static xyz.zcraft.seira.command.target.TargetKind.*;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
-import xyz.zcraft.seira.command.parse.ShortcutTarget;
-import xyz.zcraft.seira.command.parse.TargetResolution;
 import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 
@@ -22,7 +21,7 @@ import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class BeatmapCommandHandler {
     private final Resolver resolver;
-    private final TargetHistory lastTarget;
+    private final CommandTargets targets;
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
     private final VideoRenderRecord videoRenderRecord;
@@ -30,14 +29,14 @@ public final class BeatmapCommandHandler {
 
     public BeatmapCommandHandler(
             Resolver resolver,
-            TargetHistory targetHistory,
+            CommandTargets targets,
             TaskCoordinator taskCoordinator,
             ReplyFactory replyFactory,
             VideoRenderRecord videoRenderRecord,
             Function<String, String> accessTokenProvider
     ) {
         this.resolver = resolver;
-        this.lastTarget = targetHistory;
+        this.targets = targets;
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
         this.videoRenderRecord = videoRenderRecord;
@@ -51,252 +50,65 @@ public final class BeatmapCommandHandler {
     }
 
     public void handleM(Context ctx) {
-        if (ctx.args().length >= 1) {
-            TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
-            ShortcutTarget target = targetResolution.target();
-            if (target.isError()) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
-                return;
-            }
-
-            lastTarget.put(ctx.senderUserId(), target);
-
-            if (ctx.args().length > targetResolution.consumedArgs() + 1) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.M));
-                return;
-            }
-
-            String mod = ctx.args().length == targetResolution.consumedArgs() + 1
-                    ? ctx.args()[targetResolution.consumedArgs()]
-                    : null;
-
-            taskCoordinator.runImageRequest(
-                    ctx,
-                    "Beatmap",
-                    () -> APIHelper.getBeatmapResponse(target, mod, accessTokenProvider.apply(ctx.senderUserId())),
-                    replyFactory::beatmapMessage
-            );
-        } else {
-            if (lastTarget.get(ctx.senderUserId()) != null) {
-                ShortcutTarget target = lastTarget.get(ctx.senderUserId());
-                taskCoordinator.runImageRequest(
-                        ctx,
-                        "Beatmap",
-                        () -> APIHelper.getBeatmapResponse(target, null, accessTokenProvider.apply(ctx.senderUserId())),
-                        replyFactory::beatmapMessage
-                );
-                return;
-            }
-
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.M));
-        }
+        var target = targets.parse(ctx, BEATMAP, CommandUsage.M, 1);
+        if (target == null) return;
+        taskCoordinator.runImageRequest(ctx, "Beatmap",
+                () -> APIHelper.getBeatmapResponse(targets.resolve(ctx, target),
+                        target.nextArgument(ctx), accessTokenProvider.apply(ctx.senderUserId())),
+                replyFactory::beatmapMessage);
     }
 
     public void handleBma(Context ctx) {
-        if (ctx.args().length >= 1) {
-            TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(
-                    ctx.args(), ctx.senderUserId());
-            ShortcutTarget target = targetResolution.target();
-            if (target.isError()) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
-                return;
-            }
-
-            lastTarget.put(ctx.senderUserId(), target);
-            if (ctx.args().length > targetResolution.consumedArgs() + 1) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.BMA));
-                return;
-            }
-
-            String mod = ctx.args().length == targetResolution.consumedArgs() + 1
-                    ? ctx.args()[targetResolution.consumedArgs()]
-                    : null;
-            taskCoordinator.runImageRequest(
-                    ctx,
-                    "Beatmap Analysis",
-                    () -> APIHelper.getBeatmapAnalysisResponse(
-                            target, mod, accessTokenProvider.apply(ctx.senderUserId())),
-                    replyFactory::beatmapMessage
-            );
-            return;
-        }
-
-        ShortcutTarget target = lastTarget.get(ctx.senderUserId());
-        if (target == null) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.BMA));
-            return;
-        }
-        taskCoordinator.runImageRequest(
-                ctx,
-                "Beatmap Analysis",
-                () -> APIHelper.getBeatmapAnalysisResponse(
-                        target, null, accessTokenProvider.apply(ctx.senderUserId())),
-                replyFactory::beatmapMessage
-        );
+        var target = targets.parse(ctx, BEATMAP, CommandUsage.BMA, 1);
+        if (target == null) return;
+        taskCoordinator.runImageRequest(ctx, "Beatmap Analysis",
+                () -> APIHelper.getBeatmapAnalysisResponse(targets.resolve(ctx, target),
+                        target.nextArgument(ctx), accessTokenProvider.apply(ctx.senderUserId())),
+                replyFactory::beatmapMessage);
     }
 
     public void handleAp(Context ctx) {
-        ShortcutTarget target;
-
-        if (ctx.args().length >= 1) {
-            TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
-            target = targetResolution.target();
-            if (target.isError()) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
-                return;
-            }
-
-            lastTarget.put(ctx.senderUserId(), target);
-        } else {
-            if (lastTarget.get(ctx.senderUserId()) != null) {
-                target = lastTarget.get(ctx.senderUserId());
-            } else {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.AP));
-                return;
-            }
-        }
-
+        var target = targets.parse(ctx, BEATMAPSET, CommandUsage.AP, Integer.MAX_VALUE);
+        if (target == null) return;
         taskCoordinator.runApiRequest(ctx, "Audio Preview", () -> {
-                    final long id = APIHelper.lookupBeatmapset(target, accessTokenProvider.apply(ctx.senderUserId()));
-                    ctx.sendReply(PendingMessage.ofVoiceUrl("https://b.ppy.sh/preview/" + id + ".mp3").doUpload(false));
-                }
-        );
+            long id = APIHelper.lookupBeatmapset(targets.resolve(ctx, target), accessTokenProvider.apply(ctx.senderUserId()));
+            ctx.sendReply(PendingMessage.ofVoiceUrl("https://b.ppy.sh/preview/" + id + ".mp3").doUpload(false));
+        });
     }
 
     public void handleBpv(Context ctx) {
-        if (ctx.args().length < 1) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.BPV));
-            return;
-        }
-
-        TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(
-                ctx.args(), ctx.senderUserId());
-        if (ctx.args().length > targetResolution.consumedArgs() + 1) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.BPV));
-            return;
-        }
-
-        ShortcutTarget target = targetResolution.target();
-        if (target.isError()) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
-            return;
-        }
-
-        String mods = ctx.args().length == targetResolution.consumedArgs() + 1
-                ? ctx.args()[targetResolution.consumedArgs()]
-                : null;
-        lastTarget.put(ctx.senderUserId(), target);
-
-        taskCoordinator.runReplayRequest(
-                ctx,
-                "Beatmap Preview Render",
-                qqUpload -> {
-                    APIHelper.ReplayTaskInfo task = APIHelper.createBeatmapPreviewTask(
-                            target, mods, accessTokenProvider.apply(ctx.senderUserId()), qqUpload);
-                    videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
-                    return task;
-                },
-                replyFactory::replayMessage
-        );
+        var target = targets.parse(ctx, BEATMAP, CommandUsage.BPV, 1, arg -> arg.startsWith("+"));
+        if (target == null) return;
+        taskCoordinator.runReplayRequest(ctx, "Beatmap Preview Render", qqUpload -> {
+            var task = APIHelper.createBeatmapPreviewTask(targets.resolve(ctx, target),
+                    target.nextArgument(ctx), accessTokenProvider.apply(ctx.senderUserId()), qqUpload);
+            videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
+            return task;
+        }, replyFactory::replayMessage);
     }
 
     public void handleBgp(Context ctx) {
-        ShortcutTarget target;
-
-        if (ctx.args().length >= 1) {
-            TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
-            target = targetResolution.target();
-            if (target.isError()) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
-                return;
-            }
-
-            lastTarget.put(ctx.senderUserId(), target);
-        } else {
-            if (lastTarget.get(ctx.senderUserId()) != null) {
-                target = lastTarget.get(ctx.senderUserId());
-            } else {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.BGP));
-                return;
-            }
-        }
-
-        taskCoordinator.runImageRequest(
-                ctx,
-                "Background Preview",
-                () -> APIHelper.getBeatmapBgResponse(target, accessTokenProvider.apply(ctx.senderUserId())),
-                replyFactory::bgpMessage
-        );
+        var target = targets.parse(ctx, BEATMAP, CommandUsage.BGP, Integer.MAX_VALUE);
+        if (target == null) return;
+        taskCoordinator.runImageRequest(ctx, "Background Preview",
+                () -> APIHelper.getBeatmapBgResponse(targets.resolve(ctx, target), accessTokenProvider.apply(ctx.senderUserId())),
+                replyFactory::bgpMessage);
     }
 
     public void handleDl(Context ctx) {
-        ShortcutTarget target;
-
-        if (ctx.args().length == 0) {
-            target = lastTarget.get(ctx.senderUserId());
-        } else if (ctx.args().length <= 2) {
-            TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
-            if (ctx.args().length != targetResolution.consumedArgs()) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.DL));
-                return;
-            }
-
-            target = targetResolution.target();
-            if (target.isError()) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
-                return;
-            }
-
-            lastTarget.put(ctx.senderUserId(), target);
-        } else {
-            target = null;
-        }
-
-        if (target == null) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.DL));
-            return;
-        }
-
+        var target = targets.parse(ctx, BEATMAPSET, CommandUsage.DL, 0);
+        if (target == null) return;
         taskCoordinator.runApiRequest(ctx, "Download Beatmap", () ->
-                ctx.sendReply(replyFactory.dlMessage(
-                        ctx,
-                        APIHelper.getLookupBeatmapsetResponse(target, accessTokenProvider.apply(ctx.senderUserId()))
-                ))
-        );
+                ctx.sendReply(replyFactory.dlMessage(ctx,
+                        APIHelper.getLookupBeatmapsetResponse(targets.resolve(ctx, target), accessTokenProvider.apply(ctx.senderUserId())))));
     }
 
     public void handleMs(Context ctx) {
-        ShortcutTarget target;
-        if (ctx.args().length == 0) {
-            target = lastTarget.get(ctx.senderUserId());
-        } else if (ctx.args().length <= 2) {
-            TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
-            if (ctx.args().length != targetResolution.consumedArgs()) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/ms <谱面集ID 或 快捷查询>"));
-                return;
-            }
-            target = targetResolution.target();
-            if (target.isError()) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
-                return;
-            }
-
-            lastTarget.put(ctx.senderUserId(), target);
-        } else {
-            target = null;
-        }
-
-        if (target == null) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/ms <谱面集ID 或 快捷查询>"));
-            return;
-        }
-
-        taskCoordinator.runImageRequest(
-                ctx,
-                "Beatmapset",
-                () -> APIHelper.getBeatmapsetResponse(target, accessTokenProvider.apply(ctx.senderUserId())),
-                replyFactory::beatmapsetMessage
-        );
+        var target = targets.parse(ctx, BEATMAPSET, "用法：/ms <谱面集ID 或 快捷查询>", 0);
+        if (target == null) return;
+        taskCoordinator.runImageRequest(ctx, "Beatmapset",
+                () -> APIHelper.getBeatmapsetResponse(targets.resolve(ctx, target), accessTokenProvider.apply(ctx.senderUserId())),
+                replyFactory::beatmapsetMessage);
     }
 
     public void handleSms(Context ctx) {

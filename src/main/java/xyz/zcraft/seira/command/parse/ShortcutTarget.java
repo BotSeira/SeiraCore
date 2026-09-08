@@ -2,6 +2,12 @@ package xyz.zcraft.seira.command.parse;
 
 import xyz.zcraft.seira.data.UserRef;
 
+/**
+ * Compatibility DTO for the existing parser and API helper. TargetAdapter maps
+ * this syntax to typed queries and IDs; the memory service never stores this DTO.
+ * At the API boundary m means beatmap, ms without an index means beatmapset,
+ * and s means online score. Bare input IDs are interpreted by the declared target kind.
+ */
 public record ShortcutTarget(
         Long explicitId,
         String localScoreId,

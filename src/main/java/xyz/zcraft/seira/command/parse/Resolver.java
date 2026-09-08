@@ -11,6 +11,15 @@ import java.util.regex.Pattern;
 
 public final class Resolver {
     private static final ArrayList<String> USER_MACRO_TYPES = new ArrayList<>(List.of("rs", "bp", "rp"));
+    private final java.util.function.Function<String, Long> boundUid;
+
+    public Resolver() {
+        this(UserDataStore::findBoundUid);
+    }
+
+    public Resolver(java.util.function.Function<String, Long> boundUid) {
+        this.boundUid = Objects.requireNonNull(boundUid);
+    }
 
     public String sanitize(String rawContent) {
         Matcher matcher = Patterns.USER_MACRO_PATTERN.matcher(rawContent);
@@ -152,7 +161,7 @@ public final class Resolver {
         if (senderUserId == null || senderUserId.isBlank()) {
             return null;
         }
-        return UserDataStore.findBoundUid(senderUserId);
+        return boundUid.apply(senderUserId);
     }
 
     public Integer parsePositiveInt(String value) {

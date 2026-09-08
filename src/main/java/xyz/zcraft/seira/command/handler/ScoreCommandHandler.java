@@ -3,7 +3,8 @@ package xyz.zcraft.seira.command.handler;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
-import xyz.zcraft.seira.command.TargetHistory;
+import xyz.zcraft.seira.command.target.CommandTargets;
+import static xyz.zcraft.seira.command.target.TargetKind.SCORE;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.*;
 import xyz.zcraft.seira.command.reply.CommandUsage;
@@ -16,18 +17,18 @@ public final class ScoreCommandHandler {
     private static final int MAX_SCORE_LIST_COUNT = 200;
 
     private final Resolver resolver;
-    private final TargetHistory targetHistory;
+    private final CommandTargets targets;
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
 
     public ScoreCommandHandler(
             Resolver resolver,
-            TargetHistory targetHistory,
+            CommandTargets targets,
             TaskCoordinator taskCoordinator,
             ReplyFactory replyFactory
     ) {
         this.resolver = resolver;
-        this.targetHistory = targetHistory;
+        this.targets = targets;
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
     }
@@ -59,7 +60,7 @@ public final class ScoreCommandHandler {
             taskCoordinator.runImageRequest(
                     ctx,
                     "Score",
-                    () -> APIHelper.getScoreResponse(target),
+                    () -> APIHelper.getScoreResponse(targets.resolve(ctx, SCORE, target)),
                     replyFactory::scoreMessage
             );
             return;
@@ -97,7 +98,7 @@ public final class ScoreCommandHandler {
             taskCoordinator.runImageRequest(
                     ctx,
                     "Score",
-                    () -> APIHelper.getScoreResponse(target),
+                    () -> APIHelper.getScoreResponse(targets.resolve(ctx, SCORE, target)),
                     replyFactory::scoreMessage
             );
             return;
@@ -194,7 +195,7 @@ public final class ScoreCommandHandler {
         taskCoordinator.runImageRequest(
                 ctx,
                 "Score",
-                () -> APIHelper.getScoreResponse(target, filters.filters()),
+                () -> APIHelper.getScoreResponse(targets.resolve(ctx, SCORE, target, filters.filters())),
                 replyFactory::scoreMessage
         );
     }
@@ -239,170 +240,39 @@ public final class ScoreCommandHandler {
     }
 
     public void handleS(Context ctx) {
-        var ref = new Object() {
-            ShortcutTarget target;
-        };
-
-        if (ctx.args().length == 0) {
-            ref.target = targetHistory.get(ctx.senderUserId());
-        } else if (ctx.args().length == 1 && resolver.looksLikeMention(ctx.args()[0])) {
-            UserRefResolution resolution = resolver.resolveUserRefArgument(ctx.args()[0]);
-            if (resolution.errorMessage() != null) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + resolution.errorMessage()));
-                return;
-            }
-            if (resolution.userRef() == null) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.S));
-                return;
-            }
-
-            UserRef user = resolution.userRef();
-
-            ref.target = new ShortcutTarget(
-                    ref.target.explicitId(),
-                    user,
-                    ref.target.macroType(),
-                    ref.target.macroIndex(),
-                    ref.target.errorMessage()
-            );
-        } else if (ctx.args().length <= 2) {
-            TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
-
-            UserRef overrideUser = null;
-
-            if (ctx.args().length == targetResolution.consumedArgs() + 1) {
-                UserRefResolution resolution = resolver.resolveUserRefArgument(ctx.args()[targetResolution.consumedArgs()]);
-                if (resolution.errorMessage() != null) {
-                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + resolution.errorMessage()));
-                    return;
-                }
-                if (resolution.userRef() == null) {
-                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.S));
-                    return;
-                }
-                overrideUser = resolution.userRef();
-            } else if (ctx.args().length != targetResolution.consumedArgs()) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.S));
-                return;
-            }
-
-            ref.target = targetResolution.target();
-
-            if (ref.target.isError()) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + ref.target.errorMessage()));
-                return;
-            }
-
-            if (overrideUser != null) {
-                ref.target = new ShortcutTarget(
-                        ref.target.explicitId(),
-                        overrideUser,
-                        ref.target.macroType(),
-                        ref.target.macroIndex(),
-                        ref.target.errorMessage()
-                );
-            }
-
-            targetHistory.put(ctx.senderUserId(), ref.target);
-        } else {
-            ref.target = null;
-        }
-
-        if (ref.target == null) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.S));
-            return;
-        }
-
-        taskCoordinator.runImageRequest(
-                ctx,
-                "Score",
-                () -> APIHelper.getScoreResponse(ref.target),
+        var target = targets.parseScore(ctx, CommandUsage.S);
+        if (target == null) return;
+        taskCoordinator.runImageRequest(ctx, "Score",
+                () -> APIHelper.getScoreResponse(targets.resolve(ctx, target)),
                 replyFactory::scoreMessage,
-                "> Tips: 若要查找指定谱面上的成绩，请使用 /s __m__`bid`"
-        );
+                "> Tips: 若要查找指定谱面上的成绩，请使用 /s __m__`bid`");
     }
 
     public void handleSa(Context ctx) {
-        ShortcutTarget target;
-        if (ctx.args().length == 0) {
-            target = targetHistory.get(ctx.senderUserId());
-        } else if (ctx.args().length <= 2) {
-            TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
-
-            if (ctx.args().length != targetResolution.consumedArgs()) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.SA));
-                return;
-            }
-
-            target = targetResolution.target();
-
-            if (target.isError()) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
-                return;
-            }
-
-            targetHistory.put(ctx.senderUserId(), target);
-        } else {
-            target = null;
-        }
-
-        if (target == null) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.SA));
-            return;
-        }
-
-        taskCoordinator.runImageRequest(
-                ctx,
-                "Score Analysis",
-                () -> APIHelper.getScoreAnalyzeResponse(target),
-                replyFactory::scoreAnalyzeMessage
-        );
+        var target = targets.parse(ctx, SCORE, CommandUsage.SA, 0);
+        if (target == null) return;
+        taskCoordinator.runImageRequest(ctx, "Score Analysis",
+                () -> APIHelper.getScoreAnalyzeResponse(targets.resolve(ctx, target)),
+                replyFactory::scoreAnalyzeMessage);
     }
 
     public void handleMa(Context ctx) {
-        TargetResolution targetResolution = targetHistory.resolveOptionalTarget(ctx, resolver, arg -> arg.startsWith("#"));
-        ShortcutTarget target = targetResolution.target();
-        if (target == null) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.MA));
-            return;
-        }
-        if (target.isError()) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
-            return;
-        }
-
-        int remainingArgs = ctx.args().length - targetResolution.consumedArgs();
-        if (remainingArgs > 1) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.MA));
-            return;
-        }
-
-        if (remainingArgs == 1) {
-            Integer index = parseMissIndex(
-                    ctx.args()[targetResolution.consumedArgs()],
-                    targetResolution.consumedArgs() == 0
-            );
+        var target = targets.parse(ctx, SCORE, CommandUsage.MA, 1, arg -> arg.startsWith("#"));
+        if (target == null) return;
+        String indexArgument = target.nextArgument(ctx);
+        if (indexArgument != null) {
+            Integer index = parseMissIndex(indexArgument, target.consumedArgs() == 0);
             if (index == null) {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.MA));
                 return;
             }
-
-            targetHistory.rememberExplicitTarget(ctx, targetResolution);
-
-            taskCoordinator.runImageRequest(
-                    ctx,
-                    "Miss Visualize",
-                    () -> APIHelper.getMissVisualizeResponse(target, index),
-                    (_, _) -> null
-            );
+            taskCoordinator.runImageRequest(ctx, "Miss Visualize",
+                    () -> APIHelper.getMissVisualizeResponse(targets.resolve(ctx, target), index),
+                    (_, _) -> null);
             return;
         }
-
-        targetHistory.rememberExplicitTarget(ctx, targetResolution);
-
         taskCoordinator.runApiRequest(ctx, "Get Score Misses", () ->
-                ctx.sendReply(replyFactory.scoreMissesMessage(ctx, APIHelper.getScoreMissesResponse(target)))
-        );
+                ctx.sendReply(replyFactory.scoreMissesMessage(ctx, APIHelper.getScoreMissesResponse(targets.resolve(ctx, target)))));
     }
 
     private Integer parseMissIndex(String arg, boolean requirePrefix) {

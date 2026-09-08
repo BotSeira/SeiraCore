@@ -262,8 +262,10 @@ public class APIHelper {
 
     public static long lookupBeatmap(ShortcutTarget target, String auth) {
         long beatmapId;
-        if (target.isLocalScore()) {
-            beatmapId = lookupScoreData(target.localScoreId()).get("beatmap_id").getAsLong();
+        if (target.isLocalScore() || "s".equals(target.macroType())) {
+            beatmapId = lookupScoreData(lookupScoreId(target)).get("beatmap_id").getAsLong();
+        } else if ("m".equals(target.macroType())) {
+            beatmapId = target.explicitId();
         } else if (!target.isMacro()) {
             beatmapId = target.explicitId();
         } else {
@@ -344,7 +346,9 @@ public class APIHelper {
 
     public static long lookupBeatmapset(ShortcutTarget target, String auth) {
         long beatmapsetId;
-        if (!target.isMacro()) {
+        if (target.isLocalScore() || "s".equals(target.macroType())) {
+            return lookupBeatmapset(new ShortcutTarget(lookupBeatmap(target, auth), null, "m", null, null), auth);
+        } else if (!target.isMacro() || "ms".equals(target.macroType())) {
             beatmapsetId = target.explicitId();
         } else {
             try {
@@ -379,6 +383,7 @@ public class APIHelper {
 
         return switch (target.macroType().toLowerCase()) {
             case "m" -> query + "?m=" + target.explicitId();
+            case "ms" -> query + "?ms=" + target.explicitId();
             case "rs", "bp", "rp" ->
                     query + "?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + resolveUid(target.userRef());
             case "mp" -> query + "?of=mp";
@@ -744,11 +749,11 @@ public class APIHelper {
         return lookupScoreId(target, List.of());
     }
 
-    private static String lookupScoreId(ShortcutTarget target, List<String> filters) {
+    public static String lookupScoreId(ShortcutTarget target, List<String> filters) {
         String scoreId;
         if (target.isLocalScore()) {
             scoreId = target.localScoreId();
-        } else if (!target.isMacro()) {
+        } else if (!target.isMacro() || "s".equals(target.macroType())) {
             scoreId = String.valueOf(target.explicitId());
         } else {
             try {

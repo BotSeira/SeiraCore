@@ -5,12 +5,11 @@ import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.ReplayResultStore;
-import xyz.zcraft.seira.command.TargetHistory;
+import xyz.zcraft.seira.command.target.CommandTargets;
+import static xyz.zcraft.seira.command.target.TargetKind.SCORE;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.parse.RscTarget;
-import xyz.zcraft.seira.command.parse.ShortcutTarget;
-import xyz.zcraft.seira.command.parse.TargetResolution;
 import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.util.TimeDurationParser;
@@ -21,7 +20,7 @@ import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class ReplayCommandHandler {
     private final Resolver resolver;
-    private final TargetHistory targetHistory;
+    private final CommandTargets targets;
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
     private final VideoRenderRecord videoRenderRecord;
@@ -30,7 +29,7 @@ public final class ReplayCommandHandler {
 
     public ReplayCommandHandler(
             Resolver resolver,
-            TargetHistory targetHistory,
+            CommandTargets targets,
             TaskCoordinator taskCoordinator,
             ReplyFactory replyFactory,
             VideoRenderRecord videoRenderRecord,
@@ -38,7 +37,7 @@ public final class ReplayCommandHandler {
             Function<String, String> accessTokenProvider
     ) {
         this.resolver = resolver;
-        this.targetHistory = targetHistory;
+        this.targets = targets;
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
         this.videoRenderRecord = videoRenderRecord;
@@ -47,41 +46,26 @@ public final class ReplayCommandHandler {
     }
 
     public void handleR(Context ctx) {
-        TargetResolution targetResolution = targetHistory.resolveOptionalTarget(ctx, resolver, TimeDurationParser::isTimeRange);
-        if (ctx.args().length - targetResolution.consumedArgs() > 1) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.R));
-            return;
-        }
-
-        ShortcutTarget target = targetResolution.target();
-        if (target == null) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.R));
-            return;
-        }
-        if (target.isError()) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
-            return;
-        }
+        var target = targets.parse(ctx, SCORE, CommandUsage.R, 1, TimeDurationParser::isTimeRange);
+        if (target == null) return;
 
         TimeDurationParser.TimeRange range = null;
 
-        if (ctx.args().length > targetResolution.consumedArgs()) {
+        if (ctx.args().length > target.consumedArgs()) {
             try {
-                range = TimeDurationParser.parseRange(ctx.args()[targetResolution.consumedArgs()]);
+                range = TimeDurationParser.parseRange(ctx.args()[target.consumedArgs()]);
             } catch (IllegalArgumentException e) {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "无法解析时间范围"));
                 return;
             }
         }
 
-        targetHistory.rememberExplicitTarget(ctx, targetResolution);
-
         TimeDurationParser.TimeRange finalRange = range;
         taskCoordinator.runReplayRequest(
                 ctx,
                 "Score Render",
                 qqUpload -> {
-                    APIHelper.ReplayTaskInfo task = APIHelper.createReplayRenderTask(target, finalRange, qqUpload);
+                    APIHelper.ReplayTaskInfo task = APIHelper.createReplayRenderTask(targets.resolve(ctx, target), finalRange, qqUpload);
                     videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
                     return task;
                 },
@@ -94,24 +78,12 @@ public final class ReplayCommandHandler {
             return;
         }
 
-        TargetResolution targetResolution = targetHistory.resolveOptionalTarget(
-                ctx,
-                resolver,
-                arg -> arg.startsWith("+") || arg.startsWith("=")
-        );
-        ShortcutTarget target = targetResolution.target();
-        if (target == null) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.RSC));
-            return;
-        }
-        if (target.isError()) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
-            return;
-        }
+        var target = targets.parseShowcase(ctx, CommandUsage.RSC);
+        if (target == null) return;
 
         String extraUidArg = null;
 
-        int i = targetResolution.consumedArgs();
+        int i = target.consumedArgs();
 
         if (i < ctx.args().length) {
             if (ctx.args()[i].startsWith("+") || ctx.args()[i].startsWith("=")) {
@@ -122,7 +94,7 @@ public final class ReplayCommandHandler {
             }
         }
 
-        RscTarget rscTarget = target.isLocalScore() && extraUidArg == null
+        RscTarget rscTarget = target.request().isLocalScore() && extraUidArg == null
                 ? new RscTarget(new String[0], null)
                 : resolver.resolveRscTarget(ctx.groupId(), extraUidArg);
         if (rscTarget.errorMessage() != null) {
@@ -132,14 +104,12 @@ public final class ReplayCommandHandler {
 
         String[] targetsArray = rscTarget.targets();
 
-        targetHistory.rememberExplicitTarget(ctx, targetResolution);
-
         taskCoordinator.runReplayRequest(
                 ctx,
                 "Showcase Render",
                 qqUpload -> {
                     var task = APIHelper.createReplayShowcaseTask(
-                            target, targetsArray, accessTokenProvider.apply(ctx.senderUserId()), qqUpload);
+                            targets.resolveShowcase(ctx, target), targetsArray, accessTokenProvider.apply(ctx.senderUserId()), qqUpload);
                     videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
                     return task;
                 },

@@ -8,6 +8,9 @@ import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.*;
+import xyz.zcraft.seira.command.target.CommandTargets;
+import xyz.zcraft.seira.command.target.TargetService;
+import xyz.zcraft.seira.api.OstellaTargetLookup;
 import xyz.zcraft.seira.command.handler.*;
 import xyz.zcraft.seira.command.parse.CommandParser;
 import xyz.zcraft.seira.command.parse.Resolver;
@@ -62,24 +65,25 @@ public class Router {
         AppConfig startupConfig = configSupplier.get();
         ReplyFactory replyFactory = new ReplyFactory(configSupplier);
         Resolver resolver = new Resolver();
-        TargetHistory targetHistory = new TargetHistory();
+        CommandTargets targets = new CommandTargets(resolver, new TargetService(
+                new TargetHistory(), new OstellaTargetLookup(), resolver::resolveBoundUid, this::getAccessTokenFor));
         ReplayResultStore replayResults = new ReplayResultStore();
         VideoRenderRecord videoRenderRecord = new VideoRenderRecord();
         this.taskCoordinator = new TaskCoordinator(messageSender, replayResults, discordBridgeService);
         this.authHelper = new OsuAuthHelper(startupConfig.binding());
         BindingCommandHandler bindingCommands = new BindingCommandHandler(startupConfig, replyFactory, bindingService);
         ScoreCommandHandler scoreCommands = new ScoreCommandHandler(
-                resolver, targetHistory, taskCoordinator, replyFactory
+                resolver, targets, taskCoordinator, replyFactory
         );
         BeatmapCommandHandler beatmapCommands = new BeatmapCommandHandler(
-                resolver, targetHistory, taskCoordinator, replyFactory, videoRenderRecord, this::getAccessTokenFor
+                resolver, targets, taskCoordinator, replyFactory, videoRenderRecord, this::getAccessTokenFor
         );
         SocialCommandHandler socialCommands = new SocialCommandHandler(
                 resolver, authHelper, taskCoordinator, replyFactory, this::getAccessTokenFor
         );
         ReplayCommandHandler replayCommands = new ReplayCommandHandler(
                 resolver,
-                targetHistory,
+                targets,
                 taskCoordinator,
                 replyFactory,
                 videoRenderRecord,
