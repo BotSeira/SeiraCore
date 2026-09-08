@@ -18,6 +18,8 @@ import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
+
 public final class MultiplayerRoomWatchCommandHandler {
     private static final String USAGE =
             "用法：/mpwatch [start] <房间ID> [stable|lazer]；"
@@ -84,12 +86,12 @@ public final class MultiplayerRoomWatchCommandHandler {
     }
 
     private static void usage(Context ctx) {
-        ctx.sendReply(PendingMessage.ofString(USAGE));
+        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
     }
 
     public void handleMpWatch(Context ctx) {
         if (!ctx.inGroup()) {
-            ctx.sendReply(PendingMessage.ofString("/mpwatch 仅支持群聊使用。"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "/mpwatch 仅支持群聊使用。"));
             return;
         }
 
@@ -117,7 +119,7 @@ public final class MultiplayerRoomWatchCommandHandler {
         if (startArgumentCount == 0) {
             final OsuToken osuToken = UserDataStore.findOsuToken(ctx.senderUserId());
             if (osuToken == null) {
-                ctx.sendReply("由于未绑定账户，无法获取当前房间，请手动提供ID~");
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "由于未绑定账户，无法获取当前房间，请手动提供ID~"));
                 return;
             }
             final Response<MultiplayerRoom> multiplayerRoom = APIHelper.getMultiplayerRoom(osuToken.accessToken());
@@ -128,13 +130,13 @@ public final class MultiplayerRoomWatchCommandHandler {
         }
 
         if (target == null) {
-            ctx.sendReply(PendingMessage.ofString("房间 ID、链接或版本格式不正确。\n" + USAGE));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "房间 ID、链接或版本格式不正确。\n" + USAGE));
             return;
         }
 
         taskCoordinator.runApiRequest(ctx, "Start Multiplayer Room Watch", () -> {
             if (!ctx.sendMessage(PendingMessage.ofString("正在尝试启动多人房间监视……")).success()) {
-                ctx.sendReply(PendingMessage.ofString(
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) +
                         "由于缺少主动消息权限，无法启动监视！权限配置请见：https://docs.seira.top/overview/use.html#extra-permission"
                 ));
                 return;
@@ -144,7 +146,7 @@ public final class MultiplayerRoomWatchCommandHandler {
                         ctx.groupId(), ctx.senderUserId(), target.version(), target.roomId()
                 );
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(
-                        "已开始监视 `" + formatRoom(view) + "` 。"
+                        at(ctx) + "已开始监视 `" + formatRoom(view) + "` 。"
                                 + "之后完成的每张图都会自动推送结果。"
                 ));
             } catch (IllegalArgumentException | IllegalStateException e) {
@@ -156,11 +158,9 @@ public final class MultiplayerRoomWatchCommandHandler {
     private void handleStop(Context ctx) {
         if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
             int stoppedCount = watchService.stopAll(ctx.groupId()).size();
-            ctx.sendReply(PendingMessage.ofString(
-                    stoppedCount == 0
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + (stoppedCount == 0
                             ? "当前群聊没有多人房间监视。"
-                            : "已停止当前群聊的全部 " + stoppedCount + " 个多人房间监视。"
-            ));
+                            : "已停止当前群聊的全部 " + stoppedCount + " 个多人房间监视。")));
             return;
         }
         if (ctx.argumentCount() != 1) {
@@ -168,11 +168,9 @@ public final class MultiplayerRoomWatchCommandHandler {
             return;
         }
         RoomWatchView stopped = watchService.stop(ctx.groupId(), ctx.senderUserId());
-        ctx.sendReply(PendingMessage.ofString(
-                stopped == null
+        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + (stopped == null
                         ? "你当前没有在本群启动多人房间监视。"
-                        : "已停止你启动的监视：" + formatRoom(stopped) + "。"
-        ));
+                        : "已停止你启动的监视：" + formatRoom(stopped) + "。")));
     }
 
     private void handleStatus(Context ctx) {
@@ -181,11 +179,9 @@ public final class MultiplayerRoomWatchCommandHandler {
             return;
         }
         RoomWatchView view = watchService.get(ctx.groupId(), ctx.senderUserId());
-        ctx.sendReply(PendingMessage.ofString(
-                view == null
+        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + (view == null
                         ? "你当前没有在本群启动多人房间监视。"
-                        : "你当前正在监视" + formatRoom(view) + "。"
-        ));
+                        : "你当前正在监视" + formatRoom(view) + "。")));
     }
 
     record RoomTarget(long roomId, MultiplayerRoomVersion version) {

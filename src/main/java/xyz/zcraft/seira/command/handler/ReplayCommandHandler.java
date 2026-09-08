@@ -17,6 +17,8 @@ import xyz.zcraft.seira.util.TimeDurationParser;
 
 import java.util.function.Function;
 
+import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
+
 public final class ReplayCommandHandler {
     private final Resolver resolver;
     private final TargetHistory targetHistory;
@@ -47,17 +49,17 @@ public final class ReplayCommandHandler {
     public void handleR(Context ctx) {
         TargetResolution targetResolution = targetHistory.resolveOptionalTarget(ctx, resolver, TimeDurationParser::isTimeRange);
         if (ctx.args().length - targetResolution.consumedArgs() > 1) {
-            ctx.sendReply(PendingMessage.ofString(CommandUsage.R));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.R));
             return;
         }
 
         ShortcutTarget target = targetResolution.target();
         if (target == null) {
-            ctx.sendReply(PendingMessage.ofString(CommandUsage.R));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.R));
             return;
         }
         if (target.isError()) {
-            ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
             return;
         }
 
@@ -67,7 +69,7 @@ public final class ReplayCommandHandler {
             try {
                 range = TimeDurationParser.parseRange(ctx.args()[targetResolution.consumedArgs()]);
             } catch (IllegalArgumentException e) {
-                ctx.sendReply(PendingMessage.ofString("无法解析时间范围"));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "无法解析时间范围"));
                 return;
             }
         }
@@ -88,7 +90,7 @@ public final class ReplayCommandHandler {
 
     public void handleRsc(Context ctx) {
         if (ctx.groupId() == null || ctx.groupId().isBlank()) {
-            ctx.sendReply(PendingMessage.ofString("/rsc 仅支持群聊使用。"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "/rsc 仅支持群聊使用。"));
             return;
         }
 
@@ -99,11 +101,11 @@ public final class ReplayCommandHandler {
         );
         ShortcutTarget target = targetResolution.target();
         if (target == null) {
-            ctx.sendReply(PendingMessage.ofString(CommandUsage.RSC));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.RSC));
             return;
         }
         if (target.isError()) {
-            ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
             return;
         }
 
@@ -115,7 +117,7 @@ public final class ReplayCommandHandler {
             if (ctx.args()[i].startsWith("+") || ctx.args()[i].startsWith("=")) {
                 extraUidArg = ctx.query().substring(Math.max(ctx.query().indexOf("+"), ctx.query().indexOf("=")));
             } else {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.RSC));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.RSC));
                 return;
             }
         }
@@ -124,7 +126,7 @@ public final class ReplayCommandHandler {
                 ? new RscTarget(new String[0], null)
                 : resolver.resolveRscTarget(ctx.groupId(), extraUidArg);
         if (rscTarget.errorMessage() != null) {
-            ctx.sendReply(PendingMessage.ofString(rscTarget.errorMessage()));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + rscTarget.errorMessage()));
             return;
         }
 
@@ -146,7 +148,7 @@ public final class ReplayCommandHandler {
 
     public void handleRstat(Context ctx) {
         if (ctx.args().length != 1 && ctx.args().length != 0) {
-            ctx.sendReply(PendingMessage.ofString("用法：/rstat [任务ID]"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/rstat [任务ID]"));
             return;
         }
 
@@ -155,7 +157,7 @@ public final class ReplayCommandHandler {
             if (videoRenderRecord.hasRenderTask(ctx.senderUserId())) {
                 jobId = videoRenderRecord.getRenderTask(ctx.senderUserId());
             } else {
-                ctx.sendReply(PendingMessage.ofString("未找到渲染请求"));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "未找到渲染请求"));
                 return;
             }
         } else {

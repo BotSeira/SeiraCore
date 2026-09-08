@@ -15,6 +15,8 @@ import xyz.zcraft.seira.services.DailyLuck;
 
 import java.util.function.Predicate;
 
+import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
+
 public final class GeneralCommandHandler {
     private final MessageSender messageSender;
     private final TaskCoordinator taskCoordinator;
@@ -44,14 +46,14 @@ public final class GeneralCommandHandler {
         } else {
             UserRefResolution target = resolver.resolveUserRefArgument(context.argument(0));
             if (target.errorMessage() != null) {
-                context.sendReply(PendingMessage.ofString(target.errorMessage()));
+                context.sendReply(PendingMessage.ofMarkdownRaw(at(context) + target.errorMessage()));
                 return;
             }
             userRef = target.userRef();
         }
 
         if (userRef == null) {
-            context.sendReply(PendingMessage.ofString("用法：/u [玩家ID/用户名/@用户]"));
+            context.sendReply(PendingMessage.ofMarkdownRaw(at(context) + "用法：/u [玩家ID/用户名/@用户]"));
             return;
         }
 
@@ -65,7 +67,7 @@ public final class GeneralCommandHandler {
 
     public void handleLuck(Context context) {
         if (context.argumentCount() != 0) {
-            context.sendReply(PendingMessage.ofString("用法：/luck"));
+            context.sendReply(PendingMessage.ofMarkdownRaw(at(context) + "用法：/luck"));
             return;
         }
 
@@ -97,6 +99,6 @@ public final class GeneralCommandHandler {
     }
 
     public void handleUnknown(Context context) {
-        context.sendReply(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
+        context.sendReply(PendingMessage.ofMarkdownRaw(at(context) + "未知指令。使用/help获取帮助。"));
     }
 }

@@ -25,6 +25,8 @@ import java.util.List;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
+import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
+
 public class DebugRoutes {
     private static final Logger LOG = LogManager.getLogger(DebugRoutes.class);
     private final Supplier<AppConfig> configSupplier;
@@ -55,12 +57,12 @@ public class DebugRoutes {
 
     public void routeDebug(Context ctx) {
         if (!configSupplier.get().seira().debugMode()) {
-            ctx.sendReply(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "未知指令。使用/help获取帮助。"));
             return;
         }
 
         if (!adminAuthorizer.test(ctx.senderUserId())) {
-            ctx.sendReply(PendingMessage.ofString("你没有权限使用此指令。"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "你没有权限使用此指令。"));
             return;
         }
 
@@ -85,7 +87,7 @@ public class DebugRoutes {
 
     public void handleUpload(Context ctx) {
         if (ctx.argumentCount() != 3) {
-            ctx.sendReply(PendingMessage.ofString("用法：/debug.upload <type> <cos> <url>"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/debug.upload <type> <cos> <url>"));
             return;
         }
 
@@ -115,7 +117,7 @@ public class DebugRoutes {
             new Base64Encoder().decode(ctx.query(), out);
             ctx.sendReply(PendingMessage.ofMarkdownRaw(out.toString()));
         } catch (Exception e) {
-            ctx.sendReply(PendingMessage.ofString("解码失败"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "解码失败"));
         }
     }
 
@@ -130,11 +132,11 @@ public class DebugRoutes {
             }
 
             if (cause != null) {
-                ctx.sendReply(PendingMessage.ofString("执行失败: " + cause.getMessage()));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "执行失败: " + cause.getMessage()));
                 return;
             }
 
-            ctx.sendReply(PendingMessage.ofString("执行失败"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "执行失败"));
         }
     }
 
@@ -143,10 +145,10 @@ public class DebugRoutes {
             final List<Long> allUsers = UserDataStore.findAllUsers();
             taskCoordinator.runApiRequest(ctx, "Update All User Info", () -> {
                 APIHelper.getUsers(allUsers).forEach(user -> UserDataStore.storeUserInfo(user.getId(), user.getUsername()));
-                ctx.sendReply(PendingMessage.ofString("更新完成，共更新了" + allUsers.size() + "个用户的信息"));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "更新完成，共更新了" + allUsers.size() + "个用户的信息"));
             });
         } catch (Exception e) {
-            ctx.sendReply(PendingMessage.ofString("用户信息更新失败"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用户信息更新失败"));
         }
     }
 
@@ -191,10 +193,10 @@ public class DebugRoutes {
                             }
                         });
 
-                ctx.sendReply(PendingMessage.ofString("获取完成，共获取了" + allOsuTokens.size() + "个用户的好友列表"));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "获取完成，共获取了" + allOsuTokens.size() + "个用户的好友列表"));
             } catch (Exception e) {
                 LOG.error("Failed to get friends", e);
-                ctx.sendReply(PendingMessage.ofString("用户信息更新失败"));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用户信息更新失败"));
             }
         });
     }
@@ -216,10 +218,10 @@ public class DebugRoutes {
                     }
                 }
 
-                ctx.sendReply(PendingMessage.ofString("Token验证完成，共更新了" + updated + "，移除了" + removed));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "Token验证完成，共更新了" + updated + "，移除了" + removed));
             } catch (Exception e) {
                 LOG.error("Failed to get friends", e);
-                ctx.sendReply(PendingMessage.ofString("用户信息更新失败"));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用户信息更新失败"));
             }
         });
     }

@@ -77,7 +77,7 @@ public final class RankGuessCommandHandler {
 
     public void handleRankGuess(Context ctx) {
         if (!ctx.inGroup()) {
-            ctx.sendReply(PendingMessage.ofString("/rg 仅支持群聊使用。"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "/rg 仅支持群聊使用。"));
             return;
         }
 
@@ -95,7 +95,7 @@ public final class RankGuessCommandHandler {
                 } else if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
                     statistics(ctx, true);
                 } else {
-                    ctx.sendReply(PendingMessage.ofString(USAGE));
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
                 }
                 return;
             }
@@ -107,7 +107,7 @@ public final class RankGuessCommandHandler {
                 } else if (ctx.argumentCount() == 2 && "global".equalsIgnoreCase(ctx.argument(1))) {
                     leaderboard(ctx, LeaderboardType.GLOBAL);
                 } else {
-                    ctx.sendReply(PendingMessage.ofString(USAGE));
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
                 }
                 return;
             }
@@ -123,12 +123,12 @@ public final class RankGuessCommandHandler {
                     return;
                 }
 
-                ctx.sendReply(PendingMessage.ofString(USAGE));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
                 return;
             }
             case "group" -> {
                 if (ctx.argumentCount() != 1) {
-                    ctx.sendReply(PendingMessage.ofString(USAGE));
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
                     return;
                 }
 
@@ -137,7 +137,7 @@ public final class RankGuessCommandHandler {
             }
             case "end" -> {
                 if (ctx.argumentCount() != 1) {
-                    ctx.sendReply(PendingMessage.ofString(USAGE));
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
                     return;
                 }
                 end(ctx, false);
@@ -151,12 +151,12 @@ public final class RankGuessCommandHandler {
                     if (matcher.matches()) {
                         final int i = Integer.parseInt(matcher.group(1));
                         if (i <= 0 || i > 200) {
-                            ctx.sendReply(PendingMessage.ofString(USAGE));
+                            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
                         }
                         wishScore(ctx, i);
                     }
                 } else {
-                    ctx.sendReply(PendingMessage.ofString(USAGE));
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
                 }
                 return;
             }
@@ -166,7 +166,7 @@ public final class RankGuessCommandHandler {
                 } else if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
                     weight(ctx, true);
                 } else {
-                    ctx.sendReply(PendingMessage.ofString(USAGE));
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
                 }
                 return;
             }
@@ -188,7 +188,7 @@ public final class RankGuessCommandHandler {
         } else {
             rank = parseRank(argument);
             if (rank == null) {
-                ctx.sendReply(PendingMessage.ofString(USAGE));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
                 return;
             }
         }
@@ -199,14 +199,14 @@ public final class RankGuessCommandHandler {
     private void currentStatus(Context ctx) {
         final RankGuessGameService.GameStatus status = games.getStatus(ctx.groupId());
         if (status == RankGuessGameService.GameStatus.NO_GAME) {
-            ctx.sendReply(PendingMessage.ofString("目前本群没有进行中的猜 Rank 游戏喵！可以使用 /rg group 或 /rg start 开始游戏喵~"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "目前本群没有进行中的猜 Rank 游戏喵！可以使用 /rg group 或 /rg start 开始游戏喵~"));
             return;
         }
 
         final MessageReference videoMessageRef = games.getVideoMessageRef(ctx.groupId());
 
         if (status == RankGuessGameService.GameStatus.STARTING || videoMessageRef == null) {
-            ctx.sendReply(PendingMessage.ofString("游戏即将开始，稍等片刻喵~"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "游戏即将开始，稍等片刻喵~"));
             return;
         }
 
@@ -426,7 +426,7 @@ public final class RankGuessCommandHandler {
     private void start(Context ctx, boolean fromGroup) {
         Reservation reservation = games.reserve(ctx.groupId(), ctx.senderUserId(), fromGroup);
         if (reservation == null) {
-            ctx.sendReply(PendingMessage.ofString("本群已有一轮 Rank Guess 正在进行。"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "本群已有一轮 Rank Guess 正在进行。"));
             return;
         }
 
@@ -604,9 +604,9 @@ public final class RankGuessCommandHandler {
         GuessResponse response = games.guess(ctx.groupId(), ctx.senderUserId(), rank);
         final GuessResult result = response.guessResult();
         PendingMessage message = switch (result.status()) {
-            case NO_GAME -> PendingMessage.ofString("本群当前没有进行中的 Rank Guess 喵");
-            case STARTING -> PendingMessage.ofString("回放仍在渲染，请等待视频发送后再猜测喵");
-            case TOO_SOON -> PendingMessage.ofString("距离上次猜测不足20秒，无法修改猜测喵");
+            case NO_GAME -> PendingMessage.ofMarkdownRaw(at(ctx) + "本群当前没有进行中的 Rank Guess 喵");
+            case STARTING -> PendingMessage.ofMarkdownRaw(at(ctx) + "回放仍在渲染，请等待视频发送后再猜测喵");
+            case TOO_SOON -> PendingMessage.ofMarkdownRaw(at(ctx) + "距离上次猜测不足20秒，无法修改猜测喵");
             case UPDATED, RECORDED -> PendingMessage.ofMarkdownRaw(
                     at(ctx)
                             + "已" + (result.status() == RankGuessGameService.GuessStatus.UPDATED ? "更新" : "记录") + "你的猜测："
@@ -627,15 +627,15 @@ public final class RankGuessCommandHandler {
             result = games.end(ctx.groupId(), ctx.senderUserId(), adminAuthorizer.test(ctx.senderUserId()), force);
         } catch (RankGuessRecordStore.RecordSaveException e) {
             LOG.error("Failed to record rank guess round in group {}", ctx.groupId(), e);
-            PendingMessage failure = PendingMessage.ofString("战绩保存失败，本轮尚未结算，请稍后使用 /rg end 重试喵。");
+            PendingMessage failure = PendingMessage.ofMarkdownRaw(at(ctx) + "战绩保存失败，本轮尚未结算，请稍后使用 /rg end 重试喵。");
             if (!ctx.sendReply(failure).success()) ctx.sendMessage(failure);
             return;
         }
 
         PendingMessage message = switch (result.status()) {
-            case NO_GAME -> PendingMessage.ofString("本群当前没有进行中的 Rank Guess 喵");
-            case STARTING -> PendingMessage.ofString("高光仍在渲染，请等待视频发送后再结束游戏喵");
-            case FORBIDDEN -> PendingMessage.ofString(
+            case NO_GAME -> PendingMessage.ofMarkdownRaw(at(ctx) + "本群当前没有进行中的 Rank Guess 喵");
+            case STARTING -> PendingMessage.ofMarkdownRaw(at(ctx) + "高光仍在渲染，请等待视频发送后再结束游戏喵");
+            case FORBIDDEN -> PendingMessage.ofMarkdownRaw(at(ctx) +
                     "开始猜测后的3分钟内，仅发起者和机器人管理员可以结束游戏喵"
             );
             case FINISHED -> replyFactory.rankGuessResultMessage(ctx, result.round(), result.rankType());

@@ -11,6 +11,8 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
+import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
+
 public final class SpecificScoreWatchCommandHandler {
     private static final String USAGE =
             "用法：/wx start <UID列表，逗号分隔> <谱面ID列表，逗号分隔>；/wx stop";
@@ -44,7 +46,7 @@ public final class SpecificScoreWatchCommandHandler {
 
     public void handleWx(Context ctx) {
         if (!ctx.inGroup()) {
-            ctx.sendReply(PendingMessage.ofString("/wx 仅支持群聊使用。"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "/wx 仅支持群聊使用。"));
             return;
         }
         if (ctx.argumentCount() == 0) {
@@ -68,19 +70,19 @@ public final class SpecificScoreWatchCommandHandler {
         Set<Long> userIds = parseIds(ctx.argument(1));
         Set<Long> beatmapIds = parseIds(ctx.argument(2));
         if (userIds == null || beatmapIds == null) {
-            ctx.sendReply(PendingMessage.ofString("UID 与谱面 ID 必须是以逗号分隔的正整数。\n" + USAGE));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "UID 与谱面 ID 必须是以逗号分隔的正整数。\n" + USAGE));
             return;
         }
 
         taskCoordinator.runApiRequest(ctx, "Start Specific Score Watch", () -> {
             if (!ctx.sendMessage(PendingMessage.ofString("正在尝试启动指定谱面成绩监视……")).success()) {
-                ctx.sendReply(PendingMessage.ofString(
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) +
                         "由于缺少主动消息权限，无法启动监视！权限配置请见：https://docs.seira.top/overview/use.html#extra-permission"
                 ));
                 return;
             }
             SpecificScoreWatchState state = watchService.startSpecific(ctx.groupId(), userIds, beatmapIds);
-            ctx.sendReply(PendingMessage.ofString(
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) +
                     "指定谱面成绩监视已启动，目标为" + state.userIds().size() + " 名玩家，"
                             + state.beatmapIds().size() + " 张谱面。"
             ));
@@ -93,12 +95,10 @@ public final class SpecificScoreWatchCommandHandler {
             return;
         }
         boolean stopped = watchService.stopSpecific(ctx.groupId());
-        ctx.sendReply(PendingMessage.ofString(
-                stopped ? "已停止当前群聊的指定谱面成绩监视。" : "当前群聊没有指定谱面成绩监视。"
-        ));
+        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + (stopped ? "已停止当前群聊的指定谱面成绩监视。" : "当前群聊没有指定谱面成绩监视。")));
     }
 
     private void usage(Context ctx) {
-        ctx.sendReply(PendingMessage.ofString(USAGE));
+        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
     }
 }

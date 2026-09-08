@@ -24,6 +24,8 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
+import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
+
 public final class SocialCommandHandler {
     private final Resolver resolver;
     private final OsuAuthHelper authHelper;
@@ -47,7 +49,7 @@ public final class SocialCommandHandler {
 
     public void handleMp(Context ctx) {
         if (resolver.resolveBoundUid(ctx.senderUserId()) == null) {
-            ctx.sendReply(PendingMessage.ofString(CommandUsage.NO_BIND));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.NO_BIND));
             return;
         }
 
@@ -65,7 +67,7 @@ public final class SocialCommandHandler {
     public void handleF(Context ctx, boolean all) {
         final Long uid = resolver.resolveBoundUid(ctx.senderUserId());
         if (uid == null) {
-            ctx.sendReply(PendingMessage.ofString(CommandUsage.NO_BIND));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.NO_BIND));
             return;
         }
 
@@ -155,11 +157,11 @@ public final class SocialCommandHandler {
     public void handleFclear(Context ctx) {
         Long uid = resolver.resolveBoundUid(ctx.senderUserId());
         if (uid == null) {
-            ctx.sendReply(PendingMessage.ofString(CommandUsage.NO_BIND));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.NO_BIND));
             return;
         }
 
-        ctx.sendReply(PendingMessage.ofString(
+        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) +
                 "已清除 " + UserDataStore.clearFollowed(uid) + " 条好友记录。"
         ));
     }
@@ -169,7 +171,7 @@ public final class SocialCommandHandler {
             if (ctx.groupId() != null && !ctx.groupId().isBlank()) {
                 List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(ctx.groupId());
                 if (groupBoundUids.isEmpty()) {
-                    ctx.sendReply(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind"));
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "本群还没有已绑定的玩家，请先使用 /bind"));
                     return;
                 }
 
@@ -183,7 +185,7 @@ public final class SocialCommandHandler {
             }
             Long uid = resolver.resolveBoundUid(ctx.senderUserId());
             if (uid == null) {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.NO_BIND));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.NO_BIND));
                 return;
             }
 
@@ -197,7 +199,7 @@ public final class SocialCommandHandler {
             TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
             ShortcutTarget target = targetResolution.target();
             if (target.isError()) {
-                ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
                 return;
             }
 
@@ -206,7 +208,7 @@ public final class SocialCommandHandler {
                 if (ctx.groupId() != null && !ctx.groupId().isBlank()) {
                     List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(ctx.groupId());
                     if (groupBoundUids.isEmpty()) {
-                        ctx.sendReply(PendingMessage.ofString("本群还没有已绑定的玩家，请先使用 /bind"));
+                        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "本群还没有已绑定的玩家，请先使用 /bind"));
                         return;
                     }
                     taskCoordinator.runImageRequest(
@@ -219,7 +221,7 @@ public final class SocialCommandHandler {
                 }
                 Long uid = resolver.resolveBoundUid(ctx.senderUserId());
                 if (uid == null) {
-                    ctx.sendReply(PendingMessage.ofString(CommandUsage.NO_BIND));
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.NO_BIND));
                     return;
                 }
 
@@ -233,13 +235,13 @@ public final class SocialCommandHandler {
             }
 
             if (remainingArgs != 1) {
-                ctx.sendReply(PendingMessage.ofString("用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
                 return;
             }
 
             String[] uidTokens = ctx.args()[targetResolution.consumedArgs()].split(",");
             if (uidTokens.length == 0) {
-                ctx.sendReply(PendingMessage.ofString("玩家ID列表不能为空。用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "玩家ID列表不能为空。用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
                 return;
             }
 
@@ -247,7 +249,7 @@ public final class SocialCommandHandler {
             for (String uidToken : uidTokens) {
                 Long uid = resolver.parsePositiveLong(uidToken.trim());
                 if (uid == null) {
-                    ctx.sendReply(PendingMessage.ofString("玩家ID列表包含非法值。用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "玩家ID列表包含非法值。用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
                     return;
                 }
                 uids.add(uid);
@@ -260,7 +262,7 @@ public final class SocialCommandHandler {
                     replyFactory::lbMessage
             );
         } else {
-            ctx.sendReply(PendingMessage.ofString("用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
         }
     }
 

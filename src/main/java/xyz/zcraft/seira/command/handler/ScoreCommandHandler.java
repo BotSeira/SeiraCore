@@ -10,6 +10,8 @@ import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.data.UserRef;
 
+import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
+
 public final class ScoreCommandHandler {
     private static final int MAX_SCORE_LIST_COUNT = 200;
 
@@ -50,7 +52,7 @@ public final class ScoreCommandHandler {
         if (ctx.args().length == 0) {
             ShortcutTarget target = resolver.parseTarget("bp1", ctx.senderUserId());
             if (target.isError()) {
-                ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
                 return;
             }
 
@@ -88,7 +90,7 @@ public final class ScoreCommandHandler {
         if (ctx.args().length == 0) {
             ShortcutTarget target = resolver.parseTarget(ctx.command() + "1", ctx.senderUserId());
             if (target.isError()) {
-                ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
                 return;
             }
 
@@ -125,7 +127,7 @@ public final class ScoreCommandHandler {
     public void handleTb(Context ctx) {
         TbArguments request = parseTbArguments(ctx.args());
         if (request == null) {
-            ctx.sendReply(PendingMessage.ofString(CommandUsage.TB));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.TB));
             return;
         }
 
@@ -133,18 +135,18 @@ public final class ScoreCommandHandler {
         if (request.target() != null) {
             UserRefResolution resolution = resolver.resolveUserRefArgument(request.target());
             if (resolution.errorMessage() != null) {
-                ctx.sendReply(PendingMessage.ofString(resolution.errorMessage()));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + resolution.errorMessage()));
                 return;
             }
             if (resolution.userRef() == null) {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.TB));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.TB));
                 return;
             }
             userRef = resolution.userRef();
         } else {
             Long uid = resolver.resolveBoundUid(ctx.senderUserId());
             if (uid == null) {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.NO_BIND));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.NO_BIND));
                 return;
             }
             userRef = new UserRef.ByUid(uid);
@@ -166,7 +168,7 @@ public final class ScoreCommandHandler {
         if (resolver.looksLikeMention(ctx.args()[0]) || resolver.looksLikeUid(ctx.args()[0])) {
             final UserRefResolution userRefResolution = resolver.resolveUserRefArgument(ctx.args()[0]);
             if (userRefResolution.errorMessage() != null) {
-                ctx.sendReply(PendingMessage.ofString(userRefResolution.errorMessage()));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + userRefResolution.errorMessage()));
                 return;
             }
             targetUser = userRefResolution.userRef();
@@ -175,14 +177,14 @@ public final class ScoreCommandHandler {
 
         ScoreFilterArguments.ParseResult filters = ScoreFilterArguments.parse(ctx.args(), startIndex);
         if (filters.isError()) {
-            ctx.sendReply(PendingMessage.ofString(filters.errorMessage() + "\n" + CommandUsage.SCORE_FILTERS));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + filters.errorMessage() + "\n" + CommandUsage.SCORE_FILTERS));
             return;
         }
 
         if (targetUser == null) {
             Long uid = resolver.resolveBoundUid(ctx.senderUserId());
             if (uid == null) {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.NO_BIND));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.NO_BIND));
                 return;
             }
             targetUser = new UserRef.ByUid(uid);
@@ -201,7 +203,7 @@ public final class ScoreCommandHandler {
         String[] args = ctx.args();
         Integer count = resolver.parsePositiveInt(args[0]);
         if (count == null || count > MAX_SCORE_LIST_COUNT) {
-            ctx.sendReply(PendingMessage.ofString(usage + "\n数量必须在 1 到 " + MAX_SCORE_LIST_COUNT + " 之间。"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + usage + "\n数量必须在 1 到 " + MAX_SCORE_LIST_COUNT + " 之间。"));
             return null;
         }
 
@@ -210,11 +212,11 @@ public final class ScoreCommandHandler {
         if (nextArg < args.length && (resolver.looksLikeMention(args[nextArg]) || resolver.looksLikeUid(args[nextArg]))) {
             UserRefResolution resolution = resolver.resolveUserRefArgument(args[nextArg]);
             if (resolution.errorMessage() != null) {
-                ctx.sendReply(PendingMessage.ofString(resolution.errorMessage()));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + resolution.errorMessage()));
                 return null;
             }
             if (resolution.userRef() == null) {
-                ctx.sendReply(PendingMessage.ofString(usage));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + usage));
                 return null;
             }
             userRef = resolution.userRef();
@@ -222,7 +224,7 @@ public final class ScoreCommandHandler {
         } else {
             Long uid = resolver.resolveBoundUid(ctx.senderUserId());
             if (uid == null) {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.NO_BIND));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.NO_BIND));
                 return null;
             }
             userRef = new UserRef.ByUid(uid);
@@ -230,7 +232,7 @@ public final class ScoreCommandHandler {
 
         ScoreFilterArguments.ParseResult filters = ScoreFilterArguments.parse(args, nextArg);
         if (filters.isError()) {
-            ctx.sendReply(PendingMessage.ofString(filters.errorMessage() + "\n" + CommandUsage.SCORE_FILTERS));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + filters.errorMessage() + "\n" + CommandUsage.SCORE_FILTERS));
             return null;
         }
         return new ScoreListRequest(count, userRef, filters.filters());
@@ -246,11 +248,11 @@ public final class ScoreCommandHandler {
         } else if (ctx.args().length == 1 && resolver.looksLikeMention(ctx.args()[0])) {
             UserRefResolution resolution = resolver.resolveUserRefArgument(ctx.args()[0]);
             if (resolution.errorMessage() != null) {
-                ctx.sendReply(PendingMessage.ofString(resolution.errorMessage()));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + resolution.errorMessage()));
                 return;
             }
             if (resolution.userRef() == null) {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.S));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.S));
                 return;
             }
 
@@ -271,23 +273,23 @@ public final class ScoreCommandHandler {
             if (ctx.args().length == targetResolution.consumedArgs() + 1) {
                 UserRefResolution resolution = resolver.resolveUserRefArgument(ctx.args()[targetResolution.consumedArgs()]);
                 if (resolution.errorMessage() != null) {
-                    ctx.sendReply(PendingMessage.ofString(resolution.errorMessage()));
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + resolution.errorMessage()));
                     return;
                 }
                 if (resolution.userRef() == null) {
-                    ctx.sendReply(PendingMessage.ofString(CommandUsage.S));
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.S));
                     return;
                 }
                 overrideUser = resolution.userRef();
             } else if (ctx.args().length != targetResolution.consumedArgs()) {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.S));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.S));
                 return;
             }
 
             ref.target = targetResolution.target();
 
             if (ref.target.isError()) {
-                ctx.sendReply(PendingMessage.ofString(ref.target.errorMessage()));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + ref.target.errorMessage()));
                 return;
             }
 
@@ -307,7 +309,7 @@ public final class ScoreCommandHandler {
         }
 
         if (ref.target == null) {
-            ctx.sendReply(PendingMessage.ofString(CommandUsage.S));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.S));
             return;
         }
 
@@ -328,14 +330,14 @@ public final class ScoreCommandHandler {
             TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
 
             if (ctx.args().length != targetResolution.consumedArgs()) {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.SA));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.SA));
                 return;
             }
 
             target = targetResolution.target();
 
             if (target.isError()) {
-                ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
                 return;
             }
 
@@ -345,7 +347,7 @@ public final class ScoreCommandHandler {
         }
 
         if (target == null) {
-            ctx.sendReply(PendingMessage.ofString(CommandUsage.SA));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.SA));
             return;
         }
 
@@ -361,17 +363,17 @@ public final class ScoreCommandHandler {
         TargetResolution targetResolution = targetHistory.resolveOptionalTarget(ctx, resolver, arg -> arg.startsWith("#"));
         ShortcutTarget target = targetResolution.target();
         if (target == null) {
-            ctx.sendReply(PendingMessage.ofString(CommandUsage.MA));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.MA));
             return;
         }
         if (target.isError()) {
-            ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
             return;
         }
 
         int remainingArgs = ctx.args().length - targetResolution.consumedArgs();
         if (remainingArgs > 1) {
-            ctx.sendReply(PendingMessage.ofString(CommandUsage.MA));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.MA));
             return;
         }
 
@@ -381,7 +383,7 @@ public final class ScoreCommandHandler {
                     targetResolution.consumedArgs() == 0
             );
             if (index == null) {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.MA));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.MA));
                 return;
             }
 

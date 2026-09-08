@@ -85,16 +85,16 @@ public final class WatchCommandHandler {
     }
 
     private static void usage(Context ctx) {
-        ctx.sendReply(PendingMessage.ofString(USAGE));
+        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
     }
 
     public void handleWatch(Context ctx) {
         if (!ctx.inGroup()) {
-            ctx.sendReply(PendingMessage.ofString("/watch 仅支持群聊使用。"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "/watch 仅支持群聊使用。"));
             return;
         }
         if (watchService == null) {
-            ctx.sendReply(PendingMessage.ofString("成绩监视服务暂不可用。"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "成绩监视服务暂不可用。"));
             return;
         }
         if (ctx.argumentCount() == 0) {
@@ -114,9 +114,9 @@ public final class WatchCommandHandler {
     private void handleNow(Context ctx) {
         if (adminAuthorizer.test(ctx.senderUserId())) {
             watchService.pollNow();
-            ctx.sendReply(PendingMessage.ofString("已触发立即轮询。"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "已触发立即轮询。"));
         } else {
-            ctx.sendReply(PendingMessage.ofString("你没有权限使用此指令。"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "你没有权限使用此指令。"));
         }
     }
 
@@ -140,13 +140,13 @@ public final class WatchCommandHandler {
                     at(ctx) + "正在尝试添加监视..."
             )).success();
             if (!b) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw("由于缺少主动消息权限，无法添加监视！权限配置请见[这里](https://docs.seira.top/overview/use.html#extra-permission)~"));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "由于缺少主动消息权限，无法添加监视！权限配置请见[这里](https://docs.seira.top/overview/use.html#extra-permission)~"));
                 return;
             }
 
             watchService.add(ctx.groupId(), target, Duration.ofMinutes(minutes));
             ctx.sendReply(PendingMessage.ofMarkdownRaw(
-                    displayTarget(target) + " 添加监视成功！有效期：" + minutes + "分钟"
+                    at(ctx) + ": " + displayTarget(target) + " 添加监视成功！有效期：" + minutes + "分钟"
             ));
         });
     }
@@ -158,10 +158,10 @@ public final class WatchCommandHandler {
         }
         if (ctx.argumentCount() == 1) {
             int removed = watchService.removeAll(ctx.groupId());
-            ctx.sendReply(PendingMessage.ofString(
-                    removed == 0
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) +
+                    (removed == 0
                             ? "当前群聊没有监视任务。"
-                            : "已移除当前群聊中的全部监视任务，共 " + removed + " 个。"
+                            : "已移除当前群聊中的全部监视任务，共 " + removed + " 个。")
             ));
             return;
         }
@@ -170,7 +170,7 @@ public final class WatchCommandHandler {
         String mentionedOpenId = resolver.extractMentionedUserId(targetArgument);
         if (mentionedOpenId != null) {
             if (!UserDataStore.isGroupMember(ctx.groupId(), mentionedOpenId)) {
-                ctx.sendReply(PendingMessage.ofString("指定的用户不在当前群聊中。"));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "指定的用户不在当前群聊中。"));
                 return;
             }
             WatchView removed = watchService.removeByQqOpenId(ctx.groupId(), mentionedOpenId);
@@ -191,11 +191,11 @@ public final class WatchCommandHandler {
         }
         List<WatchView> watches = watchService.list(ctx.groupId());
         if (watches.isEmpty()) {
-            ctx.sendReply(PendingMessage.ofString("当前群聊没有监视任务。"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "当前群聊没有监视任务。"));
             return;
         }
 
-        StringBuilder content = new StringBuilder("当前群聊的监视任务：\n");
+        StringBuilder content = new StringBuilder(at(ctx) + "当前群聊的监视任务：\n");
         for (WatchView watch : watches) {
             content.append("> ")
                     .append(displayTarget(watch.target()))

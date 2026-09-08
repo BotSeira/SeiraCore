@@ -18,6 +18,8 @@ import xyz.zcraft.seira.command.reply.ReplyFactory;
 import java.util.List;
 import java.util.function.Function;
 
+import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
+
 public final class BeatmapCommandHandler {
     private final Resolver resolver;
     private final TargetHistory lastTarget;
@@ -53,14 +55,14 @@ public final class BeatmapCommandHandler {
             TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
             ShortcutTarget target = targetResolution.target();
             if (target.isError()) {
-                ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
                 return;
             }
 
             lastTarget.put(ctx.senderUserId(), target);
 
             if (ctx.args().length > targetResolution.consumedArgs() + 1) {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.M));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.M));
                 return;
             }
 
@@ -86,7 +88,7 @@ public final class BeatmapCommandHandler {
                 return;
             }
 
-            ctx.sendReply(PendingMessage.ofString(CommandUsage.M));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.M));
         }
     }
 
@@ -96,13 +98,13 @@ public final class BeatmapCommandHandler {
                     ctx.args(), ctx.senderUserId());
             ShortcutTarget target = targetResolution.target();
             if (target.isError()) {
-                ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
                 return;
             }
 
             lastTarget.put(ctx.senderUserId(), target);
             if (ctx.args().length > targetResolution.consumedArgs() + 1) {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.BMA));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.BMA));
                 return;
             }
 
@@ -121,7 +123,7 @@ public final class BeatmapCommandHandler {
 
         ShortcutTarget target = lastTarget.get(ctx.senderUserId());
         if (target == null) {
-            ctx.sendReply(PendingMessage.ofString(CommandUsage.BMA));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.BMA));
             return;
         }
         taskCoordinator.runImageRequest(
@@ -140,7 +142,7 @@ public final class BeatmapCommandHandler {
             TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
             target = targetResolution.target();
             if (target.isError()) {
-                ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
                 return;
             }
 
@@ -149,7 +151,7 @@ public final class BeatmapCommandHandler {
             if (lastTarget.get(ctx.senderUserId()) != null) {
                 target = lastTarget.get(ctx.senderUserId());
             } else {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.AP));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.AP));
                 return;
             }
         }
@@ -163,20 +165,20 @@ public final class BeatmapCommandHandler {
 
     public void handleBpv(Context ctx) {
         if (ctx.args().length < 1) {
-            ctx.sendReply(PendingMessage.ofString(CommandUsage.BPV));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.BPV));
             return;
         }
 
         TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(
                 ctx.args(), ctx.senderUserId());
         if (ctx.args().length > targetResolution.consumedArgs() + 1) {
-            ctx.sendReply(PendingMessage.ofString(CommandUsage.BPV));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.BPV));
             return;
         }
 
         ShortcutTarget target = targetResolution.target();
         if (target.isError()) {
-            ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
             return;
         }
 
@@ -205,7 +207,7 @@ public final class BeatmapCommandHandler {
             TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
             target = targetResolution.target();
             if (target.isError()) {
-                ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
                 return;
             }
 
@@ -214,7 +216,7 @@ public final class BeatmapCommandHandler {
             if (lastTarget.get(ctx.senderUserId()) != null) {
                 target = lastTarget.get(ctx.senderUserId());
             } else {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.BGP));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.BGP));
                 return;
             }
         }
@@ -235,13 +237,13 @@ public final class BeatmapCommandHandler {
         } else if (ctx.args().length <= 2) {
             TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
             if (ctx.args().length != targetResolution.consumedArgs()) {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.DL));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.DL));
                 return;
             }
 
             target = targetResolution.target();
             if (target.isError()) {
-                ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
                 return;
             }
 
@@ -251,7 +253,7 @@ public final class BeatmapCommandHandler {
         }
 
         if (target == null) {
-            ctx.sendReply(PendingMessage.ofString(CommandUsage.DL));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.DL));
             return;
         }
 
@@ -270,12 +272,12 @@ public final class BeatmapCommandHandler {
         } else if (ctx.args().length <= 2) {
             TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
             if (ctx.args().length != targetResolution.consumedArgs()) {
-                ctx.sendReply(PendingMessage.ofString("用法：/ms <谱面集ID 或 快捷查询>"));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/ms <谱面集ID 或 快捷查询>"));
                 return;
             }
             target = targetResolution.target();
             if (target.isError()) {
-                ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
                 return;
             }
 
@@ -285,7 +287,7 @@ public final class BeatmapCommandHandler {
         }
 
         if (target == null) {
-            ctx.sendReply(PendingMessage.ofString("用法：/ms <谱面集ID 或 快捷查询>"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/ms <谱面集ID 或 快捷查询>"));
             return;
         }
 
@@ -300,7 +302,7 @@ public final class BeatmapCommandHandler {
     public void handleSms(Context ctx) {
         final SearchQuery searchQuery = resolver.resolveSearchQuery(ctx.query());
         if (searchQuery == null) {
-            ctx.sendReply(PendingMessage.ofString("用法：/sms [#页数] <搜索关键字>"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/sms [#页数] <搜索关键字>"));
             return;
         }
         taskCoordinator.runApiRequest(ctx, "Search Beatmapset", () -> {

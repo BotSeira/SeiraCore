@@ -177,7 +177,7 @@ public final class TaskCoordinator {
 
             APIHelper.ReplayRenderResult result = waitForReplay(taskInfo);
             if (result == null) {
-                ctx.sendReply(PendingMessage.ofString("回放视频生成失败，请稍后重试。"));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "回放视频生成失败，请稍后重试。"));
                 return;
             }
 
