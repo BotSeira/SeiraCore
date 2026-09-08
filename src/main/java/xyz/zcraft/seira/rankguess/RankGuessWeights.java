@@ -210,7 +210,7 @@ public class RankGuessWeights {
             }
 
             state.scoreRecords.forEach((scoreId, count) ->
-                    scores.put(
+                    scores.putIfAbsent(
                             scoreId,
                             Math.pow(SCORE_REPEAT_FACTOR, count)
                     )
