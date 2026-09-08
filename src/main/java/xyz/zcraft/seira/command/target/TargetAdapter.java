@@ -8,7 +8,7 @@ public final class TargetAdapter {
     private TargetAdapter() {}
 
     public static TargetQuery fromShortcut(ShortcutTarget target, TargetKind numericKind) {
-        if (target == null) throw new ResolutionException("没有可用的目标记忆，请先指定目标。");
+        if (target == null) throw new ResolutionException("请指定指令目标喵");
         if (target.isError()) throw new ResolutionException(target.errorMessage());
         if (target.isLocalScore()) return new TargetQuery.Reference(TargetId.score(target.localScoreId()), null);
         return switch (target.macroType()) {

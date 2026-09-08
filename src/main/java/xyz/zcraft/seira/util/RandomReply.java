@@ -1,0 +1,27 @@
+package xyz.zcraft.seira.util;
+
+import java.util.concurrent.ThreadLocalRandom;
+
+public class RandomReply {
+    public static String loading() {
+        final ThreadLocalRandom current = ThreadLocalRandom.current();
+
+        return RandomReplyTexts.LOADING_PREFIXES[current.nextInt(RandomReplyTexts.LOADING_PREFIXES.length)]
+                + RandomReplyTexts.LOADING_TEXTS[current.nextInt(RandomReplyTexts.LOADING_TEXTS.length)]
+                + RandomReplyTexts.LOADING_SUFFIXES[current.nextInt(RandomReplyTexts.LOADING_SUFFIXES.length)];
+    }
+}
+
+class RandomReplyTexts {
+    public static final String[] LOADING_PREFIXES = new String[]{
+            "正在", "即将", "马上", "准备", "开始"
+    };
+    public static final String[] LOADING_TEXTS = new String[]{
+            "刷PP", "加载中", "处理中", "修BP", "打舞萌", "打中二", "联系ppy", "给你擦皮鞋", "插U盘",
+            "氛围编程", "给群友炒菜", "看百合漫画", "准备rework", "被notelock", "摸鱼", "寻找mp", "de",
+            "大调查群友"
+    };
+    public static final String[] LOADING_SUFFIXES = new String[]{
+            "...", "!", "~", "喵", "喵...", "喵!", "喵~"
+    };
+}

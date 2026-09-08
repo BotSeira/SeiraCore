@@ -20,6 +20,7 @@ import xyz.zcraft.seira.rankguess.HintUtil;
 import xyz.zcraft.seira.rankguess.RankGuessGame;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
 import xyz.zcraft.seira.rankguess.data.*;
+import xyz.zcraft.seira.util.RandomReply;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -435,7 +436,7 @@ public final class RankGuessCommandHandler {
                 ctx,
                 "Rank Guess Render",
                 () -> {
-                    final PendingMessage message = PendingMessage.ofMarkdownRaw(at(ctx) + "正在选定随机成绩...");
+                    final PendingMessage message = PendingMessage.ofMarkdownRaw(at(ctx) + RandomReply.loading());
                     final boolean activeMessageEnabled = ctx.sendMessage(message).success();
                     if (!activeMessageEnabled) {
                         ctx.sendReply(message);

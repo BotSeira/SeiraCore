@@ -39,7 +39,7 @@ public final class TargetService {
     }
 
     public TargetId resolve(String caller, TargetRequest request, List<String> filters) {
-        if (request == null) throw new ResolutionException("没有可用的目标记忆，请先指定目标。");
+        if (request == null) throw new ResolutionException("请指定指令目标喵");
         List<String> scoreFilters = List.copyOf(filters);
         TargetMemory result = history.update(caller, previous -> {
             TargetMemory memory = request.remembered()
@@ -80,7 +80,7 @@ public final class TargetService {
         if (target.kind() == desired && !scoreOverride) return memory;
 
         if (target.kind() == TargetKind.BEATMAPSET) {
-            throw new ResolutionException("只记忆了谱面集，请使用 谱面集ID#难度序号 或指定谱面ID。");
+            throw new ResolutionException("请指定指令目标谱面喵");
         }
         // An override on a score selects that player's score on the same map.
         if (scoreOverride && target.kind() == TargetKind.SCORE) {
@@ -100,7 +100,7 @@ public final class TargetService {
     private TargetQuery withPlayer(String caller, TargetQuery query) {
         if (query.user() != null) return query;
         Long uid = boundUid.apply(caller);
-        if (uid == null) throw new ResolutionException("请先绑定 osu! 账号，再查找记忆谱面上的成绩。");
+        if (uid == null) throw new ResolutionException("请先绑定 osu! 账号，再查找记忆谱面上的成绩喵");
         return query.withUser(new UserRef.ByUid(uid));
     }
 }
