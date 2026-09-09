@@ -345,7 +345,7 @@ public class RankGuessRecordStore {
                 statement.setInt(index++, scoringVersion);
             }
 
-            statement.setInt(index, recentGameLimit);
+            statement.setInt(index++, recentGameLimit);
 
             if (gameLimit != null) {
                 statement.setInt(index, gameLimit);
