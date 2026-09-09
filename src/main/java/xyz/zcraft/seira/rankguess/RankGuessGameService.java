@@ -77,6 +77,23 @@ public final class RankGuessGameService {
         }
     }
 
+    public static boolean isOutstandingGuess(
+            long guess, long actualRank, int participants, int revealedHints, int totalHints
+    ) {
+        double allowedDifference = 50.0 * Math.pow(actualRank / 1000.0, 0.65);
+
+        double participantFactor = 1.0 - Math.min(0.15, Math.max(0, participants - 3) * 0.02);
+
+        double progress = totalHints <= 0 ? 0.0
+                : Math.clamp(revealedHints / (double) totalHints, 0.0, 1.0);
+
+        double hintFactor = 1.0 - 0.10 * progress;
+
+        allowedDifference *= participantFactor * hintFactor;
+
+        return Math.abs(guess - actualRank) <= allowedDifference;
+    }
+
     public void saveWeights() {
         weights.saveToFile();
     }

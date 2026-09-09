@@ -263,9 +263,10 @@ public final class RankGuessCommandHandler {
 
             Long groupGameCount = boundUid == null ? null : RankGuessRecordStore.getGroupGameCount(ctx.groupId(), null);
             Long pickedTimes = boundUid == null ? null : RankGuessRecordStore.getPickedTimes(boundUid, ctx.groupId());
+            RankGuessRecordStore.RankGuessed rankGuessed = boundUid == null ? null : RankGuessRecordStore.getAverageRankGuessed(boundUid, ctx.groupId());
 
             ctx.sendReply(replyFactory.rankGuessStatisticsMessage(
-                    ctx, statistics, recentStatistics, allGroups, rank, pickedTimes, groupGameCount
+                    ctx, statistics, recentStatistics, allGroups, rank, pickedTimes, groupGameCount, rankGuessed
             ));
         } catch (RuntimeException e) {
             LOG.error("Failed to query rank guess statistics", e);
@@ -559,9 +560,22 @@ public final class RankGuessCommandHandler {
                                         guess.rank() == game.getRound().actualRank()
                                 );
 
-                        if (hasExactGuess) {
+                        boolean hasOutstandingGuess = game.getGuesses()
+                                .values()
+                                .stream()
+                                .anyMatch(guess ->
+                                        RankGuessGameService.isOutstandingGuess(
+                                                guess.rank(),
+                                                game.getRound().actualRank(),
+                                                game.getGuesses().size(),
+                                                game.getRevealedHints().size(),
+                                                hints.size()
+                                        )
+                                );
+
+                        if (hasOutstandingGuess) {
                             String hintContent = "__猜Rank提示：__\n"
-                                    + "- 似乎已经有人精准命中了 Rank！游戏将在 30 秒后结束喵~\n"
+                                    + "- 有人已经做出了非常精准的猜测！游戏将在 30 秒后结束喵~\n"
                                     + hintString;
 
                             ctx.sendMessage(PendingMessage.ofMarkdownRaw(hintContent.trim()));

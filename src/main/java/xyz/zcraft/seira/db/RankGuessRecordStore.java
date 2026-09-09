@@ -284,6 +284,67 @@ public class RankGuessRecordStore {
         }
     }
 
+    public static RankGuessed getAverageRankGuessed(Long osuUid, String groupId) {
+        String sql = """
+            WITH ranked AS (
+                SELECT
+                    g.round_id,
+                    g.target_user_id,
+                    r.guessed_rank,
+
+                    ROW_NUMBER() OVER (
+                        PARTITION BY g.round_id
+                        ORDER BY r.guessed_rank ASC, r.user_id ASC
+                    ) AS low_rank,
+
+                    ROW_NUMBER() OVER (
+                        PARTITION BY g.round_id
+                        ORDER BY r.guessed_rank DESC, r.user_id DESC
+                    ) AS high_rank
+
+                FROM rank_guess_games g
+                JOIN rank_guess_results r
+                    ON r.round_id = g.round_id
+
+                WHERE g.target_user_id = ?
+            """;
+
+        if (groupId != null) {
+            sql += " AND g.group_id = ?";
+        }
+
+        sql += """
+            )
+            SELECT
+                AVG(guessed_rank) AS avg_guessed_rank,
+                POW(10, AVG(LOG10(guessed_rank))) AS log_avg_guessed_rank
+            FROM ranked
+            WHERE low_rank > 1
+              AND high_rank > 1
+            """;
+
+        try (Connection connection = SqliteDatabase.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setLong(1, osuUid);
+
+            if (groupId != null) {
+                statement.setString(2, groupId);
+            }
+
+            try (ResultSet result = statement.executeQuery()) {
+                result.next();
+
+                return new RankGuessed(
+                        result.getDouble("avg_guessed_rank"),
+                        result.getDouble("log_avg_guessed_rank")
+                );
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to query average rank guessed", e);
+        }
+    }
+
     public static class Statistics {
         public record Personal(
                 long participation, long wins, long topTwentyCount,
@@ -304,5 +365,8 @@ public class RankGuessRecordStore {
         public RecordSaveException(String message, Throwable cause) {
             super(message, cause);
         }
+    }
+
+    public record RankGuessed(double average, double logAverage) {
     }
 }

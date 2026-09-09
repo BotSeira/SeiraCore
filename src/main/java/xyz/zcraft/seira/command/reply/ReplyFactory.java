@@ -133,7 +133,8 @@ public final class ReplyFactory {
             Context ctx, RankGuessRecordStore.Statistics.Personal statistics,
             RankGuessRecordStore.Statistics.Personal recentStatistics,
             boolean allGroups, Rank rank,
-            Long pickedTimes, Long groupGameCount
+            Long pickedTimes, Long groupGameCount,
+            RankGuessRecordStore.RankGuessed rankGuessed
     ) {
         String scope = allGroups ? "全部群聊" : "本群";
         if (statistics.participation() == 0) {
@@ -143,8 +144,12 @@ public final class ReplyFactory {
         String rankText = "?".equals(rank.rank()) ? "" : "根据你最近 %d 场的表现，可以给到一个 `%s` 喵！\n"
                 .formatted(Rank.RECENT_GAME_LIMIT, rank.rank());
         String groupCountText = "";
+        String averageGuessedText = "";
         if (!allGroups && pickedTimes != null && groupGameCount != null) {
             groupCountText = "> 被猜次数：`%d`，占本群：`%.3f%%`\n".formatted(pickedTimes, (double) pickedTimes / groupGameCount * 100);
+        }
+        if (!allGroups && rankGuessed != null) {
+            averageGuessedText = "> 你平均被猜为：`#%,d` / `#%,d`\n".formatted((long) rankGuessed.average(), (long) rankGuessed.logAverage());
         }
         return PendingMessage.ofMarkdownRaw(at(ctx) + String.format(Locale.ROOT, """
                         你的猜 Rank 战绩（%s，括号为近 %d 场）
@@ -157,7 +162,7 @@ public final class ReplyFactory {
                         > 最高分：`%.2f`（`%.2f`）
                         > 平均名次：`%.2f`（`%.2f`）
                         > 总得分：`%.2f`
-                        %s%s
+                        %s%s%s
                         """,
                 scope, Rank.RECENT_GAME_LIMIT,
                 statistics.participation(), rank.rating(),
@@ -168,7 +173,7 @@ public final class ReplyFactory {
                 statistics.averageScore(), recentStatistics.averageScore(),
                 statistics.highestScore(), recentStatistics.highestScore(),
                 statistics.averagePlacement(), recentStatistics.averagePlacement(),
-                statistics.totalScore(), groupCountText, rankText).strip());
+                statistics.totalScore(), averageGuessedText, groupCountText, rankText).strip());
     }
 
     public PendingMessage bpMessage(Context ctx, Response<?> response) {
