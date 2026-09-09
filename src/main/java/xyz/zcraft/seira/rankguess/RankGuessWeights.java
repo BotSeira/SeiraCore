@@ -5,6 +5,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.seira.db.RankGuessRecordStore;
 import xyz.zcraft.seira.db.UserDataStore;
 
 import java.io.IOException;
@@ -20,8 +21,6 @@ public class RankGuessWeights {
     private static final Logger LOG = LogManager.getLogger(RankGuessWeights.class);
     private static final Path WEIGHTS_FILE = Path.of("data", "rank-guess-weights.json");
 
-    private static final int RECENT_USER_LIMIT = 8;
-    private static final double RECENT_USER_WEIGHT = 0.10;
     private static final double SCORE_REPEAT_FACTOR = 0.10;
 
     private final Map<String, GroupState> groups = new ConcurrentHashMap<>();
@@ -32,12 +31,12 @@ public class RankGuessWeights {
         this(WEIGHTS_FILE);
     }
 
-    private double getWishWeight(String groupId) {
+    private double getWishFactor(String groupId) {
         int playerCount = UserDataStore.findBoundUidsByGroup(groupId).size();
 
-        final double value = 2.5 + playerCount / 15.0;
+        final double value = 1.25 + playerCount / 100.0;
 
-        return Math.clamp(value, 2.5, 10.0);
+        return Math.clamp(value, 1.25, 2.0);
     }
 
     RankGuessWeights(Path store) {
@@ -67,19 +66,9 @@ public class RankGuessWeights {
                         }
                     });
                 }
-                if (snapshot.userRecords() != null) {
-                    for (Long userId : snapshot.userRecords()) {
-                        if (userId != null && userId > 0) {
-                            state.userRecords.add(userId);
-                            if (state.userRecords.size() > RECENT_USER_LIMIT) {
-                                state.userRecords.removeFirst();
-                            }
-                        }
-                    }
-                }
                 if (snapshot.userWishes() != null) {
                     for (Long userId : snapshot.userWishes()) {
-                        if (userId != null && userId > 0 && !state.userRecords.contains(userId)) {
+                        if (userId != null && userId > 0) {
                             state.userWishes.add(userId);
                         }
                     }
@@ -106,8 +95,10 @@ public class RankGuessWeights {
             groups.forEach((groupId, state) -> {
                 synchronized (state) {
                     snapshot.put(groupId, new GroupSnapshot(
-                            new TreeMap<>(state.scoreRecords), List.copyOf(state.userRecords),
-                            new TreeSet<>(state.userWishes), new TreeSet<>(state.scoreWishes)));
+                            new TreeMap<>(state.scoreRecords),
+                            new TreeSet<>(state.userWishes),
+                            new TreeSet<>(state.scoreWishes))
+                    );
                 }
             });
             JsonObject data = new JsonObject();
@@ -145,10 +136,6 @@ public class RankGuessWeights {
         synchronized (state) {
             state.scoreRecords.merge(scoreId, 1, Integer::sum);
 
-            state.userRecords.add(userId);
-            if (state.userRecords.size() > RECENT_USER_LIMIT) {
-                state.userRecords.removeFirst();
-            }
             state.userWishes.remove(userId);
 
             state.scoreWishes.remove(scoreId);
@@ -158,15 +145,16 @@ public class RankGuessWeights {
 
     public RankGuessGameService.WishResult tryWish(String groupId, long userId) {
         final GroupState state = getGroup(groupId);
+        final Map<Long, Integer> gamesSincePicked = RankGuessRecordStore.getGamesSincePicked(groupId);
 
         synchronized (state) {
             if (state.userWishes.contains(userId)) {
                 return RankGuessGameService.WishResult.ALREADY_WISHED;
             }
 
-            if (state.userRecords.contains(userId)) {
-                return RankGuessGameService.WishResult.RECENTLY_PICKED;
-            }
+//            if (state.userRecords.contains(userId)) {
+//                return RankGuessGameService.WishResult.RECENTLY_PICKED;
+//            }
 
             state.userWishes.add(userId);
         }
@@ -191,29 +179,17 @@ public class RankGuessWeights {
     public JsonObject generateWeights(String groupId) {
         final GroupState state = getGroup(groupId);
 
-        final Map<Long, Double> users = new HashMap<>();
+        final Map<Long, Double> users = generateUserWeights(groupId, state);
+
         final Map<Long, Double> scores = new HashMap<>();
 
-        final double wishWeight = getWishWeight(groupId);
-
         synchronized (state) {
-            for (Long wishedId : state.userWishes) {
-                users.put(wishedId, wishWeight);
-            }
-
-            for (Long pickedId : state.userRecords) {
-                users.put(pickedId, RECENT_USER_WEIGHT);
-            }
-
             for (Long wishedId : state.scoreWishes) {
                 scores.put(wishedId, 7.50);
             }
 
-            state.scoreRecords.forEach((scoreId, count) ->
-                    scores.putIfAbsent(
-                            scoreId,
-                            Math.pow(SCORE_REPEAT_FACTOR, count)
-                    )
+            state.scoreRecords.forEach(
+                    (scoreId, count) -> scores.putIfAbsent(scoreId, Math.pow(SCORE_REPEAT_FACTOR, count))
             );
         }
 
@@ -233,47 +209,81 @@ public class RankGuessWeights {
     public Probability getProbability(String groupId, long boundUid) {
         final GroupState state = getGroup(groupId);
 
-        final Map<Long, Double> users = new HashMap<>();
+        final Map<Long, Double> users = generateUserWeights(groupId, state);
 
-        double weight;
-
-        final double wishWeight = getWishWeight(groupId);
-
-        synchronized (state) {
-            for (Long wishedId : state.userWishes) {
-                users.put(wishedId, wishWeight);
-            }
-
-            for (Long pickedId : state.userRecords) {
-                users.put(pickedId, RECENT_USER_WEIGHT);
-            }
-        }
-
-        weight = users.getOrDefault(boundUid, 1.0);
+        final double weight = users.getOrDefault(boundUid, 1.0);
 
         double accumulation = 0;
 
-        for (Long l : UserDataStore.findBoundUidsByGroup(groupId)) {
-            accumulation += users.getOrDefault(l, 1.0);
+        for (Long uid : UserDataStore.findBoundUidsByGroup(groupId)) {
+            accumulation += users.getOrDefault(uid, 1.0);
         }
 
-        if (accumulation == 0) throw new IllegalStateException("Error calculating probability for " + groupId + " " + boundUid);
+        if (accumulation <= 0) {
+            throw new IllegalStateException("Error calculating probability for " + groupId + " " + boundUid);
+        }
 
-        double chance = weight / accumulation;
-
-        return new Probability(weight, chance);
+        return new Probability(weight, weight / accumulation);
     }
 
     private static class GroupState {
         private final Map<Long, Integer> scoreRecords = new HashMap<>();
-        private final LinkedList<Long> userRecords = new LinkedList<>();
         private final Set<Long> userWishes = new HashSet<>();
         private final Set<Long> scoreWishes = new HashSet<>();
     }
 
     private record GroupSnapshot(Map<Long, Integer> scoreRecords,
-                                 List<Long> userRecords,
                                  Set<Long> userWishes,
                                  Set<Long> scoreWishes) {
+    }
+
+    private static final double JUST_PICKED_WEIGHT = 0.05;
+    private static final double MAX_OVERDUE_WEIGHT = 2.00;
+    private static final double NEVER_PICKED_WEIGHT = 2.50;
+
+    private Map<Long, Double> generateUserWeights(String groupId, GroupState state) {
+        final List<Long> boundUsers = UserDataStore.findBoundUidsByGroup(groupId);
+        final Map<Long, Integer> gamesSincePicked = RankGuessRecordStore.getGamesSincePicked(groupId);
+
+        final int playerCount = boundUsers.size();
+        final double wishFactor = getWishFactor(groupId);
+
+        final Set<Long> wishes;
+
+        synchronized (state) {
+            wishes = Set.copyOf(state.userWishes);
+        }
+
+        final Map<Long, Double> users = new HashMap<>();
+
+        for (Long uid : boundUsers) {
+            double weight = getPickWeight(gamesSincePicked.get(uid), playerCount);
+
+            if (wishes.contains(uid)) {
+                weight *= wishFactor;
+            }
+
+            users.put(uid, weight);
+        }
+
+        return users;
+    }
+
+    private static double getPickWeight(Integer gamesSincePicked, int playerCount) {
+        if (gamesSincePicked == null) {
+            return NEVER_PICKED_WEIGHT;
+        }
+
+        if (playerCount <= 0) {
+            return 1.0;
+        }
+
+        double progress = gamesSincePicked / (double) playerCount;
+
+        return Math.clamp(
+                JUST_PICKED_WEIGHT + progress * 1.5,
+                JUST_PICKED_WEIGHT,
+                MAX_OVERDUE_WEIGHT
+        );
     }
 }

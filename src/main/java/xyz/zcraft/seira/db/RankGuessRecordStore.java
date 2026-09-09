@@ -4,13 +4,13 @@ import xyz.zcraft.seira.rankguess.data.FinishedRound;
 import xyz.zcraft.seira.rankguess.data.Standing;
 
 import java.sql.*;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 
 import static xyz.zcraft.seira.rankguess.RankGuessGameService.MIN_GAMES_TO_RANK;
 
 public class RankGuessRecordStore {
-    public static final int TOP_TWENTY_MIN_PARTICIPANTS = 1;
-
     /**
      * Returns false when this round has already been saved. All rows are committed together.
      */
@@ -361,6 +361,55 @@ public class RankGuessRecordStore {
         } catch (SQLException e) {
             throw new IllegalStateException("Failed to query picked times", e);
         }
+    }
+
+    public static Map<Long, Integer> getGamesSincePicked(String groupId) {
+        String sql = """
+                WITH group_games AS (
+                    SELECT
+                        target_user_id,
+                        ROW_NUMBER() OVER (
+                            ORDER BY ended_at ASC, round_id ASC
+                        ) AS game_no
+                    FROM rank_guess_games
+                    WHERE group_id = ?
+                    AND source_mode = 'group'
+                ),
+                latest_pick AS (
+                    SELECT
+                        target_user_id,
+                        MAX(game_no) AS last_game_no
+                    FROM group_games
+                    GROUP BY target_user_id
+                ),
+                total AS (
+                    SELECT COALESCE(MAX(game_no), 0) AS current_game_no
+                    FROM group_games
+                )
+                SELECT
+                    latest_pick.target_user_id,
+                    total.current_game_no - latest_pick.last_game_no AS games_since_picked
+                FROM latest_pick
+                CROSS JOIN total;
+                """;
+
+        Map<Long, Integer> gamesSincePicked = new HashMap<>();
+        try (Connection connection = SqliteDatabase.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            if (groupId != null) statement.setString(1, groupId);
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    gamesSincePicked.put(
+                            result.getLong("target_user_id"),
+                            result.getInt("games_since_picked")
+                    );
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to query picked times", e);
+        }
+
+        return gamesSincePicked;
     }
 
     public static class Statistics {
