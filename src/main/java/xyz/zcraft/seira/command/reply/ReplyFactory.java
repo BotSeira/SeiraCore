@@ -130,7 +130,7 @@ public final class ReplyFactory {
     }
 
     public PendingMessage rankGuessStatisticsMessage(
-            Context ctx, RankGuessRecordStore.Statistics.Personal statistics,
+            Context ctx, String ref, RankGuessRecordStore.Statistics.Personal statistics,
             RankGuessRecordStore.Statistics.Personal recentStatistics,
             boolean allGroups, Rank rank,
             Long pickedTimes, Long groupGameCount,
@@ -138,10 +138,10 @@ public final class ReplyFactory {
     ) {
         String scope = allGroups ? "全部群聊" : "本群";
         if (statistics.participation() == 0) {
-            return PendingMessage.ofMarkdownRaw(at(ctx) + "你在" + scope + "还没有已结算的猜 Rank 战绩喵~");
+            return PendingMessage.ofMarkdownRaw(at(ctx) + ref + "在" + scope + "还没有已结算的猜 Rank 战绩喵~");
         }
 
-        String rankText = "?".equals(rank.rank()) ? "" : "根据你最近 %d 场的表现，可以给到一个 `%s` 喵！\n"
+        String rankText = "?".equals(rank.rank()) ? "" : "根据" + ref + "最近 %d 场的表现，可以给到一个 `%s` 喵！\n"
                 .formatted(Rank.RECENT_GAME_LIMIT, rank.rank());
         String groupCountText = "";
         String averageGuessedText = "";
@@ -149,10 +149,10 @@ public final class ReplyFactory {
             groupCountText = "> 被猜次数：`%d`，占本群：`%.3f%%`\n".formatted(pickedTimes, (double) pickedTimes / groupGameCount * 100);
         }
         if (!allGroups && rankGuessed != null) {
-            averageGuessedText = "> 你平均被猜为：`#%,d` / `#%,d`\n".formatted((long) rankGuessed.average(), (long) rankGuessed.logAverage());
+            averageGuessedText = "> 平均被猜为：`#%,d` / `#%,d`\n".formatted((long) rankGuessed.average(), (long) rankGuessed.logAverage());
         }
         return PendingMessage.ofMarkdownRaw(at(ctx) + String.format(Locale.ROOT, """
-                        你的猜 Rank 战绩（%s，括号为近 %d 场）
+                        %s的猜 Rank 战绩（%s，括号为近 %d 场）
                         > 总参与数：`%d`，Rating：`%.2f`
                         > 获胜数：`%d`（`%d`）
                         > 胜率：`%.2f%%`（`%.2f%%`）
@@ -164,7 +164,7 @@ public final class ReplyFactory {
                         > 总得分：`%.2f`
                         %s%s%s
                         """,
-                scope, Rank.RECENT_GAME_LIMIT,
+                ref, scope, Rank.RECENT_GAME_LIMIT,
                 statistics.participation(), rank.rating(),
                 statistics.wins(), recentStatistics.wins(),
                 statistics.winRate() * 100, recentStatistics.winRate() * 100,

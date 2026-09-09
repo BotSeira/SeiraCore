@@ -91,9 +91,12 @@ public final class RankGuessCommandHandler {
         switch (argument.toLowerCase()) {
             case "stats" -> {
                 if (ctx.argumentCount() == 1) {
-                    statistics(ctx, false);
+                    statistics(ctx, false, null);
+                } else if (ctx.argumentCount() == 2 && resolver.looksLikeMention(ctx.argument(1))) {
+                    final String s = resolver.extractMentionedUserId(ctx.argument(1));
+                    statistics(ctx, false, s);
                 } else if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
-                    statistics(ctx, true);
+                    statistics(ctx, true, null);
                 } else {
                     ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
                 }
@@ -162,9 +165,12 @@ public final class RankGuessCommandHandler {
             }
             case "weight" -> {
                 if (ctx.argumentCount() == 1) {
-                    weight(ctx, false);
+                    weight(ctx, false, null);
+                } else if (ctx.argumentCount() == 2 && resolver.looksLikeMention(ctx.argument(1))) {
+                    final String s = resolver.extractMentionedUserId(ctx.argument(1));
+                    weight(ctx, false, s);
                 } else if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
-                    weight(ctx, true);
+                    weight(ctx, true, null);
                 } else {
                     ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
                 }
@@ -216,10 +222,14 @@ public final class RankGuessCommandHandler {
         ctx.sendReply(PendingMessage.ofString(reply).ref(games.getVideoMessageRef(ctx.groupId())));
     }
 
-    private void weight(Context ctx, boolean all) {
-        final Long boundUid = UserDataStore.findBoundUid(ctx.senderUserId());
+    private void weight(Context ctx, boolean all, String target) {
+        final String effectiveTarget = target == null ? ctx.senderUserId() : target;
+        final Long boundUid = UserDataStore.findBoundUid(effectiveTarget);
+
+        final String ref = target == null ? "你" : "对方";
+
         if (boundUid == null) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "由于未绑定，无法查看权重喵~"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "由于" + ref + "未绑定，无法查看权重喵~"));
             return;
         }
 
@@ -230,28 +240,34 @@ public final class RankGuessCommandHandler {
         final var probability = games.getProbabilityFor(ctx.groupId(), boundUid);
         final int totalPlayer = UserDataStore.findBoundUidsByGroup(ctx.groupId()).size();
 
-        reply.append(at(ctx)).append("目前你在本群权重为 `%.2f`\n".formatted(probability.weight()));
-        reply.append("在本群 `%d` 名玩家中，你被选中的概率为 `%.3f%%`\n".formatted(totalPlayer, probability.chance() * 100));
+        reply.append(at(ctx)).append("目前%s在本群权重为 `%.2f`\n".formatted(ref, probability.weight()));
+        reply.append("在本群 `%d` 名玩家中，%s被选中的概率为 `%.3f%%`\n".formatted(totalPlayer, ref, probability.chance() * 100));
 
         final String randomScoreWeight = APIHelper.getRandomScoreWeight(boundUid, games.generateWeights(ctx.groupId()), all);
 
-        reply.append("你的成绩当前抽选概率：\n>").append(randomScoreWeight).append("\n");
+        reply.append("%s的成绩当前抽选概率：\n>".formatted(ref)).append(randomScoreWeight).append("\n");
 
         ctx.sendReply(PendingMessage.ofMarkdownRaw(reply.toString().trim()));
     }
 
-    private void statistics(Context ctx, boolean allGroups) {
-        final Long boundUid = UserDataStore.findBoundUid(ctx.senderUserId());
+    private void statistics(Context ctx, boolean allGroups, String target) {
+        final String effectiveTarget = target == null ? ctx.senderUserId() : target;
+        final Long boundUid = UserDataStore.findBoundUid(effectiveTarget);
+        final String ref = target == null ? "你" : "对方";
+        if (boundUid == null) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "由于" + ref + "未绑定，无法查看战绩喵~"));
+            return;
+        }
         try {
             RankGuessRecordStore.Statistics.Personal statistics = RankGuessRecordStore.getPersonalStatistics(
-                    ctx.senderUserId(),
+                    effectiveTarget,
                     allGroups ? null : ctx.groupId(),
                     null,
                     Rank.STATS_MIN_PARTICIPANTS
             );
 
             RankGuessRecordStore.Statistics.Personal recentStatistics = RankGuessRecordStore.getRecentPersonalStatistics(
-                    ctx.senderUserId(),
+                    effectiveTarget,
                     allGroups ? null : ctx.groupId(),
                     null,
                     Rank.RECENT_GAME_LIMIT,
@@ -260,12 +276,12 @@ public final class RankGuessCommandHandler {
 
             final Rank rank = Rank.from(recentStatistics, statistics);
 
-            Long groupGameCount = boundUid == null ? null : RankGuessRecordStore.getGroupGameCount(ctx.groupId(), null);
-            Long pickedTimes = boundUid == null ? null : RankGuessRecordStore.getPickedTimes(boundUid, ctx.groupId());
-            RankGuessRecordStore.RankGuessed rankGuessed = boundUid == null ? null : RankGuessRecordStore.getAverageRankGuessed(boundUid, ctx.groupId());
+            Long groupGameCount = RankGuessRecordStore.getGroupGameCount(ctx.groupId(), null);
+            Long pickedTimes = RankGuessRecordStore.getPickedTimes(boundUid, ctx.groupId());
+            RankGuessRecordStore.RankGuessed rankGuessed = RankGuessRecordStore.getAverageRankGuessed(boundUid, ctx.groupId());
 
             ctx.sendReply(replyFactory.rankGuessStatisticsMessage(
-                    ctx, statistics, recentStatistics, allGroups, rank, pickedTimes, groupGameCount, rankGuessed
+                    ctx, ref, statistics, recentStatistics, allGroups, rank, pickedTimes, groupGameCount, rankGuessed
             ));
         } catch (RuntimeException e) {
             LOG.error("Failed to query rank guess statistics", e);
@@ -402,8 +418,8 @@ public final class RankGuessCommandHandler {
         try {
             scoreId = Long.parseLong(
                     APIHelper.lookupScoreId(new ShortcutTarget(
-                            null, new UserRef.ByUid(boundUid), "bp", (long) index, null)
-                    , List.of(), null)
+                                    null, new UserRef.ByUid(boundUid), "bp", (long) index, null)
+                            , List.of(), null)
             );
         } catch (Exception e) {
             LOG.error("Failed to lookup score id", e);
