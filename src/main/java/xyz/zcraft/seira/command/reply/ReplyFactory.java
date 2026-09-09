@@ -659,6 +659,7 @@ public final class ReplyFactory {
                     "> - 连续运行了 `" + BotStat.getCurrentUptime() / 1000 / 60 + "` 分钟" + "\n" +
                     "> - 总共处理了 `" + BotStat.getTotalCommands() + "` 条指令" + "(近30分钟 `" + BotStat.getCommandCountFor(30) + "` )\n" +
                     "> - 总共渲染了 `" + BotStat.getTotalReplays() + "` 条回放" + "\n" +
+                    "> - 总共进行了 `" + RankGuessRecordStore.getTotalGamesCount(null) + "` 次猜 Rank" + "\n" +
                     "> - 并正在为 `" + UserDataStore.countGroups() + "` 个群聊和 `" + UserDataStore.countBoundUser() + "` 位用户提供服务~" + "\n";
             return (stat + version + res).trim();
         }

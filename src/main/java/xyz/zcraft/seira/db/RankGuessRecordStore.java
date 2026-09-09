@@ -345,6 +345,24 @@ public class RankGuessRecordStore {
         }
     }
 
+    public static long getTotalGamesCount(String groupId) {
+        String sql = """
+                SELECT COUNT(*)
+                FROM rank_guess_games g
+                """;
+        if (groupId != null) sql += " AND g.group_id = ?";
+        try (Connection connection = SqliteDatabase.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            if (groupId != null) statement.setString(1, groupId);
+            try (ResultSet result = statement.executeQuery()) {
+                result.next();
+                return result.getLong(1);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to query picked times", e);
+        }
+    }
+
     public static class Statistics {
         public record Personal(
                 long participation, long wins, long topTwentyCount,

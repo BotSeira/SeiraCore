@@ -306,6 +306,10 @@ public final class RankGuessCommandHandler {
                     continue;
                 }
 
+                if (UserDataStore.findBoundUid(openId) == null) {
+                    continue;
+                }
+
                 RankGuessRecordStore.Statistics.Personal statistics = RankGuessRecordStore.getPersonalStatistics(
                         openId,
                         effectiveGroupId,
