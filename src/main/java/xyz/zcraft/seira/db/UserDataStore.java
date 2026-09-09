@@ -128,6 +128,33 @@ public final class UserDataStore {
         return null;
     }
 
+    public static Map<String, Long> findBoundUsersByGroup(String groupId) {
+        SqliteDatabase.ensureInitialized();
+        String sql = """
+                SELECT gm.open_id, ub.osu_uid
+                FROM group_members gm
+                JOIN user_bindings ub
+                    ON ub.open_id = gm.open_id
+                WHERE gm.group_id = ?
+                """;
+        try (Connection connection = SqliteDatabase.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, groupId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                Map<String, Long> result = new HashMap<>();
+                while (resultSet.next()) {
+                    result.put(
+                            resultSet.getString("open_id"),
+                            resultSet.getLong("osu_uid")
+                    );
+                }
+                return result;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to query group bindings", e);
+        }
+    }
+
     public static OsuToken findOsuToken(String openId) {
         SqliteDatabase.ensureInitialized();
         String sql = "SELECT access_token, refresh_token, expires_in, refreshed_at FROM token_store WHERE open_id = ?";

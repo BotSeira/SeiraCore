@@ -162,8 +162,7 @@ public class RankGuessRecordStore {
     }
 
     private static Statistics.Personal getPersonalStatistics(
-            String userId, String groupId, Integer scoringVersion, Integer gameLimit,
-            Integer minParticipants
+            String userId, String groupId, Integer scoringVersion, Integer gameLimit, Integer minParticipants
     ) {
         requireText(userId, "userId");
         if (groupId != null) requireText(groupId, "groupId");
@@ -208,6 +207,182 @@ public class RankGuessRecordStore {
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Failed to query rank guess statistics", e);
+        }
+    }
+
+    public record RankData(
+            Statistics.Personal all,
+            Statistics.Personal recent
+    ) {}
+
+    public static Map<String, RankData> getGroupRankData(
+            String groupId,
+            Integer scoringVersion,
+            int recentGameLimit,
+            Integer minParticipants
+    ) {
+        if (groupId != null) {
+            requireText(groupId, "groupId");
+        }
+
+        if (scoringVersion != null && scoringVersion < 1) {
+            throw new IllegalArgumentException("scoringVersion must be positive");
+        }
+
+        if (recentGameLimit <= 0) {
+            throw new IllegalArgumentException("recentGameLimit must be positive");
+        }
+
+        String sql = """
+            WITH ranked AS (
+                SELECT
+                    r.user_id,
+                    r.placement,
+                    r.final_score,
+                    g.participant_count,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY r.user_id
+                        ORDER BY g.ended_at DESC, g.round_id DESC
+                    ) AS rn
+                FROM rank_guess_results r
+                JOIN rank_guess_games g
+                    ON g.round_id = r.round_id
+                WHERE 1 = 1
+            """;
+
+        if (groupId != null) {
+            sql += " AND g.group_id = ?";
+        }
+
+        if (minParticipants != null) {
+            sql += " AND g.participant_count >= ?";
+        }
+
+        if (scoringVersion != null) {
+            sql += " AND g.scoring_version = ?";
+        }
+
+        sql += """
+            ),
+            all_stats AS (
+                SELECT
+                    user_id,
+                    COUNT(*) AS participation,
+                    SUM(CASE WHEN placement = 1 THEN 1 ELSE 0 END) AS wins,
+                    SUM(
+                        CASE
+                            WHEN placement <= (participant_count + 4) / 5
+                            THEN 1
+                            ELSE 0
+                        END
+                    ) AS top_twenty,
+                    SUM(final_score) AS total_score,
+                    AVG(final_score) AS average_score,
+                    MAX(final_score) AS highest_score,
+                    AVG(placement) AS average_placement
+                FROM ranked
+                GROUP BY user_id
+            ),
+            recent_stats AS (
+                SELECT
+                    user_id,
+                    COUNT(*) AS participation,
+                    SUM(CASE WHEN placement = 1 THEN 1 ELSE 0 END) AS wins,
+                    SUM(
+                        CASE
+                            WHEN placement <= (participant_count + 4) / 5
+                            THEN 1
+                            ELSE 0
+                        END
+                    ) AS top_twenty,
+                    SUM(final_score) AS total_score,
+                    AVG(final_score) AS average_score,
+                    MAX(final_score) AS highest_score,
+                    AVG(placement) AS average_placement
+                FROM ranked
+                WHERE rn <= ?
+                GROUP BY user_id
+            )
+            SELECT
+                a.user_id,
+
+                a.participation AS all_participation,
+                a.wins AS all_wins,
+                a.top_twenty AS all_top_twenty,
+                a.total_score AS all_total_score,
+                a.average_score AS all_average_score,
+                a.highest_score AS all_highest_score,
+                a.average_placement AS all_average_placement,
+
+                COALESCE(r.participation, 0) AS recent_participation,
+                COALESCE(r.wins, 0) AS recent_wins,
+                COALESCE(r.top_twenty, 0) AS recent_top_twenty,
+                COALESCE(r.total_score, 0) AS recent_total_score,
+                COALESCE(r.average_score, 0) AS recent_average_score,
+                COALESCE(r.highest_score, 0) AS recent_highest_score,
+                COALESCE(r.average_placement, 0) AS recent_average_placement
+
+            FROM all_stats a
+            LEFT JOIN recent_stats r
+                ON r.user_id = a.user_id
+            """;
+
+        try (Connection connection = SqliteDatabase.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            int index = 1;
+
+            if (groupId != null) {
+                statement.setString(index++, groupId);
+            }
+
+            if (minParticipants != null) {
+                statement.setInt(index++, minParticipants);
+            }
+
+            if (scoringVersion != null) {
+                statement.setInt(index++, scoringVersion);
+            }
+
+            statement.setInt(index, recentGameLimit);
+
+            Map<String, RankData> resultMap = new HashMap<>();
+
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    Statistics.Personal all = new Statistics.Personal(
+                            result.getLong("all_participation"),
+                            result.getLong("all_wins"),
+                            result.getLong("all_top_twenty"),
+                            result.getDouble("all_total_score"),
+                            result.getDouble("all_average_score"),
+                            result.getDouble("all_highest_score"),
+                            result.getDouble("all_average_placement")
+                    );
+
+                    Statistics.Personal recent = new Statistics.Personal(
+                            result.getLong("recent_participation"),
+                            result.getLong("recent_wins"),
+                            result.getLong("recent_top_twenty"),
+                            result.getDouble("recent_total_score"),
+                            result.getDouble("recent_average_score"),
+                            result.getDouble("recent_highest_score"),
+                            result.getDouble("recent_average_placement")
+                    );
+
+                    resultMap.put(
+                            result.getString("user_id"),
+                            new RankData(all, recent)
+                    );
+                }
+            }
+
+            return resultMap;
+        } catch (SQLException e) {
+            throw new IllegalStateException(
+                    "Failed to query rank guess data",
+                    e
+            );
         }
     }
 

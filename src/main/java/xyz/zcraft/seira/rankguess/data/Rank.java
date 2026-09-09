@@ -15,6 +15,10 @@ public record Rank(double rating, double ratingRaw, String rank) {
         return new Rank(pendingRating, pendingRatingRaw, pendingRank);
     }
 
+    public static Rank from(RankGuessRecordStore.RankData rankData) {
+        return from(rankData.recent(), rankData.all());
+    }
+
     private static double getRatingRaw(RankGuessRecordStore.Statistics.Personal recent,
                                        RankGuessRecordStore.Statistics.Personal all) {
         double averageScoreRate = Math.clamp(

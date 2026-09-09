@@ -240,7 +240,9 @@ public final class RankGuessCommandHandler {
         final var probability = games.getProbabilityFor(ctx.groupId(), boundUid);
         final int totalPlayer = UserDataStore.findBoundUidsByGroup(ctx.groupId()).size();
 
-        reply.append(at(ctx)).append("目前%s在本群权重为 `%.2f`\n".formatted(ref, probability.weight()));
+        final String factors = String.join(",", probability.factors());
+
+        reply.append(at(ctx)).append("目前%s在本群权重为 `%.2f` (%s)\n".formatted(ref, probability.weight(), factors.isBlank() ? "基础权重" : factors));
         reply.append("在本群 `%d` 名玩家中，%s被选中的概率为 `%.3f%%`\n".formatted(totalPlayer, ref, probability.chance() * 100));
 
         final String randomScoreWeight = APIHelper.getRandomScoreWeight(boundUid, games.generateWeights(ctx.groupId()), all);
@@ -293,40 +295,19 @@ public final class RankGuessCommandHandler {
         try {
             StringBuilder reply = new StringBuilder();
 
-            final List<String> allOpenIds = type == LeaderboardType.GLOBAL ?
-                    UserDataStore.findAllBoundOpenIds()
-                    : UserDataStore.findAllGroupMembers(ctx.groupId());
-
             final Map<String, Rank> ranks = new HashMap<>();
 
             final String effectiveGroupId = type == LeaderboardType.GLOBAL ? null : ctx.groupId();
 
-            for (String openId : allOpenIds) {
-                if (!RankGuessRecordStore.canBeRanked(openId, effectiveGroupId)) {
-                    continue;
-                }
+            final Map<String, RankGuessRecordStore.RankData> rankData =
+                    RankGuessRecordStore.getGroupRankData(
+                            effectiveGroupId,
+                            null,
+                            Rank.RECENT_GAME_LIMIT,
+                            Rank.STATS_MIN_PARTICIPANTS
+                    );
 
-                if (UserDataStore.findBoundUid(openId) == null) {
-                    continue;
-                }
-
-                RankGuessRecordStore.Statistics.Personal statistics = RankGuessRecordStore.getPersonalStatistics(
-                        openId,
-                        effectiveGroupId,
-                        null,
-                        Rank.STATS_MIN_PARTICIPANTS
-                );
-
-                RankGuessRecordStore.Statistics.Personal recentStatistics = RankGuessRecordStore.getRecentPersonalStatistics(
-                        openId,
-                        effectiveGroupId,
-                        null,
-                        Rank.RECENT_GAME_LIMIT,
-                        Rank.STATS_MIN_PARTICIPANTS
-                );
-
-                ranks.put(openId, Rank.from(recentStatistics, statistics));
-            }
+            rankData.forEach((s, rank) -> ranks.put(s, Rank.from(rank)));
 
             final List<Map.Entry<String, Rank>> groupRanks = ranks.entrySet().stream()
                     .sorted(Comparator.comparingDouble(entry -> entry.getValue().rating()))
