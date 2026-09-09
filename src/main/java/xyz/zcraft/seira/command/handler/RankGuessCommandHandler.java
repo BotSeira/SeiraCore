@@ -305,7 +305,7 @@ public final class RankGuessCommandHandler {
                             null,
                             Rank.RECENT_GAME_LIMIT,
                             Rank.STATS_MIN_PARTICIPANTS,
-                            5
+                            RankGuessGameService.MIN_GAMES_TO_RANK
                     );
 
             rankData.forEach((s, rank) -> ranks.put(s, Rank.from(rank)));
