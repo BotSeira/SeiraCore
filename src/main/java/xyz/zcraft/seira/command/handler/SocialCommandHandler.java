@@ -60,8 +60,10 @@ public final class SocialCommandHandler {
             return;
         }
 
-        taskCoordinator.runApiRequest(ctx, "Multiplayer Room", () ->
-                ctx.sendReply(replyFactory.mpMessage(ctx, APIHelper.getMultiplayerRoom(token.accessToken()))));
+        try (var timing = taskCoordinator.beginRequest(ctx, "Multiplayer Room")) {
+            var response = APIHelper.getMultiplayerRoom(token.accessToken());
+            ctx.sendReply(replyFactory.mpMessage(ctx, response));
+        }
     }
 
     public void handleF(Context ctx, boolean all) {
@@ -78,7 +80,7 @@ public final class SocialCommandHandler {
             return;
         }
 
-        taskCoordinator.runApiRequest(ctx, "Friend List", () -> {
+        try (var timing = taskCoordinator.beginRequest(ctx, "Friend List")) {
             final Response<UserExtended> self = APIHelper.getSelf(token.accessToken());
             final Response<List<FriendEntry>> response = APIHelper.getFollowed(token.accessToken());
             final List<FriendEntry> content = response.getContent();
@@ -151,7 +153,7 @@ public final class SocialCommandHandler {
                     ctx, all, self.getContent(), content.size(), allMutualCount,
                     mutual, onlyFollowed, onlyFollower
             ));
-        });
+        }
     }
 
     public void handleFclear(Context ctx) {
@@ -175,12 +177,10 @@ public final class SocialCommandHandler {
                     return;
                 }
 
-                taskCoordinator.runImageRequest(
-                        ctx,
-                        "Leaderboard",
-                        () -> APIHelper.getLeaderboardResponse(groupBoundUids),
-                        replyFactory::lbMessage
-                );
+                try (var timing = taskCoordinator.beginRequest(ctx, "Leaderboard")) {
+                    var response = APIHelper.getLeaderboardResponse(groupBoundUids);
+                    ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
+                }
                 return;
             }
             Long uid = resolver.resolveBoundUid(ctx.senderUserId());
@@ -189,12 +189,10 @@ public final class SocialCommandHandler {
                 return;
             }
 
-            taskCoordinator.runImageRequest(
-                    ctx,
-                    "Leaderboard",
-                    () -> APIHelper.getLeaderboardResponse(List.of(uid)),
-                    replyFactory::lbMessage
-            );
+            try (var timing = taskCoordinator.beginRequest(ctx, "Leaderboard")) {
+                var response = APIHelper.getLeaderboardResponse(List.of(uid));
+                ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
+            }
         } else if (ctx.args().length == 1 || ctx.args().length == 2) {
             TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
             ShortcutTarget target = targetResolution.target();
@@ -211,12 +209,11 @@ public final class SocialCommandHandler {
                         ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "本群还没有已绑定的玩家，请先使用 /bind"));
                         return;
                     }
-                    taskCoordinator.runImageRequest(
-                            ctx,
-                            "Map Leaderboard",
-                            () -> APIHelper.getGroupLeaderboardResponse(target, groupBoundUids, accessTokenProvider.apply(ctx.senderUserId())),
-                            replyFactory::lbMessage
-                    );
+                    try (var timing = taskCoordinator.beginRequest(ctx, "Map Leaderboard")) {
+                        long beatmapId = APIHelper.lookupBeatmap(target, accessTokenProvider.apply(ctx.senderUserId()));
+                        var response = APIHelper.getGroupLeaderboardResponse(beatmapId, groupBoundUids);
+                        ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
+                    }
                     return;
                 }
                 Long uid = resolver.resolveBoundUid(ctx.senderUserId());
@@ -225,12 +222,11 @@ public final class SocialCommandHandler {
                     return;
                 }
 
-                taskCoordinator.runImageRequest(
-                        ctx,
-                        "Map Leaderboard",
-                        () -> APIHelper.getGroupLeaderboardResponse(target, List.of(uid), accessTokenProvider.apply(ctx.senderUserId())),
-                        replyFactory::lbMessage
-                );
+                try (var timing = taskCoordinator.beginRequest(ctx, "Map Leaderboard")) {
+                    long beatmapId = APIHelper.lookupBeatmap(target, accessTokenProvider.apply(ctx.senderUserId()));
+                    var response = APIHelper.getGroupLeaderboardResponse(beatmapId, List.of(uid));
+                    ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
+                }
                 return;
             }
 
@@ -255,12 +251,11 @@ public final class SocialCommandHandler {
                 uids.add(uid);
             }
 
-            taskCoordinator.runImageRequest(
-                    ctx,
-                    "Map Leaderboard",
-                    () -> APIHelper.getGroupLeaderboardResponse(target, uids, accessTokenProvider.apply(ctx.senderUserId())),
-                    replyFactory::lbMessage
-            );
+            try (var timing = taskCoordinator.beginRequest(ctx, "Map Leaderboard")) {
+                long beatmapId = APIHelper.lookupBeatmap(target, accessTokenProvider.apply(ctx.senderUserId()));
+                var response = APIHelper.getGroupLeaderboardResponse(beatmapId, uids);
+                ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
+            }
         } else {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
         }

@@ -20,9 +20,6 @@ import xyz.zcraft.seira.services.BotStat;
 import java.nio.channels.ClosedChannelException;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BiFunction;
-import java.util.function.Function;
-import java.util.function.Supplier;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
@@ -44,7 +41,7 @@ public final class TaskCoordinator {
         this.discordBridgeService = java.util.Objects.requireNonNull(discordBridgeService);
     }
 
-    static String resolveErrorMessage(Exception exception) {
+    public static String resolveErrorMessage(Exception exception) {
         Throwable cursor = exception;
         while (cursor != null) {
             switch (cursor) {
@@ -77,39 +74,42 @@ public final class TaskCoordinator {
         return new OutboundReplyChannel(targetId, messageId, groupMessage, queueMessageInGroup);
     }
 
-    /**
-     * Runs a reusable queued API flow while leaving the number, type and timing
-     * of its replies entirely under the command handler's control.
-     *
-     * @return whether the action completed without throwing
-     */
-    @SuppressWarnings("UnusedReturnValue")
-    public boolean runApiRequest(Context ctx, String requestType, Runnable action) {
-        return runApiRequest(ctx, requestType, action, null);
+
+    /** Tracks queue estimates and elapsed time; the caller executes the request directly. */
+    public RequestTiming beginRequest(Context ctx, String requestType) {
+        long estimatedSeconds = apiRequestStats.estimateAndEnqueue(requestType);
+        RequestTiming timing = new RequestTiming(requestType);
+        try {
+            ctx.sendQueueNotice(PendingMessage.ofMarkdownRaw(
+                    at(ctx) + "请求已加入队列，预计等待时间" + estimatedSeconds + "秒。"));
+            return timing;
+        } catch (RuntimeException e) {
+            timing.close();
+            throw e;
+        }
     }
 
-    public boolean runApiRequest(Context ctx, String requestType, Runnable action, String errorNote) {
-        long estimatedSeconds = apiRequestStats.estimateAndEnqueue(requestType);
-        ctx.sendQueueNotice(PendingMessage.ofMarkdownRaw(
-                at(ctx) + "请求已加入队列，预计等待时间" + estimatedSeconds + "秒。"
-        ));
+    public final class RequestTiming implements AutoCloseable {
+        private final String requestType;
+        private final long startedAt = System.nanoTime();
+        private boolean closed;
 
-        long startedAt = System.nanoTime();
-        try {
-            action.run();
-            return true;
-        } catch (Exception e) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw((at(ctx) + resolveErrorMessage(e) + (errorNote == null ? "" : "\n" + errorNote)).trim()));
-            String message = e.getMessage();
-            if (e instanceof ApiRequestException apiException) {
-                message += " - " + apiException.getDefaultMessage();
-            }
-            LOG.error("Failed to execute command flow {}: {}", requestType, message, e);
-            return false;
-        } finally {
-            long elapsedMillis = Math.max(1L, (System.nanoTime() - startedAt) / 1_000_000L);
-            apiRequestStats.complete(requestType, elapsedMillis);
+        private RequestTiming(String requestType) {
+            this.requestType = requestType;
         }
+
+        @Override
+        public void close() {
+            if (closed) return;
+            closed = true;
+            apiRequestStats.complete(requestType,
+                    Math.max(1L, (System.nanoTime() - startedAt) / 1_000_000L));
+        }
+    }
+
+    public PendingMessage imageMessage(Response<Base64Bytes> response, PendingMessage completion) {
+        UploadedImage image = messageSender.uploadImageToCos(response.getContent().bytes());
+        return combineImageAndCompletion(image, completion);
     }
 
     public QqUploadRequest createVideoUploadRequest(Context ctx) {
@@ -143,64 +143,6 @@ public final class TaskCoordinator {
         }
     }
 
-    public void runImageRequest(
-            Context ctx,
-            String requestType,
-            Supplier<Response<Base64Bytes>> creator,
-            BiFunction<Context, Response<?>, PendingMessage> postProcessor
-    ) {
-        runImageRequest(ctx, requestType, creator, postProcessor, null);
-    }
-
-    public void runImageRequest(
-            Context ctx,
-            String requestType,
-            Supplier<Response<Base64Bytes>> creator,
-            BiFunction<Context, Response<?>, PendingMessage> postProcessor,
-            String errorNote
-    ) {
-        runApiRequest(ctx, requestType, () ->
-                        ctx.sendReply(waitForImage(ctx, creator, postProcessor))
-                , errorNote);
-    }
-
-    public void runReplayRequest(
-            Context ctx,
-            String requestType,
-            Function<QqUploadRequest, APIHelper.ReplayTaskInfo> creator,
-            BiFunction<Context, APIHelper.ReplayTaskInfo, PendingMessage> taskMessageCreator
-    ) {
-        runApiRequest(ctx, requestType, () -> {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "正在获取谱面以及回放文件，请稍作等待喵..."));
-            APIHelper.ReplayTaskInfo taskInfo = creator.apply(createVideoUploadRequest(ctx));
-            ctx.sendReply(taskMessageCreator.apply(ctx, taskInfo));
-
-            APIHelper.ReplayRenderResult result = waitForReplay(taskInfo);
-            if (result == null) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "回放视频生成失败，请稍后重试。"));
-                return;
-            }
-
-            if (ctx.sendReply(replayVideoMessage(result)).success()) {
-                removeReplayResult(taskInfo.taskId());
-            }
-        });
-    }
-
-    /**
-     * Waits for an image renderer and returns a sendable message without sending it.
-     */
-    private PendingMessage waitForImage(
-            Context ctx,
-            Supplier<Response<Base64Bytes>> creator,
-            BiFunction<Context, Response<?>, PendingMessage> postProcessor
-    ) {
-        Response<Base64Bytes> response = creator.get();
-        byte[] imageBytes = response.getContent().bytes();
-        UploadedImage uploadedImage = messageSender.uploadImageToCos(imageBytes);
-        PendingMessage completionMessage = postProcessor.apply(ctx, response);
-        return combineImageAndCompletion(uploadedImage, completionMessage);
-    }
 
     private PendingMessage combineImageAndCompletion(UploadedImage image, PendingMessage completionMessage) {
         String imageMarkdown = image.toMarkdown();

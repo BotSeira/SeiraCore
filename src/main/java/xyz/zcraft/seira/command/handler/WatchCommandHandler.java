@@ -134,7 +134,7 @@ public final class WatchCommandHandler {
         }
 
         String targetArgument = ctx.argument(1);
-        taskCoordinator.runApiRequest(ctx, "Add Score Watch", () -> {
+        try (var timing = taskCoordinator.beginRequest(ctx, "Add Score Watch")) {
             WatchTarget target = targetResolver.apply(ctx.groupId(), targetArgument);
             final boolean b = ctx.sendMessage(PendingMessage.ofMarkdownRaw(
                     at(ctx) + "正在尝试添加监视..."
@@ -148,7 +148,7 @@ public final class WatchCommandHandler {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(
                     at(ctx) + ": " + displayTarget(target) + " 添加监视成功！有效期：" + minutes + "分钟"
             ));
-        });
+        }
     }
 
     private void handleDelete(Context ctx) {
@@ -178,10 +178,10 @@ public final class WatchCommandHandler {
             return;
         }
 
-        taskCoordinator.runApiRequest(ctx, "Delete Score Watch", () -> {
+        try (var timing = taskCoordinator.beginRequest(ctx, "Delete Score Watch")) {
             WatchTarget target = resolveTarget(ctx.groupId(), targetArgument);
             ctx.sendReply(removedMessage(watchService.remove(ctx.groupId(), target.userId())));
-        });
+        }
     }
 
     private void handleList(Context ctx) {

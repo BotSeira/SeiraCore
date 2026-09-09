@@ -134,7 +134,7 @@ public final class MultiplayerRoomWatchCommandHandler {
             return;
         }
 
-        taskCoordinator.runApiRequest(ctx, "Start Multiplayer Room Watch", () -> {
+        try (var timing = taskCoordinator.beginRequest(ctx, "Start Multiplayer Room Watch")) {
             if (!ctx.sendMessage(PendingMessage.ofString("正在尝试启动多人房间监视……")).success()) {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) +
                         "由于缺少主动消息权限，无法启动监视！权限配置请见：https://docs.seira.top/overview/use.html#extra-permission"
@@ -152,7 +152,7 @@ public final class MultiplayerRoomWatchCommandHandler {
             } catch (IllegalArgumentException | IllegalStateException e) {
                 throw new ResolutionException(e.getMessage());
             }
-        });
+        }
     }
 
     private void handleStop(Context ctx) {

@@ -83,8 +83,7 @@ public class Router {
                 taskCoordinator,
                 replyFactory,
                 videoRenderRecord,
-                replayResults,
-                this::getAccessTokenFor
+                replayResults
         );
         GeneralCommandHandler generalCommands = new GeneralCommandHandler(
                 messageSender, taskCoordinator, replyFactory, resolver, admins::isAdmin
@@ -227,7 +226,7 @@ public class Router {
                     LOG.info("Routing {} message : {}", groupMessage ? "group" : "private", context.rawContent());
                     dispatch(context);
                 } catch (Exception e) {
-                    context.sendReply(PendingMessage.ofMarkdownRaw(at(context) + "处理指令时发生错误，请稍后再试。"));
+                    context.sendReply(PendingMessage.ofMarkdownRaw(at(context) + TaskCoordinator.resolveErrorMessage(e)));
                     LOG.error("Failed to process inbound message {}", messageId, e);
                 }
             });

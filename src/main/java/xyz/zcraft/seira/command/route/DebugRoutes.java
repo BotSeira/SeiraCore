@@ -141,19 +141,24 @@ public class DebugRoutes {
     }
 
     public void handleUpdateUserInfo(Context ctx) {
+        final List<Long> allUsers;
         try {
-            final List<Long> allUsers = UserDataStore.findAllUsers();
-            taskCoordinator.runApiRequest(ctx, "Update All User Info", () -> {
-                APIHelper.getUsers(allUsers).forEach(user -> UserDataStore.storeUserInfo(user.getId(), user.getUsername()));
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "更新完成，共更新了" + allUsers.size() + "个用户的信息"));
-            });
+            allUsers = UserDataStore.findAllUsers();
         } catch (Exception e) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用户信息更新失败"));
+            return;
+        }
+        try (var timing = taskCoordinator.beginRequest(ctx, "Update All User Info")) {
+            var users = APIHelper.getUsers(allUsers);
+            for (var user : users) {
+                UserDataStore.storeUserInfo(user.getId(), user.getUsername());
+            }
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "更新完成，共更新了" + allUsers.size() + "个用户的信息"));
         }
     }
 
     public void handleGetAllFriends(Context ctx) {
-        taskCoordinator.runApiRequest(ctx, "Get All Friends", () -> {
+        try (var timing = taskCoordinator.beginRequest(ctx, "Get All Friends")) {
             try {
                 final List<OsuAuthHelper.TokenStore> allOsuTokens = UserDataStore.getAllOsuTokens();
                 allOsuTokens
@@ -198,11 +203,11 @@ public class DebugRoutes {
                 LOG.error("Failed to get friends", e);
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用户信息更新失败"));
             }
-        });
+        }
     }
 
     public void handleValidateToken(Context ctx) {
-        taskCoordinator.runApiRequest(ctx, "Validate Token", () -> {
+        try (var timing = taskCoordinator.beginRequest(ctx, "Validate Token")) {
             int updated = 0, removed = 0;
             try {
                 final List<OsuAuthHelper.TokenStore> allOsuTokens = UserDataStore.getAllOsuTokens();
@@ -223,6 +228,6 @@ public class DebugRoutes {
                 LOG.error("Failed to get friends", e);
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用户信息更新失败"));
             }
-        });
+        }
     }
 }

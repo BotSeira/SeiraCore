@@ -20,10 +20,14 @@ public final class TargetHistory {
     public enum Type { BEATMAPSET, BEATMAP, SCORE }
 
     // 每个调用者只保存三个 ID。成绩 ID 使用字符串以兼容 loc... 本地成绩。
-    private static final class Ids {
-        Long beatmapsetId;
-        Long beatmapId;
-        String scoreId;
+    public static final class Ids {
+        private Long beatmapsetId;
+        private Long beatmapId;
+        private String scoreId;
+
+        public Long beatmapsetId() { return beatmapsetId; }
+        public Long beatmapId() { return beatmapId; }
+        public String scoreId() { return scoreId; }
 
         Ids() {}
 
@@ -74,122 +78,110 @@ public final class TargetHistory {
         return new ShortcutTarget(Long.parseLong(id), null, null, null, null);
     }
 
-    public ShortcutTarget resolveAndGet(Context ctx, Type type) {
-        TargetResolution args = ctx.argumentCount() == 0 ? new TargetResolution(null, 0)
-                : resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
-        if (ctx.argumentCount() != args.consumedArgs()) {
-            throw new ResolutionException("目标后还有未处理的参数喵");
-        }
-        return resolveAndGet(ctx, type, args);
+
+    public void remember(Context ctx, Ids ids) {
+        users.put(ctx.senderUserId(), new Ids(ids));
     }
 
-    public ShortcutTarget resolveAndGet(Context ctx, Type type, TargetResolution args) {
-        return resolveAndGet(ctx, type, args, List.of());
+    public Ids resolve(Context ctx, Type type, TargetResolution args) {
+        return resolve(ctx, type, args, List.of(), null);
     }
 
-    /** 在请求工作线程中调用；查找成功后才保存三个 ID，失败时保留原来的记忆。 */
-    public ShortcutTarget resolveAndGet(Context ctx, Type type, TargetResolution args, List<String> filters) {
+    /** 查找只修改本次结果；调用者显式 remember 后才更新历史。 */
+    public Ids resolve(Context ctx, Type type, TargetResolution args, List<String> filters, String mod) {
         ShortcutTarget target = args.target();
         if (target != null && target.isError()) throw new ResolutionException(target.errorMessage());
 
-        Ids resolved = users.compute(ctx.senderUserId(), (_, previous) -> {
-            // 省略目标时沿用三个 ID；显式输入目标时从空记忆开始。
-            Ids ids = target == null ? new Ids(previous) : new Ids();
-            UserRef player = args.userOverride() != null ? args.userOverride()
-                    : target == null ? null : target.userRef();
-            boolean selectedPlayerScore = false;
+        Ids previous = users.get(ctx.senderUserId());
+        // 省略目标时沿用三个 ID；显式输入目标时从空记忆开始。
+        Ids ids = target == null ? new Ids(previous) : new Ids();
+        UserRef player = args.userOverride() != null ? args.userOverride()
+                : target == null ? null : target.userRef();
+        boolean selectedPlayerScore = false;
 
-            if (target != null) {
-                if (target.isLocalScore()) {
-                    ids.scoreId = target.localScoreId();
-                } else if (!target.isMacro()) {
-                    switch (type) {
-                        case BEATMAPSET -> ids.beatmapsetId = target.explicitId();
-                        case BEATMAP -> ids.beatmapId = target.explicitId();
-                        case SCORE -> ids.scoreId = target.explicitId().toString();
-                    }
-                } else {
-                    switch (target.macroType()) {
-                        case "m" -> ids.beatmapId = target.explicitId();
-                        case "s" -> ids.scoreId = target.explicitId().toString();
-                        case "ms" -> {
-                            ids.beatmapsetId = target.explicitId();
-                            if (type != Type.BEATMAPSET) {
-                                if (target.macroIndex() == null) throw new ResolutionException("请指定指令目标谱面喵");
-                                if (type == Type.BEATMAP) {
-                                    ids.beatmapId = APIHelper.lookupBeatmap(target, accessToken.apply(ctx.senderUserId()));
-                                } else {
-                                    player = requirePlayer(ctx, player);
-                                    ids.scoreId = APIHelper.lookupScoreId(new ShortcutTarget(
-                                            target.explicitId(), player, "ms", target.macroIndex(), null), filters);
-                                    selectedPlayerScore = true;
-                                }
-                            }
-                        }
-                        case "rs", "rp", "bp" -> {
-                            // 先把列表位置固定为实际成绩 ID，后续指令不再重新查询列表。
-                            player = requirePlayer(ctx, player);
-                            ids.scoreId = APIHelper.lookupScoreId(new ShortcutTarget(
-                                    null, player, target.macroType(), target.macroIndex(), null), filters);
-                            selectedPlayerScore = true;
-                        }
-                        case "mp" -> {
-                            if (type == Type.BEATMAPSET) {
-                                ids.beatmapsetId = APIHelper.lookupBeatmapset(target, accessToken.apply(ctx.senderUserId()));
-                            } else {
+        if (target != null) {
+            if (target.isLocalScore()) {
+                ids.scoreId = target.localScoreId();
+            } else if (!target.isMacro()) {
+                switch (type) {
+                    case BEATMAPSET -> ids.beatmapsetId = target.explicitId();
+                    case BEATMAP -> ids.beatmapId = target.explicitId();
+                    case SCORE -> ids.scoreId = target.explicitId().toString();
+                }
+            } else {
+                switch (target.macroType()) {
+                    case "m" -> ids.beatmapId = target.explicitId();
+                    case "s" -> ids.scoreId = target.explicitId().toString();
+                    case "ms" -> {
+                        ids.beatmapsetId = target.explicitId();
+                        if (type != Type.BEATMAPSET) {
+                            if (target.macroIndex() == null) throw new ResolutionException("请指定指令目标谱面喵");
+                            if (type == Type.BEATMAP) {
                                 ids.beatmapId = APIHelper.lookupBeatmap(target, accessToken.apply(ctx.senderUserId()));
+                            } else {
+                                player = requirePlayer(ctx, player);
+                                ids.scoreId = APIHelper.lookupScoreId(new ShortcutTarget(
+                                        target.explicitId(), player, "ms", target.macroIndex(), null), filters, mod);
+                                selectedPlayerScore = true;
                             }
                         }
-                        default -> throw new ResolutionException("未知的快捷查询");
                     }
-                }
-            }
-
-            // /s @用户：取记忆成绩所在的谱面，再查指定用户的成绩。
-            // /s rs2 @用户 已经选好了该用户的 rs2，不再改查谱面最佳成绩。
-            if (type == Type.SCORE && args.userOverride() != null && ids.scoreId != null && !selectedPlayerScore) {
-                if (ids.beatmapId == null) {
-                    ids.beatmapId = APIHelper.lookupBeatmap(scoreTarget(ids.scoreId), accessToken.apply(ctx.senderUserId()));
-                }
-                ids.scoreId = null;
-            }
-
-            switch (type) {
-                case BEATMAP -> {
-                    if (ids.beatmapId == null) {
-                        if (ids.scoreId == null) throw new ResolutionException("请指定指令目标谱面喵");
-                        ids.beatmapId = APIHelper.lookupBeatmap(scoreTarget(ids.scoreId), accessToken.apply(ctx.senderUserId()));
-                    }
-                }
-                case BEATMAPSET -> {
-                    if (ids.beatmapsetId == null) {
-                        if (ids.beatmapId == null && ids.scoreId != null) {
-                            ids.beatmapId = APIHelper.lookupBeatmap(scoreTarget(ids.scoreId), accessToken.apply(ctx.senderUserId()));
-                        }
-                        if (ids.beatmapId == null) throw new ResolutionException("请指定指令目标喵");
-                        ids.beatmapsetId = APIHelper.lookupBeatmapset(new ShortcutTarget(
-                                ids.beatmapId, null, "m", null, null), accessToken.apply(ctx.senderUserId()));
-                    }
-                }
-                case SCORE -> {
-                    if (ids.scoreId == null) {
-                        if (ids.beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
+                    case "rs", "rp", "bp" -> {
+                        // 先把列表位置固定为实际成绩 ID，后续指令不再重新查询列表。
                         player = requirePlayer(ctx, player);
                         ids.scoreId = APIHelper.lookupScoreId(new ShortcutTarget(
-                                ids.beatmapId, player, "m", null, null), filters);
+                                null, player, target.macroType(), target.macroIndex(), null), filters, mod);
+                        selectedPlayerScore = true;
                     }
+                    case "mp" -> {
+                        if (type == Type.BEATMAPSET) {
+                            ids.beatmapsetId = APIHelper.lookupBeatmapset(target, accessToken.apply(ctx.senderUserId()));
+                        } else {
+                            ids.beatmapId = APIHelper.lookupBeatmap(target, accessToken.apply(ctx.senderUserId()));
+                        }
+                    }
+                    default -> throw new ResolutionException("未知的快捷查询");
                 }
             }
-            return ids;
-        });
+        }
 
-        // 直接返回本次结果，避免并发指令写入后读到别的目标。
-        return switch (type) {
-            case BEATMAPSET -> new ShortcutTarget(resolved.beatmapsetId, null, null, null, null);
-            case BEATMAP -> new ShortcutTarget(resolved.beatmapId, null, null, null, null);
-            case SCORE -> isLocalId(resolved.scoreId) ? ShortcutTarget.localScore(resolved.scoreId)
-                    : new ShortcutTarget(Long.parseLong(resolved.scoreId), null, null, null, null);
-        };
+        // 指定用户或 Mods 时，按同一谱面重新查成绩，不能直接沿用旧成绩 ID。
+        // /s rs2 @用户 已经选好了该用户的 rs2，不再改查谱面最佳成绩。
+        if (type == Type.SCORE && (args.userOverride() != null || mod != null)
+                && ids.scoreId != null && !selectedPlayerScore) {
+            if (ids.beatmapId == null) {
+                ids.beatmapId = APIHelper.getScoreBeatmapId(ids.scoreId);
+            }
+            ids.scoreId = null;
+        }
+
+        switch (type) {
+            case BEATMAP -> {
+                if (ids.beatmapId == null) {
+                    if (ids.scoreId == null) throw new ResolutionException("请指定指令目标谱面喵");
+                    ids.beatmapId = APIHelper.getScoreBeatmapId(ids.scoreId);
+                }
+            }
+            case BEATMAPSET -> {
+                if (ids.beatmapsetId == null) {
+                    if (ids.beatmapId == null && ids.scoreId != null) {
+                        ids.beatmapId = APIHelper.getScoreBeatmapId(ids.scoreId);
+                    }
+                    if (ids.beatmapId == null) throw new ResolutionException("请指定指令目标喵");
+                    ids.beatmapsetId = APIHelper.lookupBeatmapset(new ShortcutTarget(
+                            ids.beatmapId, null, "m", null, null), accessToken.apply(ctx.senderUserId()));
+                }
+            }
+            case SCORE -> {
+                if (ids.scoreId == null) {
+                    if (ids.beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
+                    player = requirePlayer(ctx, player);
+                    ids.scoreId = APIHelper.lookupScoreId(new ShortcutTarget(
+                            ids.beatmapId, player, "m", null, null), filters, mod);
+                }
+            }
+        }
+        return ids;
     }
 
     private UserRef requirePlayer(Context ctx, UserRef player) {
@@ -201,12 +193,6 @@ public final class TargetHistory {
 
     private static boolean isLocalId(String id) {
         return !id.chars().allMatch(Character::isDigit);
-    }
-
-    // 仅在跨类型查找时标注这是成绩 ID，避免 APIHelper 将其当成谱面 ID。
-    private static ShortcutTarget scoreTarget(String id) {
-        return isLocalId(id) ? ShortcutTarget.localScore(id)
-                : new ShortcutTarget(Long.parseLong(id), null, "s", null, null);
     }
 
     /** 同屏回放需要保留本地成绩本身，以便把它加入回放列表。 */
@@ -240,16 +226,31 @@ public final class TargetHistory {
     }
 
     public TargetResolution parseScoreArguments(Context ctx, String usage) {
+        return parseScoreArguments(ctx, usage, 0, _ -> false);
+    }
+
+    /** 目标和可选用户在前，其余参数交给指令；这里不认识 +mod 等具体选项。 */
+    public TargetResolution parseScoreArguments(Context ctx, String usage, int maxOptions, Predicate<String> optional) {
         try {
-            if (ctx.argumentCount() > 2) throw new ResolutionException(usage);
-            if (ctx.argumentCount() == 1 && resolver.looksLikeMention(ctx.argument(0))) {
+            TargetResolution args;
+            if (ctx.argumentCount() > 0 && resolver.looksLikeMention(ctx.argument(0))
+                    && (ctx.argumentCount() == 1 || optional.test(ctx.argument(1)))) {
                 UserRef player = parsePlayer(ctx.argument(0), usage);
                 if (!users.containsKey(ctx.senderUserId())) throw new ResolutionException(usage);
-                return new TargetResolution(null, 1, player);
+                args = new TargetResolution(null, 1, player);
+            } else {
+                args = parseArguments(ctx, usage, Integer.MAX_VALUE, optional);
+                if (args == null) return null;
+                String next = args.nextArgument(ctx);
+                if (next != null && !optional.test(next)) {
+                    args = new TargetResolution(args.target(), args.consumedArgs() + 1, parsePlayer(next, usage));
+                }
             }
-            TargetResolution args = parseArguments(ctx, usage, 1);
-            if (args == null || args.nextArgument(ctx) == null) return args;
-            return new TargetResolution(args.target(), args.consumedArgs() + 1, parsePlayer(args.nextArgument(ctx), usage));
+            if (ctx.argumentCount() - args.consumedArgs() > maxOptions) throw new ResolutionException(usage);
+            for (int i = args.consumedArgs(); i < ctx.argumentCount(); i++) {
+                if (!optional.test(ctx.argument(i))) throw new ResolutionException(usage);
+            }
+            return args;
         } catch (ResolutionException e) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + e.getMessage()));
             return null;

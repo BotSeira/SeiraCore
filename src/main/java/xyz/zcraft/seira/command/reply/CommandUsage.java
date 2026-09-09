@@ -13,7 +13,7 @@ public final class CommandUsage {
     public static final String BPV = "用法：/bpv [谱面ID 或 快捷查询] [Mod]（省略目标时使用记忆）";
     public static final String BGP = "用法：/bgp <谱面ID 或 快捷查询>";
     public static final String DL = "用法：/dl <谱面集ID 或 快捷查询>";
-    public static final String S = "用法：/s <成绩ID 或 快捷查询>";
+    public static final String S = "用法：/s [成绩ID 或 快捷查询] [用户] [+Mod]（省略目标时使用记忆）";
     public static final String SA = "用法：/sa <成绩ID 或 快捷查询>";
     public static final String MA = "用法：/ma [成绩ID 或 快捷查询] [序号]；省略目标并指定序号时请使用 #序号";
     public static final String R = "用法：/r [成绩ID 或 快捷查询] [[mm:ss]-[mm:ss]]";

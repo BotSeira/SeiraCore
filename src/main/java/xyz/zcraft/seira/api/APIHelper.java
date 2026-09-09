@@ -23,11 +23,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
 
 public class APIHelper {
     private static final String ENDPOINT;
@@ -133,8 +131,7 @@ public class APIHelper {
         );
     }
 
-    public static Response<Base64Bytes> getGroupLeaderboardResponse(ShortcutTarget target, List<Long> uids, String auth) {
-        final long beatmapId = lookupBeatmap(target, auth);
+    public static Response<Base64Bytes> getGroupLeaderboardResponse(long beatmapId, List<Long> uids) {
         return getBase64BytesResponse(
                 "/beatmaps/" + beatmapId + "/leaderboards",
                 "获取群排行失败",
@@ -236,13 +233,11 @@ public class APIHelper {
         return "&filters=" + URLEncoder.encode(String.join(",", filters), StandardCharsets.UTF_8);
     }
 
-    public static Response<Base64Bytes> getBeatmapResponse(ShortcutTarget target, String mod, String auth) {
-        final long beatmapId = lookupBeatmap(target, auth);
+    public static Response<Base64Bytes> getBeatmapResponse(long beatmapId, String mod) {
         return getBase64BytesResponse("/beatmaps/" + beatmapId + (mod != null ? "?mod=" + mod : ""), "获取谱面失败", null);
     }
 
-    public static Response<Base64Bytes> getBeatmapAnalysisResponse(ShortcutTarget target, String mod, String auth) {
-        final long beatmapId = lookupBeatmap(target, auth);
+    public static Response<Base64Bytes> getBeatmapAnalysisResponse(long beatmapId, String mod) {
         String query = "/beatmaps/" + beatmapId + "/analysis";
         if (mod != null && !mod.isBlank()) {
             query += "?mod=" + URLEncoder.encode(mod, StandardCharsets.UTF_8);
@@ -250,20 +245,18 @@ public class APIHelper {
         return getBase64BytesResponse(query, "获取谱面分析失败", null);
     }
 
-    public static Response<Base64Bytes> getBeatmapsetBgResponse(ShortcutTarget target, String auth) {
-        final long beatmapsetId = lookupBeatmapset(target, auth);
+    public static Response<Base64Bytes> getBeatmapsetBgResponse(long beatmapsetId) {
         return getBase64BytesResponse("/beatmapsets/" + beatmapsetId + "/background", "获取谱面集失败", null);
     }
 
-    public static Response<Base64Bytes> getBeatmapBgResponse(ShortcutTarget target, String auth) {
-        final long beatmapId = lookupBeatmap(target, auth);
+    public static Response<Base64Bytes> getBeatmapBgResponse(long beatmapId) {
         return getBase64BytesResponse("/beatmaps/" + beatmapId + "/background", "获取谱面失败", null);
     }
 
     public static long lookupBeatmap(ShortcutTarget target, String auth) {
         long beatmapId;
         if (target.isLocalScore() || "s".equals(target.macroType())) {
-            beatmapId = lookupScoreData(lookupScoreId(target)).get("beatmap_id").getAsLong();
+            beatmapId = lookupScoreData(lookupScoreId(target, List.of(), null)).get("beatmap_id").getAsLong();
         } else if ("m".equals(target.macroType())) {
             beatmapId = target.explicitId();
         } else if (!target.isMacro()) {
@@ -317,8 +310,7 @@ public class APIHelper {
         return query;
     }
 
-    public static Response<Base64Bytes> getBeatmapsetResponse(ShortcutTarget target, String auth) {
-        final long beatmapsetId = lookupBeatmapset(target, auth);
+    public static Response<Base64Bytes> getBeatmapsetResponse(long beatmapsetId) {
         return getBase64BytesResponse("/beatmapsets/" + beatmapsetId, "获取谱面集失败", null);
     }
 
@@ -391,22 +383,15 @@ public class APIHelper {
         };
     }
 
-    public static Response<Base64Bytes> getScoreResponse(ShortcutTarget target) {
-        return getScoreResponse(target, List.of());
-    }
-
-    public static Response<Base64Bytes> getScoreResponse(ShortcutTarget target, List<String> filters) {
-        String scoreId = lookupScoreId(target, filters);
+    public static Response<Base64Bytes> getScoreResponse(String scoreId) {
         return getBase64BytesResponse("/scores/" + scoreId, "获取成绩失败", null);
     }
 
-    public static Response<Base64Bytes> getScoreAnalyzeResponse(ShortcutTarget target) {
-        String scoreId = lookupScoreId(target);
+    public static Response<Base64Bytes> getScoreAnalyzeResponse(String scoreId) {
         return getBase64BytesResponse("/scores/" + scoreId + "/analysis", "获取成绩分析失败", null);
     }
 
-    public static Response<Base64Bytes> getMissVisualizeResponse(ShortcutTarget target, int index) {
-        String scoreId = lookupScoreId(target);
+    public static Response<Base64Bytes> getMissVisualizeResponse(String scoreId, int index) {
         return getBase64BytesResponse("/scores/" + scoreId + "/misses/" + index + "/visualize", "获取Miss可视化失败", null);
     }
 
@@ -448,13 +433,13 @@ public class APIHelper {
         };
     }
 
-    public static Response<?> getLookupBeatmapsetResponse(@NotNull ShortcutTarget target, String s) {
+    public static Response<?> getLookupBeatmapsetResponse(long beatmapsetId, String auth) {
         try {
-            final String query = target.isMacro() ? getBeatmapsetQuery(target) : "/beatmapsets/lookup?ms=" + target.explicitId();
+            final String query = "/beatmapsets/lookup?ms=" + beatmapsetId;
 
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + query))
-                    .header("Authorization", "Bearer " + s)
+                    .header("Authorization", "Bearer " + auth)
                     .GET()
                     .build();
 
@@ -503,16 +488,6 @@ public class APIHelper {
         } catch (IOException | InterruptedException e) {
             throw requestFailure(e);
         }
-    }
-
-    public static ReplayTaskInfo createReplayRenderTask(ShortcutTarget target, TimeDurationParser.TimeRange timeRange) {
-        return createReplayTask(target, timeRange, null);
-    }
-
-    public static ReplayTaskInfo createReplayRenderTask(ShortcutTarget target,
-                                                        TimeDurationParser.TimeRange timeRange,
-                                                        QqUploadRequest qqUpload) {
-        return createReplayTask(target, timeRange, qqUpload);
     }
 
     public static ReplayTaskInfo createObscuredReplayRenderTask(long scoreId) {
@@ -640,13 +615,9 @@ public class APIHelper {
         }
     }
 
-    public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] ids, String auth) {
-        return createReplayShowcaseTask(target, ids, auth, null);
-    }
 
-    public static ReplayTaskInfo createBeatmapPreviewTask(ShortcutTarget target, String mods, String auth,
+    public static ReplayTaskInfo createBeatmapPreviewTask(long beatmapId, String mods,
                                                           QqUploadRequest qqUpload) {
-        long beatmapId = lookupBeatmap(target, auth);
         JsonObject body = new JsonObject();
         if (mods != null && !mods.isBlank()) {
             body.addProperty("mods", mods);
@@ -663,20 +634,13 @@ public class APIHelper {
         return getReplayTaskInfo(request);
     }
 
-    public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget beatmapTarget, String[] scoreTargets, String auth,
+    public static ReplayTaskInfo createReplayShowcaseTask(long beatmapId, String[] scoreTargets,
                                                           QqUploadRequest qqUpload) {
         scoreTargets = scoreTargets == null ? new String[0] : scoreTargets;
 
-        if (beatmapTarget.isLocalScore()) {
-            scoreTargets = Stream.concat(Stream.of("s" + beatmapTarget.localScoreId()), Arrays.stream(scoreTargets))
-                    .distinct()
-                    .toArray(String[]::new);
-        }
         if (scoreTargets.length == 0) {
             throw new RuntimeException("同屏回放需要至少一个ID。");
         }
-
-        final long beatmapId = lookupBeatmap(beatmapTarget, auth);
 
         JsonObject body = GSON.toJsonTree(Map.of("ids", scoreTargets)).getAsJsonObject();
         if (qqUpload != null) {
@@ -697,11 +661,9 @@ public class APIHelper {
                 ENDPOINT + "/replays/" + taskId + "/video/replay.mp4", taskId, qqFile);
     }
 
-    private static ReplayTaskInfo createReplayTask(ShortcutTarget target,
+    public static ReplayTaskInfo createReplayRenderTask(String scoreId,
                                                    TimeDurationParser.TimeRange timeRange,
                                                    QqUploadRequest qqUpload) {
-        String scoreId = lookupScoreId(target);
-
         if (timeRange == null) {
             timeRange = getScoreHighlight(scoreId, 5);
         }
@@ -745,11 +707,7 @@ public class APIHelper {
         }
     }
 
-    public static String lookupScoreId(ShortcutTarget target) {
-        return lookupScoreId(target, List.of());
-    }
-
-    public static String lookupScoreId(ShortcutTarget target, List<String> filters) {
+    public static String lookupScoreId(ShortcutTarget target, List<String> filters, String mod) {
         String scoreId;
         if (target.isLocalScore()) {
             scoreId = target.localScoreId();
@@ -757,7 +715,8 @@ public class APIHelper {
             scoreId = String.valueOf(target.explicitId());
         } else {
             try {
-                final String query = getScoreQuery(target) + encodeScoreFilters(filters);
+                final String query = getScoreQuery(target) + encodeScoreFilters(filters)
+                        + (mod == null ? "" : "&mod=" + URLEncoder.encode(mod, StandardCharsets.UTF_8));
 
                 HttpRequest localRequest = HttpRequest.newBuilder()
                         .uri(URI.create(ENDPOINT + query))
@@ -780,6 +739,10 @@ public class APIHelper {
             }
         }
         return scoreId;
+    }
+
+    public static long getScoreBeatmapId(String scoreId) {
+        return lookupScoreData(scoreId).get("beatmap_id").getAsLong();
     }
 
     private static JsonObject lookupScoreData(String scoreId) {
@@ -1033,8 +996,7 @@ public class APIHelper {
         return new ServerStatus(true, oStella, oStellaVersion, osu);
     }
 
-    public static Response<List<MissData>> getScoreMissesResponse(ShortcutTarget target) {
-        final String scoreId = lookupScoreId(target);
+    public static Response<List<MissData>> getScoreMissesResponse(String scoreId) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/scores/" + scoreId + "/misses"))

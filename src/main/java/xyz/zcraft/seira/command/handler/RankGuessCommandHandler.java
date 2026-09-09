@@ -23,7 +23,6 @@ import xyz.zcraft.seira.rankguess.data.*;
 import xyz.zcraft.seira.util.RandomReply;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -404,7 +403,7 @@ public final class RankGuessCommandHandler {
             scoreId = Long.parseLong(
                     APIHelper.lookupScoreId(new ShortcutTarget(
                             null, new UserRef.ByUid(boundUid), "bp", (long) index, null)
-                    )
+                    , List.of(), null)
             );
         } catch (Exception e) {
             LOG.error("Failed to lookup score id", e);
@@ -432,186 +431,183 @@ public final class RankGuessCommandHandler {
             return;
         }
 
-        AtomicBoolean activated = new AtomicBoolean();
-        taskCoordinator.runApiRequest(
-                ctx,
-                "Rank Guess Render",
-                () -> {
-                    final PendingMessage message = PendingMessage.ofMarkdownRaw(at(ctx) + RandomReply.loading());
-                    final boolean activeMessageEnabled = ctx.sendMessage(message).success();
-                    if (!activeMessageEnabled) {
-                        ctx.sendReply(message);
-                    }
+        boolean activated = false;
+        try (var timing = taskCoordinator.beginRequest(ctx, "Rank Guess Render")) {
+            final PendingMessage message = PendingMessage.ofMarkdownRaw(at(ctx) + RandomReply.loading());
+            final boolean activeMessageEnabled = ctx.sendMessage(message).success();
+            if (!activeMessageEnabled) {
+                ctx.sendReply(message);
+            }
 
-                    RandomScore randomScore;
+            RandomScore randomScore;
 
-                    if (fromGroup) {
-                        final List<Long> uids = UserDataStore.findBoundUidsByGroup(ctx.groupId());
-                        if (uids.isEmpty()) {
-                            ctx.sendReply(PendingMessage.ofMarkdownRaw("本群没有绑定的用户，无法开始游戏喵"));
-                            return;
-                        }
-                        randomScore = APIHelper.getRandomScoreFromUsers(uids, games.generateWeights(ctx.groupId()));
-                    } else {
-                        randomScore = APIHelper.getRandomScore();
-                    }
-
-                    Round round = Round.from(randomScore, activeMessageEnabled);
-
-                    String content = at(ctx);
-
-                    if (fromGroup) {
-                        content += "随机群友及其成绩已选定";
-                    } else {
-                        content += "随机用户与成绩已选定";
-                    }
-
-                    content += "，正在渲染回放片段...";
-
-                    if (!activeMessageEnabled) {
-                        content += "\n\n> 提示: 由于缺少主动消息权限，阶段提示与自动结束已禁用。稍后需要使用 `/rg end` 手动结束。权限配置请见[这里](https://docs.seira.top/overview/use.html#extra-permission)。";
-                    }
-
-                    ctx.sendReply(PendingMessage.ofMarkdownRaw(content));
-
-                    var renderTask = APIHelper.createObscuredReplayRenderTask(
-                            round.scoreId(), taskCoordinator.createVideoUploadRequest(ctx)
-                    );
-
-                    APIHelper.ReplayRenderResult replay = null;
-                    try {
-                        replay = taskCoordinator.waitForReplay(renderTask);
-                    } catch (Exception e) {
-                        LOG.error("Failed to render replay for rank guess", e);
-                    }
-
-                    if (replay == null) {
-                        ctx.sendReply(PendingMessage.ofMarkdownRaw("由于回放渲染失败，本轮游戏已取消~"));
-                        return;
-                    }
-
-                    final SendResult sendResult = ctx.sendReply(taskCoordinator.replayVideoMessage(replay));
-                    boolean videoSent = sendResult.success();
-                    if (!videoSent) {
-                        taskCoordinator.removeReplayResult(renderTask.taskId());
-                        ctx.sendReply(PendingMessage.ofMarkdownRaw("由于回放发送失败，本轮游戏已取消~"));
-                        return;
-                    }
-
-                    taskCoordinator.removeReplayResult(renderTask.taskId());
-                    var game = games.activate(reservation, round, MessageReference.of(sendResult.sentMessage()));
-
-                    if (game == null) {
-                        ctx.sendReply(PendingMessage.ofMarkdownRaw("无法开始游戏，请稍后再试喵"));
-                        return;
-                    }
-
-                    activated.set(true);
-
-                    StringBuilder result = new StringBuilder("回放渲染完成，游戏已开始！请在群内发送 `/rg #Rank` 猜测排名~");
-
-                    if (fromGroup) {
-                        result.append("\n").append("__Tip: 这是一位群友的成绩喵~__").append("\n");
-                    }
-
-                    var hints = HintUtil.prepareHints(round.getNormalHints(), 4);
-
-                    if (!activeMessageEnabled) {
-                        result.append("\n").append("> 提示: ");
-                        for (RankGuessGame.Hint s : hints) {
-                            result.append("\n").append("> ").append(s.content());
-                        }
-                    } else {
-                        result.append("\n").append("> 第一个提示将在 1 分钟后揭晓~");
-                    }
-
-                    boolean startMessageSent = ctx.sendReply(
-                            PendingMessage.ofMarkdownRaw(result.toString().trim())
-                    ).success();
-
-                    if (!activeMessageEnabled) {
-                        if (startMessageSent) {
-                            game.revealHints(hints);
-                        }
-                        return;
-                    }
-
-                    boolean firstHint = true;
-
-                    StringBuilder hintString = new StringBuilder();
-
-                    while (!hints.isEmpty() && !game.isEnded()) {
-                        try {
-                            //noinspection BusyWait
-                            Thread.sleep((firstHint ? 60 : 30) * 1000);
-                        } catch (InterruptedException _) {
-                            Thread.currentThread().interrupt();
-                            break;
-                        }
-
-                        firstHint = false;
-
-                        if (game.isEnded()) {
-                            return;
-                        }
-
-                        boolean hasExactGuess = game.getGuesses().values().stream()
-                                .anyMatch(guess ->
-                                        guess.rank() == game.getRound().actualRank()
-                                );
-
-                        boolean hasOutstandingGuess = game.getGuesses()
-                                .values()
-                                .stream()
-                                .anyMatch(guess ->
-                                        RankGuessGameService.isOutstandingGuess(
-                                                guess.rank(),
-                                                game.getRound().actualRank(),
-                                                game.getGuesses().size(),
-                                                game.getRevealedHints().size(),
-                                                hints.size()
-                                        )
-                                );
-
-                        if (hasOutstandingGuess) {
-                            String hintContent = "__猜Rank提示：__\n"
-                                    + "- 有人已经做出了非常精准的猜测！游戏将在 30 秒后结束喵~\n"
-                                    + hintString;
-
-                            ctx.sendMessage(PendingMessage.ofMarkdownRaw(hintContent.trim()));
-                            break;
-                        }
-
-                        final RankGuessGame.Hint hint = hints.removeFirst();
-
-                        hintString.insert(0, "- " + hint.content() + "\n");
-
-                        String hintContent = "__猜Rank提示：__\n" + hintString;
-
-                        if (!hints.isEmpty()) {
-                            hintContent += "\n> 下一个提示将在 30 秒后揭晓~";
-                        } else {
-                            hintContent += "\n> 所有提示已经揭晓啦！游戏将在 30 秒后自动结束~";
-                        }
-
-                        if (ctx.sendMessage(PendingMessage.ofMarkdownRaw(hintContent)).success()) {
-                            game.revealHint(hint);
-                        }
-                    }
-
-                    try {
-                        Thread.sleep(30 * 1000);
-                    } catch (InterruptedException _) {
-                        Thread.currentThread().interrupt();
-                    }
-
-                    if (!game.isEnded()) {
-                        end(ctx, true);
-                    }
+            if (fromGroup) {
+                final List<Long> uids = UserDataStore.findBoundUidsByGroup(ctx.groupId());
+                if (uids.isEmpty()) {
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw("本群没有绑定的用户，无法开始游戏喵"));
+                    return;
                 }
-        );
-        if (!activated.get()) {
-            games.cancel(reservation);
+                randomScore = APIHelper.getRandomScoreFromUsers(uids, games.generateWeights(ctx.groupId()));
+            } else {
+                randomScore = APIHelper.getRandomScore();
+            }
+
+            Round round = Round.from(randomScore, activeMessageEnabled);
+
+            String content = at(ctx);
+
+            if (fromGroup) {
+                content += "随机群友及其成绩已选定";
+            } else {
+                content += "随机用户与成绩已选定";
+            }
+
+            content += "，正在渲染回放片段...";
+
+            if (!activeMessageEnabled) {
+                content += "\n\n> 提示: 由于缺少主动消息权限，阶段提示与自动结束已禁用。稍后需要使用 `/rg end` 手动结束。权限配置请见[这里](https://docs.seira.top/overview/use.html#extra-permission)。";
+            }
+
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(content));
+
+            var renderTask = APIHelper.createObscuredReplayRenderTask(
+                    round.scoreId(), taskCoordinator.createVideoUploadRequest(ctx)
+            );
+
+            APIHelper.ReplayRenderResult replay = null;
+            try {
+                replay = taskCoordinator.waitForReplay(renderTask);
+            } catch (Exception e) {
+                LOG.error("Failed to render replay for rank guess", e);
+            }
+
+            if (replay == null) {
+                ctx.sendReply(PendingMessage.ofMarkdownRaw("由于回放渲染失败，本轮游戏已取消~"));
+                return;
+            }
+
+            final SendResult sendResult = ctx.sendReply(taskCoordinator.replayVideoMessage(replay));
+            boolean videoSent = sendResult.success();
+            if (!videoSent) {
+                taskCoordinator.removeReplayResult(renderTask.taskId());
+                ctx.sendReply(PendingMessage.ofMarkdownRaw("由于回放发送失败，本轮游戏已取消~"));
+                return;
+            }
+
+            taskCoordinator.removeReplayResult(renderTask.taskId());
+            var game = games.activate(reservation, round, MessageReference.of(sendResult.sentMessage()));
+
+            if (game == null) {
+                ctx.sendReply(PendingMessage.ofMarkdownRaw("无法开始游戏，请稍后再试喵"));
+                return;
+            }
+
+            activated = true;
+
+            StringBuilder result = new StringBuilder("回放渲染完成，游戏已开始！请在群内发送 `/rg #Rank` 猜测排名~");
+
+            if (fromGroup) {
+                result.append("\n").append("__Tip: 这是一位群友的成绩喵~__").append("\n");
+            }
+
+            var hints = HintUtil.prepareHints(round.getNormalHints(), 4);
+
+            if (!activeMessageEnabled) {
+                result.append("\n").append("> 提示: ");
+                for (RankGuessGame.Hint s : hints) {
+                    result.append("\n").append("> ").append(s.content());
+                }
+            } else {
+                result.append("\n").append("> 第一个提示将在 1 分钟后揭晓~");
+            }
+
+            boolean startMessageSent = ctx.sendReply(
+                    PendingMessage.ofMarkdownRaw(result.toString().trim())
+            ).success();
+
+            if (!activeMessageEnabled) {
+                if (startMessageSent) {
+                    game.revealHints(hints);
+                }
+                return;
+            }
+
+            boolean firstHint = true;
+
+            StringBuilder hintString = new StringBuilder();
+
+            while (!hints.isEmpty() && !game.isEnded()) {
+                try {
+                    //noinspection BusyWait
+                    Thread.sleep((firstHint ? 60 : 30) * 1000);
+                } catch (InterruptedException _) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+
+                firstHint = false;
+
+                if (game.isEnded()) {
+                    return;
+                }
+
+                boolean hasExactGuess = game.getGuesses().values().stream()
+                        .anyMatch(guess ->
+                                guess.rank() == game.getRound().actualRank()
+                        );
+
+                boolean hasOutstandingGuess = game.getGuesses()
+                        .values()
+                        .stream()
+                        .anyMatch(guess ->
+                                RankGuessGameService.isOutstandingGuess(
+                                        guess.rank(),
+                                        game.getRound().actualRank(),
+                                        game.getGuesses().size(),
+                                        game.getRevealedHints().size(),
+                                        hints.size()
+                                )
+                        );
+
+                if (hasOutstandingGuess) {
+                    String hintContent = "__猜Rank提示：__\n"
+                            + "- 有人已经做出了非常精准的猜测！游戏将在 30 秒后结束喵~\n"
+                            + hintString;
+
+                    ctx.sendMessage(PendingMessage.ofMarkdownRaw(hintContent.trim()));
+                    break;
+                }
+
+                final RankGuessGame.Hint hint = hints.removeFirst();
+
+                hintString.insert(0, "- " + hint.content() + "\n");
+
+                String hintContent = "__猜Rank提示：__\n" + hintString;
+
+                if (!hints.isEmpty()) {
+                    hintContent += "\n> 下一个提示将在 30 秒后揭晓~";
+                } else {
+                    hintContent += "\n> 所有提示已经揭晓啦！游戏将在 30 秒后自动结束~";
+                }
+
+                if (ctx.sendMessage(PendingMessage.ofMarkdownRaw(hintContent)).success()) {
+                    game.revealHint(hint);
+                }
+            }
+
+            try {
+                Thread.sleep(30 * 1000);
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+            }
+
+            if (!game.isEnded()) {
+                end(ctx, true);
+            }
+        } finally {
+            if (!activated) {
+                games.cancel(reservation);
+            }
         }
     }
 

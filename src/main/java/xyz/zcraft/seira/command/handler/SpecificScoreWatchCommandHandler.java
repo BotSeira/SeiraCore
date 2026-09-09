@@ -74,7 +74,7 @@ public final class SpecificScoreWatchCommandHandler {
             return;
         }
 
-        taskCoordinator.runApiRequest(ctx, "Start Specific Score Watch", () -> {
+        try (var timing = taskCoordinator.beginRequest(ctx, "Start Specific Score Watch")) {
             if (!ctx.sendMessage(PendingMessage.ofString("正在尝试启动指定谱面成绩监视……")).success()) {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) +
                         "由于缺少主动消息权限，无法启动监视！权限配置请见：https://docs.seira.top/overview/use.html#extra-permission"
@@ -86,7 +86,7 @@ public final class SpecificScoreWatchCommandHandler {
                     "指定谱面成绩监视已启动，目标为" + state.userIds().size() + " 名玩家，"
                             + state.beatmapIds().size() + " 张谱面。"
             ));
-        });
+        }
     }
 
     private void handleStop(Context ctx) {

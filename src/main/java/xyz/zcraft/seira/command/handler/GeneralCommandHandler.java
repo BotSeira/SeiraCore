@@ -57,12 +57,11 @@ public final class GeneralCommandHandler {
             return;
         }
 
-        taskCoordinator.runImageRequest(
-                context,
-                "User Info",
-                () -> APIHelper.getUserInfoResponse(userRef),
-                replyFactory::userInfoMessage
-        );
+        try (var timing = taskCoordinator.beginRequest(context, "User Info")) {
+            var response = APIHelper.getUserInfoResponse(userRef);
+            var completion = replyFactory.userInfoMessage(context, response);
+            context.sendReply(taskCoordinator.imageMessage(response, completion));
+        }
     }
 
     public void handleLuck(Context context) {
@@ -71,12 +70,12 @@ public final class GeneralCommandHandler {
             return;
         }
 
-        taskCoordinator.runApiRequest(context, "Luck", () -> {
+        try (var timing = taskCoordinator.beginRequest(context, "Luck")) {
             DailyLuck.Luck luck = DailyLuck.getLuck(context.senderUserId());
             Beatmapset mapset = APIHelper.getBeatmapsetRaw(luck.dailyMapset());
             UploadedImage cover = messageSender.uploadImageToCos(mapset.getCovers().getCover());
             context.sendReply(replyFactory.luckMessage(context, luck, mapset, cover));
-        });
+        }
     }
 
     public void handleInspect(Context context) {

@@ -14,7 +14,6 @@ import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
-import java.util.function.Function;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
@@ -25,7 +24,6 @@ public final class ReplayCommandHandler {
     private final ReplyFactory replyFactory;
     private final VideoRenderRecord videoRenderRecord;
     private final ReplayResultStore replayResults;
-    private final Function<String, String> accessTokenProvider;
 
     public ReplayCommandHandler(
             Resolver resolver,
@@ -33,8 +31,7 @@ public final class ReplayCommandHandler {
             TaskCoordinator taskCoordinator,
             ReplyFactory replyFactory,
             VideoRenderRecord videoRenderRecord,
-            ReplayResultStore replayResults,
-            Function<String, String> accessTokenProvider
+            ReplayResultStore replayResults
     ) {
         this.resolver = resolver;
         this.history = history;
@@ -42,7 +39,6 @@ public final class ReplayCommandHandler {
         this.replyFactory = replyFactory;
         this.videoRenderRecord = videoRenderRecord;
         this.replayResults = replayResults;
-        this.accessTokenProvider = accessTokenProvider;
     }
 
     public void handleR(Context ctx) {
@@ -60,16 +56,23 @@ public final class ReplayCommandHandler {
             }
         }
 
-        TimeDurationParser.TimeRange finalRange = range;
-        taskCoordinator.runReplayRequest(
-                ctx,
-                "Score Render",
-                qqUpload -> {
-                    APIHelper.ReplayTaskInfo task = APIHelper.createReplayRenderTask(history.resolveAndGet(ctx, SCORE, target), finalRange, qqUpload);
-                    videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
-                    return task;
-                },
-                replyFactory::replayMessage);
+        try (var timing = taskCoordinator.beginRequest(ctx, "Score Render")) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "正在获取谱面以及回放文件，请稍作等待喵..."));
+            var ids = history.resolve(ctx, SCORE, target);
+            history.remember(ctx, ids);
+            var upload = taskCoordinator.createVideoUploadRequest(ctx);
+            var task = APIHelper.createReplayRenderTask(ids.scoreId(), range, upload);
+            videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
+            ctx.sendReply(replyFactory.replayMessage(ctx, task));
+            var result = taskCoordinator.waitForReplay(task);
+            if (result == null) {
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "回放视频生成失败，请稍后重试。"));
+                return;
+            }
+            if (ctx.sendReply(taskCoordinator.replayVideoMessage(result)).success()) {
+                replayResults.remove(task.taskId());
+            }
+        }
     }
 
     public void handleRsc(Context ctx) {
@@ -103,18 +106,35 @@ public final class ReplayCommandHandler {
             return;
         }
 
-        String[] targetsArray = rscTarget.targets();
-
-        taskCoordinator.runReplayRequest(
-                ctx,
-                "Showcase Render",
-                qqUpload -> {
-                    var task = APIHelper.createReplayShowcaseTask(
-                            history.resolveAndGet(ctx, history.isLocalScore(ctx, target) ? SCORE : BEATMAP, target), targetsArray, accessTokenProvider.apply(ctx.senderUserId()), qqUpload);
-                    videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
-                    return task;
-                },
-                replyFactory::replayMessage);
+        try (var timing = taskCoordinator.beginRequest(ctx, "Showcase Render")) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "正在获取谱面以及回放文件，请稍作等待喵..."));
+            var targetType = history.isLocalScore(ctx, target) ? SCORE : BEATMAP;
+            var resolved = history.resolve(ctx, targetType, target);
+            history.remember(ctx, resolved);
+            var upload = taskCoordinator.createVideoUploadRequest(ctx);
+            String[] scoreTargets = rscTarget.targets();
+            long beatmapId;
+            if (targetType == SCORE) {
+                var ids = new java.util.LinkedHashSet<String>();
+                ids.add("s" + resolved.scoreId());
+                java.util.Collections.addAll(ids, scoreTargets);
+                scoreTargets = ids.toArray(String[]::new);
+                beatmapId = APIHelper.getScoreBeatmapId(resolved.scoreId());
+            } else {
+                beatmapId = resolved.beatmapId();
+            }
+            var task = APIHelper.createReplayShowcaseTask(beatmapId, scoreTargets, upload);
+            videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
+            ctx.sendReply(replyFactory.replayMessage(ctx, task));
+            var result = taskCoordinator.waitForReplay(task);
+            if (result == null) {
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "回放视频生成失败，请稍后重试。"));
+                return;
+            }
+            if (ctx.sendReply(taskCoordinator.replayVideoMessage(result)).success()) {
+                replayResults.remove(task.taskId());
+            }
+        }
     }
 
     public void handleRstat(Context ctx) {
