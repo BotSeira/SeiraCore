@@ -17,8 +17,8 @@ class RandomReplyTexts {
             "正在", "即将", "马上", "准备", "开始"
     };
     public static final String[] LOADING_TEXTS = new String[]{
-            "刷PP", "加载中", "处理中", "修BP", "打舞萌", "打中二", "联系ppy", "给你擦皮鞋", "插U盘",
-            "氛围编程", "给群友炒菜", "看百合漫画", "准备rework", "被notelock", "摸鱼", "寻找mp", "de",
+            "刷PP", "处理", "干活", "修BP", "打舞萌", "打中二", "联系ppy", "给你擦皮鞋", "插U盘",
+            "氛围编程", "给群友炒菜", "看百合漫画", "进行rework", "享受notelock", "摸鱼", "寻找mp", "偷偷当de",
             "大调查群友"
     };
     public static final String[] LOADING_SUFFIXES = new String[]{
