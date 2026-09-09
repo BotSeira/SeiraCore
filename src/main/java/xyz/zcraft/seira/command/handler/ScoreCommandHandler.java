@@ -3,8 +3,8 @@ package xyz.zcraft.seira.command.handler;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
-import xyz.zcraft.seira.command.target.CommandTargets;
-import static xyz.zcraft.seira.command.target.TargetKind.SCORE;
+import xyz.zcraft.seira.command.TargetHistory;
+import static xyz.zcraft.seira.command.TargetHistory.Type.SCORE;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.*;
 import xyz.zcraft.seira.command.reply.CommandUsage;
@@ -17,18 +17,18 @@ public final class ScoreCommandHandler {
     private static final int MAX_SCORE_LIST_COUNT = 200;
 
     private final Resolver resolver;
-    private final CommandTargets targets;
+    private final TargetHistory history;
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
 
     public ScoreCommandHandler(
             Resolver resolver,
-            CommandTargets targets,
+            TargetHistory history,
             TaskCoordinator taskCoordinator,
             ReplyFactory replyFactory
     ) {
         this.resolver = resolver;
-        this.targets = targets;
+        this.history = history;
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
     }
@@ -60,7 +60,7 @@ public final class ScoreCommandHandler {
             taskCoordinator.runImageRequest(
                     ctx,
                     "Score",
-                    () -> APIHelper.getScoreResponse(targets.resolve(ctx, SCORE, target)),
+                    () -> APIHelper.getScoreResponse(history.resolveAndGet(ctx, SCORE, new TargetResolution(target, 0))),
                     replyFactory::scoreMessage
             );
             return;
@@ -98,7 +98,7 @@ public final class ScoreCommandHandler {
             taskCoordinator.runImageRequest(
                     ctx,
                     "Score",
-                    () -> APIHelper.getScoreResponse(targets.resolve(ctx, SCORE, target)),
+                    () -> APIHelper.getScoreResponse(history.resolveAndGet(ctx, SCORE, new TargetResolution(target, 0))),
                     replyFactory::scoreMessage
             );
             return;
@@ -195,7 +195,7 @@ public final class ScoreCommandHandler {
         taskCoordinator.runImageRequest(
                 ctx,
                 "Score",
-                () -> APIHelper.getScoreResponse(targets.resolve(ctx, SCORE, target, filters.filters())),
+                () -> APIHelper.getScoreResponse(history.resolveAndGet(ctx, SCORE, new TargetResolution(target, 0), filters.filters())),
                 replyFactory::scoreMessage
         );
     }
@@ -240,24 +240,24 @@ public final class ScoreCommandHandler {
     }
 
     public void handleS(Context ctx) {
-        var target = targets.parseScore(ctx, CommandUsage.S);
+        var target = history.parseScoreArguments(ctx, CommandUsage.S);
         if (target == null) return;
         taskCoordinator.runImageRequest(ctx, "Score",
-                () -> APIHelper.getScoreResponse(targets.resolve(ctx, target)),
+                () -> APIHelper.getScoreResponse(history.resolveAndGet(ctx, SCORE, target)),
                 replyFactory::scoreMessage,
                 "> Tips: 若要查找指定谱面上的成绩，请使用 /s __m__`bid`");
     }
 
     public void handleSa(Context ctx) {
-        var target = targets.parse(ctx, SCORE, CommandUsage.SA, 0);
+        var target = history.parseArguments(ctx, CommandUsage.SA, 0);
         if (target == null) return;
         taskCoordinator.runImageRequest(ctx, "Score Analysis",
-                () -> APIHelper.getScoreAnalyzeResponse(targets.resolve(ctx, target)),
+                () -> APIHelper.getScoreAnalyzeResponse(history.resolveAndGet(ctx, SCORE, target)),
                 replyFactory::scoreAnalyzeMessage);
     }
 
     public void handleMa(Context ctx) {
-        var target = targets.parse(ctx, SCORE, CommandUsage.MA, 1, arg -> arg.startsWith("#"));
+        var target = history.parseArguments(ctx, CommandUsage.MA, 1, arg -> arg.startsWith("#"));
         if (target == null) return;
         String indexArgument = target.nextArgument(ctx);
         if (indexArgument != null) {
@@ -267,12 +267,12 @@ public final class ScoreCommandHandler {
                 return;
             }
             taskCoordinator.runImageRequest(ctx, "Miss Visualize",
-                    () -> APIHelper.getMissVisualizeResponse(targets.resolve(ctx, target), index),
+                    () -> APIHelper.getMissVisualizeResponse(history.resolveAndGet(ctx, SCORE, target), index),
                     (_, _) -> null);
             return;
         }
         taskCoordinator.runApiRequest(ctx, "Get Score Misses", () ->
-                ctx.sendReply(replyFactory.scoreMissesMessage(ctx, APIHelper.getScoreMissesResponse(targets.resolve(ctx, target)))));
+                ctx.sendReply(replyFactory.scoreMissesMessage(ctx, APIHelper.getScoreMissesResponse(history.resolveAndGet(ctx, SCORE, target)))));
     }
 
     private Integer parseMissIndex(String arg, boolean requirePrefix) {

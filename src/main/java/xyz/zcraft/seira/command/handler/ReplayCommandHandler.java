@@ -5,8 +5,8 @@ import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.ReplayResultStore;
-import xyz.zcraft.seira.command.target.CommandTargets;
-import static xyz.zcraft.seira.command.target.TargetKind.SCORE;
+import xyz.zcraft.seira.command.TargetHistory;
+import static xyz.zcraft.seira.command.TargetHistory.Type.*;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.parse.RscTarget;
@@ -20,7 +20,7 @@ import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class ReplayCommandHandler {
     private final Resolver resolver;
-    private final CommandTargets targets;
+    private final TargetHistory history;
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
     private final VideoRenderRecord videoRenderRecord;
@@ -29,7 +29,7 @@ public final class ReplayCommandHandler {
 
     public ReplayCommandHandler(
             Resolver resolver,
-            CommandTargets targets,
+            TargetHistory history,
             TaskCoordinator taskCoordinator,
             ReplyFactory replyFactory,
             VideoRenderRecord videoRenderRecord,
@@ -37,7 +37,7 @@ public final class ReplayCommandHandler {
             Function<String, String> accessTokenProvider
     ) {
         this.resolver = resolver;
-        this.targets = targets;
+        this.history = history;
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
         this.videoRenderRecord = videoRenderRecord;
@@ -46,7 +46,7 @@ public final class ReplayCommandHandler {
     }
 
     public void handleR(Context ctx) {
-        var target = targets.parse(ctx, SCORE, CommandUsage.R, 1, TimeDurationParser::isTimeRange);
+        var target = history.parseArguments(ctx, CommandUsage.R, 1, TimeDurationParser::isTimeRange);
         if (target == null) return;
 
         TimeDurationParser.TimeRange range = null;
@@ -65,7 +65,7 @@ public final class ReplayCommandHandler {
                 ctx,
                 "Score Render",
                 qqUpload -> {
-                    APIHelper.ReplayTaskInfo task = APIHelper.createReplayRenderTask(targets.resolve(ctx, target), finalRange, qqUpload);
+                    APIHelper.ReplayTaskInfo task = APIHelper.createReplayRenderTask(history.resolveAndGet(ctx, SCORE, target), finalRange, qqUpload);
                     videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
                     return task;
                 },
@@ -78,7 +78,8 @@ public final class ReplayCommandHandler {
             return;
         }
 
-        var target = targets.parseShowcase(ctx, CommandUsage.RSC);
+        var target = history.parseArguments(ctx, CommandUsage.RSC, Integer.MAX_VALUE,
+                arg -> arg.startsWith("+") || arg.startsWith("="));
         if (target == null) return;
 
         String extraUidArg = null;
@@ -94,7 +95,7 @@ public final class ReplayCommandHandler {
             }
         }
 
-        RscTarget rscTarget = target.request().isLocalScore() && extraUidArg == null
+        RscTarget rscTarget = history.isLocalScore(ctx, target) && extraUidArg == null
                 ? new RscTarget(new String[0], null)
                 : resolver.resolveRscTarget(ctx.groupId(), extraUidArg);
         if (rscTarget.errorMessage() != null) {
@@ -109,7 +110,7 @@ public final class ReplayCommandHandler {
                 "Showcase Render",
                 qqUpload -> {
                     var task = APIHelper.createReplayShowcaseTask(
-                            targets.resolveShowcase(ctx, target), targetsArray, accessTokenProvider.apply(ctx.senderUserId()), qqUpload);
+                            history.resolveAndGet(ctx, history.isLocalScore(ctx, target) ? SCORE : BEATMAP, target), targetsArray, accessTokenProvider.apply(ctx.senderUserId()), qqUpload);
                     videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
                     return task;
                 },

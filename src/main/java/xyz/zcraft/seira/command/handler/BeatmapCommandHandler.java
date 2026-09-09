@@ -7,8 +7,8 @@ import xyz.zcraft.seira.api.data.SearchResultItem;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
-import xyz.zcraft.seira.command.target.CommandTargets;
-import static xyz.zcraft.seira.command.target.TargetKind.*;
+import xyz.zcraft.seira.command.TargetHistory;
+import static xyz.zcraft.seira.command.TargetHistory.Type.*;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.reply.CommandUsage;
@@ -21,7 +21,7 @@ import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class BeatmapCommandHandler {
     private final Resolver resolver;
-    private final CommandTargets targets;
+    private final TargetHistory history;
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
     private final VideoRenderRecord videoRenderRecord;
@@ -29,14 +29,14 @@ public final class BeatmapCommandHandler {
 
     public BeatmapCommandHandler(
             Resolver resolver,
-            CommandTargets targets,
+            TargetHistory history,
             TaskCoordinator taskCoordinator,
             ReplyFactory replyFactory,
             VideoRenderRecord videoRenderRecord,
             Function<String, String> accessTokenProvider
     ) {
         this.resolver = resolver;
-        this.targets = targets;
+        this.history = history;
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
         this.videoRenderRecord = videoRenderRecord;
@@ -50,37 +50,37 @@ public final class BeatmapCommandHandler {
     }
 
     public void handleM(Context ctx) {
-        var target = targets.parse(ctx, BEATMAP, CommandUsage.M, 1);
+        var target = history.parseArguments(ctx, CommandUsage.M, 1);
         if (target == null) return;
         taskCoordinator.runImageRequest(ctx, "Beatmap",
-                () -> APIHelper.getBeatmapResponse(targets.resolve(ctx, target),
+                () -> APIHelper.getBeatmapResponse(history.resolveAndGet(ctx, BEATMAP, target),
                         target.nextArgument(ctx), accessTokenProvider.apply(ctx.senderUserId())),
                 replyFactory::beatmapMessage);
     }
 
     public void handleBma(Context ctx) {
-        var target = targets.parse(ctx, BEATMAP, CommandUsage.BMA, 1);
+        var target = history.parseArguments(ctx, CommandUsage.BMA, 1);
         if (target == null) return;
         taskCoordinator.runImageRequest(ctx, "Beatmap Analysis",
-                () -> APIHelper.getBeatmapAnalysisResponse(targets.resolve(ctx, target),
+                () -> APIHelper.getBeatmapAnalysisResponse(history.resolveAndGet(ctx, BEATMAP, target),
                         target.nextArgument(ctx), accessTokenProvider.apply(ctx.senderUserId())),
                 replyFactory::beatmapMessage);
     }
 
     public void handleAp(Context ctx) {
-        var target = targets.parse(ctx, BEATMAPSET, CommandUsage.AP, Integer.MAX_VALUE);
+        var target = history.parseArguments(ctx, CommandUsage.AP, Integer.MAX_VALUE);
         if (target == null) return;
         taskCoordinator.runApiRequest(ctx, "Audio Preview", () -> {
-            long id = APIHelper.lookupBeatmapset(targets.resolve(ctx, target), accessTokenProvider.apply(ctx.senderUserId()));
+            long id = APIHelper.lookupBeatmapset(history.resolveAndGet(ctx, BEATMAPSET, target), accessTokenProvider.apply(ctx.senderUserId()));
             ctx.sendReply(PendingMessage.ofVoiceUrl("https://b.ppy.sh/preview/" + id + ".mp3").doUpload(false));
         });
     }
 
     public void handleBpv(Context ctx) {
-        var target = targets.parse(ctx, BEATMAP, CommandUsage.BPV, 1, arg -> arg.startsWith("+"));
+        var target = history.parseArguments(ctx, CommandUsage.BPV, 1, arg -> arg.startsWith("+"));
         if (target == null) return;
         taskCoordinator.runReplayRequest(ctx, "Beatmap Preview Render", qqUpload -> {
-            var task = APIHelper.createBeatmapPreviewTask(targets.resolve(ctx, target),
+            var task = APIHelper.createBeatmapPreviewTask(history.resolveAndGet(ctx, BEATMAP, target),
                     target.nextArgument(ctx), accessTokenProvider.apply(ctx.senderUserId()), qqUpload);
             videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
             return task;
@@ -88,26 +88,26 @@ public final class BeatmapCommandHandler {
     }
 
     public void handleBgp(Context ctx) {
-        var target = targets.parse(ctx, BEATMAP, CommandUsage.BGP, Integer.MAX_VALUE);
+        var target = history.parseArguments(ctx, CommandUsage.BGP, Integer.MAX_VALUE);
         if (target == null) return;
         taskCoordinator.runImageRequest(ctx, "Background Preview",
-                () -> APIHelper.getBeatmapBgResponse(targets.resolve(ctx, target), accessTokenProvider.apply(ctx.senderUserId())),
+                () -> APIHelper.getBeatmapBgResponse(history.resolveAndGet(ctx, BEATMAP, target), accessTokenProvider.apply(ctx.senderUserId())),
                 replyFactory::bgpMessage);
     }
 
     public void handleDl(Context ctx) {
-        var target = targets.parse(ctx, BEATMAPSET, CommandUsage.DL, 0);
+        var target = history.parseArguments(ctx, CommandUsage.DL, 0);
         if (target == null) return;
         taskCoordinator.runApiRequest(ctx, "Download Beatmap", () ->
                 ctx.sendReply(replyFactory.dlMessage(ctx,
-                        APIHelper.getLookupBeatmapsetResponse(targets.resolve(ctx, target), accessTokenProvider.apply(ctx.senderUserId())))));
+                        APIHelper.getLookupBeatmapsetResponse(history.resolveAndGet(ctx, BEATMAPSET, target), accessTokenProvider.apply(ctx.senderUserId())))));
     }
 
     public void handleMs(Context ctx) {
-        var target = targets.parse(ctx, BEATMAPSET, "用法：/ms <谱面集ID 或 快捷查询>", 0);
+        var target = history.parseArguments(ctx, "用法：/ms <谱面集ID 或 快捷查询>", 0);
         if (target == null) return;
         taskCoordinator.runImageRequest(ctx, "Beatmapset",
-                () -> APIHelper.getBeatmapsetResponse(targets.resolve(ctx, target), accessTokenProvider.apply(ctx.senderUserId())),
+                () -> APIHelper.getBeatmapsetResponse(history.resolveAndGet(ctx, BEATMAPSET, target), accessTokenProvider.apply(ctx.senderUserId())),
                 replyFactory::beatmapsetMessage);
     }
 
