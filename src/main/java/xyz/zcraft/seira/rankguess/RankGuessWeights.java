@@ -302,7 +302,7 @@ public class RankGuessWeights {
 
         final Map<String, RankGuessRecordStore.RankData> rankData =
                 RankGuessRecordStore.getGroupRankData(
-                        groupId, null, Rank.RECENT_GAME_LIMIT, Rank.STATS_MIN_PARTICIPANTS
+                        groupId, null, Rank.RECENT_GAME_LIMIT, Rank.STATS_MIN_PARTICIPANTS, null
                 );
 
         rankData.forEach((openId, data) -> {

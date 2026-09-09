@@ -304,7 +304,8 @@ public final class RankGuessCommandHandler {
                             effectiveGroupId,
                             null,
                             Rank.RECENT_GAME_LIMIT,
-                            Rank.STATS_MIN_PARTICIPANTS
+                            Rank.STATS_MIN_PARTICIPANTS,
+                            5
                     );
 
             rankData.forEach((s, rank) -> ranks.put(s, Rank.from(rank)));

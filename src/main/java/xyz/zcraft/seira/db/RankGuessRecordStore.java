@@ -216,10 +216,7 @@ public class RankGuessRecordStore {
     ) {}
 
     public static Map<String, RankData> getGroupRankData(
-            String groupId,
-            Integer scoringVersion,
-            int recentGameLimit,
-            Integer minParticipants
+            String groupId, Integer scoringVersion, int recentGameLimit, Integer minParticipants, Integer gameLimit
     ) {
         if (groupId != null) {
             requireText(groupId, "groupId");
@@ -327,6 +324,10 @@ public class RankGuessRecordStore {
                 ON r.user_id = a.user_id
             """;
 
+        if (gameLimit != null) {
+            sql += " WHERE a.participation > ?";
+        }
+
         try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
@@ -345,6 +346,10 @@ public class RankGuessRecordStore {
             }
 
             statement.setInt(index, recentGameLimit);
+
+            if (gameLimit != null) {
+                statement.setInt(index, gameLimit);
+            }
 
             Map<String, RankData> resultMap = new HashMap<>();
 
