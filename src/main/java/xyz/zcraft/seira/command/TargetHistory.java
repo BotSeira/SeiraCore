@@ -17,39 +17,21 @@ import java.util.function.Predicate;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class TargetHistory {
-    public enum Type { BEATMAPSET, BEATMAP, SCORE }
-
-    // 每个调用者只保存三个 ID。成绩 ID 使用字符串以兼容 loc... 本地成绩。
-    public static final class Ids {
-        private Long beatmapsetId;
-        private Long beatmapId;
-        private String scoreId;
-
-        public Long beatmapsetId() { return beatmapsetId; }
-        public Long beatmapId() { return beatmapId; }
-        public String scoreId() { return scoreId; }
-
-        Ids() {}
-
-        Ids(Ids previous) {
-            if (previous != null) {
-                beatmapsetId = previous.beatmapsetId;
-                beatmapId = previous.beatmapId;
-                scoreId = previous.scoreId;
-            }
-        }
-    }
-
     private final ConcurrentMap<String, Ids> users = new ConcurrentHashMap<>();
     private final Resolver resolver;
     private final Function<String, String> accessToken;
-
     public TargetHistory(Resolver resolver, Function<String, String> accessToken) {
         this.resolver = resolver;
         this.accessToken = accessToken;
     }
 
-    /** 显式记忆一个新目标，清除旧目标的关联 ID。 */
+    private static boolean isLocalId(String id) {
+        return !id.chars().allMatch(Character::isDigit);
+    }
+
+    /**
+     * 显式记忆一个新目标，清除旧目标的关联 ID。
+     */
     public void remember(Context ctx, long id, Type type) {
         remember(ctx, Long.toString(id), type);
     }
@@ -64,7 +46,9 @@ public final class TargetHistory {
         users.put(ctx.senderUserId(), ids);
     }
 
-    /** 只取指定类型已经记住的 ID，不进行查找。 */
+    /**
+     * 只取指定类型已经记住的 ID，不进行查找。
+     */
     public ShortcutTarget get(Context ctx, Type type) {
         Ids ids = users.get(ctx.senderUserId());
         if (ids == null) return null;
@@ -78,7 +62,6 @@ public final class TargetHistory {
         return new ShortcutTarget(Long.parseLong(id), null, null, null, null);
     }
 
-
     public void remember(Context ctx, Ids ids) {
         users.put(ctx.senderUserId(), new Ids(ids));
     }
@@ -87,7 +70,9 @@ public final class TargetHistory {
         return resolve(ctx, type, args, List.of(), null);
     }
 
-    /** 查找只修改本次结果；调用者显式 remember 后才更新历史。 */
+    /**
+     * 查找只修改本次结果；调用者显式 remember 后才更新历史。
+     */
     public Ids resolve(Context ctx, Type type, TargetResolution args, List<String> filters, String mod) {
         ShortcutTarget target = args.target();
         if (target != null && target.isError()) throw new ResolutionException(target.errorMessage());
@@ -191,11 +176,9 @@ public final class TargetHistory {
         return new UserRef.ByUid(uid);
     }
 
-    private static boolean isLocalId(String id) {
-        return !id.chars().allMatch(Character::isDigit);
-    }
-
-    /** 同屏回放需要保留本地成绩本身，以便把它加入回放列表。 */
+    /**
+     * 同屏回放需要保留本地成绩本身，以便把它加入回放列表。
+     */
     public boolean isLocalScore(Context ctx, TargetResolution args) {
         if (args.target() != null) return args.target().isLocalScore();
         Ids ids = users.get(ctx.senderUserId());
@@ -206,7 +189,9 @@ public final class TargetHistory {
         return parseArguments(ctx, usage, maxOptions, _ -> false);
     }
 
-    /** optional 判断首个参数是否是省略目标后的选项；返回的 consumedArgs 标记选项起点。 */
+    /**
+     * optional 判断首个参数是否是省略目标后的选项；返回的 consumedArgs 标记选项起点。
+     */
     public TargetResolution parseArguments(Context ctx, String usage, int maxOptions, Predicate<String> optional) {
         try {
             TargetResolution args;
@@ -229,7 +214,9 @@ public final class TargetHistory {
         return parseScoreArguments(ctx, usage, 0, _ -> false);
     }
 
-    /** 目标和可选用户在前，其余参数交给指令；这里不认识 +mod 等具体选项。 */
+    /**
+     * 目标和可选用户在前，其余参数交给指令；这里不认识 +mod 等具体选项。
+     */
     public TargetResolution parseScoreArguments(Context ctx, String usage, int maxOptions, Predicate<String> optional) {
         try {
             TargetResolution args;
@@ -262,5 +249,37 @@ public final class TargetHistory {
         if (result.errorMessage() != null) throw new ResolutionException(result.errorMessage());
         if (result.userRef() == null) throw new ResolutionException(usage);
         return result.userRef();
+    }
+
+    public enum Type {BEATMAPSET, BEATMAP, SCORE}
+
+    // 每个调用者只保存三个 ID。成绩 ID 使用字符串以兼容 loc... 本地成绩。
+    public static final class Ids {
+        private Long beatmapsetId;
+        private Long beatmapId;
+        private String scoreId;
+
+        Ids() {
+        }
+
+        Ids(Ids previous) {
+            if (previous != null) {
+                beatmapsetId = previous.beatmapsetId;
+                beatmapId = previous.beatmapId;
+                scoreId = previous.scoreId;
+            }
+        }
+
+        public Long beatmapsetId() {
+            return beatmapsetId;
+        }
+
+        public Long beatmapId() {
+            return beatmapId;
+        }
+
+        public String scoreId() {
+            return scoreId;
+        }
     }
 }

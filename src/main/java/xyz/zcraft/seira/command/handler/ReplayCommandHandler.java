@@ -6,7 +6,6 @@ import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.ReplayResultStore;
 import xyz.zcraft.seira.command.TargetHistory;
-import static xyz.zcraft.seira.command.TargetHistory.Type.*;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.parse.RscTarget;
@@ -14,7 +13,8 @@ import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
-
+import static xyz.zcraft.seira.command.TargetHistory.Type.BEATMAP;
+import static xyz.zcraft.seira.command.TargetHistory.Type.SCORE;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class ReplayCommandHandler {

@@ -4,7 +4,6 @@ import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.TargetHistory;
-import static xyz.zcraft.seira.command.TargetHistory.Type.SCORE;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.*;
 import xyz.zcraft.seira.command.reply.CommandUsage;
@@ -13,6 +12,7 @@ import xyz.zcraft.seira.data.UserRef;
 
 import java.util.List;
 
+import static xyz.zcraft.seira.command.TargetHistory.Type.SCORE;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class ScoreCommandHandler {

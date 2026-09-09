@@ -159,8 +159,8 @@ public final class MultiplayerRoomWatchCommandHandler {
         if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
             int stoppedCount = watchService.stopAll(ctx.groupId()).size();
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + (stoppedCount == 0
-                            ? "当前群聊没有多人房间监视。"
-                            : "已停止当前群聊的全部 " + stoppedCount + " 个多人房间监视。")));
+                    ? "当前群聊没有多人房间监视。"
+                    : "已停止当前群聊的全部 " + stoppedCount + " 个多人房间监视。")));
             return;
         }
         if (ctx.argumentCount() != 1) {
@@ -169,8 +169,8 @@ public final class MultiplayerRoomWatchCommandHandler {
         }
         RoomWatchView stopped = watchService.stop(ctx.groupId(), ctx.senderUserId());
         ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + (stopped == null
-                        ? "你当前没有在本群启动多人房间监视。"
-                        : "已停止你启动的监视：" + formatRoom(stopped) + "。")));
+                ? "你当前没有在本群启动多人房间监视。"
+                : "已停止你启动的监视：" + formatRoom(stopped) + "。")));
     }
 
     private void handleStatus(Context ctx) {
@@ -180,8 +180,8 @@ public final class MultiplayerRoomWatchCommandHandler {
         }
         RoomWatchView view = watchService.get(ctx.groupId(), ctx.senderUserId());
         ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + (view == null
-                        ? "你当前没有在本群启动多人房间监视。"
-                        : "你当前正在监视" + formatRoom(view) + "。")));
+                ? "你当前没有在本群启动多人房间监视。"
+                : "你当前正在监视" + formatRoom(view) + "。")));
     }
 
     record RoomTarget(long roomId, MultiplayerRoomVersion version) {

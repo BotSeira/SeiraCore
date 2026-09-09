@@ -8,7 +8,6 @@ import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.TargetHistory;
-import static xyz.zcraft.seira.command.TargetHistory.Type.*;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.reply.CommandUsage;
@@ -17,6 +16,8 @@ import xyz.zcraft.seira.command.reply.ReplyFactory;
 import java.util.List;
 import java.util.function.Function;
 
+import static xyz.zcraft.seira.command.TargetHistory.Type.BEATMAP;
+import static xyz.zcraft.seira.command.TargetHistory.Type.BEATMAPSET;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class BeatmapCommandHandler {

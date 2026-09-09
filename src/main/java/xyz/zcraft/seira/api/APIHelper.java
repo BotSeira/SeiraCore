@@ -662,8 +662,8 @@ public class APIHelper {
     }
 
     public static ReplayTaskInfo createReplayRenderTask(String scoreId,
-                                                   TimeDurationParser.TimeRange timeRange,
-                                                   QqUploadRequest qqUpload) {
+                                                        TimeDurationParser.TimeRange timeRange,
+                                                        QqUploadRequest qqUpload) {
         if (timeRange == null) {
             timeRange = getScoreHighlight(scoreId, 5);
         }

@@ -24,7 +24,9 @@ public class RankGuessWeights {
     private static final Path WEIGHTS_FILE = Path.of("data", "rank-guess-weights.json");
 
     private static final double SCORE_REPEAT_FACTOR = 0.10;
-
+    private static final double JUST_PICKED_WEIGHT = 0.10;
+    private static final double MAX_OVERDUE_WEIGHT = 2.50;
+    private static final double NEVER_PICKED_WEIGHT = 4.00;
     private final Map<String, GroupState> groups = new ConcurrentHashMap<>();
     private final Path store;
     private final Object persistenceLock = new Object();
@@ -33,17 +35,21 @@ public class RankGuessWeights {
         this(WEIGHTS_FILE);
     }
 
-    private double getWishFactor(String groupId) {
-        int playerCount = UserDataStore.findBoundUidsByGroup(groupId).size();
-
-        final double value = 1.25 + playerCount / 100.0;
-
-        return Math.clamp(value, 1.25, 2.0);
-    }
-
     RankGuessWeights(Path store) {
         this.store = Objects.requireNonNull(store, "store").toAbsolutePath();
         loadFromFile();
+    }
+
+    private static double getRatingWeight(double rating) {
+        return 1.0 + Math.clamp(rating - 1.0, 0.0, 1.0) * 0.20;
+    }
+
+    private double getWishFactor(String groupId) {
+        int playerCount = UserDataStore.findBoundUidsByGroup(groupId).size();
+
+        final double value = 1.25 + playerCount / 40.0;
+
+        return Math.clamp(value, 1.5, 4.0);
     }
 
     private void loadFromFile() {
@@ -146,10 +152,6 @@ public class RankGuessWeights {
         saveToFile();
     }
 
-    private static double getRatingWeight(double rating) {
-        return 1.0 + Math.clamp(rating - 1.0, 0.0, 1.0) * 0.1;
-    }
-
     public RankGuessGameService.WishResult tryWish(String groupId, long userId) {
         final GroupState state = getGroup(groupId);
         final Map<Long, Integer> gamesSincePicked = RankGuessRecordStore.getGamesSincePicked(groupId);
@@ -212,12 +214,6 @@ public class RankGuessWeights {
         return weights;
     }
 
-    public record Probability(double weight, double chance, List<String> factors){
-        public static Probability of(double weight, double chance) {
-            return new Probability(weight, chance, new ArrayList<>());
-        }
-    }
-
     public Probability getProbability(String groupId, long boundUid) {
         final GroupState state = getGroup(groupId);
 
@@ -225,21 +221,6 @@ public class RankGuessWeights {
 
         return probability.get(boundUid);
     }
-
-    private static class GroupState {
-        private final Map<Long, Integer> scoreRecords = new HashMap<>();
-        private final Set<Long> userWishes = new HashSet<>();
-        private final Set<Long> scoreWishes = new HashSet<>();
-    }
-
-    private record GroupSnapshot(Map<Long, Integer> scoreRecords,
-                                 Set<Long> userWishes,
-                                 Set<Long> scoreWishes) {
-    }
-
-    private static final double JUST_PICKED_WEIGHT = 0.05;
-    private static final double MAX_OVERDUE_WEIGHT = 2.00;
-    private static final double NEVER_PICKED_WEIGHT = 2.50;
 
     private Map<Long, Probability> generateUserWeights(String groupId, GroupState state) {
         final var bindings = UserDataStore.findBoundUsersByGroup(groupId);
@@ -267,7 +248,7 @@ public class RankGuessWeights {
             double result;
 
             if (lastPicked == null) {
-                strings.add("↑↑从未被抽选");
+                strings.add("↑↑↑从未被抽选");
                 result = NEVER_PICKED_WEIGHT;
             } else if (playerCount == 0) {
                 result = 1.0;
@@ -280,10 +261,12 @@ public class RankGuessWeights {
                         MAX_OVERDUE_WEIGHT
                 );
 
-                if (lastPicked <= (playerCount / 20)) {
+                if (lastPicked <= (playerCount / 40)) {
+                    strings.add("↓↓↓刚被抽选");
+                } else if (lastPicked <= (playerCount / 20)) {
                     strings.add("↓↓最近被抽选");
                 } else if (lastPicked <= (playerCount / 10)) {
-                    strings.add("↓最近被抽选");
+                    strings.add("↓近期被抽选");
                 } else if (lastPicked > (playerCount / 2)) {
                     strings.add("↑↑很久未被抽选");
                 } else if (lastPicked > (playerCount / 5)) {
@@ -293,7 +276,7 @@ public class RankGuessWeights {
 
             if (wishes.contains(uid)) {
                 result *= wishFactor;
-                strings.add("↑许愿");
+                strings.add("↑↑许愿");
             }
 
             users.put(uid, result);
@@ -331,5 +314,22 @@ public class RankGuessWeights {
                         Map.Entry::getKey,
                         entry -> new Probability(entry.getValue(), entry.getValue() / accumulation, factors.get(entry.getKey()))
                 ));
+    }
+
+    public record Probability(double weight, double chance, List<String> factors) {
+        public static Probability of(double weight, double chance) {
+            return new Probability(weight, chance, new ArrayList<>());
+        }
+    }
+
+    private static class GroupState {
+        private final Map<Long, Integer> scoreRecords = new HashMap<>();
+        private final Set<Long> userWishes = new HashSet<>();
+        private final Set<Long> scoreWishes = new HashSet<>();
+    }
+
+    private record GroupSnapshot(Map<Long, Integer> scoreRecords,
+                                 Set<Long> userWishes,
+                                 Set<Long> scoreWishes) {
     }
 }

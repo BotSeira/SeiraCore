@@ -75,7 +75,9 @@ public final class TaskCoordinator {
     }
 
 
-    /** Tracks queue estimates and elapsed time; the caller executes the request directly. */
+    /**
+     * Tracks queue estimates and elapsed time; the caller executes the request directly.
+     */
     public RequestTiming beginRequest(Context ctx, String requestType) {
         long estimatedSeconds = apiRequestStats.estimateAndEnqueue(requestType);
         RequestTiming timing = new RequestTiming(requestType);
@@ -86,24 +88,6 @@ public final class TaskCoordinator {
         } catch (RuntimeException e) {
             timing.close();
             throw e;
-        }
-    }
-
-    public final class RequestTiming implements AutoCloseable {
-        private final String requestType;
-        private final long startedAt = System.nanoTime();
-        private boolean closed;
-
-        private RequestTiming(String requestType) {
-            this.requestType = requestType;
-        }
-
-        @Override
-        public void close() {
-            if (closed) return;
-            closed = true;
-            apiRequestStats.complete(requestType,
-                    Math.max(1L, (System.nanoTime() - startedAt) / 1_000_000L));
         }
     }
 
@@ -142,7 +126,6 @@ public final class TaskCoordinator {
             replayResults.remove(taskId);
         }
     }
-
 
     private PendingMessage combineImageAndCompletion(UploadedImage image, PendingMessage completionMessage) {
         String imageMarkdown = image.toMarkdown();
@@ -232,6 +215,24 @@ public final class TaskCoordinator {
         }
 
         return new SendResult(uploadResult && sentMessage != null, sentMessage);
+    }
+
+    public final class RequestTiming implements AutoCloseable {
+        private final String requestType;
+        private final long startedAt = System.nanoTime();
+        private boolean closed;
+
+        private RequestTiming(String requestType) {
+            this.requestType = requestType;
+        }
+
+        @Override
+        public void close() {
+            if (closed) return;
+            closed = true;
+            apiRequestStats.complete(requestType,
+                    Math.max(1L, (System.nanoTime() - startedAt) / 1_000_000L));
+        }
     }
 
     private final class OutboundReplyChannel implements CommandReplyChannel {
