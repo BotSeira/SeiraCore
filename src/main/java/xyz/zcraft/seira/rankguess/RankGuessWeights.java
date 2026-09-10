@@ -47,9 +47,9 @@ public class RankGuessWeights {
     private double getWishFactor(String groupId) {
         int playerCount = UserDataStore.findBoundUidsByGroup(groupId).size();
 
-        final double value = 1.25 + playerCount / 40.0;
+        final double value = 1.5 + playerCount / 40.0;
 
-        return Math.clamp(value, 1.5, 4.0);
+        return Math.clamp(value, 1.5, 5.0);
     }
 
     private void loadFromFile() {
@@ -269,7 +269,7 @@ public class RankGuessWeights {
                     strings.add("↓近期被抽选");
                 } else if (lastPicked > (playerCount / 2)) {
                     strings.add("↑↑很久未被抽选");
-                } else if (lastPicked > (playerCount / 5)) {
+                } else if (lastPicked > (playerCount / 4)) {
                     strings.add("↑较久未被抽选");
                 }
             }
@@ -298,9 +298,9 @@ public class RankGuessWeights {
             final Rank rank = Rank.from(data);
 
             users.computeIfPresent(boundUid, (_, weight) -> {
-                if (rank.rating() > 1.25) {
+                if (rank.rating() > 1.80) {
                     factors.get(boundUid).add("↑↑Rating奖励");
-                } else if (rank.rating() > 1.10) {
+                } else if (rank.rating() > 1.40) {
                     factors.get(boundUid).add("↑Rating奖励");
                 }
                 return weight * getRatingWeight(rank.rating());
