@@ -42,6 +42,50 @@ public final class ReplyFactory {
         return "<qqbot-cmd-input text=\"%s\" show=\"%s\" reference=\"false\" />".formatted(command, text);
     }
 
+    public static String cmd(String command) {
+        return cmd(command, command);
+    }
+
+    public static String m(String id) {
+        return cmd("/m " + id, id);
+    }
+
+    public static String m(long id) {
+        return cmd("/m " + id, String.valueOf(id));
+    }
+
+    public static String s(String id) {
+        return cmd("/s " + id, id);
+    }
+
+    public static String s(long id) {
+        return cmd("/s " + id, String.valueOf(id));
+    }
+
+    public static String ms(String id) {
+        return cmd("/ms " + id, id);
+    }
+
+    public static String ms(long id) {
+        return cmd("/ms " + id, String.valueOf(id));
+    }
+
+    public static String u(String id, String name) {
+        return cmd("/u " + id, name);
+    }
+
+    public static String u(long id, String name) {
+        return cmd("/u " + id, name);
+    }
+
+    public static String u(long id) {
+        return cmd("/u " + id, String.valueOf(id));
+    }
+
+    public static String u(String id) {
+        return cmd("/u " + id, id);
+    }
+
     public static String at(Context ctx) {
         if (ctx.inGroup()) {
             return at(ctx.senderUserId());
@@ -62,9 +106,9 @@ public final class ReplyFactory {
     public static PendingMessage replayUploadMessage(ReplayUploadInfo info) {
         return PendingMessage.ofMarkdownRaw(
                 ("\n" + "## Replay上传成功~" + "\n" +
-                        "> 成绩: " + cmd("/s " + info.scoreId(), String.valueOf(info.scoreId())) + "\n" +
-                        "> 谱面: " + cmd("/m " + info.beatmapId(), String.valueOf(info.beatmapId())) + "\n" +
-                        "> 用户: " + cmd("/u " + info.userId(), info.username()) + "\n").trim(),
+                        "> 成绩: " + s(info.scoreId()) + "\n" +
+                        "> 谱面: " + m(info.beatmapId()) + "\n" +
+                        "> 用户: " + u(info.userId(), info.username()) + "\n").trim(),
                 null
         );
     }
@@ -97,12 +141,12 @@ public final class ReplyFactory {
         content.append("~\n");
 
         content.append("> 玩家：`%s` %s\n".formatted(round.randomScore().user().getUsername(), userAt))
-                .append("> 实际Rank：`#%s` (%s)\n".formatted(rank, cmd("/u " + round.userId(), String.valueOf(round.userId()))))
+                .append("> 实际Rank：`#%s` (%s)\n".formatted(rank, u(round.userId())))
                 .append("> 成绩：`%s` (%s|%s)\n"
                         .formatted(
                                 pp,
                                 "BP" + round.randomScore().bestIndex(),
-                                cmd("/s " + round.scoreId(), String.valueOf(round.scoreId()))
+                                s(round.scoreId())
                         ))
                 .append("\n猜测排行榜：\n");
 
@@ -179,7 +223,7 @@ public final class ReplyFactory {
     public PendingMessage bpMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "查询完成，共" + response.getScoreIds().size() + "个成绩\n" +
-                        "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()),
+                        "> 玩家: " + u(response.getUserId()),
                 buttons().bpButtons(response.getUserId())
         );
     }
@@ -187,7 +231,7 @@ public final class ReplyFactory {
     public PendingMessage rsMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "最近成绩查询完成\n" +
-                        "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()) + "\n" +
+                        "> 玩家: " + u(response.getUserId()) + "\n" +
                         "> 数量: " + response.getScoreIds().size(),
                 buttons().rsButtons()
         );
@@ -196,7 +240,7 @@ public final class ReplyFactory {
     public PendingMessage userInfoMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "玩家资料查询完成\n" +
-                        "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()),
+                        "> 玩家: " + u(response.getUserId()),
                 buttons().userInfoButtons(response.getUserId())
         );
     }
@@ -204,7 +248,7 @@ public final class ReplyFactory {
     public PendingMessage tbMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "今日BP查询完成\n" +
-                        "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()) + "\n" +
+                        "> 玩家: " + u(response.getUserId()) + "\n" +
                         "> 数量: " + response.getScoreIds().size(),
                 buttons().bpButtons(response.getUserId())
         );
@@ -213,8 +257,8 @@ public final class ReplyFactory {
     public PendingMessage beatmapMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "谱面查询完成\n" +
-                        "> 谱面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
-                        "> 谱面集: " + cmd("/ms " + response.getBeatmapsetId(), response.getBeatmapsetId()),
+                        "> 谱面: " + m(response.getBeatmapId()) + "\n" +
+                        "> 谱面集: " + ms(response.getBeatmapsetId()),
                 buttons().beatmapButtons(response.getBeatmapId())
         );
 
@@ -223,8 +267,8 @@ public final class ReplyFactory {
     public PendingMessage scoreMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "成绩查询完成\n" +
-                        "> 谱面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
-                        "> 成绩: " + cmd("/s " + response.getScoreId(), response.getScoreId()),
+                        "> 谱面: " + m(response.getBeatmapId()) + "\n" +
+                        "> 成绩: " + s(response.getScoreId()),
                 buttons().sButtons(response.getBeatmapId(), response.getScoreId())
         );
     }
@@ -232,8 +276,8 @@ public final class ReplyFactory {
     public PendingMessage scoreAnalyzeMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "成绩分析完成\n" +
-                        "> 谱面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
-                        "> 成绩: " + cmd("/s " + response.getScoreId(), response.getScoreId()),
+                        "> 谱面: " + m(response.getBeatmapId()) + "\n" +
+                        "> 成绩: " + s(response.getScoreId()),
                 buttons().saButtons(response.getBeatmapId(), response.getScoreId())
         );
     }
@@ -241,7 +285,7 @@ public final class ReplyFactory {
     public PendingMessage lbMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "排行榜查询完成" +
-                        (response.getBeatmapId() == null ? "" : "\n> 谱面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId())),
+                        (response.getBeatmapId() == null ? "" : "\n> 谱面: " + m(response.getBeatmapId())),
                 buttons().lbButtons(response.getBeatmapId())
         );
     }
@@ -389,7 +433,7 @@ public final class ReplyFactory {
             if (taskInfo.beatmap() != null) {
                 BeatmapExtended beatmap = taskInfo.beatmap();
 
-                sb.append("> 谱面: ").append(cmd("/m " + beatmap.getId(), String.valueOf(beatmap.getId()))).append("\n");
+                sb.append("> 谱面: ").append(m(beatmap.getId())).append("\n");
                 sb.append("> ").append(beatmap.getBeatmapset().getArtist()).append(" - ").append(beatmap.getBeatmapset().getTitle()).append("\n");
                 sb.append("> ").append(String.format("%.2f★", beatmap.getDifficultyRating())).append(" ").append(beatmap.getVersion()).append("\n");
             }
@@ -450,7 +494,7 @@ public final class ReplyFactory {
                 return null;
             }
 
-            return "> - %s - %s \n (%s %s %s)".formatted(cmd("/s " + id, id), username, rank, accuracy, pp);
+            return "> - %s - %s \n (%s %s %s)".formatted(s(id), username, rank, accuracy, pp);
         }
 
         private static String getScoreField(JsonObject score, String field) {
@@ -516,7 +560,7 @@ public final class ReplyFactory {
         static String beatmapsetContent(Context ctx, Response<?> response) {
             StringBuilder sb = new StringBuilder();
             sb.append(at(ctx)).append("谱面集查询完成").append("\n");
-            sb.append("> 谱面集: ").append(cmd("/ms " + response.getBeatmapsetId(), response.getBeatmapsetId())).append("\n");
+            sb.append("> 谱面集: ").append(ms(response.getBeatmapsetId())).append("\n");
             sb.append("> ");
             for (int i = 0; i < response.getBeatmapStars().size(); i++) {
                 sb.append(cmd("/m " + response.getBeatmapIds().get(i), response.getBeatmapStars().get(i) + "★")).append(" ");
@@ -602,7 +646,7 @@ public final class ReplyFactory {
             final MultiplayerRoom.CurrentPlaylistItem cur = content.getCurrentPlaylistItem();
             if (cur != null) {
                 sb += "> 当前: " + "%s - %s - %s [%.2f★ %s]".formatted(
-                        cmd("/m " + cur.getBeatmapId(), String.valueOf(cur.getBeatmapId())),
+                        m(cur.getBeatmapId()),
                         cur.getBeatmap().getBeatmapset().getArtist(),
                         cur.getBeatmap().getBeatmapset().getTitle(),
                         cur.getBeatmap().getDifficultyRating(),
@@ -699,9 +743,9 @@ public final class ReplyFactory {
 
         public static String bgpContent(Context context, Response<?> response) {
             return at(context) + "\n> 背景预览("
-                    + cmd("/ms " + response.getBeatmapsetId(), response.getBeatmapsetId())
+                    + ms(response.getBeatmapsetId())
                     + " - "
-                    + cmd("/m " + response.getBeatmapId(), response.getBeatmapId())
+                    + m(response.getBeatmapId())
                     + ")";
         }
 
@@ -712,7 +756,7 @@ public final class ReplyFactory {
                     "> 人品值: **" + luck.luck() + "**/100\n" +
                     "> 宜: " + luck.ups() + "\n" +
                     "> 忌: " + luck.downs() + "\n\n" +
-                    "今日推荐图: " + cmd("/ms " + mapset.getId(), mapset.getId().toString()) + "\n" +
+                    "今日推荐图: " + ms(mapset.getId()) + "\n" +
                     "> %s - %s [★%.2f-★%.2f]".formatted(mapset.getArtist(), mapset.getTitle(), list.getFirst(), list.getLast()) + "\n" +
                     ">" + cover.toMarkdown();
             return sb.trim();

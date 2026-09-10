@@ -28,6 +28,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
+import static xyz.zcraft.seira.command.reply.ReplyFactory.cmd;
 
 public final class RankGuessCommandHandler {
     private static final Logger LOG = LogManager.getLogger(RankGuessCommandHandler.class);
@@ -205,7 +206,8 @@ public final class RankGuessCommandHandler {
     private void currentStatus(Context ctx) {
         final RankGuessGameService.GameStatus status = games.getStatus(ctx.groupId());
         if (status == RankGuessGameService.GameStatus.NO_GAME) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "目前本群没有进行中的猜 Rank 游戏喵！可以使用 /rg group 或 /rg start 开始游戏喵~"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "目前本群没有进行中的猜 Rank 游戏喵！可以使用 "
+                    + cmd("/rg group") + " 或 " + cmd("/rg start") + " 开始游戏喵~"));
             return;
         }
 
