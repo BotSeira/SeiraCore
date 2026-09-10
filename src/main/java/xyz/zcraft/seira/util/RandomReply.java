@@ -4,11 +4,13 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class RandomReply {
     public static String loading() {
-        final ThreadLocalRandom current = ThreadLocalRandom.current();
+        return roll(RandomReplyTexts.LOADING_PREFIXES)
+                + roll(RandomReplyTexts.LOADING_TEXTS)
+                + roll(RandomReplyTexts.LOADING_SUFFIXES);
+    }
 
-        return RandomReplyTexts.LOADING_PREFIXES[current.nextInt(RandomReplyTexts.LOADING_PREFIXES.length)]
-                + RandomReplyTexts.LOADING_TEXTS[current.nextInt(RandomReplyTexts.LOADING_TEXTS.length)]
-                + RandomReplyTexts.LOADING_SUFFIXES[current.nextInt(RandomReplyTexts.LOADING_SUFFIXES.length)];
+    private static <T> T roll(T[] arr) {
+        return arr[ThreadLocalRandom.current().nextInt(arr.length)];
     }
 }
 
