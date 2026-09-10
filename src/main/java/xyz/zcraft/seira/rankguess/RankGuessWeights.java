@@ -298,9 +298,9 @@ public class RankGuessWeights {
             final Rank rank = Rank.from(data);
 
             users.computeIfPresent(boundUid, (_, weight) -> {
-                if (rank.rating() > 1.80) {
+                if (rank.rating() >= 1.80) {
                     factors.get(boundUid).add("↑↑Rating奖励");
-                } else if (rank.rating() > 1.40) {
+                } else if (rank.rating() >= 1.40) {
                     factors.get(boundUid).add("↑Rating奖励");
                 }
                 return weight * getRatingWeight(rank.rating());
