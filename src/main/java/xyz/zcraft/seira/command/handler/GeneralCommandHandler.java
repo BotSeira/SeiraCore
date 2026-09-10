@@ -98,6 +98,8 @@ public final class GeneralCommandHandler {
     }
 
     public void handleUnknown(Context context) {
-        context.sendReply(PendingMessage.ofMarkdownRaw(at(context) + "未知指令。使用/help获取帮助。"));
+        if (!context.inGroup()) {
+            context.sendReply(PendingMessage.ofMarkdownRaw(at(context) + "未知指令。使用/help获取帮助。"));
+        }
     }
 }

@@ -215,7 +215,8 @@ public class Router {
                     groupMessage,
                     config.seira().queueMessageInGroup()
             );
-            if (parseResult.status() == CommandParser.ParseResult.Status.EMPTY_COMMAND) {
+            if (parseResult.status() == CommandParser.ParseResult.Status.EMPTY_COMMAND
+                    && !parseResult.context().inGroup()) {
                 replies.sendReply(PendingMessage.ofString("请输入指令。使用/help获取帮助。"));
                 return;
             }
