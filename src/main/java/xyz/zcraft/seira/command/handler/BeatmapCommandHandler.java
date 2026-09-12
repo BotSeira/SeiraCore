@@ -1,5 +1,6 @@
 package xyz.zcraft.seira.command.handler;
 
+import org.jline.utils.Log;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.data.Response;
 import xyz.zcraft.seira.api.data.SearchQuery;
@@ -12,6 +13,7 @@ import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
+import xyz.zcraft.seira.data.SendResult;
 
 import java.util.List;
 import java.util.function.Function;
@@ -95,12 +97,24 @@ public final class BeatmapCommandHandler {
             var task = APIHelper.createBeatmapPreviewTask(ids.beatmapId(), target.nextArgument(ctx), qqUpload);
             videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
             ctx.sendReply(replyFactory.replayMessage(ctx, task));
-            var result = taskCoordinator.waitForReplay(task);
-            if (result == null) {
+
+            APIHelper.ReplayRenderResult result;
+
+            try {
+                result = taskCoordinator.waitForReplay(task);
+            } catch (Exception e) {
+                Log.error("Error while waiting for replay", e);
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "回放视频生成失败，请稍后重试。"));
                 return;
             }
-            if (ctx.sendReply(taskCoordinator.replayVideoMessage(result)).success()) {
+
+            SendResult sendResult = ctx.sendReply(taskCoordinator.replayVideoMessage(result));
+
+            if (!sendResult.success()) {
+                sendResult = ctx.sendMessage(taskCoordinator.replayVideoMessage(result));
+            }
+
+            if (sendResult.success()) {
                 taskCoordinator.removeReplayResult(task.taskId());
             }
         }

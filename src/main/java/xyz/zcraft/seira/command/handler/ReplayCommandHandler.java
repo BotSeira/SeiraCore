@@ -1,5 +1,6 @@
 package xyz.zcraft.seira.command.handler;
 
+import org.jline.utils.Log;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.data.PendingMessage;
@@ -11,6 +12,7 @@ import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.parse.RscTarget;
 import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
+import xyz.zcraft.seira.data.SendResult;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
 import static xyz.zcraft.seira.command.TargetHistory.Type.BEATMAP;
@@ -56,7 +58,7 @@ public final class ReplayCommandHandler {
             }
         }
 
-        try (var timing = taskCoordinator.beginRequest(ctx, "Score Render")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "Score Render")) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "正在获取谱面以及回放文件，请稍作等待喵..."));
             var ids = history.resolve(ctx, SCORE, target);
             history.remember(ctx, ids);
@@ -64,12 +66,24 @@ public final class ReplayCommandHandler {
             var task = APIHelper.createReplayRenderTask(ids.scoreId(), range, upload);
             videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
             ctx.sendReply(replyFactory.replayMessage(ctx, task));
-            var result = taskCoordinator.waitForReplay(task);
-            if (result == null) {
+
+            APIHelper.ReplayRenderResult result;
+
+            try {
+                result = taskCoordinator.waitForReplay(task);
+            } catch (Exception e) {
+                Log.error("Error while waiting for replay", e);
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "回放视频生成失败，请稍后重试。"));
                 return;
             }
-            if (ctx.sendReply(taskCoordinator.replayVideoMessage(result)).success()) {
+
+            SendResult sendResult = ctx.sendReply(taskCoordinator.replayVideoMessage(result));
+
+            if (!sendResult.success()) {
+                sendResult = ctx.sendMessage(taskCoordinator.replayVideoMessage(result));
+            }
+
+            if (sendResult.success()) {
                 replayResults.remove(task.taskId());
             }
         }
@@ -106,7 +120,7 @@ public final class ReplayCommandHandler {
             return;
         }
 
-        try (var timing = taskCoordinator.beginRequest(ctx, "Showcase Render")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "Showcase Render")) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "正在获取谱面以及回放文件，请稍作等待喵..."));
             var targetType = history.isLocalScore(ctx, target) ? SCORE : BEATMAP;
             var resolved = history.resolve(ctx, targetType, target);
@@ -126,12 +140,24 @@ public final class ReplayCommandHandler {
             var task = APIHelper.createReplayShowcaseTask(beatmapId, scoreTargets, upload);
             videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
             ctx.sendReply(replyFactory.replayMessage(ctx, task));
-            var result = taskCoordinator.waitForReplay(task);
-            if (result == null) {
+
+            APIHelper.ReplayRenderResult result;
+
+            try {
+                result = taskCoordinator.waitForReplay(task);
+            } catch (Exception e) {
+                Log.error("Error while waiting for replay", e);
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "回放视频生成失败，请稍后重试。"));
                 return;
             }
-            if (ctx.sendReply(taskCoordinator.replayVideoMessage(result)).success()) {
+
+            SendResult sendResult = ctx.sendReply(taskCoordinator.replayVideoMessage(result));
+
+            if (!sendResult.success()) {
+                sendResult = ctx.sendMessage(taskCoordinator.replayVideoMessage(result));
+            }
+
+            if (sendResult.success()) {
                 replayResults.remove(task.taskId());
             }
         }

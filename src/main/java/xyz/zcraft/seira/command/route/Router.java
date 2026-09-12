@@ -240,8 +240,6 @@ public class Router {
         }
     }
 
-
-
     private void dispatch(Context ctx) {
         lastContext = ctx;
         commandMetric.run();

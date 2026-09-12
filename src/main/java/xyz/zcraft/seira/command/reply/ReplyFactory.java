@@ -519,6 +519,7 @@ public final class ReplyFactory {
                 case "timeout" -> "超时";
                 case "queued" -> "排队中";
                 case "rendering" -> "渲染中";
+                case "uploading" -> "上传中";
                 default -> "未知";
             }).append("\n");
 
