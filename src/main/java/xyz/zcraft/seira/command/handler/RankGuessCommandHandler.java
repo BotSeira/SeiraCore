@@ -23,6 +23,9 @@ import xyz.zcraft.seira.rankguess.data.*;
 import xyz.zcraft.seira.util.RandomReply;
 
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -31,9 +34,12 @@ import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.cmd;
 
 public final class RankGuessCommandHandler {
-    private static final Logger LOG = LogManager.getLogger(RankGuessCommandHandler.class);
+    static final Logger LOG = LogManager.getLogger(RankGuessCommandHandler.class);
+    static final Pattern RANGE_PATTERN = Pattern.compile("^(\\d+)-(\\d+)$");
+    static final int MAX_LEADERBOARD_RANGE = 50;
     private static final String USAGE = "用法：/rg start|group|#Rank|end|wish|stats|lb";
     private static final Pattern RANK_PATTERN = Pattern.compile("^#?(\\d+)[wk]?$");
+    private static final ScheduledExecutorService SCHEDULER = Executors.newSingleThreadScheduledExecutor();
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
     private final RankGuessGameService games;
@@ -76,6 +82,31 @@ public final class RankGuessCommandHandler {
         }
     }
 
+    private LeaderboardRange parseLeaderboardRange(String raw) {
+        final Matcher matcher = RANGE_PATTERN.matcher(raw);
+
+        if (!matcher.matches()) {
+            return null;
+        }
+
+        try {
+            final int start = Integer.parseInt(matcher.group(1));
+            final int end = Integer.parseInt(matcher.group(2));
+
+            if (start < 1 || end < start) {
+                return null;
+            }
+
+            if (end - start + 1 > MAX_LEADERBOARD_RANGE) {
+                return null;
+            }
+
+            return new LeaderboardRange(start, end);
+        } catch (NumberFormatException _) {
+            return null;
+        }
+    }
+
     public void handleRankGuess(Context ctx) {
         if (!ctx.inGroup()) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "/rg 仅支持群聊使用。"));
@@ -105,14 +136,45 @@ public final class RankGuessCommandHandler {
             }
             case "lb" -> {
                 if (ctx.argumentCount() == 1) {
-                    leaderboard(ctx, LeaderboardType.SELF);
-                } else if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
-                    leaderboard(ctx, LeaderboardType.FULL);
-                } else if (ctx.argumentCount() == 2 && "global".equalsIgnoreCase(ctx.argument(1))) {
-                    leaderboard(ctx, LeaderboardType.GLOBAL);
-                } else {
-                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
+                    LeaderboardHandler.leaderboard(ctx, LeaderboardType.GROUP_SELF);
+                    return;
                 }
+
+                if (ctx.argumentCount() == 2) {
+                    final String arg = ctx.argument(1);
+
+                    if ("all".equalsIgnoreCase(arg)) {
+                        LeaderboardHandler.leaderboard(ctx, LeaderboardType.GROUP_FULL);
+                        return;
+                    }
+
+                    if ("global".equalsIgnoreCase(arg)) {
+                        LeaderboardHandler.leaderboard(ctx, LeaderboardType.GLOBAL_SELF);
+                        return;
+                    }
+
+                    final LeaderboardRange range = parseLeaderboardRange(arg);
+
+                    if (range != null) {
+                        LeaderboardHandler.leaderboard(ctx, LeaderboardType.GROUP_RANGE, range.start(), range.end());
+                        return;
+                    }
+
+                    usage(ctx);
+                    return;
+                }
+
+                if (ctx.argumentCount() == 3 && "global".equalsIgnoreCase(ctx.argument(1))) {
+
+                    final LeaderboardRange range = parseLeaderboardRange(ctx.argument(2));
+
+                    if (range != null) {
+                        LeaderboardHandler.leaderboard(ctx, LeaderboardType.GLOBAL_RANGE, range.start(), range.end());
+                        return;
+                    }
+                }
+
+                usage(ctx);
                 return;
             }
             case "start" -> {
@@ -127,12 +189,12 @@ public final class RankGuessCommandHandler {
                     return;
                 }
 
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
+                usage(ctx);
                 return;
             }
             case "group" -> {
                 if (ctx.argumentCount() != 1) {
-                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
+                    usage(ctx);
                     return;
                 }
 
@@ -141,7 +203,7 @@ public final class RankGuessCommandHandler {
             }
             case "end" -> {
                 if (ctx.argumentCount() != 1) {
-                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
+                    usage(ctx);
                     return;
                 }
                 end(ctx, false);
@@ -152,15 +214,27 @@ public final class RankGuessCommandHandler {
                     wish(ctx);
                 } else if (ctx.argumentCount() == 2) {
                     final Matcher matcher = BP_PATTERN.matcher(ctx.argument(1).toLowerCase());
-                    if (matcher.matches()) {
-                        final int i = Integer.parseInt(matcher.group(1));
-                        if (i <= 0 || i > 200) {
-                            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
-                        }
-                        wishScore(ctx, i);
+                    if (!matcher.matches()) {
+                        usage(ctx);
+                        return;
                     }
+
+                    final int i;
+                    try {
+                        i = Integer.parseInt(matcher.group(1));
+                    } catch (NumberFormatException _) {
+                        usage(ctx);
+                        return;
+                    }
+
+                    if (i <= 0 || i > 200) {
+                        usage(ctx);
+                        return;
+                    }
+
+                    wishScore(ctx, i);
                 } else {
-                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
+                    usage(ctx);
                 }
                 return;
             }
@@ -195,12 +269,16 @@ public final class RankGuessCommandHandler {
         } else {
             rank = parseRank(argument);
             if (rank == null) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
+                usage(ctx);
                 return;
             }
         }
 
         guess(ctx, rank);
+    }
+
+    private void usage(Context ctx) {
+        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
     }
 
     private void currentStatus(Context ctx) {
@@ -235,7 +313,7 @@ public final class RankGuessCommandHandler {
             return;
         }
 
-        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "正在计算你的权重喵~\n> Tip: 第一次计算可能耗时较长"));
+        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "正在计算" + ref + "的权重喵~\n> Tip: 第一次计算可能耗时较长"));
 
         StringBuilder reply = new StringBuilder();
 
@@ -287,88 +365,6 @@ public final class RankGuessCommandHandler {
             ctx.sendReply(replyFactory.rankGuessStatisticsMessage(
                     ctx, ref, statistics, recentStatistics, allGroups, rank, pickedTimes, groupGameCount, rankGuessed
             ));
-        } catch (RuntimeException e) {
-            LOG.error("Failed to query rank guess statistics", e);
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "战绩查询失败，请稍后重试喵。"));
-        }
-    }
-
-    private void leaderboard(Context ctx, LeaderboardType type) {
-        try {
-            StringBuilder reply = new StringBuilder();
-
-            final Map<String, Rank> ranks = new HashMap<>();
-
-            final String effectiveGroupId = type == LeaderboardType.GLOBAL ? null : ctx.groupId();
-
-            final Map<String, RankGuessRecordStore.RankData> rankData =
-                    RankGuessRecordStore.getGroupRankData(
-                            effectiveGroupId,
-                            null,
-                            Rank.RECENT_GAME_LIMIT,
-                            Rank.STATS_MIN_PARTICIPANTS,
-                            RankGuessGameService.MIN_GAMES_TO_RANK
-                    );
-
-            rankData.forEach((s, rank) -> ranks.put(s, Rank.from(rank)));
-
-            final List<Map.Entry<String, Rank>> groupRanks = ranks.entrySet().stream()
-                    .sorted(Comparator.comparingDouble(entry -> entry.getValue().rating()))
-                    .toList()
-                    .reversed();
-
-            if (type == LeaderboardType.FULL) {
-                reply.append(at(ctx)).append("本群猜 Rank 战绩排行：\n");
-                if (groupRanks.isEmpty()) {
-                    reply.append("> (暂无玩家)");
-                } else {
-                    for (int i = 0; i < groupRanks.size(); i++) {
-                        final Map.Entry<String, Rank> aRank = groupRanks.get(i);
-                        final String name = Optional.ofNullable(aRank.getKey())
-                                .map(UserDataStore::findBoundUid)
-                                .flatMap(UserDataStore::findUsername)
-                                .orElse("未知");
-                        reply.append("> __\\#").append(i + 1).append("__ ").append(name).append(" (%.2f)".formatted(aRank.getValue().rating())).append("\n");
-                    }
-                }
-            } else if (type == LeaderboardType.SELF || type == LeaderboardType.GLOBAL) {
-                if (!RankGuessRecordStore.canBeRanked(ctx.senderUserId(), effectiveGroupId)
-                        || !ranks.containsKey(ctx.senderUserId())) {
-                    reply.append(at(ctx)).append("你还未在")
-                            .append(type == LeaderboardType.GLOBAL ? "全局" : "本群")
-                            .append("参加过猜 Rank，或参与次数不足喵~");
-                } else {
-                    int placement = 0;
-                    for (int i = 0; i < groupRanks.size(); i++) {
-                        if (groupRanks.get(i).getKey().equals(ctx.senderUserId())) {
-                            placement = i + 1;
-                            break;
-                        }
-                    }
-
-                    reply.append(at(ctx)).append("你在")
-                            .append(type == LeaderboardType.GLOBAL ? "全局" : "本群")
-                            .append("猜 Rank 战绩排行第 __")
-                            .append(placement).append("__ 名！\n");
-
-                    final int WINDOW = type == LeaderboardType.GLOBAL ? 5 : 3;
-                    reply.append("以下是你附近的玩家：\n");
-                    for (int i = Math.max(0, placement - 1 - WINDOW); i < groupRanks.size() && i < placement + WINDOW; i++) {
-                        final Map.Entry<String, Rank> aRank = groupRanks.get(i);
-                        final String name = Optional.ofNullable(aRank.getKey())
-                                .map(UserDataStore::findBoundUid)
-                                .flatMap(UserDataStore::findUsername)
-                                .orElse("未知");
-                        reply.append("> __\\#").append(i + 1).append("__: ").append(name)
-                                .append(" (%.2f) (%+.3f)".formatted(
-                                        aRank.getValue().rating(),
-                                        groupRanks.get(placement - 1).getValue().rating() - aRank.getValue().rating())
-                                ).append("\n");
-                    }
-                }
-            }
-
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(reply.toString().trim()));
         } catch (RuntimeException e) {
             LOG.error("Failed to query rank guess statistics", e);
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "战绩查询失败，请稍后重试喵。"));
@@ -436,7 +432,7 @@ public final class RankGuessCommandHandler {
         }
 
         boolean activated = false;
-        try (var timing = taskCoordinator.beginRequest(ctx, "Rank Guess Render")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "Rank Guess Render")) {
             final PendingMessage message = PendingMessage.ofMarkdownRaw(at(ctx) + RandomReply.loading());
             final boolean activeMessageEnabled = ctx.sendMessage(message).success();
             if (!activeMessageEnabled) {
@@ -478,11 +474,23 @@ public final class RankGuessCommandHandler {
                     round.scoreId(), taskCoordinator.createVideoUploadRequest(ctx)
             );
 
+            var warning = SCHEDULER.schedule(
+                    () -> {
+                        ctx.sendReply(PendingMessage.ofMarkdownRaw(
+                                "回放渲染时间超过预期，可" + cmd("/rstat " + renderTask.taskId(), "点击查看渲染进度") + "喵~")
+                        );
+                    },
+                    60,
+                    TimeUnit.SECONDS
+            );
+
             APIHelper.ReplayRenderResult replay = null;
             try {
                 replay = taskCoordinator.waitForReplay(renderTask);
             } catch (Exception e) {
                 LOG.error("Failed to render replay for rank guess", e);
+            } finally {
+                warning.cancel(false);
             }
 
             if (replay == null) {
@@ -490,11 +498,19 @@ public final class RankGuessCommandHandler {
                 return;
             }
 
-            final SendResult sendResult = ctx.sendReply(taskCoordinator.replayVideoMessage(replay));
-            boolean videoSent = sendResult.success();
-            if (!videoSent) {
+            final PendingMessage videoMessage = taskCoordinator.replayVideoMessage(replay);
+            SendResult sendResult = ctx.sendReply(videoMessage);
+
+            if (!sendResult.success()) {
+                sendResult = ctx.sendMessage(videoMessage);
+            }
+
+            if (!sendResult.success()) {
                 taskCoordinator.removeReplayResult(renderTask.taskId());
-                ctx.sendReply(PendingMessage.ofMarkdownRaw("由于回放发送失败，本轮游戏已取消~"));
+                final PendingMessage cancelMessage = PendingMessage.ofMarkdownRaw("由于回放发送失败，本轮游戏已取消~");
+                if (!ctx.sendReply(cancelMessage).success()) {
+                    ctx.sendMessage(cancelMessage);
+                }
                 return;
             }
 
@@ -661,7 +677,245 @@ public final class RankGuessCommandHandler {
         }
     }
 
-    private enum LeaderboardType {
-        SELF, FULL, GLOBAL
+    enum LeaderboardType {
+        GROUP_SELF, GROUP_FULL, GROUP_RANGE, GLOBAL_SELF, GLOBAL_RANGE
+    }
+
+    record LeaderboardRange(int start, int end) {
+    }
+}
+
+final class LeaderboardHandler {
+    static void leaderboard(Context ctx, RankGuessCommandHandler.LeaderboardType type) {
+        leaderboard(ctx, type, null, null);
+    }
+
+    static void leaderboard(
+            Context ctx, RankGuessCommandHandler.LeaderboardType type, Integer start, Integer end
+    ) {
+        try {
+            final StringBuilder reply = new StringBuilder();
+
+            final String effectiveGroupId =
+                    (type == RankGuessCommandHandler.LeaderboardType.GLOBAL_SELF || type == RankGuessCommandHandler.LeaderboardType.GLOBAL_RANGE)
+                            ? null
+                            : ctx.groupId();
+
+            final Map<String, RankGuessRecordStore.RankData> rankData =
+                    RankGuessRecordStore.getGroupRankData(
+                            effectiveGroupId,
+                            null,
+                            Rank.RECENT_GAME_LIMIT,
+                            Rank.STATS_MIN_PARTICIPANTS,
+                            RankGuessGameService.MIN_GAMES_TO_RANK
+                    );
+
+            final List<Map.Entry<String, Rank>> ranks =
+                    rankData.entrySet().stream()
+                            .map(entry -> Map.entry(entry.getKey(), Rank.from(entry.getValue())))
+                            .filter(entry -> UserDataStore.findBoundUid(entry.getKey()) != null)
+                            .sorted(Comparator.<Map.Entry<String, Rank>>comparingDouble(
+                                                    entry -> entry.getValue().rating()
+                                            )
+                                            .reversed()
+                                            .thenComparing(Map.Entry::getKey)
+                            )
+                            .toList();
+
+            if (type == RankGuessCommandHandler.LeaderboardType.GROUP_RANGE || type == RankGuessCommandHandler.LeaderboardType.GLOBAL_RANGE) {
+
+                if (start == null || end == null
+                        || start < 1 || end < start || end - start + 1 > RankGuessCommandHandler.MAX_LEADERBOARD_RANGE) {
+                    throw new IllegalArgumentException(
+                            "Invalid leaderboard range: " + start + "-" + end
+                    );
+                }
+            }
+
+            switch (type) {
+                case GROUP_FULL -> groupLeaderboard(ctx, reply, ranks, 0, ranks.size());
+                case GROUP_RANGE -> groupLeaderboard(ctx, reply, ranks, start - 1, Math.min(end, ranks.size()));
+                case GROUP_SELF -> selfLeaderboard(ctx, reply, effectiveGroupId, ranks);
+                case GLOBAL_SELF -> globalLeaderboard(ctx, reply, ranks);
+                case GLOBAL_RANGE -> globalRangeLeaderboard(ctx, reply, ranks, start, end);
+            }
+
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(reply.toString().trim()));
+        } catch (RuntimeException e) {
+            RankGuessCommandHandler.LOG.error("Failed to query rank guess statistics", e);
+
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "战绩查询失败，请稍后重试喵。"));
+        }
+    }
+
+    private static void globalRangeLeaderboard(
+            Context ctx, StringBuilder reply, List<Map.Entry<String, Rank>> ranks, int start, int end
+    ) {
+        reply.append(at(ctx))
+                .append("全局猜 Rank 战绩排行：\n");
+
+        final int from = start - 1;
+        final int to = Math.min(end, ranks.size());
+
+        if (from >= to) {
+            reply.append("> (该范围暂无玩家)");
+            return;
+        }
+
+        for (int i = from; i < to; i++) {
+            final Map.Entry<String, Rank> rank = ranks.get(i);
+
+            reply.append("> __\\#")
+                    .append(i + 1)
+                    .append("__: ")
+                    .append(getLeaderboardName(rank.getKey()))
+                    .append(" (%.2f)".formatted(rank.getValue().rating()))
+                    .append("\n");
+        }
+    }
+
+    private static String getLeaderboardName(String userId) {
+        return Optional.ofNullable(userId)
+                .map(UserDataStore::findBoundUid)
+                .flatMap(UserDataStore::findUsername)
+                .orElse("未知");
+    }
+
+    private static void globalLeaderboard(
+            Context ctx, StringBuilder reply, List<Map.Entry<String, Rank>> ranks
+    ) {
+        final String userId = ctx.senderUserId();
+
+        if (!RankGuessRecordStore.canBeRanked(userId, null)) {
+            reply.append(at(ctx))
+                    .append("你还未在全局参加过猜 Rank，或参与次数不足喵~");
+            return;
+        }
+
+        int placement = -1;
+
+        for (int i = 0; i < ranks.size(); i++) {
+            if (ranks.get(i).getKey().equals(userId)) {
+                placement = i;
+                break;
+            }
+        }
+
+        if (placement < 0) {
+            reply.append(at(ctx))
+                    .append("你还未在全局参加过猜 Rank，或参与次数不足喵~");
+            return;
+        }
+
+        final double selfRating =
+                ranks.get(placement).getValue().rating();
+
+        reply.append(at(ctx))
+                .append("你在全局猜 Rank 战绩排行第 __")
+                .append(placement + 1)
+                .append("__ 名！\n");
+
+        reply.append("以下是你附近的玩家：\n");
+
+        final int window = 5;
+        final int from = Math.max(0, placement - window);
+        final int to = Math.min(ranks.size(), placement + window + 1);
+
+        for (int i = from; i < to; i++) {
+            final Map.Entry<String, Rank> rank = ranks.get(i);
+            final double otherRating = rank.getValue().rating();
+
+            reply.append("> __\\#")
+                    .append(i + 1)
+                    .append("__: ")
+                    .append(getLeaderboardName(rank.getKey()))
+                    .append(" (%.2f) (%+.3f)".formatted(
+                            otherRating,
+                            otherRating - selfRating
+                    ))
+                    .append("\n");
+        }
+    }
+
+    private static void selfLeaderboard(
+            Context ctx, StringBuilder reply, String groupId, List<Map.Entry<String, Rank>> ranks
+    ) {
+        final String userId = ctx.senderUserId();
+
+        if (!RankGuessRecordStore.canBeRanked(userId, groupId)) {
+            reply.append(at(ctx))
+                    .append("你还未在本群参加过猜 Rank，或参与次数不足喵~");
+            return;
+        }
+
+        int placement = -1;
+
+        for (int i = 0; i < ranks.size(); i++) {
+            if (ranks.get(i).getKey().equals(userId)) {
+                placement = i;
+                break;
+            }
+        }
+
+        if (placement < 0) {
+            reply.append(at(ctx)).append("你还未在本群参加过猜 Rank，或参与次数不足喵~");
+            return;
+        }
+
+        final double selfRating =
+                ranks.get(placement).getValue().rating();
+
+        reply.append(at(ctx))
+                .append("你在本群猜 Rank 战绩排行第 __")
+                .append(placement + 1)
+                .append("__ 名！\n");
+
+        reply.append("以下是你附近的玩家：\n");
+
+        final int window = 3;
+        final int from = Math.max(0, placement - window);
+        final int to = Math.min(ranks.size(), placement + window + 1);
+
+        for (int i = from; i < to; i++) {
+            final Map.Entry<String, Rank> rank = ranks.get(i);
+            final double otherRating = rank.getValue().rating();
+
+            reply.append("> __\\#")
+                    .append(i + 1)
+                    .append("__: ")
+                    .append(getLeaderboardName(rank.getKey()))
+                    .append(" (%.2f) (%+.3f)".formatted(
+                            otherRating,
+                            otherRating - selfRating
+                    ))
+                    .append("\n");
+        }
+    }
+
+    private static void groupLeaderboard(
+            Context ctx, StringBuilder reply, List<Map.Entry<String, Rank>> ranks, int from, int to
+    ) {
+        reply.append(at(ctx)).append("本群猜 Rank 战绩排行：\n");
+
+        if (ranks.isEmpty()) {
+            reply.append("> (暂无玩家)");
+            return;
+        }
+
+        if (from >= to) {
+            reply.append("> (该范围暂无玩家)");
+            return;
+        }
+
+        for (int i = from; i < to; i++) {
+            final Map.Entry<String, Rank> rank = ranks.get(i);
+
+            reply.append("> __\\#")
+                    .append(i + 1)
+                    .append("__: ")
+                    .append(getLeaderboardName(rank.getKey()))
+                    .append(" (%.2f)".formatted(rank.getValue().rating()))
+                    .append("\n");
+        }
     }
 }

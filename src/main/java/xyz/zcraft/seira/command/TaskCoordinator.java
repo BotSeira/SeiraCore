@@ -103,11 +103,15 @@ public final class TaskCoordinator {
     }
 
     public APIHelper.ReplayRenderResult waitForReplay(APIHelper.ReplayTaskInfo taskInfo) {
+        return waitForReplay(taskInfo, -1);
+    }
+
+    public APIHelper.ReplayRenderResult waitForReplay(APIHelper.ReplayTaskInfo taskInfo, long timeout) {
         if (taskInfo == null || taskInfo.taskId() == null || taskInfo.taskId().isBlank()) {
             throw new IllegalArgumentException("回放任务未返回有效请求ID，无法获取视频结果。");
         }
 
-        APIHelper.ReplayRenderResult result = APIHelper.waitReplayVideo(taskInfo.taskId());
+        APIHelper.ReplayRenderResult result = APIHelper.waitReplayVideo(taskInfo.taskId(), timeout);
         replayResults.put(taskInfo.taskId(), result);
         BotStat.incrementReplays();
         return result;

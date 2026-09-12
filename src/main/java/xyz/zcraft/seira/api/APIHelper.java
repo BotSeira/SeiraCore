@@ -655,8 +655,8 @@ public class APIHelper {
         return getReplayTaskInfo(request);
     }
 
-    public static ReplayRenderResult waitReplayVideo(String taskId) {
-        FileInfo qqFile = waitReplayDone(taskId);
+    public static ReplayRenderResult waitReplayVideo(String taskId, long timeout) {
+        FileInfo qqFile = waitReplayDone(taskId, timeout);
         return new ReplayRenderResult(
                 ENDPOINT + "/replays/" + taskId + "/video/replay.mp4", taskId, qqFile);
     }
@@ -807,7 +807,8 @@ public class APIHelper {
         }
     }
 
-    private static FileInfo waitReplayDone(String taskId) {
+    private static FileInfo waitReplayDone(String taskId, long timeout) {
+        final long start = System.currentTimeMillis();
         for (int attempt = 1; attempt <= REPLAY_MAX_POLL_ATTEMPTS; attempt++) {
             JsonObject statusData = getReplayStatus(taskId);
             String status = statusData.get("status").getAsString();
@@ -823,6 +824,9 @@ public class APIHelper {
                         ? statusData.get("error").getAsString()
                         : null;
                 throw new ReplayRenderException(status, error);
+            }
+            if (timeout > 0 && System.currentTimeMillis() - start > timeout) {
+                throw new RuntimeException("回放渲染超时，请稍后重试。");
             }
             try {
                 Thread.sleep(REPLAY_POLL_INTERVAL_MS);
