@@ -7,10 +7,11 @@ import org.apache.logging.log4j.core.config.Configurator;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.route.Router;
-import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.RuntimeConfig;
 import xyz.zcraft.seira.db.SqliteDatabase;
 import xyz.zcraft.seira.services.BotStat;
+import xyz.zcraft.seira.services.handler.ConfigHandler;
+import xyz.zcraft.seira.services.handler.NoticeHandler;
 import xyz.zcraft.seira.util.AdminRegistry;
 import xyz.zcraft.seira.watch.WatchView;
 
@@ -29,7 +30,7 @@ public final class ConsoleCommandProcessor {
     private static final Pattern SQL_IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
     private static final List<String> ROOT_COMMANDS = List.of(
             "help", "status", "metrics", "system", "config", "admin", "data", "send",
-            "watch", "cache", "gateway", "log", "inspect", "stop", "panel"
+            "watch", "cache", "gateway", "log", "inspect", "stop", "panel", "notice"
     );
     private static final Map<String, List<String>> SUBCOMMANDS = Map.of(
             "config", List.of("show", "check", "reload"),
@@ -40,7 +41,8 @@ public final class ConsoleCommandProcessor {
             "cache", List.of("query", "delete", "get", "fetch"),
             "gateway", List.of("status", "reconnect"),
             "log", List.of("show", "level"),
-            "panel", List.of("list", "create", "delete", "edit", "get")
+            "panel", List.of("list", "create", "delete", "edit", "get"),
+            "notice", List.of("new", "reload", "publish", "revoke", "list")
     );
 
     private final RuntimeConfig runtimeConfig;
@@ -48,6 +50,9 @@ public final class ConsoleCommandProcessor {
     private final ConsoleDataAccess dataAccess;
     private final MessageSender messenger;
     private final ConsoleRuntimeControl runtimeControl;
+
+    private final ConfigHandler configHandler;
+    private final NoticeHandler noticeHandler;
 
     public ConsoleCommandProcessor(
             RuntimeConfig runtimeConfig,
@@ -61,6 +66,9 @@ public final class ConsoleCommandProcessor {
         this.dataAccess = Objects.requireNonNull(dataAccess);
         this.messenger = Objects.requireNonNull(messenger);
         this.runtimeControl = Objects.requireNonNull(runtimeControl);
+
+        this.configHandler = new ConfigHandler(runtimeConfig, admins);
+        this.noticeHandler = new NoticeHandler();
     }
 
     static List<String> rootCommands() {
@@ -179,7 +187,7 @@ public final class ConsoleCommandProcessor {
         return String.format(Locale.ROOT, "%.1f %s", value, units[unit]);
     }
 
-    private static String blankAs(String value, String fallback) {
+    public static String blankAs(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
     }
 
@@ -220,7 +228,8 @@ public final class ConsoleCommandProcessor {
                 case "status", "stat" -> exact(input, 1, this::status, "Usage: status");
                 case "metrics" -> exact(input, 1, this::metrics, "Usage: metrics");
                 case "system" -> exact(input, 1, this::system, "Usage: system");
-                case "config" -> config(input);
+                case "config" -> configHandler.dispatch(input);
+                case "notice" -> noticeHandler.dispatch(input);
                 case "admin" -> admin(input);
                 case "data" -> data(input);
                 case "send" -> send(input);
@@ -327,6 +336,13 @@ public final class ConsoleCommandProcessor {
                     panel create <c2c/group> <path-to-json>
                     panel edit <panel-id> <path-to-json>
                     Manage command panels to be displayed on QQ platform.""";
+            case "notice" -> """
+                    notice new
+                    notice list
+                    notice reload
+                    notice publish <notice-id>
+                    notice revoke <notice-id>
+                    """;
             case "inspect" -> "inspect\nShows IDs and parsed command data from the last dispatched QQ message.";
             case "stop", "shutdown", "exit", "quit" ->
                     "stop confirm\nGracefully stops the gateway and all application services.";
@@ -408,76 +424,6 @@ public final class ConsoleCommandProcessor {
                 formatBytes(runtime.totalMemory()),
                 formatBytes(runtime.maxMemory())
         ).stripTrailing());
-    }
-
-    private ConsoleResult config(ConsoleInputParser.ParsedInput input) {
-        if (input.size() != 2) {
-            return ConsoleResult.failure("Usage: config <show|check|reload>");
-        }
-        return switch (input.value(1).toLowerCase(Locale.ROOT)) {
-            case "show" -> showConfig();
-            case "check" -> checkConfig();
-            case "reload" -> reloadConfig();
-            default -> ConsoleResult.failure("Usage: config <show|check|reload>");
-        };
-    }
-
-    private ConsoleResult showConfig() {
-        AppConfig config = runtimeConfig.current();
-        String pending = runtimeConfig.pendingRestart().isEmpty()
-                ? "none"
-                : String.join(", ", runtimeConfig.pendingRestart());
-        return ConsoleResult.success("""
-                Effective configuration (credentials redacted)
-                  seira.sqlitePath = %s
-                  seira.directUrl = %s
-                  seira.queueMessageInGroup = %s
-                  seira.watchIntervalMinutes = %d
-                  seira.debugMode = %s
-                  seira.administrators = %d
-                  ostella.endpoint = %s
-                  binding.listener = 0.0.0.0:%d%s
-                  binding.clientId = %d
-                  qq.selfId = %s
-                  qq.appId = %s
-                  cos.region = %s
-                  cos.bucket = %s
-                  cos.baseUrl = %s
-                  Pending restart changes = %s
-                """.formatted(
-                config.seira().sqlitePath(),
-                config.seira().directUrl(),
-                config.seira().queueMessageInGroup(),
-                config.seira().effectiveWatchIntervalMinutes(),
-                config.seira().debugMode(),
-                admins.list().size(),
-                config.ostella().endpoint(),
-                config.binding().listenPort(),
-                config.binding().listenPath(),
-                config.binding().clientId(),
-                config.qq().selfId(),
-                config.qq().appId(),
-                config.cos().region(),
-                config.cos().bucket(),
-                blankAs(config.cos().baseUrl(), "not set"),
-                pending
-        ).stripTrailing());
-    }
-
-    private ConsoleResult checkConfig() {
-        runtimeConfig.validateSource();
-        return ConsoleResult.success("config.yml is valid. No settings were applied.");
-    }
-
-    private ConsoleResult reloadConfig() {
-        RuntimeConfig.ReloadResult result = runtimeConfig.reload();
-        String applied = result.applied().isEmpty() ? "none" : String.join(", ", result.applied());
-        String restart = result.restartRequired().isEmpty()
-                ? "none"
-                : String.join(", ", result.restartRequired());
-        return ConsoleResult.success(
-                "Configuration reloaded.\nApplied online: " + applied + "\nRestart required: " + restart
-        );
     }
 
     private ConsoleResult admin(ConsoleInputParser.ParsedInput input) {

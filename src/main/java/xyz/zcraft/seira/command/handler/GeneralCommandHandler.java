@@ -9,9 +9,11 @@ import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.parse.UserRefResolution;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
+import xyz.zcraft.seira.data.Notice;
 import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.services.DailyLuck;
+import xyz.zcraft.seira.services.NoticeStore;
 
 import java.util.function.Predicate;
 
@@ -57,7 +59,7 @@ public final class GeneralCommandHandler {
             return;
         }
 
-        try (var timing = taskCoordinator.beginRequest(context, "User Info")) {
+        try (var _ = taskCoordinator.beginRequest(context, "User Info")) {
             var response = APIHelper.getUserInfoResponse(userRef);
             var completion = replyFactory.userInfoMessage(context, response);
             context.sendReply(taskCoordinator.imageMessage(response, completion));
@@ -70,7 +72,7 @@ public final class GeneralCommandHandler {
             return;
         }
 
-        try (var timing = taskCoordinator.beginRequest(context, "Luck")) {
+        try (var _ = taskCoordinator.beginRequest(context, "Luck")) {
             DailyLuck.Luck luck = DailyLuck.getLuck(context.senderUserId());
             Beatmapset mapset = APIHelper.getBeatmapsetRaw(luck.dailyMapset());
             UploadedImage cover = messageSender.uploadImageToCos(mapset.getCovers().getCover());
@@ -101,5 +103,32 @@ public final class GeneralCommandHandler {
         if (!context.inGroup()) {
             context.sendReply(PendingMessage.ofMarkdownRaw(at(context) + "未知指令。使用/help获取帮助。"));
         }
+    }
+
+    public void handleNotice(Context context) {
+        if (context.argumentCount() != 0 && context.argumentCount() != 1) {
+            context.sendReply(PendingMessage.ofMarkdownRaw(at(context) + "用法：/notice [公告ID]"));
+            return;
+        }
+
+        long noticeId;
+
+        if (context.argumentCount() == 1) {
+            noticeId = Long.parseLong(context.argument(0));
+        } else {
+            noticeId = NoticeStore.getNewestId();
+        }
+
+        StringBuilder sb = new StringBuilder();
+        NoticeStore.getNotices().stream()
+                .filter(notice -> notice.id() == noticeId)
+                .filter(Notice::isActive)
+                .findFirst()
+                .ifPresentOrElse(notice -> {
+                    sb.append(at(context)).append("公告#").append(notice.id()).append(" ").append(notice.title()).append("\n");
+                    sb.append(NoticeStore.getContentFor(notice));
+                }, () -> sb.append(at(context)).append("未找到公告#").append(noticeId));
+
+        context.sendReply(PendingMessage.ofMarkdownRaw(sb.toString()));
     }
 }

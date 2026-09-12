@@ -3,6 +3,7 @@ package xyz.zcraft.seira.command;
 import com.google.gson.Gson;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.ApiRequestException;
 import xyz.zcraft.seira.api.ReplayRenderException;
@@ -144,6 +145,7 @@ public final class TaskCoordinator {
         );
     }
 
+    @NotNull
     public SendResult sendOutboundMessage(String targetId, String messageId, boolean groupMessage, PendingMessage pendingMsg, AtomicInteger messageSeqCounter) {
         Message message = new Message();
         message.setMsgType(pendingMsg.getMsgType());

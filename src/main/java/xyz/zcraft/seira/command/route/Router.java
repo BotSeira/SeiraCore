@@ -18,6 +18,7 @@ import xyz.zcraft.seira.discord.DiscordBridgeService;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
 import xyz.zcraft.seira.services.BindingService;
 import xyz.zcraft.seira.util.AdminRegistry;
+import xyz.zcraft.seira.util.NoticesHelper;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 import xyz.zcraft.seira.watch.MultiplayerRoomWatchService;
 import xyz.zcraft.seira.watch.ScoreWatchService;
@@ -175,6 +176,7 @@ public class Router {
                 .register(multiplayerRoomWatchCommands::handleMpWatch, "mpwatch", "mpw")
                 .register(dcsCommands::handleDcs, "dcs")
                 .register(rankGuessCommands::handleRankGuess, "rg")
+                .register(generalCommands::handleNotice, "notice")
                 .build();
     }
 
@@ -226,6 +228,7 @@ public class Router {
                 try {
                     LOG.info("Routing {} message : {}", groupMessage ? "group" : "private", context.rawContent());
                     dispatch(context);
+                    NoticesHelper.checkNotices(context);
                 } catch (Exception e) {
                     context.sendReply(PendingMessage.ofMarkdownRaw(at(context) + TaskCoordinator.resolveErrorMessage(e)));
                     LOG.error("Failed to process inbound message {}", messageId, e);
@@ -236,6 +239,8 @@ public class Router {
             LOG.error("Failed to process inbound message {}", messageId, e);
         }
     }
+
+
 
     private void dispatch(Context ctx) {
         lastContext = ctx;

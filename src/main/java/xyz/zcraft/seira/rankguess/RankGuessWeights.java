@@ -1,6 +1,7 @@
 package xyz.zcraft.seira.rankguess;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.apache.logging.log4j.LogManager;
@@ -19,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 public class RankGuessWeights {
-    private static final Gson GSON = new Gson();
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Logger LOG = LogManager.getLogger(RankGuessWeights.class);
     private static final Path WEIGHTS_FILE = Path.of("data", "rank-guess-weights.json");
 
@@ -116,7 +117,7 @@ public class RankGuessWeights {
             try {
                 Files.createDirectories(store.getParent());
                 temporary = Files.createTempFile(store.getParent(), "rank-guess-weights-", ".tmp");
-                Files.writeString(temporary, data.toString());
+                Files.writeString(temporary, GSON.toJson(data));
                 try {
                     Files.move(temporary, store, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
                 } catch (AtomicMoveNotSupportedException e) {

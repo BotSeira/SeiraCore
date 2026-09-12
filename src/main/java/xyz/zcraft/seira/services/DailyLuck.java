@@ -27,6 +27,7 @@ public class DailyLuck {
     };
     private static String salt = "Ciallo～(∠・ω< )⌒★";
     private static String luckDate;
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     public static void initialize(String salt) {
         DailyLuck.salt = salt;
@@ -87,7 +88,7 @@ public class DailyLuck {
                     obj.get("luck").getAsJsonObject().entrySet().forEach(entry -> {
                         String id = entry.getKey();
                         JsonObject luckObj = entry.getValue().getAsJsonObject();
-                        luck.put(id, new Gson().fromJson(luckObj, Luck.class));
+                        luck.put(id, GSON.fromJson(luckObj, Luck.class));
                     });
                 } catch (Exception e) {
                     LOG.warn("Failed to load luck file", e);
@@ -117,10 +118,10 @@ public class DailyLuck {
 
             JsonObject obj = new JsonObject();
             obj.addProperty("date", luckDate);
-            obj.add("luck", new Gson().toJsonTree(luck));
+            obj.add("luck", GSON.toJsonTree(luck));
             try {
                 Files.createDirectories(LUCK_FILE.getParent());
-                Files.writeString(LUCK_FILE, obj.toString());
+                Files.writeString(LUCK_FILE, GSON.toJson(obj));
             } catch (IOException e) {
                 LOG.error("Failed to save luck file", e);
             }
