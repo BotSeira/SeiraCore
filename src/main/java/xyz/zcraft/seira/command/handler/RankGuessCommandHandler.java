@@ -37,7 +37,6 @@ public final class RankGuessCommandHandler {
     static final Logger LOG = LogManager.getLogger(RankGuessCommandHandler.class);
     static final Pattern RANGE_PATTERN = Pattern.compile("^(\\d+)-(\\d+)$");
     static final int MAX_LEADERBOARD_RANGE = 50;
-    private static final String USAGE = "用法：/rg start|group|#Rank|end|wish|stats|lb";
     private static final Pattern RANK_PATTERN = Pattern.compile("^#?(\\d+)[wk]?$");
     private static final ScheduledExecutorService SCHEDULER = Executors.newSingleThreadScheduledExecutor();
     private final TaskCoordinator taskCoordinator;
@@ -130,7 +129,7 @@ public final class RankGuessCommandHandler {
                 } else if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
                     statistics(ctx, true, null);
                 } else {
-                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
+                    usage(ctx);
                 }
                 return;
             }
@@ -247,7 +246,7 @@ public final class RankGuessCommandHandler {
                 } else if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
                     weight(ctx, true, null);
                 } else {
-                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
+                    usage(ctx);
                 }
                 return;
             }
@@ -278,6 +277,7 @@ public final class RankGuessCommandHandler {
     }
 
     private void usage(Context ctx) {
+        final String USAGE = "用法：/rg start|group|#Rank|end|wish|stats|lb|weight";
         ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + USAGE));
     }
 

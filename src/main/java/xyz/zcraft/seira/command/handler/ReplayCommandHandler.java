@@ -73,7 +73,7 @@ public final class ReplayCommandHandler {
                 result = taskCoordinator.waitForReplay(task);
             } catch (Exception e) {
                 Log.error("Error while waiting for replay", e);
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "回放视频生成失败，请稍后重试。"));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + e.getMessage()));
                 return;
             }
 
@@ -147,7 +147,7 @@ public final class ReplayCommandHandler {
                 result = taskCoordinator.waitForReplay(task);
             } catch (Exception e) {
                 Log.error("Error while waiting for replay", e);
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "回放视频生成失败，请稍后重试。"));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + e.getMessage()));
                 return;
             }
 
