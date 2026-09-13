@@ -306,7 +306,8 @@ public final class ReplyFactory {
     }
 
     private static boolean isCancelableReplayStatus(String status) {
-        return "queued".equals(status) || "rendering".equals(status) || "uploading".equals(status);
+        return "queued".equals(status) || "rendering".equals(status)
+                || "upload_queued".equals(status) || "uploading".equals(status);
     }
 
     public PendingMessage searchMessage(Context ctx, Response<List<SearchResultItem>> response, SearchQuery searchQuery) {
@@ -524,6 +525,7 @@ public final class ReplyFactory {
                 case "timeout" -> "超时";
                 case "queued" -> "排队中";
                 case "rendering" -> "渲染中";
+                case "upload_queued" -> "等待上传";
                 case "uploading" -> "上传中";
                 case "canceled" -> "已取消";
                 default -> "未知";
