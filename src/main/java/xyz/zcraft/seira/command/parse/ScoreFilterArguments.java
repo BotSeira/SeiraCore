@@ -17,9 +17,9 @@ public final class ScoreFilterArguments {
                     + "(>=|<=|!=|!~|>|<|=|~)(.+)$"
     );
     private static final Pattern MISS_SHORTHAND_PATTERN = Pattern.compile("(?i)^(!?)(\\d+)miss(?:es)?$");
-    private static final Pattern NEGATED_RANK_SHORTHAND_PATTERN = Pattern.compile("(?i)^!(XH|X|SH|S|A|B|C|D|F)$");
+    private static final Pattern NEGATED_RANK_SHORTHAND_PATTERN = Pattern.compile("(?i)^!(SSH|SS|XH|X|SH|S|A|B|C|D|F)$");
     private static final Pattern DURATION_PATTERN = Pattern.compile("(?i)^(?:(\\d+)m)?(?:(\\d+(?:\\.\\d+)?)s)?$");
-    private static final Set<String> RANKS = Set.of("XH", "X", "SH", "S", "A", "B", "C", "D", "F");
+    private static final Set<String> RANKS = Set.of("SSH", "SS", "XH", "X", "SH", "S", "A", "B", "C", "D", "F");
 
     private ScoreFilterArguments() {
     }
@@ -64,12 +64,12 @@ public final class ScoreFilterArguments {
             }
             validateMods(value);
         } else if (field.equals("rank")) {
-            if (!Set.of("=", "!=").contains(operator)) {
-                throw new IllegalArgumentException("rank 仅支持 =、!=");
+            if (!Set.of(">", ">=", "<", "<=", "=", "!=").contains(operator)) {
+                throw new IllegalArgumentException("rank 仅支持 >、>=、<、<=、=、!=");
             }
             value = value.toUpperCase(Locale.ROOT);
             if (!RANKS.contains(value)) {
-                throw new IllegalArgumentException("rank 必须是 XH/X/SH/S/A/B/C/D/F");
+                throw new IllegalArgumentException("rank 必须是 SSH/SS/XH/X/SH/S/A/B/C/D/F");
             }
         } else if (Set.of("any", "title", "artist", "mapper", "genre", "language").contains(field)) {
             if (!Set.of("~", "!~", "=", "!=").contains(operator)) {
