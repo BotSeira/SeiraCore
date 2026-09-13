@@ -284,8 +284,9 @@ public final class ScoreCommandHandler {
             var response = APIHelper.getScoreResponse(ids.scoreId());
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.scoreMessage(ctx, response)));
         } catch (Exception e) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + TaskCoordinator.resolveErrorMessage(e)
-                    + "\n> Tips: 若要查找指定谱面上的成绩，请使用 /s __m__`bid`"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + TaskCoordinator.resolveErrorMessage(e)));
+//            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + TaskCoordinator.resolveErrorMessage(e)
+//                    + "\n> Tips: 若要查找指定谱面上的成绩，请使用 /s __m__`bid`"));
             org.apache.logging.log4j.LogManager.getLogger(ScoreCommandHandler.class)
                     .error("Failed to execute /s", e);
         }
