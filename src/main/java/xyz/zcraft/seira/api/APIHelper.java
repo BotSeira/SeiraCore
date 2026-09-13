@@ -96,14 +96,19 @@ public class APIHelper {
         }
     }
 
+    @SuppressWarnings("unused")
     public static Response<Base64Bytes> getBoNResponse(int n, UserRef userRef) {
         return getBoNResponse(n, userRef, List.of());
     }
 
     public static Response<Base64Bytes> getBoNResponse(int n, UserRef userRef, List<String> filters) {
+        return getBoNResponse(n, 1, userRef, filters);
+    }
+
+    public static Response<Base64Bytes> getBoNResponse(int n, int start, UserRef userRef, List<String> filters) {
         long uid = resolveUid(userRef);
         return getBase64BytesResponse(
-                "/users/" + uid + "/scores/bestof?n=" + n + encodeScoreFilters(filters),
+                "/users/" + uid + "/scores/bestof?n=" + n + encodeScoreRangeStart(start) + encodeScoreFilters(filters),
                 "获取最好成绩失败",
                 null
         );
@@ -118,6 +123,7 @@ public class APIHelper {
         );
     }
 
+    @SuppressWarnings("unused")
     public static Response<Base64Bytes> getTodayBestResponse(UserRef userRef) {
         return getTodayBestResponse(userRef, 1);
     }
@@ -213,17 +219,33 @@ public class APIHelper {
         }
     }
 
+    @SuppressWarnings("unused")
     public static Response<Base64Bytes> getRecentResponse(int n, UserRef userRef, boolean includeFail) {
         return getRecentResponse(n, userRef, includeFail, List.of());
     }
 
     public static Response<Base64Bytes> getRecentResponse(int n, UserRef userRef, boolean includeFail, List<String> filters) {
+        return getRecentResponse(n, 1, userRef, includeFail, filters);
+    }
+
+    public static Response<Base64Bytes> getRecentResponse(
+            int n,
+            int start,
+            UserRef userRef,
+            boolean includeFail,
+            List<String> filters
+    ) {
         long uid = resolveUid(userRef);
         return getBase64BytesResponse(
-                "/users/" + uid + "/scores/recent?n=" + n + "&fail=" + includeFail + encodeScoreFilters(filters),
+                "/users/" + uid + "/scores/recent?n=" + n + "&fail=" + includeFail
+                        + encodeScoreRangeStart(start) + encodeScoreFilters(filters),
                 "获取最近成绩失败",
                 null
         );
+    }
+
+    private static String encodeScoreRangeStart(int start) {
+        return start > 1 ? "&start=" + start : "";
     }
 
     private static String encodeScoreFilters(List<String> filters) {
@@ -245,6 +267,7 @@ public class APIHelper {
         return getBase64BytesResponse(query, "获取谱面分析失败", null);
     }
 
+    @SuppressWarnings("unused")
     public static Response<Base64Bytes> getBeatmapsetBgResponse(long beatmapsetId) {
         return getBase64BytesResponse("/beatmapsets/" + beatmapsetId + "/background", "获取谱面集失败", null);
     }
@@ -490,6 +513,7 @@ public class APIHelper {
         }
     }
 
+    @SuppressWarnings("unused")
     public static ReplayTaskInfo createObscuredReplayRenderTask(long scoreId) {
         return createObscuredReplayRenderTask(scoreId, null);
     }
@@ -677,6 +701,7 @@ public class APIHelper {
         return getReplayTaskInfo(request);
     }
 
+    @SuppressWarnings("SameParameterValue")
     private static TimeDurationParser.TimeRange getScoreHighlight(long scoreId, int extend) {
         return getScoreHighlight(String.valueOf(scoreId), extend);
     }
@@ -966,6 +991,28 @@ public class APIHelper {
         }
     }
 
+    public static RenderStat cancelReplayRender(String jobId) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/replays/" + jobId + "/cancel"))
+                    .POST(HttpRequest.BodyPublishers.noBody())
+                    .build();
+
+            HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            if (codeNotOk(response.statusCode())) {
+                throw parseHttpError(response.body(), response.statusCode(), "取消回放渲染失败");
+            }
+            RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
+            ensureApiSuccess(payload, "取消回放渲染失败");
+            return GSON.fromJson(requireDataObject(payload, "取消回放渲染响应缺少data"), RenderStat.class);
+        } catch (IOException e) {
+            throw requestFailure(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Replay cancellation request interrupted", e);
+        }
+    }
+
     public static ServerStatus getServerStatus() {
         boolean oStella = false;
         boolean osu = false;
@@ -1172,6 +1219,7 @@ public class APIHelper {
     }
 
     public record ReplayRenderResult(String videoUrl, String taskId, FileInfo qqFile) {
+        @SuppressWarnings("unused")
         public ReplayRenderResult(String videoUrl, String taskId) {
             this(videoUrl, taskId, null);
         }

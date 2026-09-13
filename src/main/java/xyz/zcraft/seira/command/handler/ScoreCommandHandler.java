@@ -11,12 +11,15 @@ import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.data.UserRef;
 
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static xyz.zcraft.seira.command.TargetHistory.Type.SCORE;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class ScoreCommandHandler {
     private static final int MAX_SCORE_LIST_COUNT = 200;
+    private static final Pattern SCORE_LIST_RANGE_PATTERN = Pattern.compile("^(\\d+)(?:-(\\d+))?$");
 
     private final Resolver resolver;
     private final TargetHistory history;
@@ -58,7 +61,7 @@ public final class ScoreCommandHandler {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
                 return;
             }
-            try (var timing = taskCoordinator.beginRequest(ctx, "Score")) {
+            try (var _ = taskCoordinator.beginRequest(ctx, "Score")) {
                 var ids = history.resolve(ctx, SCORE, new TargetResolution(target, 0));
                 history.remember(ctx, ids);
                 String scoreId = ids.scoreId();
@@ -80,8 +83,13 @@ public final class ScoreCommandHandler {
 
         ScoreListRequest request = parseScoreListRequest(ctx, CommandUsage.BP);
         if (request == null) return;
-        try (var timing = taskCoordinator.beginRequest(ctx, "Best Scores")) {
-            var response = APIHelper.getBoNResponse(request.count(), request.userRef(), request.filters());
+        try (var _ = taskCoordinator.beginRequest(ctx, "Best Scores")) {
+            var response = APIHelper.getBoNResponse(
+                    request.range().end(),
+                    request.range().start(),
+                    request.userRef(),
+                    request.filters()
+            );
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.bpMessage(ctx, response)));
         }
     }
@@ -93,7 +101,7 @@ public final class ScoreCommandHandler {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
                 return;
             }
-            try (var timing = taskCoordinator.beginRequest(ctx, "Score")) {
+            try (var _ = taskCoordinator.beginRequest(ctx, "Score")) {
                 var ids = history.resolve(ctx, SCORE, new TargetResolution(target, 0));
                 history.remember(ctx, ids);
                 String scoreId = ids.scoreId();
@@ -115,8 +123,14 @@ public final class ScoreCommandHandler {
 
         ScoreListRequest request = parseScoreListRequest(ctx, CommandUsage.RS);
         if (request == null) return;
-        try (var timing = taskCoordinator.beginRequest(ctx, "Recent Score")) {
-            var response = APIHelper.getRecentResponse(request.count(), request.userRef(), includeFail, request.filters());
+        try (var _ = taskCoordinator.beginRequest(ctx, "Recent Score")) {
+            var response = APIHelper.getRecentResponse(
+                    request.range().end(),
+                    request.range().start(),
+                    request.userRef(),
+                    includeFail,
+                    request.filters()
+            );
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.rsMessage(ctx, response)));
         }
     }
@@ -150,7 +164,7 @@ public final class ScoreCommandHandler {
         }
 
         UserRef target = userRef;
-        try (var timing = taskCoordinator.beginRequest(ctx, "Recent Best Scores")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "Recent Best Scores")) {
             var response = APIHelper.getTodayBestResponse(target, request.days());
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.tbMessage(ctx, response)));
         }
@@ -186,7 +200,7 @@ public final class ScoreCommandHandler {
         }
 
         ShortcutTarget target = new ShortcutTarget(null, targetUser, macroType, 1L, null);
-        try (var timing = taskCoordinator.beginRequest(ctx, "Score")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "Score")) {
             var ids = history.resolve(ctx, SCORE, new TargetResolution(target, 0), filters.filters(), null);
             history.remember(ctx, ids);
             String scoreId = ids.scoreId();
@@ -197,9 +211,10 @@ public final class ScoreCommandHandler {
 
     private ScoreListRequest parseScoreListRequest(Context ctx, String usage) {
         String[] args = ctx.args();
-        Integer count = resolver.parsePositiveInt(args[0]);
-        if (count == null || count > MAX_SCORE_LIST_COUNT) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + usage + "\n数量必须在 1 到 " + MAX_SCORE_LIST_COUNT + " 之间。"));
+        ScoreListRange range = parseScoreListRange(args[0]);
+        if (range == null) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + usage
+                    + "\n数量或范围必须在 1 到 " + MAX_SCORE_LIST_COUNT + " 之间，且范围起点不能大于终点。"));
             return null;
         }
 
@@ -231,7 +246,22 @@ public final class ScoreCommandHandler {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + filters.errorMessage() + "\n" + CommandUsage.SCORE_FILTERS));
             return null;
         }
-        return new ScoreListRequest(count, userRef, filters.filters());
+        return new ScoreListRequest(range, userRef, filters.filters());
+    }
+
+    static ScoreListRange parseScoreListRange(String value) {
+        Matcher matcher = SCORE_LIST_RANGE_PATTERN.matcher(value);
+        if (!matcher.matches()) return null;
+        try {
+            int first = Integer.parseInt(matcher.group(1));
+            String endGroup = matcher.group(2);
+            int start = endGroup == null ? 1 : first;
+            int end = endGroup == null ? first : Integer.parseInt(endGroup);
+            if (start <= 0 || start > end || end > MAX_SCORE_LIST_COUNT) return null;
+            return new ScoreListRange(start, end);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     public void handleS(Context ctx) {
@@ -248,7 +278,7 @@ public final class ScoreCommandHandler {
             }
             filters = parsed.filters();
         }
-        try (var timing = taskCoordinator.beginRequest(ctx, "Score")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "Score")) {
             var ids = history.resolve(ctx, SCORE, target, filters, mod);
             history.remember(ctx, ids);
             var response = APIHelper.getScoreResponse(ids.scoreId());
@@ -264,7 +294,7 @@ public final class ScoreCommandHandler {
     public void handleSa(Context ctx) {
         var target = history.parseArguments(ctx, CommandUsage.SA, 0);
         if (target == null) return;
-        try (var timing = taskCoordinator.beginRequest(ctx, "Score Analysis")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "Score Analysis")) {
             var ids = history.resolve(ctx, SCORE, target);
             history.remember(ctx, ids);
             String scoreId = ids.scoreId();
@@ -283,7 +313,7 @@ public final class ScoreCommandHandler {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.MA));
                 return;
             }
-            try (var timing = taskCoordinator.beginRequest(ctx, "Miss Visualize")) {
+            try (var _ = taskCoordinator.beginRequest(ctx, "Miss Visualize")) {
                 var ids = history.resolve(ctx, SCORE, target);
                 history.remember(ctx, ids);
                 String scoreId = ids.scoreId();
@@ -292,7 +322,7 @@ public final class ScoreCommandHandler {
             }
             return;
         }
-        try (var timing = taskCoordinator.beginRequest(ctx, "Get Score Misses")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "Get Score Misses")) {
             var ids = history.resolve(ctx, SCORE, target);
             history.remember(ctx, ids);
             String scoreId = ids.scoreId();
@@ -314,7 +344,10 @@ public final class ScoreCommandHandler {
     record TbArguments(int days, String target) {
     }
 
-    private record ScoreListRequest(int count, UserRef userRef, java.util.List<String> filters) {
+    record ScoreListRange(int start, int end) {
+    }
+
+    private record ScoreListRequest(ScoreListRange range, UserRef userRef, java.util.List<String> filters) {
     }
 
 }

@@ -22,13 +22,24 @@ public final class Resolver {
     }
 
     public String sanitize(String rawContent) {
-        Matcher matcher = Patterns.USER_MACRO_PATTERN.matcher(rawContent);
-        if (matcher.matches()) {
-            rawContent = "s " + rawContent;
-        }
-
-        // Add surrounding space to <@>
+        // Add surrounding space to <@> before expanding compact commands so /bp5<@...> is recognized.
         rawContent = Patterns.QQ_INLINE_AT_PATTERN.matcher(rawContent).replaceAll(r -> " " + r.group() + " ");
+
+        Matcher matcher = Patterns.COMPACT_SCORE_COMMAND_PATTERN.matcher(rawContent);
+        if (matcher.find()) {
+            String type = matcher.group(1).toLowerCase(Locale.ROOT);
+            String start = matcher.group(2);
+            String end = matcher.group(3);
+            String remaining = rawContent.substring(matcher.end());
+            if (end == null) {
+                String player = remaining.trim();
+                rawContent = player.isEmpty()
+                        ? "s " + type + start
+                        : "s " + player + " " + type + start;
+            } else {
+                rawContent = type + " " + start + "-" + end + remaining;
+            }
+        }
 
         return rawContent;
     }
@@ -301,6 +312,9 @@ public final class Resolver {
 
     private static final class Patterns {
         private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo|rp|bp)(\\d+)?$");
+        private static final Pattern COMPACT_SCORE_COMMAND_PATTERN = Pattern.compile(
+                "(?i)^(rs|rp|bp)(\\d+)(?:-(\\d+))?(?=\\s|$)"
+        );
         private static final Pattern SET_MACRO_PATTERN = Pattern.compile("^(\\d+)#(\\d+)$");
         private static final Pattern BEATMAP_MACRO_PATTERN = Pattern.compile("^m(\\d+)$");
         private static final Pattern LOCAL_SCORE_PATTERN = Pattern.compile("(?i)^loc[1-9]\\d*$");

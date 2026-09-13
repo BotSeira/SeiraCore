@@ -15,6 +15,9 @@ import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.data.SendResult;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
+import java.util.Objects;
+import java.util.UUID;
+
 import static xyz.zcraft.seira.command.TargetHistory.Type.BEATMAP;
 import static xyz.zcraft.seira.command.TargetHistory.Type.SCORE;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
@@ -193,6 +196,38 @@ public final class ReplayCommandHandler {
         }
 
         ctx.sendReply(replyFactory.replayStatMessage(ctx, jobId, APIHelper.getRenderStat(jobId)));
+    }
+
+    public void handleRcancel(Context ctx) {
+        if (ctx.args().length != 1) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.RCANCEL));
+            return;
+        }
+
+        String jobId = ctx.args()[0];
+        try {
+            if (!UUID.fromString(jobId).toString().equalsIgnoreCase(jobId)) {
+                throw new IllegalArgumentException("Non-canonical UUID");
+            }
+        } catch (IllegalArgumentException e) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "渲染任务 ID 格式无效。\n" + CommandUsage.RCANCEL));
+            return;
+        }
+
+        var result = APIHelper.cancelReplayRender(jobId);
+        String status = Objects.toString(result.getStatus(), "unknown").toLowerCase();
+        String message = switch (status) {
+            case "canceled" -> "回放渲染已取消。";
+            case "done" -> "该回放已经渲染完成，无法取消。";
+            case "failed" -> "该回放渲染已经失败，无需取消。";
+            case "timeout" -> "该回放渲染已经超时，无需取消。";
+            default -> "该回放当前状态为 `" + status + "`，无法取消。";
+        };
+        if ("canceled".equals(status)) {
+            replayResults.remove(jobId);
+            videoRenderRecord.removeRenderTask(ctx.senderUserId(), jobId);
+        }
+        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + message));
     }
 
 }

@@ -17,7 +17,12 @@ public class VideoRenderRecord {
         return renderRecord.get(uid);
     }
 
+    @SuppressWarnings("unused")
     public void removeRenderTask(String uid) {
         renderRecord.remove(uid);
+    }
+
+    public void removeRenderTask(String uid, String jobId) {
+        renderRecord.remove(uid, jobId);
     }
 }

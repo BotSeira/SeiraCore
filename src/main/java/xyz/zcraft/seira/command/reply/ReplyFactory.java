@@ -70,6 +70,7 @@ public final class ReplyFactory {
         return cmd("/ms " + id, String.valueOf(id));
     }
 
+    @SuppressWarnings("unused")
     public static String u(String id, String name) {
         return cmd("/u " + id, name);
     }
@@ -300,8 +301,12 @@ public final class ReplyFactory {
     public PendingMessage replayStatMessage(Context ctx, String jobId, RenderStat renderStat) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.replayStatContent(ctx, renderStat, jobId),
-                buttons().replayProgressButtons(jobId)
+                buttons().replayProgressButtons(jobId, isCancelableReplayStatus(renderStat.getStatus()))
         );
+    }
+
+    private static boolean isCancelableReplayStatus(String status) {
+        return "queued".equals(status) || "rendering".equals(status) || "uploading".equals(status);
     }
 
     public PendingMessage searchMessage(Context ctx, Response<List<SearchResultItem>> response, SearchQuery searchQuery) {
@@ -520,6 +525,7 @@ public final class ReplyFactory {
                 case "queued" -> "排队中";
                 case "rendering" -> "渲染中";
                 case "uploading" -> "上传中";
+                case "canceled" -> "已取消";
                 default -> "未知";
             }).append("\n");
 
@@ -723,6 +729,7 @@ public final class ReplyFactory {
                             > /bma <谱面ID或快捷查询> [Mod] - 分析谱面PP构成和类型
                             > /ms <谱面集ID或快捷查询> - 获取谱面集
                             > /r [成绩ID或快捷查询] [[mm:ss]-[mm:ss]] - 生成成绩高光视频或指定片段
+                            > /rcancel <任务ID> - 取消回放渲染任务
                             > /rg <start/group/#Rank/end/wish/stats [all]> - 猜 Rank 游戏与个人战绩
                             > /lb <谱面ID> [玩家ID列表] - 获取指定谱面排行榜
                             > /watch add <玩家ID/用户名/@用户> [分钟] - 监视群友的新成绩
@@ -911,13 +918,20 @@ public final class ReplyFactory {
         }
 
         List<List<Button>> replayProgressButtons(String jobId) {
+            return replayProgressButtons(jobId, true);
+        }
+
+        List<List<Button>> replayProgressButtons(String jobId, boolean cancelable) {
             if (jobId == null || jobId.isBlank()) {
                 return null;
             }
 
-            return Button.keyboard(Button.row(
-                    Button.command(1, "查询渲染进度", "/rstat " + jobId)
-            ));
+            return Button.keyboard(cancelable
+                    ? Button.row(
+                            Button.command(1, "查询渲染进度", "/rstat " + jobId),
+                            Button.command(2, "取消渲染", "/rcancel " + jobId)
+                    )
+                    : Button.row(Button.command(1, "查询渲染进度", "/rstat " + jobId)));
         }
 
         List<List<Button>> beatmapButtons(String beatmapId) {
