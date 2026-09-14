@@ -195,7 +195,6 @@ public record Round(long userId, long scoreId, int bestIndex, long actualRank, D
         LinkedList<RankGuessGame.Hint> hints = new LinkedList<>();
 
         final UserExtended user = this.randomScore.user();
-        final Score score = this.randomScore.score();
 
         final UserExtended.Team team = user.getTeam();
         if (team != null && team.getName() != null && team.getShortName() != null) {
@@ -248,7 +247,7 @@ public record Round(long userId, long scoreId, int bestIndex, long actualRank, D
         if (!features.isEmpty()) {
             Collections.shuffle(features);
 
-            for (int i = 0; i < Math.min(features.size(), 3); i++) {
+            for (int i = 0; i < Math.min(features.size(), 4); i++) {
                 final String s = features.get(i);
                 hints.add(new RankGuessGame.Hint(
                         "该玩家用户名" + s,

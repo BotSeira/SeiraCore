@@ -580,11 +580,6 @@ public final class RankGuessCommandHandler {
                     return;
                 }
 
-                boolean hasExactGuess = game.getGuesses().values().stream()
-                        .anyMatch(guess ->
-                                guess.rank() == game.getRound().actualRank()
-                        );
-
                 boolean hasOutstandingGuess = game.getGuesses()
                         .values()
                         .stream()

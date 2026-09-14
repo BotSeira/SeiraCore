@@ -27,21 +27,9 @@ public final class RankGuessGameService {
     private final Consumer<FinishedRound> recordWriter;
 
     public RankGuessGameService() {
-        this(Clock.systemUTC());
-    }
-
-    RankGuessGameService(Clock clock) {
-        this(clock, new RankGuessWeights());
-    }
-
-    RankGuessGameService(Clock clock, RankGuessWeights weights) {
-        this(clock, weights, RankGuessRecordStore::save);
-    }
-
-    RankGuessGameService(Clock clock, RankGuessWeights weights, Consumer<FinishedRound> recordWriter) {
-        this.clock = clock;
-        this.weights = weights;
-        this.recordWriter = Objects.requireNonNull(recordWriter);
+        this.clock = Clock.systemUTC();
+        this.weights = new RankGuessWeights();
+        this.recordWriter = RankGuessRecordStore::save;
     }
 
     static double logarithmicError(long guess, long actualRank) {
@@ -107,10 +95,12 @@ public final class RankGuessGameService {
         final int leftBracket = username.indexOf("[");
         final int rightBracket = username.indexOf("]");
         if (username.contains("[") && username.contains("]") && leftBracket < rightBracket) {
-            if (leftBracket == 0 && rightBracket == username.length() - 1) {
-                // [Example]
-                features.add("被[]包裹");
-            } else if (leftBracket == 0 && rightBracket < username.length() - 1) {
+//            if (leftBracket == 0 && rightBracket == username.length() - 1) {
+//                // [Example]
+//                features.add("被[]包裹");
+//            }
+
+            if (leftBracket == 0 && rightBracket < username.length() - 1) {
                 // [Prefix]Example
                 final String prefix = username.substring(0, rightBracket + 1);
                 features.add("有前缀" + prefix);
