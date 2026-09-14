@@ -119,7 +119,7 @@ public final class RankGuessGame {
             STRONG(0.020),
             VERY_STRONG(0.030),
             REVEALING(0.040),
-            SPECIAL(0.035);
+            SPECIAL(0.040);
 
             private final double penalty;
 
