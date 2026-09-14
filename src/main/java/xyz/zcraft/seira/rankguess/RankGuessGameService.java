@@ -99,7 +99,7 @@ public final class RankGuessGameService {
 
     public static List<String> getUsernameFeature(String username) {
         if (username == null || username.isBlank()) {
-            return null;
+            return List.of();
         }
 
         final List<String> features = new ArrayList<>();
@@ -121,10 +121,14 @@ public final class RankGuessGameService {
             features.add("首尾一样");
         }
 
-        if (Objects.equals(username, username.toUpperCase())) {
-            features.add("为全大写");
-        } else if (Objects.equals(username, username.toLowerCase())) {
-            features.add("为全小写");
+
+        boolean hasLetter = username.chars().anyMatch(Character::isLetter);
+        if (hasLetter) {
+            if (Objects.equals(username, username.toUpperCase())) {
+                features.add("为全大写");
+            } else if (Objects.equals(username, username.toLowerCase())) {
+                features.add("为全小写");
+            }
         }
 
         features.add("长度为" + username.length());
