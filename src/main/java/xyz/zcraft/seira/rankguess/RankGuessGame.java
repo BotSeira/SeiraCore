@@ -108,7 +108,8 @@ public final class RankGuessGame {
             TARGET_SCORE,
             DIFFICULTY,
             PLAYSTYLE,
-            HISTORY
+            HISTORY,
+            USER
         }
 
         public enum HintStrength {
@@ -117,7 +118,8 @@ public final class RankGuessGame {
             MEDIUM(0.015),
             STRONG(0.020),
             VERY_STRONG(0.030),
-            REVEALING(0.040);
+            REVEALING(0.040),
+            SPECIAL(0.035);
 
             private final double penalty;
 

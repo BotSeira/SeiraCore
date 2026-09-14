@@ -530,7 +530,16 @@ public final class RankGuessCommandHandler {
                 result.append("\n").append("__Tip: 这是一位群友的成绩喵~__").append("\n");
             }
 
-            var hints = HintUtil.prepareHints(round.getNormalHints(), 4);
+            final List<RankGuessGame.Hint> hintSource = new ArrayList<>(20);
+            int maxHintCount = 4;
+
+            hintSource.addAll(round.getNormalHints());
+
+            if (fromGroup) {
+                hintSource.addAll(round.getGroupHints());
+            }
+
+            var hints = HintUtil.prepareHints(hintSource, maxHintCount);
 
             if (!activeMessageEnabled) {
                 result.append("\n").append("> 提示: ");

@@ -114,6 +114,11 @@ public final class ReplyFactory {
         );
     }
 
+    private static boolean isCancelableReplayStatus(String status) {
+        return "queued".equals(status) || "rendering".equals(status)
+                || "upload_queued".equals(status) || "uploading".equals(status);
+    }
+
     private Buttons buttons() {
         return new Buttons(configSupplier.get().seira().directUrl());
     }
@@ -294,20 +299,15 @@ public final class ReplyFactory {
     public PendingMessage replayMessage(Context ctx, APIHelper.ReplayTaskInfo taskInfo) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.replayTaskContent(ctx, taskInfo),
-                buttons().replayProgressButtons(taskInfo.taskId())
+                buttons().replayProgressButtons(taskInfo.taskId(), ctx.senderUserId())
         );
     }
 
     public PendingMessage replayStatMessage(Context ctx, String jobId, RenderStat renderStat) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.replayStatContent(ctx, renderStat, jobId),
-                buttons().replayProgressButtons(jobId, isCancelableReplayStatus(renderStat.getStatus()))
+                buttons().replayProgressButtons(jobId, isCancelableReplayStatus(renderStat.getStatus()), ctx.senderUserId())
         );
-    }
-
-    private static boolean isCancelableReplayStatus(String status) {
-        return "queued".equals(status) || "rendering".equals(status)
-                || "upload_queued".equals(status) || "uploading".equals(status);
     }
 
     public PendingMessage searchMessage(Context ctx, Response<List<SearchResultItem>> response, SearchQuery searchQuery) {
@@ -919,20 +919,20 @@ public final class ReplyFactory {
             ));
         }
 
-        List<List<Button>> replayProgressButtons(String jobId) {
-            return replayProgressButtons(jobId, true);
+        List<List<Button>> replayProgressButtons(String jobId, String userId) {
+            return replayProgressButtons(jobId, true, userId);
         }
 
-        List<List<Button>> replayProgressButtons(String jobId, boolean cancelable) {
+        List<List<Button>> replayProgressButtons(String jobId, boolean cancelable, String userId) {
             if (jobId == null || jobId.isBlank()) {
                 return null;
             }
 
             return Button.keyboard(cancelable
                     ? Button.row(
-                            Button.command(1, "查询渲染进度", "/rstat " + jobId),
-                            Button.command(2, "取消渲染", "/rcancel " + jobId)
-                    )
+                    Button.command(1, "查询渲染进度", "/rstat " + jobId),
+                    Button.command(2, "取消渲染", "/rcancel " + jobId).permit(userId)
+            )
                     : Button.row(Button.command(1, "查询渲染进度", "/rstat " + jobId)));
         }
 

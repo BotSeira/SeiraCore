@@ -10,6 +10,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 import static xyz.zcraft.seira.rankguess.RankGuessGame.COPY_PUNISHMENT_THRESHOLD;
 
@@ -18,6 +19,8 @@ public final class RankGuessGameService {
     public static final int MIN_GAMES_TO_RANK = 5;
     private static final Duration END_PROTECTION_DURATION = Duration.ofMinutes(3);
     private static final int MIN_PARTICIPANT_TO_RECORD = 3;
+    private static final Pattern SUFFIX_NUMBER_PATTERN = Pattern.compile("^[A-Za-z\\-_ ]+\\d+$");
+    private static final Pattern PREFIX_NUMBER_PATTERN = Pattern.compile("^\\d+[A-Za-z\\-_ ]+$");
     private final Map<String, RankGuessGame> games = new HashMap<>();
     private final RankGuessWeights weights;
     private final Clock clock;
@@ -92,6 +95,59 @@ public final class RankGuessGameService {
         allowedDifference *= participantFactor * hintFactor;
 
         return Math.abs(guess - actualRank) <= allowedDifference;
+    }
+
+    public static List<String> getUsernameFeature(String username) {
+        if (username == null || username.isBlank()) {
+            return null;
+        }
+
+        final List<String> features = new ArrayList<>();
+
+        final int leftBracket = username.indexOf("[");
+        final int rightBracket = username.indexOf("]");
+        if (username.contains("[") && username.contains("]") && leftBracket < rightBracket) {
+            if (leftBracket == 0 && rightBracket == username.length() - 1) {
+                // [Example]
+                features.add("被[]包裹");
+            } else if (leftBracket == 0 && rightBracket < username.length() - 1) {
+                // [Prefix]Example
+                final String prefix = username.substring(0, rightBracket + 1);
+                features.add("有前缀" + prefix);
+            }
+        }
+
+        if (username.charAt(0) == username.charAt(username.length() - 1)) {
+            features.add("首尾一样");
+        }
+
+        if (Objects.equals(username, username.toUpperCase())) {
+            features.add("为全大写");
+        } else if (Objects.equals(username, username.toLowerCase())) {
+            features.add("为全小写");
+        }
+
+        features.add("长度为" + username.length());
+
+        if (username.contains(" ")) {
+            features.add("有空格");
+        }
+
+        if (username.contains("_")) {
+            features.add("有下划线(_)");
+        }
+
+        if (username.contains("-")) {
+            features.add("有横杠(-)");
+        }
+
+        if (PREFIX_NUMBER_PATTERN.matcher(username).matches()) {
+            features.add("是一串数字一串字母");
+        } else if (SUFFIX_NUMBER_PATTERN.matcher(username).matches()) {
+            features.add("是一串字母一串数字");
+        }
+
+        return features;
     }
 
     public void saveWeights() {

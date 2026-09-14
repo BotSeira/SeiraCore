@@ -6,10 +6,13 @@ import xyz.zcraft.seira.api.data.RandomScore;
 import xyz.zcraft.seira.rankguess.RankGuessGame;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedList;
+import java.util.List;
 
-public record Round(long userId, long scoreId, int bestIndex, long actualRank, Double pp, RandomScore randomScore,
-                    boolean standard) {
+public record Round(long userId, long scoreId, int bestIndex, long actualRank, Double pp,
+                    RandomScore randomScore, boolean standard) {
     public Round {
         if (userId <= 0 || scoreId <= 0 || actualRank <= 0) {
             throw new IllegalArgumentException("Rank Guess 数据必须包含有效的用户、成绩和排名");
@@ -183,6 +186,77 @@ public record Round(long userId, long scoreId, int bestIndex, long actualRank, D
                     RankGuessGame.Hint.HintCategory.ACTIVITY,
                     RankGuessGame.Hint.HintStrength.WEAK
             ));
+        }
+
+        return hints;
+    }
+
+    public LinkedList<RankGuessGame.Hint> getGroupHints() {
+        LinkedList<RankGuessGame.Hint> hints = new LinkedList<>();
+
+        final UserExtended user = this.randomScore.user();
+        final Score score = this.randomScore.score();
+
+        final UserExtended.Team team = user.getTeam();
+        if (team != null && team.getName() != null && team.getShortName() != null) {
+            hints.add(new RankGuessGame.Hint(
+                    "该玩家所处的队伍缩写为 `%s`".formatted(team.getShortName()),
+                    "玩家队伍缩写",
+                    RankGuessGame.Hint.HintCategory.USER,
+                    RankGuessGame.Hint.HintStrength.SPECIAL
+            ));
+        }
+
+        if (user.getHasSupported()) {
+            hints.add(new RankGuessGame.Hint(
+                    "该玩家是尊贵的撒泼特！",
+                    "支持者状态",
+                    RankGuessGame.Hint.HintCategory.USER,
+                    RankGuessGame.Hint.HintStrength.SPECIAL
+            ));
+        }
+
+        if (user.getInterests() != null && !user.getInterests().isBlank()) {
+            hints.add(new RankGuessGame.Hint(
+                    "该玩家填写的兴趣爱好为 `%s`".formatted(user.getInterests()),
+                    "玩家自述兴趣",
+                    RankGuessGame.Hint.HintCategory.USER,
+                    RankGuessGame.Hint.HintStrength.SPECIAL
+            ));
+        }
+
+        if (user.getLocation() != null && !user.getLocation().isBlank()) {
+            hints.add(new RankGuessGame.Hint(
+                    "该玩家填写的位置为 `%s`".formatted(user.getLocation()),
+                    "玩家自述位置",
+                    RankGuessGame.Hint.HintCategory.USER,
+                    RankGuessGame.Hint.HintStrength.SPECIAL
+            ));
+        }
+
+        if (user.getOccupation() != null && !user.getOccupation().isBlank()) {
+            hints.add(new RankGuessGame.Hint(
+                    "该玩家填写的职业为 `%s`".formatted(user.getOccupation()),
+                    "玩家自述职业",
+                    RankGuessGame.Hint.HintCategory.USER,
+                    RankGuessGame.Hint.HintStrength.SPECIAL
+            ));
+        }
+
+        final List<String> features = new ArrayList<>(RankGuessGameService.getUsernameFeature(user.getUsername()));
+
+        if (!features.isEmpty()) {
+            Collections.shuffle(features);
+
+            for (int i = 0; i < Math.min(features.size(), 3); i++) {
+                final String s = features.get(i);
+                hints.add(new RankGuessGame.Hint(
+                        "该玩家用户名" + s,
+                        "用户名特征",
+                        RankGuessGame.Hint.HintCategory.USER,
+                        RankGuessGame.Hint.HintStrength.SPECIAL
+                ));
+            }
         }
 
         return hints;
