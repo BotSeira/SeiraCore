@@ -120,8 +120,8 @@ public final class ReplyFactory {
     }
 
     public PendingMessage friendStatusMessage(String selfOpenId, Long selfUid, String selfUsername,
-                                                     String targetOpenId, Long targetUid, String targetUsername,
-                                                     boolean selfFollowed, boolean targetFollowed) {
+                                              String targetOpenId, Long targetUid, String targetUsername,
+                                              boolean selfFollowed, Boolean targetFollowed) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.friendStatusContent(
                         selfOpenId, selfUid, selfUsername,
@@ -786,16 +786,24 @@ public final class ReplyFactory {
 
         public static String friendStatusContent(String selfOpenId, Long selfUid, String selfUsername,
                                                  String targetOpenId, Long targetUid, String targetUsername,
-                                                 boolean selfFollowed, boolean targetFollowed, String directUrl) {
+                                                 boolean selfFollowed, Boolean targetFollowed, String directUrl) {
             final String status;
-            if (selfFollowed && targetFollowed) {
-                status = "↑ 好友 ↓";
-            } else if (selfFollowed) {
-                status = "✕ 单向 ↓";
-            } else if (targetFollowed) {
-                status = "↑ 单向 ✕";
+            if (targetFollowed == null) {
+                if (selfFollowed) {
+                    status = "? 未知 ↓";
+                } else {
+                    status = "? 未知 ✕";
+                }
             } else {
-                status = "✕ 路人 ✕";
+                if (selfFollowed && targetFollowed) {
+                    status = "↑ 好友 ↓";
+                } else if (selfFollowed) {
+                    status = "✕ 单向 ↓";
+                } else if (targetFollowed) {
+                    status = "↑ 单向 ✕";
+                } else {
+                    status = "✕ 路人 ✕";
+                }
             }
             return "好友状态" + "\n" +
                     at(selfOpenId) + "\n" +

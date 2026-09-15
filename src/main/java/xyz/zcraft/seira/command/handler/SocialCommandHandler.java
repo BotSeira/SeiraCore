@@ -18,6 +18,7 @@ import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -93,28 +94,36 @@ public final class SocialCommandHandler {
             return;
         }
 
+        boolean selfFollowed;
+        final AtomicReference<Boolean> targetFollowed = new AtomicReference<>();
+
         final OsuToken self = authHelper.updateTokenAndGet(ctx.senderUserId());
         final List<FriendEntry> selfFollowedList = APIHelper.getFollowed(self.accessToken()).getContent();
         updateFriends(selfId, selfFollowedList);
+        final Set<User> users = new HashSet<>(selfFollowedList.stream().map(FriendEntry::user).toList());
 
-        final OsuToken target = authHelper.updateTokenAndGet(s);
-        final List<FriendEntry> targetFollowedList = APIHelper.getFollowed(target.accessToken()).getContent();
-        updateFriends(targetId, targetFollowedList);
+        selfFollowed = selfFollowedList.stream().anyMatch(e -> e.user().getId() == targetId);
 
-        final Set<User> users = new HashSet<>(selfFollowedList.size() + targetFollowedList.size());
+        selfFollowedList.stream().filter(e -> e.user().getId() == targetId).findFirst().ifPresentOrElse(
+                e -> targetFollowed.set(e.mutual()), () -> {}
+        );
 
-        users.addAll(selfFollowedList.stream().map(FriendEntry::user).toList());
-        users.addAll(targetFollowedList.stream().map(FriendEntry::user).toList());
+        if (targetFollowed.get() == null) {
+            final List<FriendEntry> targetFollowedList;
+            final OsuToken target = authHelper.updateTokenAndGet(s);
+            if (target != null) {
+                targetFollowedList = APIHelper.getFollowed(target.accessToken()).getContent();
+                targetFollowed.set(targetFollowedList.stream().anyMatch(e -> e.user().getId() == selfId));
+                users.addAll(targetFollowedList.stream().map(FriendEntry::user).toList());
+            }
+        }
 
         UserDataStore.storeUserInfo(users);
-
-        final boolean selfFollowed = selfFollowedList.stream().anyMatch(e -> e.user().getId() == targetId);
-        final boolean targetFollowed = targetFollowedList.stream().anyMatch(e -> e.user().getId() == selfId);
 
         ctx.sendReply(replyFactory.friendStatusMessage(
                         ctx.senderUserId(), selfId, UserDataStore.findUsername(selfId).orElse("未知"),
                         s, targetId, UserDataStore.findUsername(targetId).orElse("未知"),
-                        selfFollowed, targetFollowed
+                        selfFollowed, targetFollowed.get()
                 )
         );
     }
@@ -131,8 +140,7 @@ public final class SocialCommandHandler {
         try (var _ = taskCoordinator.beginRequest(ctx, "Friend List")) {
             final Response<UserExtended> self = APIHelper.getSelf(token.accessToken());
             final Response<List<FriendEntry>> response = APIHelper.getFollowed(token.accessToken());
-            final List<FriendEntry> content = response.getContent();
-            final List<Long> ids = content.stream().map(e -> e.user().getId()).toList();
+            final List<FriendEntry> friendEntries = response.getContent();
 
             final Predicate<Long> filter;
             if (ctx.inGroup() && !all) {
@@ -147,7 +155,7 @@ public final class SocialCommandHandler {
                     .map(FriendEntry::user)
                     .toList());
 
-            updateFriends(uid, content);
+            updateFriends(uid, friendEntries);
 
             final List<Long> follower = UserDataStore.findFollower(uid);
 
@@ -155,7 +163,7 @@ public final class SocialCommandHandler {
             final List<User> onlyFollowed = new LinkedList<>();
             final List<User> onlyFollower = new LinkedList<>();
 
-            for (FriendEntry e : content) {
+            for (FriendEntry e : friendEntries) {
                 if (!filter.test(e.user().getId())) continue;
                 if (follower.contains(e.user().getId())) {
                     mutual.add(e.user());
@@ -166,7 +174,7 @@ public final class SocialCommandHandler {
 
             for (Long i : follower) {
                 if (!filter.test(i)) continue;
-                if (content.stream().noneMatch(entry -> Objects.equals(entry.user().getId(), i))) {
+                if (friendEntries.stream().noneMatch(entry -> Objects.equals(entry.user().getId(), i))) {
                     User u = new User();
                     u.setId(i);
                     u.setUsername(UserDataStore.findUsername(i).orElse("未知-" + i));
@@ -174,7 +182,7 @@ public final class SocialCommandHandler {
                 }
             }
 
-            long allMutualCount = content.stream().filter(FriendEntry::mutual).count();
+            long allMutualCount = friendEntries.stream().filter(FriendEntry::mutual).count();
 
             final Comparator<User> userComparator = Comparator.comparing(User::isOnline, Comparator.reverseOrder()).thenComparing(User::getUsername);
             mutual.sort(userComparator);
@@ -182,7 +190,7 @@ public final class SocialCommandHandler {
             onlyFollowed.sort(userComparator);
 
             ctx.sendReply(replyFactory.friendMessage(
-                    ctx, all, self.getContent(), content.size(), allMutualCount,
+                    ctx, all, self.getContent(), friendEntries.size(), allMutualCount,
                     mutual, onlyFollowed, onlyFollower
             ));
         }
