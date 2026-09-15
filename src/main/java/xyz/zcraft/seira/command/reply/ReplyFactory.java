@@ -200,7 +200,8 @@ public final class ReplyFactory {
             RankGuessRecordStore.Statistics.Personal recentStatistics,
             boolean allGroups, Rank rank,
             Long pickedTimes, Long groupGameCount,
-            RankGuessRecordStore.RankGuessed rankGuessed
+            RankGuessRecordStore.RankGuessed rankGuessed,
+            Long gameStarted
     ) {
         String scope = allGroups ? "全部群聊" : "本群";
         if (statistics.participation() == 0) {
@@ -211,11 +212,15 @@ public final class ReplyFactory {
                 .formatted(Rank.RECENT_GAME_LIMIT, rank.rank());
         String groupCountText = "";
         String averageGuessedText = "";
+        String gameStartedText = "";
         if (!allGroups && pickedTimes != null && groupGameCount != null) {
             groupCountText = "> 被猜次数：`%d`，占本群：`%.3f%%`\n".formatted(pickedTimes, (double) pickedTimes / groupGameCount * 100);
         }
         if (!allGroups && rankGuessed != null) {
             averageGuessedText = "> 平均被猜为：`#%,d` / `#%,d`\n".formatted((long) rankGuessed.average(), (long) rankGuessed.logAverage());
+        }
+        if (!allGroups && gameStarted != null) {
+            gameStartedText = "> 在本群发起了 `%d` 场游戏\n".formatted(gameStarted);
         }
         return PendingMessage.ofMarkdownRaw(at(ctx) + String.format(Locale.ROOT, """
                         %s的猜 Rank 战绩（%s，括号为近 %d 场）
@@ -228,7 +233,7 @@ public final class ReplyFactory {
                         > 最高分：`%.2f`（`%.2f`）
                         > 平均名次：`%.2f`（`%.2f`）
                         > 总得分：`%.2f`
-                        %s%s%s
+                        %s%s%s%s
                         """,
                 ref, scope, Rank.RECENT_GAME_LIMIT,
                 statistics.participation(), rank.rating(),
@@ -239,7 +244,7 @@ public final class ReplyFactory {
                 statistics.averageScore(), recentStatistics.averageScore(),
                 statistics.highestScore(), recentStatistics.highestScore(),
                 statistics.averagePlacement(), recentStatistics.averagePlacement(),
-                statistics.totalScore(), averageGuessedText, groupCountText, rankText).strip());
+                statistics.totalScore(), gameStartedText, averageGuessedText, groupCountText, rankText).strip());
     }
 
     public PendingMessage bpMessage(Context ctx, Response<?> response) {
@@ -444,6 +449,13 @@ public final class ReplyFactory {
         return PendingMessage.ofMarkdownRaw(
                 Contents.luckContent(ctx, luck, mapset, cover),
                 null
+        );
+    }
+
+    public PendingMessage missImageMessage(Context ctx, String scoreId, Integer index, int size) {
+        return PendingMessage.ofMarkdownRaw(
+                Contents.missImageContent(ctx, scoreId, index, size),
+                Buttons.missImageButton(ctx, scoreId, index, size)
         );
     }
 
@@ -810,9 +822,32 @@ public final class ReplyFactory {
                     "  " + status + "\n" +
                     url(targetUsername, "https://osu.ppy.sh/users/" + targetUid) + " (" + at(targetOpenId) + ")";
         }
+
+        public static String missImageContent(Context ctx, String scoreId, Integer index, int size) {
+            return at(ctx) + s(scoreId) + " - " + "Miss#" + index + "/" + size;
+        }
     }
 
     private record Buttons(String directUrl) {
+        public static List<List<Button>> missImageButton(Context ctx, String scoreId, Integer index, int size) {
+            List<Button> row = new ArrayList<>(3);
+            final Button prev = Button.command(1, "上一个", "/ma " + scoreId + " " + (index - 1));
+            if (index <= 1) {
+                prev.disable();
+            }
+
+            final Button center = Button.command(2, index + "/" + size, "").disable();
+
+            final Button next = Button.command(3, "下一个", "/ma " + scoreId + " " + (index + 1));
+            if (index >= size) {
+                next.disable();
+            }
+
+            row.addAll(List.of(prev, center, next));
+
+            return Button.keyboard(row);
+        }
+
         List<List<Button>> beatmapsetButtons(String beatmapsetId) {
             if (beatmapsetId == null || beatmapsetId.isBlank()) {
                 return null;

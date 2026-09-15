@@ -366,10 +366,11 @@ public final class RankGuessCommandHandler {
 
             Long groupGameCount = RankGuessRecordStore.getGroupGameCount(ctx.groupId(), null);
             Long pickedTimes = RankGuessRecordStore.getPickedTimes(boundUid, ctx.groupId());
+            Long gameStarted = RankGuessRecordStore.getGamesStarted(boundUid, ctx.groupId());
             RankGuessRecordStore.RankGuessed rankGuessed = RankGuessRecordStore.getAverageRankGuessed(boundUid, ctx.groupId());
 
             ctx.sendReply(replyFactory.rankGuessStatisticsMessage(
-                    ctx, ref, statistics, recentStatistics, allGroups, rank, pickedTimes, groupGameCount, rankGuessed
+                    ctx, ref, statistics, recentStatistics, allGroups, rank, pickedTimes, groupGameCount, rankGuessed, gameStarted
             ));
         } catch (RuntimeException e) {
             LOG.error("Failed to query rank guess statistics", e);

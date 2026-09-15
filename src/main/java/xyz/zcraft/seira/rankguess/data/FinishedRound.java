@@ -6,7 +6,7 @@ import java.util.UUID;
 
 public record FinishedRound(
         UUID id, String groupId, boolean fromGroup, Instant startedAt, Instant endedAt,
-        int scoringVersion, Round round, List<Standing> standings
+        int scoringVersion, Round round, List<Standing> standings, String starterOpenId
 ) {
     public FinishedRound {
         standings = List.copyOf(standings);

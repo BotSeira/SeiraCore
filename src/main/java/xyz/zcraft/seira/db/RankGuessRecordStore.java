@@ -19,8 +19,8 @@ public class RankGuessRecordStore {
         String gameSql = """
                 INSERT INTO rank_guess_games (
                     round_id, group_id, source_mode, target_user_id, target_score_id, actual_rank,
-                    started_at, ended_at, participant_count, scoring_version
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    started_at, ended_at, participant_count, scoring_version, starter_open_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(round_id) DO NOTHING
                 """;
         String resultSql = """
@@ -43,6 +43,7 @@ public class RankGuessRecordStore {
                     statement.setLong(8, finished.endedAt().toEpochMilli());
                     statement.setInt(9, finished.standings().size());
                     statement.setInt(10, finished.scoringVersion());
+                    statement.setString(11, finished.starterOpenId());
                     if (statement.executeUpdate() == 0) {
                         connection.rollback();
                         return false;
@@ -94,6 +95,26 @@ public class RankGuessRecordStore {
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Failed to query picked times", e);
+        }
+    }
+
+    public static long getGamesStarted(Long osuUid, String groupId) {
+        String sql = """
+                SELECT COUNT(*)
+                FROM rank_guess_games g
+                WHERE g.starter_open_id = ?
+                """;
+        if (groupId != null) sql += " AND g.group_id = ?";
+        try (Connection connection = SqliteDatabase.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, osuUid);
+            if (groupId != null) statement.setString(2, groupId);
+            try (ResultSet result = statement.executeQuery()) {
+                result.next();
+                return result.getLong(1);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to query games started", e);
         }
     }
 

@@ -318,8 +318,17 @@ public final class ScoreCommandHandler {
                 var ids = history.resolve(ctx, SCORE, target);
                 history.remember(ctx, ids);
                 String scoreId = ids.scoreId();
+                var misses = APIHelper.getScoreMissesResponse(scoreId).getContent();
+                if (misses.isEmpty()) {
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "本成绩没有Miss喵~"));
+                    return;
+                }
+                if (index <= 0 || index > misses.size()) {
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "Miss序号不在范围内喵(1~" + misses.size() + ")"));
+                    return;
+                }
                 var response = APIHelper.getMissVisualizeResponse(scoreId, index);
-                ctx.sendReply(taskCoordinator.imageMessage(response, null));
+                ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.missImageMessage(ctx, scoreId, index, misses.size())));
             }
             return;
         }

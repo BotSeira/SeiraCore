@@ -321,7 +321,7 @@ public final class RankGuessGameService {
 
         FinishedRound finished = new FinishedRound(
                 game.token, groupId, game.fromGroup, game.guessingStartedAt, clock.instant(),
-                SCORING_VERSION, game.round, standings
+                SCORING_VERSION, game.round, standings, game.starterUserId
         );
 
         EndResult.RankType rankType = EndResult.RankType.RANKED;
