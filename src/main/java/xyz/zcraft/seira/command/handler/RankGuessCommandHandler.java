@@ -37,7 +37,7 @@ public final class RankGuessCommandHandler {
     static final Logger LOG = LogManager.getLogger(RankGuessCommandHandler.class);
     static final Pattern RANGE_PATTERN = Pattern.compile("^(\\d+)-(\\d+)$");
     static final int MAX_LEADERBOARD_RANGE = 50;
-    private static final Pattern RANK_PATTERN = Pattern.compile("^#?(\\d+)[wk]?$");
+    private static final Pattern RANK_PATTERN = Pattern.compile("^#?(\\d+(?:\\.\\d+)?)[wk]?$");
     private static final ScheduledExecutorService SCHEDULER = Executors.newSingleThreadScheduledExecutor();
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
@@ -66,7 +66,7 @@ public final class RankGuessCommandHandler {
             return null;
         }
         try {
-            long base = Long.parseLong(matcher.group(1));
+            double base = Double.parseDouble(matcher.group(1));
             long multiplier = 1;
 
             if (argument.endsWith("w")) {
@@ -75,7 +75,13 @@ public final class RankGuessCommandHandler {
                 multiplier = 1000;
             }
 
-            return Math.multiplyExact(base, multiplier);
+            double result = multiplier * base;
+
+            if (!Double.isFinite(result)) {
+                throw new ArithmeticException("double overflow");
+            }
+
+            return (long) result;
         } catch (NumberFormatException | ArithmeticException _) {
             return null;
         }
