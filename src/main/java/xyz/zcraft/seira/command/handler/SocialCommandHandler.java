@@ -93,7 +93,6 @@ public final class SocialCommandHandler {
             return;
         }
 
-
         final OsuToken self = authHelper.updateTokenAndGet(ctx.senderUserId());
         final List<FriendEntry> selfFollowedList = APIHelper.getFollowed(self.accessToken()).getContent();
 

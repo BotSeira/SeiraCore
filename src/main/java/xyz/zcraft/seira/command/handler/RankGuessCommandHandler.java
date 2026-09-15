@@ -574,8 +574,6 @@ public final class RankGuessCommandHandler {
                     break;
                 }
 
-                firstHint = false;
-
                 if (game.isEnded()) {
                     return;
                 }
@@ -593,7 +591,7 @@ public final class RankGuessCommandHandler {
                                 )
                         );
 
-                if (hasOutstandingGuess) {
+                if (hasOutstandingGuess && !firstHint) {
                     String hintContent = "__猜Rank提示：__\n"
                             + "- 有人已经做出了非常精准的猜测！游戏将在 30 秒后结束喵~\n"
                             + hintString;
@@ -601,6 +599,8 @@ public final class RankGuessCommandHandler {
                     ctx.sendMessage(PendingMessage.ofMarkdownRaw(hintContent.trim()));
                     break;
                 }
+
+                firstHint = false;
 
                 final RankGuessGame.Hint hint = hints.removeFirst();
 

@@ -103,42 +103,42 @@ public final class RankGuessGameService {
             if (leftBracket == 0 && rightBracket < username.length() - 1) {
                 // [Prefix]Example
                 final String prefix = username.substring(0, rightBracket + 1);
-                features.add("有前缀" + prefix);
+                features.add("有前缀 `" + prefix + "`");
             }
         }
 
         if (username.charAt(0) == username.charAt(username.length() - 1)) {
-            features.add("首尾一样");
+            features.add("为 `首尾一样`");
         }
 
 
         boolean hasLetter = username.chars().anyMatch(Character::isLetter);
         if (hasLetter) {
             if (Objects.equals(username, username.toUpperCase())) {
-                features.add("为全大写");
+                features.add("为 `全大写`");
             } else if (Objects.equals(username, username.toLowerCase())) {
-                features.add("为全小写");
+                features.add("为 `全小写`");
             }
         }
 
-        features.add("长度为" + username.length());
+        features.add("长度为 `" + username.length() + "`");
 
         if (username.contains(" ")) {
-            features.add("有空格");
+            features.add("有 `空格`");
         }
 
         if (username.contains("_")) {
-            features.add("有下划线(_)");
+            features.add("有 `下划线(_)`");
         }
 
         if (username.contains("-")) {
-            features.add("有横杠(-)");
+            features.add("有 `横杠(-)`");
         }
 
         if (PREFIX_NUMBER_PATTERN.matcher(username).matches()) {
-            features.add("是一串数字一串字母");
+            features.add("是 `一串数字一串字母`");
         } else if (SUFFIX_NUMBER_PATTERN.matcher(username).matches()) {
-            features.add("是一串字母一串数字");
+            features.add("是 `一串字母一串数字`");
         }
 
         return features;

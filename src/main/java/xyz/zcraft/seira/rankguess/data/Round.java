@@ -206,9 +206,16 @@ public record Round(long userId, long scoreId, int bestIndex, long actualRank, D
             ));
         }
 
-        if (user.getHasSupported()) {
+        if (user.getHasSupported() && user.isSupporter()) {
             hints.add(new RankGuessGame.Hint(
                     "该玩家是尊贵的撒泼特！",
+                    "支持者状态",
+                    RankGuessGame.Hint.HintCategory.USER,
+                    RankGuessGame.Hint.HintStrength.SPECIAL
+            ));
+        } else if (user.getHasSupported() && !user.isSupporter()) {
+            hints.add(new RankGuessGame.Hint(
+                    "该玩家的撒泼特已经过期了。",
                     "支持者状态",
                     RankGuessGame.Hint.HintCategory.USER,
                     RankGuessGame.Hint.HintStrength.SPECIAL
