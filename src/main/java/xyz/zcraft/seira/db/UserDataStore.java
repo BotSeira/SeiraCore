@@ -112,9 +112,8 @@ public final class UserDataStore {
     }
 
     public static void storeUserInfo(Collection<User> users) {
-        final Map<Long, String> collect = users.stream()
-                .distinct()
-                .collect(Collectors.toMap(User::getId, User::getUsername));
+        final Map<Long, String> collect = new HashMap<>();
+        users.forEach(user -> collect.put(user.getId(), user.getUsername()));
         storeUserInfo(collect);
     }
 
