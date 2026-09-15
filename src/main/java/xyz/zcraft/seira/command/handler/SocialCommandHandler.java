@@ -99,7 +99,7 @@ public final class SocialCommandHandler {
         final OsuToken target = authHelper.updateTokenAndGet(s);
         final List<FriendEntry> targetFollowedList = APIHelper.getFollowed(target.accessToken()).getContent();
 
-        final List<User> users = new ArrayList<>(selfFollowedList.size() + targetFollowedList.size());
+        final Set<User> users = new HashSet<>(selfFollowedList.size() + targetFollowedList.size());
 
         users.addAll(selfFollowedList.stream().map(FriendEntry::user).toList());
         users.addAll(targetFollowedList.stream().map(FriendEntry::user).toList());

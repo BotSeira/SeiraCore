@@ -111,8 +111,10 @@ public final class UserDataStore {
         storeUserInfo(Map.of(uid, username));
     }
 
-    public static void storeUserInfo(List<User> users) {
-        final Map<Long, String> collect = users.stream().collect(Collectors.toMap(User::getId, User::getUsername));
+    public static void storeUserInfo(Collection<User> users) {
+        final Map<Long, String> collect = users.stream()
+                .distinct()
+                .collect(Collectors.toMap(User::getId, User::getUsername));
         storeUserInfo(collect);
     }
 

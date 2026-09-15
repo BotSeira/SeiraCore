@@ -272,7 +272,9 @@ public final class RankGuessGameService {
         return GuessResponse.of(game, guessResult, message);
     }
 
-    public synchronized EndResult end(String groupId, String senderUserId, boolean admin, boolean force) {
+    public synchronized EndResult end(
+            String groupId, String senderUserId, boolean admin, boolean force
+    ) {
         RankGuessGame game = games.get(groupId);
         if (game == null) {
             return new EndResult(EndResult.EndStatus.NO_GAME, null, null);
