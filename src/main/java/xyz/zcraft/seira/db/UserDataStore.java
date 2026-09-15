@@ -2,6 +2,7 @@ package xyz.zcraft.seira.db;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.osu.model.User;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.discord.DiscordBridgeMapping;
 import xyz.zcraft.seira.util.OsuAuthHelper;
@@ -9,6 +10,7 @@ import xyz.zcraft.seira.watch.SpecificScoreWatchState;
 
 import java.sql.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public final class UserDataStore {
     private static final Logger LOG = LogManager.getLogger(UserDataStore.class);
@@ -74,7 +76,7 @@ public final class UserDataStore {
         }
     }
 
-    public static void storeUserInfo(long osuId, String username) {
+    public static void storeUserInfo(Map<Long, String> users) {
         SqliteDatabase.ensureInitialized();
         String sql = """
                 INSERT INTO user_info(uid, username)
@@ -84,12 +86,34 @@ public final class UserDataStore {
                 """;
         try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setLong(1, osuId);
-            statement.setString(2, username);
-            statement.executeUpdate();
+
+            connection.setAutoCommit(false);
+
+            try {
+                for (var entry : users.entrySet()) {
+                    statement.setLong(1, entry.getKey());
+                    statement.setString(2, entry.getValue());
+                    statement.addBatch();
+                }
+
+                statement.executeBatch();
+                connection.commit();
+            } catch (SQLException e) {
+                connection.rollback();
+                throw e;
+            }
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to store user info", e);
+            throw new RuntimeException("Failed to delete user info", e);
         }
+    }
+
+    public static void storeUserInfo(Long uid, String username) {
+        storeUserInfo(Map.of(uid, username));
+    }
+
+    public static void storeUserInfo(List<User> users) {
+        final Map<Long, String> collect = users.stream().collect(Collectors.toMap(User::getId, User::getUsername));
+        storeUserInfo(collect);
     }
 
     public static Optional<String> findUsername(long osuId) {

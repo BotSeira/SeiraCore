@@ -119,8 +119,24 @@ public final class ReplyFactory {
                 || "upload_queued".equals(status) || "uploading".equals(status);
     }
 
+    public PendingMessage friendStatusMessage(String selfOpenId, Long selfUid, String selfUsername,
+                                                     String targetOpenId, Long targetUid, String targetUsername,
+                                                     boolean selfFollowed, boolean targetFollowed) {
+        return PendingMessage.ofMarkdownRaw(
+                Contents.friendStatusContent(
+                        selfOpenId, selfUid, selfUsername,
+                        targetOpenId, targetUid, targetUsername,
+                        selfFollowed, targetFollowed, getDirectUrl()
+                )
+        );
+    }
+
     private Buttons buttons() {
-        return new Buttons(configSupplier.get().seira().directUrl());
+        return new Buttons(getDirectUrl());
+    }
+
+    private String getDirectUrl() {
+        return configSupplier.get().seira().directUrl();
     }
 
     public PendingMessage rankGuessResultMessage(Context ctx, FinishedRound result, EndResult.RankType rankType) {
@@ -766,6 +782,29 @@ public final class ReplyFactory {
                     "> %s - %s [★%.2f-★%.2f]".formatted(mapset.getArtist(), mapset.getTitle(), list.getFirst(), list.getLast()) + "\n" +
                     ">" + cover.toMarkdown();
             return sb.trim();
+        }
+
+        public static String friendStatusContent(String selfOpenId, Long selfUid, String selfUsername,
+                                                 String targetOpenId, Long targetUid, String targetUsername,
+                                                 boolean selfFollowed, boolean targetFollowed, String directUrl) {
+            final String status;
+            if (selfFollowed && targetFollowed) {
+                status = "↑ 好友 ↓";
+            } else if (selfFollowed) {
+                status = "✕ 单向 ↓";
+            } else if (targetFollowed) {
+                status = "↑ 单向 ✕";
+            } else {
+                status = "✕ 路人 ✕";
+            }
+            return "好友状态" + "\n" +
+                    at(selfOpenId) + "\n" +
+                    url(selfUsername, "https://osu.ppy.sh/users/" + selfUid) + " " + url("跳转", directUrl + "/u/" + selfUid) + "\n" +
+                    "————————" + "\n" +
+                    "  " + status + "\n" +
+                    "————————" + "\n" +
+                    at(targetOpenId) + "\n" +
+                    url(targetUsername, "https://osu.ppy.sh/users/" + targetUid) + " " + url("跳转", directUrl + "/u/" + targetUid);
         }
     }
 

@@ -18,6 +18,7 @@ public final class CommandUsage {
     public static final String MA = "用法：/ma [成绩ID 或 快捷查询] [序号]；省略目标并指定序号时请使用 #序号";
     public static final String R = "用法：/r [成绩ID 或 快捷查询] [[mm:ss]-[mm:ss]]";
     public static final String RSC = "用法：/rsc [谱面ID或快捷查询] [+/=用户ID列表，逗号分隔]";
+    public static final String F = "用法：/f [@用户]";
     public static final String RCANCEL = "用法：/rcancel <渲染任务ID>";
 
     private CommandUsage() {
