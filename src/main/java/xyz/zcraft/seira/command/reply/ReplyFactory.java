@@ -799,12 +799,10 @@ public final class ReplyFactory {
             }
             return "好友状态" + "\n" +
                     at(selfOpenId) + "\n" +
-                    url(selfUsername, "https://osu.ppy.sh/users/" + selfUid) + " " + url("跳转", directUrl + "/u/" + selfUid) + "\n" +
-                    "————————" + "\n" +
+                    url(selfUsername, "https://osu.ppy.sh/users/" + selfUid) + "  " + url("⌈跳转游戏⌋", directUrl + "/u/" + selfUid) + "\n" +
                     "  " + status + "\n" +
-                    "————————" + "\n" +
                     at(targetOpenId) + "\n" +
-                    url(targetUsername, "https://osu.ppy.sh/users/" + targetUid) + " " + url("跳转", directUrl + "/u/" + targetUid);
+                    url(targetUsername, "https://osu.ppy.sh/users/" + targetUid) + "  " + url("⌈跳转游戏⌋", directUrl + "/u/" + targetUid);
         }
     }
 
