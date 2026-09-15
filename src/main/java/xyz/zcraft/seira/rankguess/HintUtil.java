@@ -107,8 +107,8 @@ public class HintUtil {
 
     private static EnumMap<RankGuessGame.Hint.HintStrength, Double> strengthWeights(double progress) {
         double[] first = {0, 48, 34, 15, 0, 0, 3};
-        double[] middle = {0, 9, 29, 44, 15, 0, 3};
-        double[] late = {0, 0, 4, 39, 49, 5, 3};
+        double[] middle = {0, 9, 28, 44, 15, 0, 4};
+        double[] late = {0, 0, 4, 38, 48, 5, 5};
 
         double phase = progress <= 0.5 ? progress * 2 : (progress - 0.5) * 2;
 
