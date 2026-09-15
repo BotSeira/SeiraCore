@@ -95,9 +95,11 @@ public final class SocialCommandHandler {
 
         final OsuToken self = authHelper.updateTokenAndGet(ctx.senderUserId());
         final List<FriendEntry> selfFollowedList = APIHelper.getFollowed(self.accessToken()).getContent();
+        updateFriends(selfId, selfFollowedList);
 
         final OsuToken target = authHelper.updateTokenAndGet(s);
         final List<FriendEntry> targetFollowedList = APIHelper.getFollowed(target.accessToken()).getContent();
+        updateFriends(targetId, targetFollowedList);
 
         final Set<User> users = new HashSet<>(selfFollowedList.size() + targetFollowedList.size());
 
@@ -145,23 +147,7 @@ public final class SocialCommandHandler {
                     .map(FriendEntry::user)
                     .toList());
 
-            final List<Long> origFollower = UserDataStore.findFollower(uid);
-
-            origFollower.stream()
-                    .filter(i -> !ids.contains(i))
-                    .forEach(i -> UserDataStore.removeFollowed(uid, i));
-
-            for (FriendEntry friendEntry : content) {
-                if (!UserDataStore.haveFollowed(uid, friendEntry.user().getId())) {
-                    UserDataStore.storeFollowed(uid, friendEntry.user().getId());
-                }
-
-                if (friendEntry.mutual()) {
-                    if (!UserDataStore.haveFollowed(friendEntry.user().getId(), uid)) {
-                        UserDataStore.storeFollowed(friendEntry.user().getId(), uid);
-                    }
-                }
-            }
+            updateFriends(uid, content);
 
             final List<Long> follower = UserDataStore.findFollower(uid);
 
@@ -199,6 +185,27 @@ public final class SocialCommandHandler {
                     ctx, all, self.getContent(), content.size(), allMutualCount,
                     mutual, onlyFollowed, onlyFollower
             ));
+        }
+    }
+
+    private void updateFriends(Long uid, List<FriendEntry> newFriends) {
+        final List<Long> ids = newFriends.stream().map(e -> e.user().getId()).toList();
+        final List<Long> origFollower = UserDataStore.findFollower(uid);
+
+        origFollower.stream()
+                .filter(i -> !ids.contains(i))
+                .forEach(i -> UserDataStore.removeFollowed(uid, i));
+
+        for (FriendEntry friendEntry : newFriends) {
+            if (!UserDataStore.haveFollowed(uid, friendEntry.user().getId())) {
+                UserDataStore.storeFollowed(uid, friendEntry.user().getId());
+            }
+
+            if (friendEntry.mutual()) {
+                if (!UserDataStore.haveFollowed(friendEntry.user().getId(), uid)) {
+                    UserDataStore.storeFollowed(friendEntry.user().getId(), uid);
+                }
+            }
         }
     }
 
