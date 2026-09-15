@@ -126,7 +126,7 @@ public final class ReplyFactory {
                 Contents.friendStatusContent(
                         selfOpenId, selfUid, selfUsername,
                         targetOpenId, targetUid, targetUsername,
-                        selfFollowed, targetFollowed, getDirectUrl()
+                        selfFollowed, targetFollowed
                 )
         );
     }
@@ -786,7 +786,7 @@ public final class ReplyFactory {
 
         public static String friendStatusContent(String selfOpenId, Long selfUid, String selfUsername,
                                                  String targetOpenId, Long targetUid, String targetUsername,
-                                                 boolean selfFollowed, Boolean targetFollowed, String directUrl) {
+                                                 boolean selfFollowed, Boolean targetFollowed) {
             final String status;
             if (targetFollowed == null) {
                 if (selfFollowed) {
@@ -805,12 +805,10 @@ public final class ReplyFactory {
                     status = "✕ 路人 ✕";
                 }
             }
-            return "好友状态" + "\n" +
-                    at(selfOpenId) + "\n" +
-                    url(selfUsername, "https://osu.ppy.sh/users/" + selfUid) + "  " + url("⌈跳转游戏⌋", directUrl + "/u/" + selfUid) + "\n" +
+            return at(selfOpenId) + "你们的好友状态(点击打开个人主页):" + "\n" +
+                    url(selfUsername, "https://osu.ppy.sh/users/" + selfUid) + " (" + at(selfOpenId) + ")\n" +
                     "  " + status + "\n" +
-                    at(targetOpenId) + "\n" +
-                    url(targetUsername, "https://osu.ppy.sh/users/" + targetUid) + "  " + url("⌈跳转游戏⌋", directUrl + "/u/" + targetUid);
+                    url(targetUsername, "https://osu.ppy.sh/users/" + targetUid) + " (" + at(targetOpenId) + ")";
         }
     }
 
