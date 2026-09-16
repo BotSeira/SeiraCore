@@ -90,7 +90,7 @@ public final class SocialCommandHandler {
         final Long targetId = resolver.resolveBoundUid(s);
 
         if (targetId == null) {
-            ctx.sendReply(at(ctx) + "对方还未绑定喵");
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "对方还未绑定喵"));
             return;
         }
 
