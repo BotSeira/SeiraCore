@@ -123,6 +123,31 @@ public class APIHelper {
         );
     }
 
+    public static UserExtended getUserRaw(UserRef userRef) {
+        long uid = resolveUid(userRef);
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/users/" + uid))
+                    .header("Accept", "application/json")
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw parseHttpError(send.body(), send.statusCode(), "获取用户信息失败");
+            }
+
+            final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
+            ensureApiSuccess(r, "获取用户信息失败");
+            final var data = r.getData().getAsJsonObject();
+
+            return GSON.fromJson(data, UserExtended.class);
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
+        }
+    }
+
     @SuppressWarnings("unused")
     public static Response<Base64Bytes> getTodayBestResponse(UserRef userRef) {
         return getTodayBestResponse(userRef, 1);

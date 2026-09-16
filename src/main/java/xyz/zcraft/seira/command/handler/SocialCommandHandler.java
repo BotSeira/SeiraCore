@@ -12,8 +12,10 @@ import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.parse.ShortcutTarget;
 import xyz.zcraft.seira.command.parse.TargetResolution;
+import xyz.zcraft.seira.command.parse.UserRefResolution;
 import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
+import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 
@@ -83,8 +85,12 @@ public final class SocialCommandHandler {
         }
     }
 
-    private void handleFriendStatus(Context ctx) {
+    public void handleFriendStatus(Context ctx) {
         final Long selfId = resolver.resolveBoundUid(ctx.senderUserId());
+
+        if (ctx.argumentCount() == 0) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/mu @someone\n> 注: 读取@需要开启权限。"));
+        }
 
         final String s = resolver.extractMentionedUserId(ctx.argument(0));
         final Long targetId = resolver.resolveBoundUid(s);
@@ -105,7 +111,8 @@ public final class SocialCommandHandler {
         selfFollowed = selfFollowedList.stream().anyMatch(e -> e.user().getId() == targetId);
 
         selfFollowedList.stream().filter(e -> e.user().getId() == targetId).findFirst().ifPresentOrElse(
-                e -> targetFollowed.set(e.mutual()), () -> {}
+                e -> targetFollowed.set(e.mutual()), () -> {
+                }
         );
 
         if (targetFollowed.get() == null) {
@@ -322,4 +329,31 @@ public final class SocialCommandHandler {
         }
     }
 
+    public void handleSup(Context ctx) {
+        final UserRef target;
+
+        if (ctx.argumentCount() == 0) {
+            Long targetId = resolver.resolveBoundUid(ctx.senderUserId());
+            if (targetId == null) {
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.NO_BIND));
+                return;
+            }
+            target = new UserRef.ByUid(targetId);
+        } else if (ctx.argumentCount() == 1) {
+            final UserRefResolution res = resolver.resolveUserRefArgument(ctx.argument(0));
+            if (res.errorMessage() != null) {
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + res.errorMessage()));
+                return;
+            }
+            target = res.userRef();
+        } else {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.SUP));
+            return;
+        }
+
+        final UserExtended user = APIHelper.getUserRaw(target);
+        final String openId = UserDataStore.findGroupOpenIdByUid(ctx.groupId(), user.getId()).orElse(null);
+
+        ctx.sendReply(replyFactory.supMessage(ctx, user.getUsername(), openId, user.isSupporter(), user.getHasSupported(), user.getSupportLevel()));
+    }
 }

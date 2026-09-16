@@ -443,6 +443,7 @@ public final class UserDataStore {
     }
 
     public static Optional<String> findGroupOpenIdByUid(String groupId, long osuUid) {
+        if (groupId == null) return  Optional.empty();
         SqliteDatabase.ensureInitialized();
         String sql = """
                 SELECT gm.open_id

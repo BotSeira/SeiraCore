@@ -2,7 +2,7 @@ package xyz.zcraft.seira.command.reply;
 
 public final class CommandUsage {
     public static final String BP = "用法：/bp <个数或范围> [玩家ID/用户名/@用户] [过滤条件 ...]";
-    public static final String NO_BIND = "你还没有绑定玩家ID，请先使用 /bind 绑定";
+    public static final String NO_BIND = "你还没有绑定玩家ID，请先使用 /bind 绑定喵";
     public static final String REBIND = "由于发生了一个技术问题，使用此功能需要重新绑定。请使用 `/unbind` 解除绑定，再使用 `/bind` 重新绑定~";
     public static final String RS = "用法：/rs <个数或范围> [玩家ID/用户名/@用户] [过滤条件 ...]";
     public static final String TB = "用法：/tb [#天数] [玩家ID/用户名/@用户]；天数必须为正整数";
@@ -20,6 +20,7 @@ public final class CommandUsage {
     public static final String RSC = "用法：/rsc [谱面ID或快捷查询] [+/=用户ID列表，逗号分隔]";
     public static final String F = "用法：/f [@用户]";
     public static final String RCANCEL = "用法：/rcancel <渲染任务ID>";
+    public static final String SUP = "用法：/sup [@用户]";
 
     private CommandUsage() {
     }

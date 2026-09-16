@@ -274,7 +274,7 @@ public final class ReplyFactory {
 
     public PendingMessage tbMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                at(ctx) + "今日BP查询完成\n" +
+                at(ctx) + "近日BP查询完成\n" +
                         "> 玩家: " + u(response.getUserId()) + "\n" +
                         "> 数量: " + response.getScoreIds().size(),
                 buttons().bpButtons(response.getUserId())
@@ -457,6 +457,10 @@ public final class ReplyFactory {
                 Contents.missImageContent(ctx, scoreId, index, size),
                 Buttons.missImageButton(ctx, scoreId, index, size)
         );
+    }
+
+    public PendingMessage supMessage(Context ctx, String username, String openId, Boolean isSupporter, Boolean hasSupported, Integer supportLevel) {
+        return PendingMessage.ofMarkdownRaw(Contents.supContent(ctx, username, openId, isSupporter, hasSupported, supportLevel));
     }
 
     private static final class Contents {
@@ -768,6 +772,7 @@ public final class ReplyFactory {
                             > /f - 获取好友列表
                             
                             详细指令列表请在 [这里](https://docs.seira.top/overview/commands.html) 查看
+                            配置额外权限请在 [这里](https://docs.seira.top/overview/use.html#extra-permission) 查看
                             """ + "\n"
                     + "当前版本: " + VersionInfo.getVersion() + " [更新日志](https://docs.seira.top/overview/changelog.html)" + "\n"
                     + "[常见问题](https://docs.seira.top/overview/faq.html)" + " " + cmd("/stat", "状态信息").trim();
@@ -825,6 +830,39 @@ public final class ReplyFactory {
 
         public static String missImageContent(Context ctx, String scoreId, Integer index, int size) {
             return at(ctx) + s(scoreId) + " - " + "Miss#" + index + "/" + size;
+        }
+
+        public static String supContent(
+                Context ctx, String username, String openId, Boolean isSupporter, Boolean hasSupported, Integer supportLevel
+        ) {
+            final StringBuilder sb = new StringBuilder();
+            sb.append(at(ctx)).append("当前 ").append("`%s`".formatted(username));
+            if (openId != null) {
+                sb.append("(%s)".formatted(at(openId)));
+            }
+            sb.append(" 的支持者状态:\n");
+            if (isSupporter != null) {
+                if (isSupporter) {
+                    sb.append("> - √ 是撒泼特");
+                } else {
+                    sb.append("> - × 不是撒泼特");
+                }
+                sb.append("\n");
+            }
+            if (hasSupported != null) {
+                if (hasSupported) {
+                    sb.append("> - √ 有支持历史");
+                } else {
+                    sb.append("> - × 无支持历史");
+                }
+                sb.append("\n");
+            }
+            if (supportLevel != null) {
+                sb.append("> - 支持者等级: `%d`".formatted(supportLevel));
+                sb.append("\n");
+            }
+
+            return sb.toString().trim();
         }
     }
 
