@@ -2,6 +2,7 @@ package xyz.zcraft.seira.db;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.osu.model.User;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.discord.DiscordBridgeMapping;
 import xyz.zcraft.seira.util.OsuAuthHelper;
@@ -9,6 +10,7 @@ import xyz.zcraft.seira.watch.SpecificScoreWatchState;
 
 import java.sql.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public final class UserDataStore {
     private static final Logger LOG = LogManager.getLogger(UserDataStore.class);
@@ -74,7 +76,7 @@ public final class UserDataStore {
         }
     }
 
-    public static void storeUserInfo(long osuId, String username) {
+    public static void storeUserInfo(Map<Long, String> users) {
         SqliteDatabase.ensureInitialized();
         String sql = """
                 INSERT INTO user_info(uid, username)
@@ -84,12 +86,35 @@ public final class UserDataStore {
                 """;
         try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setLong(1, osuId);
-            statement.setString(2, username);
-            statement.executeUpdate();
+
+            connection.setAutoCommit(false);
+
+            try {
+                for (var entry : users.entrySet()) {
+                    statement.setLong(1, entry.getKey());
+                    statement.setString(2, entry.getValue());
+                    statement.addBatch();
+                }
+
+                statement.executeBatch();
+                connection.commit();
+            } catch (SQLException e) {
+                connection.rollback();
+                throw e;
+            }
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to store user info", e);
+            throw new RuntimeException("Failed to delete user info", e);
         }
+    }
+
+    public static void storeUserInfo(Long uid, String username) {
+        storeUserInfo(Map.of(uid, username));
+    }
+
+    public static void storeUserInfo(Collection<User> users) {
+        final Map<Long, String> collect = new HashMap<>();
+        users.forEach(user -> collect.put(user.getId(), user.getUsername()));
+        storeUserInfo(collect);
     }
 
     public static Optional<String> findUsername(long osuId) {
@@ -126,6 +151,33 @@ public final class UserDataStore {
             throw new RuntimeException("Failed to query binding", e);
         }
         return null;
+    }
+
+    public static Map<String, Long> findBoundUsersByGroup(String groupId) {
+        SqliteDatabase.ensureInitialized();
+        String sql = """
+                SELECT gm.open_id, ub.osu_uid
+                FROM group_members gm
+                JOIN user_bindings ub
+                    ON ub.open_id = gm.open_id
+                WHERE gm.group_id = ?
+                """;
+        try (Connection connection = SqliteDatabase.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, groupId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                Map<String, Long> result = new HashMap<>();
+                while (resultSet.next()) {
+                    result.put(
+                            resultSet.getString("open_id"),
+                            resultSet.getLong("osu_uid")
+                    );
+                }
+                return result;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to query group bindings", e);
+        }
     }
 
     public static OsuToken findOsuToken(String openId) {
@@ -391,6 +443,7 @@ public final class UserDataStore {
     }
 
     public static Optional<String> findGroupOpenIdByUid(String groupId, long osuUid) {
+        if (groupId == null) return  Optional.empty();
         SqliteDatabase.ensureInitialized();
         String sql = """
                 SELECT gm.open_id
@@ -720,6 +773,29 @@ public final class UserDataStore {
         } catch (SQLException e) {
             throw new RuntimeException("Failed to execute SQL: " + sql, e);
         }
+    }
+
+    public static List<String> findAllBoundOpenIds() {
+        SqliteDatabase.ensureInitialized();
+
+        List<String> result = new LinkedList<>();
+
+        String sql = """
+                SELECT open_id FROM user_bindings ub
+                """;
+
+        try (Connection connection = SqliteDatabase.getConnection();
+             Statement statement = connection.createStatement();
+             ResultSet rs = statement.executeQuery(sql)) {
+            while (rs.next()) {
+                String openId = rs.getString("open_id");
+                result.add(openId);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to query bound open IDs", e);
+        }
+
+        return result;
     }
 
     public static List<Long> findAllUsers() {

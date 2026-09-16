@@ -15,10 +15,7 @@ import xyz.zcraft.seira.config.BindingConfig;
 import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.db.RankGuessRecordStore;
 import xyz.zcraft.seira.db.UserDataStore;
-import xyz.zcraft.seira.rankguess.data.FinishedRound;
-import xyz.zcraft.seira.rankguess.data.Rank;
-import xyz.zcraft.seira.rankguess.data.Round;
-import xyz.zcraft.seira.rankguess.data.Standing;
+import xyz.zcraft.seira.rankguess.data.*;
 import xyz.zcraft.seira.services.BindingService;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.services.DailyLuck;
@@ -45,6 +42,51 @@ public final class ReplyFactory {
         return "<qqbot-cmd-input text=\"%s\" show=\"%s\" reference=\"false\" />".formatted(command, text);
     }
 
+    public static String cmd(String command) {
+        return cmd(command, command);
+    }
+
+    public static String m(String id) {
+        return cmd("/m " + id, id);
+    }
+
+    public static String m(long id) {
+        return cmd("/m " + id, String.valueOf(id));
+    }
+
+    public static String s(String id) {
+        return cmd("/s " + id, id);
+    }
+
+    public static String s(long id) {
+        return cmd("/s " + id, String.valueOf(id));
+    }
+
+    public static String ms(String id) {
+        return cmd("/ms " + id, id);
+    }
+
+    public static String ms(long id) {
+        return cmd("/ms " + id, String.valueOf(id));
+    }
+
+    @SuppressWarnings("unused")
+    public static String u(String id, String name) {
+        return cmd("/u " + id, name);
+    }
+
+    public static String u(long id, String name) {
+        return cmd("/u " + id, name);
+    }
+
+    public static String u(long id) {
+        return cmd("/u " + id, String.valueOf(id));
+    }
+
+    public static String u(String id) {
+        return cmd("/u " + id, id);
+    }
+
     public static String at(Context ctx) {
         if (ctx.inGroup()) {
             return at(ctx.senderUserId());
@@ -65,18 +107,39 @@ public final class ReplyFactory {
     public static PendingMessage replayUploadMessage(ReplayUploadInfo info) {
         return PendingMessage.ofMarkdownRaw(
                 ("\n" + "## Replay上传成功~" + "\n" +
-                        "> 成绩: " + cmd("/s " + info.scoreId(), String.valueOf(info.scoreId())) + "\n" +
-                        "> 谱面: " + cmd("/m " + info.beatmapId(), String.valueOf(info.beatmapId())) + "\n" +
-                        "> 用户: " + cmd("/u " + info.userId(), info.username()) + "\n").trim(),
+                        "> 成绩: " + s(info.scoreId()) + "\n" +
+                        "> 谱面: " + m(info.beatmapId()) + "\n" +
+                        "> 用户: " + u(info.userId(), info.username()) + "\n").trim(),
                 null
         );
     }
 
-    private Buttons buttons() {
-        return new Buttons(configSupplier.get().seira().directUrl());
+    private static boolean isCancelableReplayStatus(String status) {
+        return "queued".equals(status) || "rendering".equals(status)
+                || "upload_queued".equals(status) || "uploading".equals(status);
     }
 
-    public PendingMessage rankGuessResultMessage(Context ctx, FinishedRound result, boolean recorded) {
+    public PendingMessage friendStatusMessage(String selfOpenId, Long selfUid, String selfUsername,
+                                              String targetOpenId, Long targetUid, String targetUsername,
+                                              boolean selfFollowed, Boolean targetFollowed) {
+        return PendingMessage.ofMarkdownRaw(
+                Contents.friendStatusContent(
+                        selfOpenId, selfUid, selfUsername,
+                        targetOpenId, targetUid, targetUsername,
+                        selfFollowed, targetFollowed
+                )
+        );
+    }
+
+    private Buttons buttons() {
+        return new Buttons(getDirectUrl());
+    }
+
+    private String getDirectUrl() {
+        return configSupplier.get().seira().directUrl();
+    }
+
+    public PendingMessage rankGuessResultMessage(Context ctx, FinishedRound result, EndResult.RankType rankType) {
         Round round = result.round();
         String rank = String.format(Locale.US, "%,d", round.actualRank());
         String pp = round.pp() == null
@@ -89,15 +152,24 @@ public final class ReplyFactory {
 
         StringBuilder content = new StringBuilder("本轮猜测结束");
 
-        if (recorded) {
-            content.append("，战绩已记录~\n");
-        } else {
-            content.append("，由于参与人数过少，战绩不会记录~\n");
+        if (rankType == EndResult.RankType.RANKED) {
+            content.append("，战绩已记录");
+        } else if (rankType == EndResult.RankType.NOT_ENOUGH_PARTICIPANT) {
+            content.append("，由于参与人数过少，战绩不会记录");
+        } else if (rankType == EndResult.RankType.NOT_A_STANDARD_GAME) {
+            content.append("，由于无主动消息权限，非完整游戏，战绩不会记录");
         }
 
+        content.append("~\n");
+
         content.append("> 玩家：`%s` %s\n".formatted(round.randomScore().user().getUsername(), userAt))
-                .append("> 实际Rank：`#%s` (%s)\n".formatted(rank, cmd("/u " + round.userId(), String.valueOf(round.userId()))))
-                .append("> 成绩PP：`%s` (%s)\n".formatted(pp, cmd("/s " + round.scoreId(), String.valueOf(round.scoreId()))))
+                .append("> 实际Rank：`#%s` (%s)\n".formatted(rank, u(round.userId())))
+                .append("> 成绩：`%s` (%s|%s)\n"
+                        .formatted(
+                                pp,
+                                "BP" + round.randomScore().bestIndex(),
+                                s(round.scoreId())
+                        ))
                 .append("\n猜测排行榜：\n");
 
         if (result.standings().isEmpty()) {
@@ -124,24 +196,34 @@ public final class ReplyFactory {
     }
 
     public PendingMessage rankGuessStatisticsMessage(
-            Context ctx, RankGuessRecordStore.Statistics.Personal statistics,
+            Context ctx, String ref, RankGuessRecordStore.Statistics.Personal statistics,
             RankGuessRecordStore.Statistics.Personal recentStatistics,
             boolean allGroups, Rank rank,
-            Long pickedTimes, Long groupGameCount
+            Long pickedTimes, Long groupGameCount,
+            RankGuessRecordStore.RankGuessed rankGuessed,
+            Long gameStarted
     ) {
         String scope = allGroups ? "全部群聊" : "本群";
         if (statistics.participation() == 0) {
-            return PendingMessage.ofMarkdownRaw(at(ctx) + "你在" + scope + "还没有已结算的猜 Rank 战绩喵~");
+            return PendingMessage.ofMarkdownRaw(at(ctx) + ref + "在" + scope + "还没有已结算的猜 Rank 战绩喵~");
         }
 
-        String rankText = "?".equals(rank.rank()) ? "" : "根据你最近 %d 场的表现，可以给到一个 `%s` 喵！\n"
+        String rankText = "?".equals(rank.rank()) ? "" : "根据" + ref + "最近 %d 场的表现，可以给到一个 `%s` 喵！\n"
                 .formatted(Rank.RECENT_GAME_LIMIT, rank.rank());
         String groupCountText = "";
+        String averageGuessedText = "";
+        String gameStartedText = "";
         if (!allGroups && pickedTimes != null && groupGameCount != null) {
             groupCountText = "> 被猜次数：`%d`，占本群：`%.3f%%`\n".formatted(pickedTimes, (double) pickedTimes / groupGameCount * 100);
         }
+        if (!allGroups && rankGuessed != null) {
+            averageGuessedText = "> 平均被猜为：`#%,d` / `#%,d`\n".formatted((long) rankGuessed.average(), (long) rankGuessed.logAverage());
+        }
+        if (!allGroups && gameStarted != null) {
+            gameStartedText = "> 在本群发起了 `%d` 场游戏\n".formatted(gameStarted);
+        }
         return PendingMessage.ofMarkdownRaw(at(ctx) + String.format(Locale.ROOT, """
-                        你的猜 Rank 战绩（%s，括号为近 %d 场）
+                        %s的猜 Rank 战绩（%s，括号为近 %d 场）
                         > 总参与数：`%d`，Rating：`%.2f`
                         > 获胜数：`%d`（`%d`）
                         > 胜率：`%.2f%%`（`%.2f%%`）
@@ -151,9 +233,9 @@ public final class ReplyFactory {
                         > 最高分：`%.2f`（`%.2f`）
                         > 平均名次：`%.2f`（`%.2f`）
                         > 总得分：`%.2f`
-                        %s%s
+                        %s%s%s%s
                         """,
-                scope, Rank.RECENT_GAME_LIMIT,
+                ref, scope, Rank.RECENT_GAME_LIMIT,
                 statistics.participation(), rank.rating(),
                 statistics.wins(), recentStatistics.wins(),
                 statistics.winRate() * 100, recentStatistics.winRate() * 100,
@@ -162,21 +244,21 @@ public final class ReplyFactory {
                 statistics.averageScore(), recentStatistics.averageScore(),
                 statistics.highestScore(), recentStatistics.highestScore(),
                 statistics.averagePlacement(), recentStatistics.averagePlacement(),
-                statistics.totalScore(), groupCountText, rankText).strip());
+                statistics.totalScore(), gameStartedText, averageGuessedText, groupCountText, rankText).strip());
     }
 
-    public PendingMessage boMessage(Context ctx, Response<?> response) {
+    public PendingMessage bpMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "查询完成，共" + response.getScoreIds().size() + "个成绩\n" +
-                        "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()),
-                buttons().boButtons(response.getUserId())
+                        "> 玩家: " + u(response.getUserId()),
+                buttons().bpButtons(response.getUserId())
         );
     }
 
     public PendingMessage rsMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "最近成绩查询完成\n" +
-                        "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()) + "\n" +
+                        "> 玩家: " + u(response.getUserId()) + "\n" +
                         "> 数量: " + response.getScoreIds().size(),
                 buttons().rsButtons()
         );
@@ -185,25 +267,25 @@ public final class ReplyFactory {
     public PendingMessage userInfoMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "玩家资料查询完成\n" +
-                        "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()),
+                        "> 玩家: " + u(response.getUserId()),
                 buttons().userInfoButtons(response.getUserId())
         );
     }
 
     public PendingMessage tbMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                at(ctx) + "今日BP查询完成\n" +
-                        "> 玩家: " + cmd("/u " + response.getUserId(), response.getUserId()) + "\n" +
+                at(ctx) + "近日BP查询完成\n" +
+                        "> 玩家: " + u(response.getUserId()) + "\n" +
                         "> 数量: " + response.getScoreIds().size(),
-                buttons().boButtons(response.getUserId())
+                buttons().bpButtons(response.getUserId())
         );
     }
 
     public PendingMessage beatmapMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "谱面查询完成\n" +
-                        "> 谱面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
-                        "> 谱面集: " + cmd("/ms " + response.getBeatmapsetId(), response.getBeatmapsetId()),
+                        "> 谱面: " + m(response.getBeatmapId()) + "\n" +
+                        "> 谱面集: " + ms(response.getBeatmapsetId()),
                 buttons().beatmapButtons(response.getBeatmapId())
         );
 
@@ -212,8 +294,8 @@ public final class ReplyFactory {
     public PendingMessage scoreMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "成绩查询完成\n" +
-                        "> 谱面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
-                        "> 成绩: " + cmd("/s " + response.getScoreId(), response.getScoreId()),
+                        "> 谱面: " + m(response.getBeatmapId()) + "\n" +
+                        "> 成绩: " + s(response.getScoreId()),
                 buttons().sButtons(response.getBeatmapId(), response.getScoreId())
         );
     }
@@ -221,8 +303,8 @@ public final class ReplyFactory {
     public PendingMessage scoreAnalyzeMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "成绩分析完成\n" +
-                        "> 谱面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId()) + "\n" +
-                        "> 成绩: " + cmd("/s " + response.getScoreId(), response.getScoreId()),
+                        "> 谱面: " + m(response.getBeatmapId()) + "\n" +
+                        "> 成绩: " + s(response.getScoreId()),
                 buttons().saButtons(response.getBeatmapId(), response.getScoreId())
         );
     }
@@ -230,7 +312,7 @@ public final class ReplyFactory {
     public PendingMessage lbMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
                 at(ctx) + "排行榜查询完成" +
-                        (response.getBeatmapId() == null ? "" : "\n> 谱面: " + cmd("/m " + response.getBeatmapId(), response.getBeatmapId())),
+                        (response.getBeatmapId() == null ? "" : "\n> 谱面: " + m(response.getBeatmapId())),
                 buttons().lbButtons(response.getBeatmapId())
         );
     }
@@ -238,14 +320,14 @@ public final class ReplyFactory {
     public PendingMessage replayMessage(Context ctx, APIHelper.ReplayTaskInfo taskInfo) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.replayTaskContent(ctx, taskInfo),
-                buttons().replayProgressButtons(taskInfo.taskId())
+                buttons().replayProgressButtons(taskInfo.taskId(), ctx.senderUserId())
         );
     }
 
     public PendingMessage replayStatMessage(Context ctx, String jobId, RenderStat renderStat) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.replayStatContent(ctx, renderStat, jobId),
-                buttons().replayProgressButtons(jobId)
+                buttons().replayProgressButtons(jobId, isCancelableReplayStatus(renderStat.getStatus()), ctx.senderUserId())
         );
     }
 
@@ -370,6 +452,17 @@ public final class ReplyFactory {
         );
     }
 
+    public PendingMessage missImageMessage(Context ctx, String scoreId, Integer index, int size) {
+        return PendingMessage.ofMarkdownRaw(
+                Contents.missImageContent(ctx, scoreId, index, size),
+                Buttons.missImageButton(ctx, scoreId, index, size)
+        );
+    }
+
+    public PendingMessage supMessage(Context ctx, String username, String openId, Boolean isSupporter, Boolean hasSupported, Integer supportLevel) {
+        return PendingMessage.ofMarkdownRaw(Contents.supContent(ctx, username, openId, isSupporter, hasSupported, supportLevel));
+    }
+
     private static final class Contents {
         static String replayTaskContent(Context ctx, APIHelper.ReplayTaskInfo taskInfo) {
             StringBuilder sb = new StringBuilder();
@@ -378,7 +471,7 @@ public final class ReplyFactory {
             if (taskInfo.beatmap() != null) {
                 BeatmapExtended beatmap = taskInfo.beatmap();
 
-                sb.append("> 谱面: ").append(cmd("/m " + beatmap.getId(), String.valueOf(beatmap.getId()))).append("\n");
+                sb.append("> 谱面: ").append(m(beatmap.getId())).append("\n");
                 sb.append("> ").append(beatmap.getBeatmapset().getArtist()).append(" - ").append(beatmap.getBeatmapset().getTitle()).append("\n");
                 sb.append("> ").append(String.format("%.2f★", beatmap.getDifficultyRating())).append(" ").append(beatmap.getVersion()).append("\n");
             }
@@ -439,7 +532,7 @@ public final class ReplyFactory {
                 return null;
             }
 
-            return "> - %s - %s \n (%s %s %s)".formatted(cmd("/s " + id, id), username, rank, accuracy, pp);
+            return "> - %s - %s \n (%s %s %s)".formatted(s(id), username, rank, accuracy, pp);
         }
 
         private static String getScoreField(JsonObject score, String field) {
@@ -464,6 +557,9 @@ public final class ReplyFactory {
                 case "timeout" -> "超时";
                 case "queued" -> "排队中";
                 case "rendering" -> "渲染中";
+                case "upload_queued" -> "等待上传";
+                case "uploading" -> "上传中";
+                case "canceled" -> "已取消";
                 default -> "未知";
             }).append("\n");
 
@@ -505,7 +601,7 @@ public final class ReplyFactory {
         static String beatmapsetContent(Context ctx, Response<?> response) {
             StringBuilder sb = new StringBuilder();
             sb.append(at(ctx)).append("谱面集查询完成").append("\n");
-            sb.append("> 谱面集: ").append(cmd("/ms " + response.getBeatmapsetId(), response.getBeatmapsetId())).append("\n");
+            sb.append("> 谱面集: ").append(ms(response.getBeatmapsetId())).append("\n");
             sb.append("> ");
             for (int i = 0; i < response.getBeatmapStars().size(); i++) {
                 sb.append(cmd("/m " + response.getBeatmapIds().get(i), response.getBeatmapStars().get(i) + "★")).append(" ");
@@ -591,7 +687,7 @@ public final class ReplyFactory {
             final MultiplayerRoom.CurrentPlaylistItem cur = content.getCurrentPlaylistItem();
             if (cur != null) {
                 sb += "> 当前: " + "%s - %s - %s [%.2f★ %s]".formatted(
-                        cmd("/m " + cur.getBeatmapId(), String.valueOf(cur.getBeatmapId())),
+                        m(cur.getBeatmapId()),
                         cur.getBeatmap().getBeatmapset().getArtist(),
                         cur.getBeatmap().getBeatmapset().getTitle(),
                         cur.getBeatmap().getDifficultyRating(),
@@ -648,6 +744,7 @@ public final class ReplyFactory {
                     "> - 连续运行了 `" + BotStat.getCurrentUptime() / 1000 / 60 + "` 分钟" + "\n" +
                     "> - 总共处理了 `" + BotStat.getTotalCommands() + "` 条指令" + "(近30分钟 `" + BotStat.getCommandCountFor(30) + "` )\n" +
                     "> - 总共渲染了 `" + BotStat.getTotalReplays() + "` 条回放" + "\n" +
+                    "> - 总共进行了 `" + RankGuessRecordStore.getTotalGamesCount(null) + "` 次猜 Rank" + "\n" +
                     "> - 并正在为 `" + UserDataStore.countGroups() + "` 个群聊和 `" + UserDataStore.countBoundUser() + "` 位用户提供服务~" + "\n";
             return (stat + version + res).trim();
         }
@@ -666,6 +763,7 @@ public final class ReplyFactory {
                             > /bma <谱面ID或快捷查询> [Mod] - 分析谱面PP构成和类型
                             > /ms <谱面集ID或快捷查询> - 获取谱面集
                             > /r [成绩ID或快捷查询] [[mm:ss]-[mm:ss]] - 生成成绩高光视频或指定片段
+                            > /rcancel <任务ID> - 取消回放渲染任务
                             > /rg <start/group/#Rank/end/wish/stats [all]> - 猜 Rank 游戏与个人战绩
                             > /lb <谱面ID> [玩家ID列表] - 获取指定谱面排行榜
                             > /watch add <玩家ID/用户名/@用户> [分钟] - 监视群友的新成绩
@@ -674,6 +772,7 @@ public final class ReplyFactory {
                             > /f - 获取好友列表
                             
                             详细指令列表请在 [这里](https://docs.seira.top/overview/commands.html) 查看
+                            配置额外权限请在 [这里](https://docs.seira.top/overview/use.html#extra-permission) 查看
                             """ + "\n"
                     + "当前版本: " + VersionInfo.getVersion() + " [更新日志](https://docs.seira.top/overview/changelog.html)" + "\n"
                     + "[常见问题](https://docs.seira.top/overview/faq.html)" + " " + cmd("/stat", "状态信息").trim();
@@ -686,11 +785,7 @@ public final class ReplyFactory {
         }
 
         public static String bgpContent(Context context, Response<?> response) {
-            return at(context) + "\n> 背景预览("
-                    + cmd("/ms " + response.getBeatmapsetId(), response.getBeatmapsetId())
-                    + " - "
-                    + cmd("/m " + response.getBeatmapId(), response.getBeatmapId())
-                    + ")";
+            return at(context) + "\n> 背景预览(" + ms(response.getBeatmapsetId()) + " - " + m(response.getBeatmapId()) + ")";
         }
 
         public static String luckContent(Context ctx, DailyLuck.Luck luck, Beatmapset mapset, UploadedImage cover) {
@@ -700,14 +795,97 @@ public final class ReplyFactory {
                     "> 人品值: **" + luck.luck() + "**/100\n" +
                     "> 宜: " + luck.ups() + "\n" +
                     "> 忌: " + luck.downs() + "\n\n" +
-                    "今日推荐图: " + cmd("/ms " + mapset.getId(), mapset.getId().toString()) + "\n" +
+                    "今日推荐图: " + ms(mapset.getId()) + "\n" +
                     "> %s - %s [★%.2f-★%.2f]".formatted(mapset.getArtist(), mapset.getTitle(), list.getFirst(), list.getLast()) + "\n" +
                     ">" + cover.toMarkdown();
             return sb.trim();
         }
+
+        public static String friendStatusContent(String selfOpenId, Long selfUid, String selfUsername,
+                                                 String targetOpenId, Long targetUid, String targetUsername,
+                                                 boolean selfFollowed, Boolean targetFollowed) {
+            final String status;
+            if (targetFollowed == null) {
+                if (selfFollowed) {
+                    status = "? 未知 ↓";
+                } else {
+                    status = "? 未知 ✕";
+                }
+            } else {
+                if (selfFollowed && targetFollowed) {
+                    status = "↑ 好友 ↓";
+                } else if (selfFollowed) {
+                    status = "✕ 单向 ↓";
+                } else if (targetFollowed) {
+                    status = "↑ 单向 ✕";
+                } else {
+                    status = "✕ 路人 ✕";
+                }
+            }
+            return at(selfOpenId) + "你们的好友状态(点击打开个人主页):" + "\n" +
+                    url(selfUsername, "https://osu.ppy.sh/users/" + selfUid) + " (" + at(selfOpenId) + ")\n" +
+                    "  " + status + "\n" +
+                    url(targetUsername, "https://osu.ppy.sh/users/" + targetUid) + " (" + at(targetOpenId) + ")";
+        }
+
+        public static String missImageContent(Context ctx, String scoreId, Integer index, int size) {
+            return at(ctx) + s(scoreId) + " - " + "Miss#" + index + "/" + size;
+        }
+
+        public static String supContent(
+                Context ctx, String username, String openId, Boolean isSupporter, Boolean hasSupported, Integer supportLevel
+        ) {
+            final StringBuilder sb = new StringBuilder();
+            sb.append(at(ctx)).append("当前 ").append("`%s`".formatted(username));
+            if (openId != null) {
+                sb.append("(%s)".formatted(at(openId)));
+            }
+            sb.append(" 的支持者状态:\n");
+            if (isSupporter != null) {
+                if (isSupporter) {
+                    sb.append("> - √ 是撒泼特");
+                } else {
+                    sb.append("> - × 不是撒泼特");
+                }
+                sb.append("\n");
+            }
+            if (hasSupported != null) {
+                if (hasSupported) {
+                    sb.append("> - √ 有支持历史");
+                } else {
+                    sb.append("> - × 无支持历史");
+                }
+                sb.append("\n");
+            }
+            if (supportLevel != null) {
+                sb.append("> - 支持者等级: `%d`".formatted(supportLevel));
+                sb.append("\n");
+            }
+
+            return sb.toString().trim();
+        }
     }
 
     private record Buttons(String directUrl) {
+        public static List<List<Button>> missImageButton(Context ctx, String scoreId, Integer index, int size) {
+            List<Button> row = new ArrayList<>(3);
+            final Button prev = Button.command(1, "上一个", "/ma " + scoreId + " " + (index - 1));
+            if (index <= 1) {
+                prev.disable();
+            }
+
+            final Button center = Button.command(2, index + "/" + size, "").disable();
+
+            final Button next = Button.command(3, "下一个", "/ma " + scoreId + " " + (index + 1));
+            if (index >= size) {
+                next.disable();
+            }
+
+            row.addAll(List.of(prev, center, next));
+
+            return Button.keyboard(row);
+        }
+
         List<List<Button>> beatmapsetButtons(String beatmapsetId) {
             if (beatmapsetId == null || beatmapsetId.isBlank()) {
                 return null;
@@ -778,7 +956,7 @@ public final class ReplyFactory {
             return rows;
         }
 
-        List<List<Button>> boButtons(String userId) {
+        List<List<Button>> bpButtons(String userId) {
             return Button.keyboard(
                     Button.row(
                             Button.command(1, "查询最好成绩", "/s bo1"),
@@ -857,14 +1035,21 @@ public final class ReplyFactory {
             ));
         }
 
-        List<List<Button>> replayProgressButtons(String jobId) {
+        List<List<Button>> replayProgressButtons(String jobId, String userId) {
+            return replayProgressButtons(jobId, true, userId);
+        }
+
+        List<List<Button>> replayProgressButtons(String jobId, boolean cancelable, String userId) {
             if (jobId == null || jobId.isBlank()) {
                 return null;
             }
 
-            return Button.keyboard(Button.row(
-                    Button.command(1, "查询渲染进度", "/rstat " + jobId)
-            ));
+            return Button.keyboard(cancelable
+                    ? Button.row(
+                    Button.command(1, "查询渲染进度", "/rstat " + jobId),
+                    Button.command(2, "取消渲染", "/rcancel " + jobId).permit(userId)
+            )
+                    : Button.row(Button.command(1, "查询渲染进度", "/rstat " + jobId)));
         }
 
         List<List<Button>> beatmapButtons(String beatmapId) {

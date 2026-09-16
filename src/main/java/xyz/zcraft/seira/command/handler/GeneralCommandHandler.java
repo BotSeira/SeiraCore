@@ -9,11 +9,15 @@ import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.parse.UserRefResolution;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
+import xyz.zcraft.seira.data.Notice;
 import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.services.DailyLuck;
+import xyz.zcraft.seira.services.NoticeStore;
 
 import java.util.function.Predicate;
+
+import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class GeneralCommandHandler {
     private final MessageSender messageSender;
@@ -44,37 +48,36 @@ public final class GeneralCommandHandler {
         } else {
             UserRefResolution target = resolver.resolveUserRefArgument(context.argument(0));
             if (target.errorMessage() != null) {
-                context.sendReply(PendingMessage.ofString(target.errorMessage()));
+                context.sendReply(PendingMessage.ofMarkdownRaw(at(context) + target.errorMessage()));
                 return;
             }
             userRef = target.userRef();
         }
 
         if (userRef == null) {
-            context.sendReply(PendingMessage.ofString("用法：/u [玩家ID/用户名/@用户]"));
+            context.sendReply(PendingMessage.ofMarkdownRaw(at(context) + "用法：/u [玩家ID/用户名/@用户]"));
             return;
         }
 
-        taskCoordinator.runImageRequest(
-                context,
-                "User Info",
-                () -> APIHelper.getUserInfoResponse(userRef),
-                replyFactory::userInfoMessage
-        );
+        try (var _ = taskCoordinator.beginRequest(context, "User Info")) {
+            var response = APIHelper.getUserInfoResponse(userRef);
+            var completion = replyFactory.userInfoMessage(context, response);
+            context.sendReply(taskCoordinator.imageMessage(response, completion));
+        }
     }
 
     public void handleLuck(Context context) {
         if (context.argumentCount() != 0) {
-            context.sendReply(PendingMessage.ofString("用法：/luck"));
+            context.sendReply(PendingMessage.ofMarkdownRaw(at(context) + "用法：/luck"));
             return;
         }
 
-        taskCoordinator.runApiRequest(context, "Luck", () -> {
+        try (var _ = taskCoordinator.beginRequest(context, "Luck")) {
             DailyLuck.Luck luck = DailyLuck.getLuck(context.senderUserId());
             Beatmapset mapset = APIHelper.getBeatmapsetRaw(luck.dailyMapset());
             UploadedImage cover = messageSender.uploadImageToCos(mapset.getCovers().getCover());
             context.sendReply(replyFactory.luckMessage(context, luck, mapset, cover));
-        });
+        }
     }
 
     public void handleInspect(Context context) {
@@ -97,6 +100,35 @@ public final class GeneralCommandHandler {
     }
 
     public void handleUnknown(Context context) {
-        context.sendReply(PendingMessage.ofString("未知指令。使用/help获取帮助。"));
+        if (!context.inGroup()) {
+            context.sendReply(PendingMessage.ofMarkdownRaw(at(context) + "未知指令。使用/help获取帮助。"));
+        }
+    }
+
+    public void handleNotice(Context context) {
+        if (context.argumentCount() != 0 && context.argumentCount() != 1) {
+            context.sendReply(PendingMessage.ofMarkdownRaw(at(context) + "用法：/notice [公告ID]"));
+            return;
+        }
+
+        long noticeId;
+
+        if (context.argumentCount() == 1) {
+            noticeId = Long.parseLong(context.argument(0));
+        } else {
+            noticeId = NoticeStore.getNewestId();
+        }
+
+        StringBuilder sb = new StringBuilder();
+        NoticeStore.getNotices().stream()
+                .filter(notice -> notice.id() == noticeId)
+                .filter(Notice::isActive)
+                .findFirst()
+                .ifPresentOrElse(notice -> {
+                    sb.append(at(context)).append("公告#").append(notice.id()).append(" ").append(notice.title()).append("\n");
+                    sb.append(NoticeStore.getContentFor(notice));
+                }, () -> sb.append(at(context)).append("未找到公告#").append(noticeId));
+
+        context.sendReply(PendingMessage.ofMarkdownRaw(sb.toString()));
     }
 }

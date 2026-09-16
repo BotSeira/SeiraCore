@@ -1,8 +1,6 @@
 package xyz.zcraft.seira.services;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -25,6 +23,7 @@ public class BotStat {
     private static final AtomicLong totalUptime = new AtomicLong();
     private static ScheduledExecutorService scheduler;
     private static long startTime;
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     public static void initialize() {
         if (!initialized.compareAndSet(false, true)) {
@@ -136,7 +135,7 @@ public class BotStat {
 
         try {
             Files.createDirectories(STAT_FILE.getParent());
-            Files.writeString(STAT_FILE, obj.toString());
+            Files.writeString(STAT_FILE, GSON.toJson(obj));
         } catch (IOException e) {
             LOG.error("Failed to write bot stat to file", e);
         }

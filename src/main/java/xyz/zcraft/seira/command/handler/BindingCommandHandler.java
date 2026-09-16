@@ -7,6 +7,8 @@ import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.services.BindingService;
 
+import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
+
 public final class BindingCommandHandler {
     private final AppConfig config;
     private final ReplyFactory replyFactory;
@@ -20,17 +22,17 @@ public final class BindingCommandHandler {
 
     public void handleBind(Context ctx) {
         if (ctx.senderUserId() == null || ctx.senderUserId().isBlank()) {
-            ctx.sendReply(PendingMessage.ofString("无法识别你的用户ID，暂时无法绑定。请稍后重试。"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "无法识别你的用户ID，暂时无法绑定。请稍后重试。"));
             return;
         }
 
         if (UserDataStore.findBoundUid(ctx.senderUserId()) != null) {
-            ctx.sendReply(PendingMessage.ofString("你已经绑定了玩家ID，如果要更换绑定请先使用 /unbind 解绑当前玩家ID。"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "你已经绑定了玩家ID，如果要更换绑定请先使用 /unbind 解绑当前玩家ID。"));
             return;
         }
 
         if (ctx.args().length != 0) {
-            ctx.sendReply(PendingMessage.ofString("用法(无需ID)：/bind"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法(无需ID)：/bind"));
             return;
         }
 
@@ -46,17 +48,17 @@ public final class BindingCommandHandler {
 
     public void handleUnbind(Context ctx) {
         if (ctx.senderUserId() == null || ctx.senderUserId().isBlank()) {
-            ctx.sendReply(PendingMessage.ofString("无法识别你的用户ID，暂时无法解绑。请稍后重试。"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "无法识别你的用户ID，暂时无法解绑。请稍后重试。"));
             return;
         }
         if (ctx.args().length != 0) {
-            ctx.sendReply(PendingMessage.ofString("用法：/unbind"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/unbind"));
             return;
         }
         boolean removed = UserDataStore.unbind(ctx.senderUserId());
-        ctx.sendReply(PendingMessage.ofString(removed
+        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + (removed
                 ? "解绑成功。"
-                : "你当前还没有绑定玩家ID，无需解绑。"));
+                : "你当前还没有绑定玩家ID，无需解绑。")));
     }
 
     public void handleClearHistory(Context ctx) {
@@ -65,11 +67,11 @@ public final class BindingCommandHandler {
             return;
         }
         if (ctx.args().length != 0) {
-            ctx.sendReply(PendingMessage.ofString("用法：/clearhistory"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/clearhistory"));
             return;
         }
         int removed = UserDataStore.clearGroupMember(ctx.senderUserId());
-        ctx.sendReply(PendingMessage.ofString("清除了 " + removed + " 条群聊记录。"));
+        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "清除了 " + removed + " 条群聊记录。"));
     }
 
 }

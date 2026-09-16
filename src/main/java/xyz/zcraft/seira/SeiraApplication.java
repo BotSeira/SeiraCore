@@ -14,6 +14,7 @@ import xyz.zcraft.seira.db.SqliteDatabase;
 import xyz.zcraft.seira.services.BindingService;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.services.DailyLuck;
+import xyz.zcraft.seira.services.NoticeStore;
 import xyz.zcraft.seira.util.AdminRegistry;
 import xyz.zcraft.seira.util.ApplicationExecutors;
 
@@ -45,6 +46,7 @@ public final class SeiraApplication implements AutoCloseable {
         LOG.info("Initializing application services");
         DailyLuck.initialize(config.qq().appId());
         BotStat.initialize();
+        NoticeStore.initialize();
 
         ApplicationExecutors createdExecutors = new ApplicationExecutors();
         BindingService createdBindingService = new BindingService(

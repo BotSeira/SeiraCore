@@ -6,6 +6,9 @@ public final class ReplayRenderException extends RuntimeException {
     }
 
     static String formatMessage(String status, String error) {
+        if ("canceled".equalsIgnoreCase(status)) {
+            return "回放渲染已取消。";
+        }
         if (error != null && !error.isBlank()) {
             String possibleReason = tryParseError(error);
             return "回放渲染失败" + (possibleReason != null ? "，这可能是由于" + possibleReason : "") + "。日志输出：\n```\n" + error.trim() + "\n```\n";

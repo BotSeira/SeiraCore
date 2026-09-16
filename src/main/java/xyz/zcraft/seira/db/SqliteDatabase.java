@@ -33,6 +33,7 @@ public class SqliteDatabase {
                     connection.setAutoCommit(false);
                     UserDataStore.createTablesIfNeeded(connection);
                     RankGuessRecordStore.createTablesIfNeeded(connection);
+                    NoticeTrackerStore.createTablesIfNeeded(connection);
                     connection.commit();
                 }
                 initializedDbPath = dbPath;

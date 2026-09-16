@@ -13,13 +13,13 @@ import java.util.regex.Pattern;
 public final class ScoreFilterArguments {
     private static final Pattern FILTER_PATTERN = Pattern.compile(
             "(?i)^(acc(?:uracy)?|combo|pp|time|length|len|star|stars|sr|bpm|miss|misses|score|mod|mods|rank|replay"
-                    + "|title|artist|mapper|genre|language|video|storyboard|fullcombo)"
+                    + "|any|title|artist|mapper|genre|language|video|storyboard|fullcombo|ar|od|cs|hp)"
                     + "(>=|<=|!=|!~|>|<|=|~)(.+)$"
     );
     private static final Pattern MISS_SHORTHAND_PATTERN = Pattern.compile("(?i)^(!?)(\\d+)miss(?:es)?$");
-    private static final Pattern NEGATED_RANK_SHORTHAND_PATTERN = Pattern.compile("(?i)^!(XH|X|SH|S|A|B|C|D|F)$");
+    private static final Pattern NEGATED_RANK_SHORTHAND_PATTERN = Pattern.compile("(?i)^!(SSH|SS|XH|X|SH|S|A|B|C|D|F)$");
     private static final Pattern DURATION_PATTERN = Pattern.compile("(?i)^(?:(\\d+)m)?(?:(\\d+(?:\\.\\d+)?)s)?$");
-    private static final Set<String> RANKS = Set.of("XH", "X", "SH", "S", "A", "B", "C", "D", "F");
+    private static final Set<String> RANKS = Set.of("SSH", "SS", "XH", "X", "SH", "S", "A", "B", "C", "D", "F");
 
     private ScoreFilterArguments() {
     }
@@ -64,19 +64,36 @@ public final class ScoreFilterArguments {
             }
             validateMods(value);
         } else if (field.equals("rank")) {
-            if (!Set.of("=", "!=").contains(operator)) {
-                throw new IllegalArgumentException("rank 仅支持 =、!=");
+            if (!Set.of(">", ">=", "<", "<=", "=", "!=").contains(operator)) {
+                throw new IllegalArgumentException("rank 仅支持 >、>=、<、<=、=、!=");
             }
             value = value.toUpperCase(Locale.ROOT);
             if (!RANKS.contains(value)) {
-                throw new IllegalArgumentException("rank 必须是 XH/X/SH/S/A/B/C/D/F");
+                throw new IllegalArgumentException("rank 必须是 SSH/SS/XH/X/SH/S/A/B/C/D/F");
             }
-        } else if (Set.of("title", "artist", "mapper", "genre", "language").contains(field)) {
+        } else if (Set.of("any", "title", "artist", "mapper", "genre", "language").contains(field)) {
             if (!Set.of("~", "!~", "=", "!=").contains(operator)) {
                 throw new IllegalArgumentException(field + " 仅支持 ~、!~、=、!=");
             }
+            if (field.equals("any") && !Set.of("=", "!=").contains(operator)) {
+                throw new IllegalArgumentException("any 仅支持 =、!=");
+            }
             if (value.isBlank()) {
                 throw new IllegalArgumentException(field + " 不能为空");
+            }
+            if (isRegexValue(value)) {
+                if (!Set.of("=", "!=").contains(operator)) {
+                    throw new IllegalArgumentException("正则表达式仅支持 =、!=");
+                }
+                String expression = value.substring(1, value.length() - 1);
+                if (expression.isEmpty()) {
+                    throw new IllegalArgumentException("正则表达式不能为空");
+                }
+                try {
+                    Pattern.compile(expression, Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+                } catch (java.util.regex.PatternSyntaxException e) {
+                    throw new IllegalArgumentException("正则表达式无效：" + e.getDescription());
+                }
             }
         } else if (Set.of("video", "storyboard", "fullcombo", "replay").contains(field)) {
             if (!Set.of("=", "!=").contains(operator)) {
@@ -112,8 +129,13 @@ public final class ScoreFilterArguments {
             case "bpm" -> "bpm";
             case "miss", "misses" -> "miss";
             case "score" -> "score";
+            case "ar" -> "ar";
+            case "od" -> "od";
+            case "cs" -> "cs";
+            case "hp" -> "hp";
             case "mod", "mods" -> "mod";
             case "rank" -> "rank";
+            case "any" -> "any";
             case "title" -> "title";
             case "artist" -> "artist";
             case "mapper" -> "mapper";
@@ -151,6 +173,10 @@ public final class ScoreFilterArguments {
             return "rank!=" + rankMatcher.group(1).toUpperCase(Locale.ROOT);
         }
         return value;
+    }
+
+    private static boolean isRegexValue(String value) {
+        return value.length() >= 2 && value.startsWith("[") && value.endsWith("]");
     }
 
     private static void validateMods(String value) {

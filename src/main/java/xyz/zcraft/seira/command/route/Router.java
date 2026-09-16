@@ -18,6 +18,7 @@ import xyz.zcraft.seira.discord.DiscordBridgeService;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
 import xyz.zcraft.seira.services.BindingService;
 import xyz.zcraft.seira.util.AdminRegistry;
+import xyz.zcraft.seira.util.NoticesHelper;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 import xyz.zcraft.seira.watch.MultiplayerRoomWatchService;
 import xyz.zcraft.seira.watch.ScoreWatchService;
@@ -62,29 +63,28 @@ public class Router {
         AppConfig startupConfig = configSupplier.get();
         ReplyFactory replyFactory = new ReplyFactory(configSupplier);
         Resolver resolver = new Resolver();
-        TargetHistory targetHistory = new TargetHistory();
+        TargetHistory history = new TargetHistory(resolver, this::getAccessTokenFor);
         ReplayResultStore replayResults = new ReplayResultStore();
         VideoRenderRecord videoRenderRecord = new VideoRenderRecord();
         this.taskCoordinator = new TaskCoordinator(messageSender, replayResults, discordBridgeService);
         this.authHelper = new OsuAuthHelper(startupConfig.binding());
         BindingCommandHandler bindingCommands = new BindingCommandHandler(startupConfig, replyFactory, bindingService);
         ScoreCommandHandler scoreCommands = new ScoreCommandHandler(
-                resolver, targetHistory, taskCoordinator, replyFactory
+                resolver, history, taskCoordinator, replyFactory
         );
         BeatmapCommandHandler beatmapCommands = new BeatmapCommandHandler(
-                resolver, targetHistory, taskCoordinator, replyFactory, videoRenderRecord, this::getAccessTokenFor
+                resolver, history, taskCoordinator, replyFactory, videoRenderRecord, this::getAccessTokenFor
         );
         SocialCommandHandler socialCommands = new SocialCommandHandler(
                 resolver, authHelper, taskCoordinator, replyFactory, this::getAccessTokenFor
         );
         ReplayCommandHandler replayCommands = new ReplayCommandHandler(
                 resolver,
-                targetHistory,
+                history,
                 taskCoordinator,
                 replyFactory,
                 videoRenderRecord,
-                replayResults,
-                this::getAccessTokenFor
+                replayResults
         );
         GeneralCommandHandler generalCommands = new GeneralCommandHandler(
                 messageSender, taskCoordinator, replyFactory, resolver, admins::isAdmin
@@ -141,7 +141,7 @@ public class Router {
                 .register(bindingCommands::handleBind, "bind")
                 .register(bindingCommands::handleUnbind, "unbind")
                 .register(bindingCommands::handleClearHistory, "clearhistory")
-                .register(scoreCommands::handleBo, "bp", "bo")
+                .register(scoreCommands::handleBp, "bp")
                 .register(beatmapCommands::handleDaily, "daily")
                 .register(socialCommands::handleMp, "mp")
                 .register(ctx -> scoreCommands.handleRs(ctx, true), "rs")
@@ -153,7 +153,9 @@ public class Router {
                 .register(beatmapCommands::handleBpv, "bpv")
                 .register(beatmapCommands::handleBgp, "bgp")
                 .register(ctx -> socialCommands.handleF(ctx, !ctx.inGroup()), "f")
+                .register(socialCommands::handleFriendStatus, "mu")
                 .register(ctx -> socialCommands.handleF(ctx, true), "fall")
+                .register(socialCommands::handleSup, "sup")
                 .register(socialCommands::handleFclear, "fclear")
                 .register(beatmapCommands::handleDl, "dl")
                 .register(scoreCommands::handleS, "s")
@@ -168,6 +170,7 @@ public class Router {
                 .register(generalCommands::handleU, "u")
                 .register(generalCommands::handleLuck, "luck")
                 .register(replayCommands::handleRstat, "rstat")
+                .register(replayCommands::handleRcancel, "rcancel")
                 .register(generalCommands::handleInspect, "inspect")
                 .register(generalCommands::handleHelp, "help")
                 .register(generalCommands::handleFaq, "faq")
@@ -176,6 +179,7 @@ public class Router {
                 .register(multiplayerRoomWatchCommands::handleMpWatch, "mpwatch", "mpw")
                 .register(dcsCommands::handleDcs, "dcs")
                 .register(rankGuessCommands::handleRankGuess, "rg")
+                .register(generalCommands::handleNotice, "notice")
                 .build();
     }
 
@@ -216,7 +220,8 @@ public class Router {
                     groupMessage,
                     config.seira().queueMessageInGroup()
             );
-            if (parseResult.status() == CommandParser.ParseResult.Status.EMPTY_COMMAND) {
+            if (parseResult.status() == CommandParser.ParseResult.Status.EMPTY_COMMAND
+                    && !group) {
                 replies.sendReply(PendingMessage.ofString("请输入指令。使用/help获取帮助。"));
                 return;
             }
@@ -226,8 +231,9 @@ public class Router {
                 try {
                     LOG.info("Routing {} message : {}", groupMessage ? "group" : "private", context.rawContent());
                     dispatch(context);
+                    NoticesHelper.checkNotices(context);
                 } catch (Exception e) {
-                    context.sendReply(PendingMessage.ofMarkdownRaw(at(context) + "处理指令时发生错误，请稍后再试。"));
+                    context.sendReply(PendingMessage.ofMarkdownRaw(at(context) + TaskCoordinator.resolveErrorMessage(e)));
                     LOG.error("Failed to process inbound message {}", messageId, e);
                 }
             });

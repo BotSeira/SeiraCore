@@ -1,5 +1,6 @@
 package xyz.zcraft.seira.command.handler;
 
+import org.jline.utils.Log;
 import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.data.PendingMessage;
@@ -9,144 +10,165 @@ import xyz.zcraft.seira.command.TargetHistory;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.parse.RscTarget;
-import xyz.zcraft.seira.command.parse.ShortcutTarget;
-import xyz.zcraft.seira.command.parse.TargetResolution;
 import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
+import xyz.zcraft.seira.data.SendResult;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
-import java.util.function.Function;
+import java.util.Objects;
+import java.util.UUID;
+
+import static xyz.zcraft.seira.command.TargetHistory.Type.BEATMAP;
+import static xyz.zcraft.seira.command.TargetHistory.Type.SCORE;
+import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class ReplayCommandHandler {
     private final Resolver resolver;
-    private final TargetHistory targetHistory;
+    private final TargetHistory history;
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
     private final VideoRenderRecord videoRenderRecord;
     private final ReplayResultStore replayResults;
-    private final Function<String, String> accessTokenProvider;
 
     public ReplayCommandHandler(
             Resolver resolver,
-            TargetHistory targetHistory,
+            TargetHistory history,
             TaskCoordinator taskCoordinator,
             ReplyFactory replyFactory,
             VideoRenderRecord videoRenderRecord,
-            ReplayResultStore replayResults,
-            Function<String, String> accessTokenProvider
+            ReplayResultStore replayResults
     ) {
         this.resolver = resolver;
-        this.targetHistory = targetHistory;
+        this.history = history;
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
         this.videoRenderRecord = videoRenderRecord;
         this.replayResults = replayResults;
-        this.accessTokenProvider = accessTokenProvider;
     }
 
     public void handleR(Context ctx) {
-        TargetResolution targetResolution = targetHistory.resolveOptionalTarget(ctx, resolver, TimeDurationParser::isTimeRange);
-        if (ctx.args().length - targetResolution.consumedArgs() > 1) {
-            ctx.sendReply(PendingMessage.ofString(CommandUsage.R));
-            return;
-        }
-
-        ShortcutTarget target = targetResolution.target();
-        if (target == null) {
-            ctx.sendReply(PendingMessage.ofString(CommandUsage.R));
-            return;
-        }
-        if (target.isError()) {
-            ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
-            return;
-        }
+        var target = history.parseArguments(ctx, CommandUsage.R, 1, TimeDurationParser::isTimeRange);
+        if (target == null) return;
 
         TimeDurationParser.TimeRange range = null;
 
-        if (ctx.args().length > targetResolution.consumedArgs()) {
+        if (ctx.args().length > target.consumedArgs()) {
             try {
-                range = TimeDurationParser.parseRange(ctx.args()[targetResolution.consumedArgs()]);
+                range = TimeDurationParser.parseRange(ctx.args()[target.consumedArgs()]);
             } catch (IllegalArgumentException e) {
-                ctx.sendReply(PendingMessage.ofString("无法解析时间范围"));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "无法解析时间范围"));
                 return;
             }
         }
 
-        targetHistory.rememberExplicitTarget(ctx, targetResolution);
+        try (var _ = taskCoordinator.beginRequest(ctx, "Score Render")) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "正在获取谱面以及回放文件，请稍作等待喵..."));
+            var ids = history.resolve(ctx, SCORE, target);
+            history.remember(ctx, ids);
+            var upload = taskCoordinator.createVideoUploadRequest(ctx);
+            var task = APIHelper.createReplayRenderTask(ids.scoreId(), range, upload);
+            videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
+            ctx.sendReply(replyFactory.replayMessage(ctx, task));
 
-        TimeDurationParser.TimeRange finalRange = range;
-        taskCoordinator.runReplayRequest(
-                ctx,
-                "Score Render",
-                qqUpload -> {
-                    APIHelper.ReplayTaskInfo task = APIHelper.createReplayRenderTask(target, finalRange, qqUpload);
-                    videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
-                    return task;
-                },
-                replyFactory::replayMessage);
+            APIHelper.ReplayRenderResult result;
+
+            try {
+                result = taskCoordinator.waitForReplay(task);
+            } catch (Exception e) {
+                Log.error("Error while waiting for replay", e);
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + e.getMessage()));
+                return;
+            }
+
+            SendResult sendResult = ctx.sendReply(taskCoordinator.replayVideoMessage(result));
+
+            if (!sendResult.success()) {
+                sendResult = ctx.sendMessage(taskCoordinator.replayVideoMessage(result));
+            }
+
+            if (sendResult.success()) {
+                replayResults.remove(task.taskId());
+            }
+        }
     }
 
     public void handleRsc(Context ctx) {
         if (ctx.groupId() == null || ctx.groupId().isBlank()) {
-            ctx.sendReply(PendingMessage.ofString("/rsc 仅支持群聊使用。"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "/rsc 仅支持群聊使用。"));
             return;
         }
 
-        TargetResolution targetResolution = targetHistory.resolveOptionalTarget(
-                ctx,
-                resolver,
-                arg -> arg.startsWith("+") || arg.startsWith("=")
-        );
-        ShortcutTarget target = targetResolution.target();
-        if (target == null) {
-            ctx.sendReply(PendingMessage.ofString(CommandUsage.RSC));
-            return;
-        }
-        if (target.isError()) {
-            ctx.sendReply(PendingMessage.ofString(target.errorMessage()));
-            return;
-        }
+        var target = history.parseArguments(ctx, CommandUsage.RSC, Integer.MAX_VALUE,
+                arg -> arg.startsWith("+") || arg.startsWith("="));
+        if (target == null) return;
 
         String extraUidArg = null;
 
-        int i = targetResolution.consumedArgs();
+        int i = target.consumedArgs();
 
         if (i < ctx.args().length) {
             if (ctx.args()[i].startsWith("+") || ctx.args()[i].startsWith("=")) {
                 extraUidArg = ctx.query().substring(Math.max(ctx.query().indexOf("+"), ctx.query().indexOf("=")));
             } else {
-                ctx.sendReply(PendingMessage.ofString(CommandUsage.RSC));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.RSC));
                 return;
             }
         }
 
-        RscTarget rscTarget = target.isLocalScore() && extraUidArg == null
+        RscTarget rscTarget = history.isLocalScore(ctx, target) && extraUidArg == null
                 ? new RscTarget(new String[0], null)
                 : resolver.resolveRscTarget(ctx.groupId(), extraUidArg);
         if (rscTarget.errorMessage() != null) {
-            ctx.sendReply(PendingMessage.ofString(rscTarget.errorMessage()));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + rscTarget.errorMessage()));
             return;
         }
 
-        String[] targetsArray = rscTarget.targets();
+        try (var _ = taskCoordinator.beginRequest(ctx, "Showcase Render")) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "正在获取谱面以及回放文件，请稍作等待喵..."));
+            var targetType = history.isLocalScore(ctx, target) ? SCORE : BEATMAP;
+            var resolved = history.resolve(ctx, targetType, target);
+            history.remember(ctx, resolved);
+            var upload = taskCoordinator.createVideoUploadRequest(ctx);
+            String[] scoreTargets = rscTarget.targets();
+            long beatmapId;
+            if (targetType == SCORE) {
+                var ids = new java.util.LinkedHashSet<String>();
+                ids.add("s" + resolved.scoreId());
+                java.util.Collections.addAll(ids, scoreTargets);
+                scoreTargets = ids.toArray(String[]::new);
+                beatmapId = APIHelper.getScoreBeatmapId(resolved.scoreId());
+            } else {
+                beatmapId = resolved.beatmapId();
+            }
+            var task = APIHelper.createReplayShowcaseTask(beatmapId, scoreTargets, upload);
+            videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
+            ctx.sendReply(replyFactory.replayMessage(ctx, task));
 
-        targetHistory.rememberExplicitTarget(ctx, targetResolution);
+            APIHelper.ReplayRenderResult result;
 
-        taskCoordinator.runReplayRequest(
-                ctx,
-                "Showcase Render",
-                qqUpload -> {
-                    var task = APIHelper.createReplayShowcaseTask(
-                            target, targetsArray, accessTokenProvider.apply(ctx.senderUserId()), qqUpload);
-                    videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
-                    return task;
-                },
-                replyFactory::replayMessage);
+            try {
+                result = taskCoordinator.waitForReplay(task);
+            } catch (Exception e) {
+                Log.error("Error while waiting for replay", e);
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + e.getMessage()));
+                return;
+            }
+
+            SendResult sendResult = ctx.sendReply(taskCoordinator.replayVideoMessage(result));
+
+            if (!sendResult.success()) {
+                sendResult = ctx.sendMessage(taskCoordinator.replayVideoMessage(result));
+            }
+
+            if (sendResult.success()) {
+                replayResults.remove(task.taskId());
+            }
+        }
     }
 
     public void handleRstat(Context ctx) {
         if (ctx.args().length != 1 && ctx.args().length != 0) {
-            ctx.sendReply(PendingMessage.ofString("用法：/rstat [任务ID]"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/rstat [任务ID]"));
             return;
         }
 
@@ -155,7 +177,7 @@ public final class ReplayCommandHandler {
             if (videoRenderRecord.hasRenderTask(ctx.senderUserId())) {
                 jobId = videoRenderRecord.getRenderTask(ctx.senderUserId());
             } else {
-                ctx.sendReply(PendingMessage.ofString("未找到渲染请求"));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "未找到渲染请求"));
                 return;
             }
         } else {
@@ -174,6 +196,38 @@ public final class ReplayCommandHandler {
         }
 
         ctx.sendReply(replyFactory.replayStatMessage(ctx, jobId, APIHelper.getRenderStat(jobId)));
+    }
+
+    public void handleRcancel(Context ctx) {
+        if (ctx.args().length != 1) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.RCANCEL));
+            return;
+        }
+
+        String jobId = ctx.args()[0];
+        try {
+            if (!UUID.fromString(jobId).toString().equalsIgnoreCase(jobId)) {
+                throw new IllegalArgumentException("Non-canonical UUID");
+            }
+        } catch (IllegalArgumentException e) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "渲染任务 ID 格式无效。\n" + CommandUsage.RCANCEL));
+            return;
+        }
+
+        var result = APIHelper.cancelReplayRender(jobId);
+        String status = Objects.toString(result.getStatus(), "unknown").toLowerCase();
+        String message = switch (status) {
+            case "canceled" -> "回放渲染已取消。";
+            case "done" -> "该回放已经渲染完成，无法取消。";
+            case "failed" -> "该回放渲染已经失败，无需取消。";
+            case "timeout" -> "该回放渲染已经超时，无需取消。";
+            default -> "该回放当前状态为 `" + status + "`，无法取消。";
+        };
+        if ("canceled".equals(status)) {
+            replayResults.remove(jobId);
+            videoRenderRecord.removeRenderTask(ctx.senderUserId(), jobId);
+        }
+        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + message));
     }
 
 }

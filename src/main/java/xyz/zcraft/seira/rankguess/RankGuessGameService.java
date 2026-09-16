@@ -10,35 +10,26 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 import static xyz.zcraft.seira.rankguess.RankGuessGame.COPY_PUNISHMENT_THRESHOLD;
 
 public final class RankGuessGameService {
     public static final int SCORING_VERSION = 1;
-    public static final int MIN_GAMES_TO_RANK = 10;
+    public static final int MIN_GAMES_TO_RANK = 5;
     private static final Duration END_PROTECTION_DURATION = Duration.ofMinutes(3);
     private static final int MIN_PARTICIPANT_TO_RECORD = 3;
+    private static final Pattern SUFFIX_NUMBER_PATTERN = Pattern.compile("^[A-Za-z\\-_ ]+\\d+$");
+    private static final Pattern PREFIX_NUMBER_PATTERN = Pattern.compile("^\\d+[A-Za-z\\-_ ]+$");
     private final Map<String, RankGuessGame> games = new HashMap<>();
     private final RankGuessWeights weights;
     private final Clock clock;
     private final Consumer<FinishedRound> recordWriter;
 
     public RankGuessGameService() {
-        this(Clock.systemUTC());
-    }
-
-    RankGuessGameService(Clock clock) {
-        this(clock, new RankGuessWeights());
-    }
-
-    RankGuessGameService(Clock clock, RankGuessWeights weights) {
-        this(clock, weights, RankGuessRecordStore::save);
-    }
-
-    RankGuessGameService(Clock clock, RankGuessWeights weights, Consumer<FinishedRound> recordWriter) {
-        this.clock = clock;
-        this.weights = weights;
-        this.recordWriter = Objects.requireNonNull(recordWriter);
+        this.clock = Clock.systemUTC();
+        this.weights = new RankGuessWeights();
+        this.recordWriter = RankGuessRecordStore::save;
     }
 
     static double logarithmicError(long guess, long actualRank) {
@@ -47,21 +38,110 @@ public final class RankGuessGameService {
 
     @NotNull
     public static String getGlobalRankRange(long l) {
-        String range;
-
         if (l <= 10_000) {
-            range = "#1 - #10k";
+            return "#1 - #10k";
         } else if (l <= 50_000) {
-            range = "#10k - #50k";
+            return "#10k - #50k";
         } else if (l <= 200_000) {
-            range = "#50k - #200k";
+            return "#50k - #200k";
         } else if (l <= 500_000) {
-            range = "#200k - #500k";
+            return "#200k - #500k";
         } else {
-            range = ">#500k";
+            return ">#500k";
+        }
+    }
+
+    @NotNull
+    public static String getPPRange(double pp) {
+        if (pp <= 80) {
+            return "<80pp";
+        } else if (pp <= 150) {
+            return "80pp - 150pp";
+        } else if (pp <= 250) {
+            return "150pp - 250pp";
+        } else if (pp <= 350) {
+            return "250pp - 350pp";
+        } else if (pp <= 500) {
+            return "350pp - 500pp";
+        } else {
+            return ">500pp";
+        }
+    }
+
+    public static boolean isOutstandingGuess(
+            long guess, long actualRank, int participants, int revealedHints, int totalHints
+    ) {
+        double allowedDifference = 50.0 * Math.pow(actualRank / 1000.0, 0.65);
+
+        double participantFactor = 1.0 - Math.min(0.15, Math.max(0, participants - 3) * 0.02);
+
+        double progress = totalHints <= 0 ? 0.0
+                : Math.clamp(revealedHints / (double) totalHints, 0.0, 1.0);
+
+        double hintFactor = 1.0 - 0.10 * progress;
+
+        allowedDifference *= participantFactor * hintFactor;
+
+        return Math.abs(guess - actualRank) <= allowedDifference;
+    }
+
+    public static List<String> getUsernameFeature(String username) {
+        if (username == null || username.isBlank()) {
+            return List.of();
         }
 
-        return range;
+        final List<String> features = new ArrayList<>();
+
+        final int leftBracket = username.indexOf("[");
+        final int rightBracket = username.indexOf("]");
+        if (username.contains("[") && username.contains("]") && leftBracket < rightBracket) {
+//            if (leftBracket == 0 && rightBracket == username.length() - 1) {
+//                // [Example]
+//                features.add("被[]包裹");
+//            }
+
+            if (leftBracket == 0 && rightBracket < username.length() - 1) {
+                // [Prefix]Example
+                final String prefix = username.substring(0, rightBracket + 1);
+                features.add("有前缀 `" + prefix + "`");
+            }
+        }
+
+        if (username.charAt(0) == username.charAt(username.length() - 1)) {
+            features.add("为 `首尾一样`");
+        }
+
+
+        boolean hasLetter = username.chars().anyMatch(Character::isLetter);
+        if (hasLetter) {
+            if (Objects.equals(username, username.toUpperCase())) {
+                features.add("为 `全大写`");
+            } else if (Objects.equals(username, username.toLowerCase())) {
+                features.add("为 `全小写`");
+            }
+        }
+
+        features.add("长度为 `" + username.length() + "`");
+
+        if (username.contains(" ")) {
+            features.add("有 `空格`");
+        }
+
+        if (username.contains("_")) {
+            features.add("有 `下划线(_)`");
+        }
+
+        if (username.contains("-")) {
+            features.add("有 `横杠(-)`");
+        }
+
+        if (PREFIX_NUMBER_PATTERN.matcher(username).matches()) {
+            features.add("是 `一串数字一串字母`");
+        } else if (SUFFIX_NUMBER_PATTERN.matcher(username).matches()) {
+            features.add("是 `一串字母一串数字`");
+        }
+
+        return features;
     }
 
     public void saveWeights() {
@@ -70,18 +150,6 @@ public final class RankGuessGameService {
 
     public JsonObject generateWeights(String groupId) {
         return weights.generateWeights(groupId);
-    }
-
-    public String getRevealedHintsString(String groupId) {
-        final RankGuessGame rankGuessGame = games.get(groupId);
-        if (rankGuessGame == null) {
-            return null;
-        }
-        StringBuilder sb = new StringBuilder();
-        for (RankGuessGame.Hint revealedHint : rankGuessGame.getRevealedHints()) {
-            sb.append(revealedHint.content()).append("\n");
-        }
-        return sb.toString().trim();
     }
 
     public synchronized Reservation reserve(String groupId, String starterUserId, boolean fromGroup) {
@@ -204,27 +272,31 @@ public final class RankGuessGameService {
         return GuessResponse.of(game, guessResult, message);
     }
 
-    public synchronized EndResult end(String groupId, String senderUserId, boolean admin, boolean force) {
+    public synchronized EndResult end(
+            String groupId, String senderUserId, boolean admin, boolean force
+    ) {
         RankGuessGame game = games.get(groupId);
         if (game == null) {
-            return new EndResult(EndResult.EndStatus.NO_GAME, null, false);
+            return new EndResult(EndResult.EndStatus.NO_GAME, null, null);
         }
         if (game.round == null) {
-            return new EndResult(EndResult.EndStatus.STARTING, null, false);
+            return new EndResult(EndResult.EndStatus.STARTING, null, null);
         }
         if (!force
                 && clock.instant().isBefore(game.guessingStartedAt.plus(END_PROTECTION_DURATION))
                 && !Objects.equals(game.starterUserId, senderUserId)
                 && !admin) {
-            return new EndResult(EndResult.EndStatus.FORBIDDEN, null, false);
+            return new EndResult(EndResult.EndStatus.FORBIDDEN, null, null);
         }
 
         List<Standing> standings = new ArrayList<>(game.guesses.size());
         for (Map.Entry<String, Guess> entry : game.guesses.entrySet()) {
             Guess guess = entry.getValue();
-            double error = logarithmicError(guess.rank(), game.round.actualRank());
 
-            final double pointsRaw = Math.max(0, 1000 * (1 - error));
+            double error = logarithmicError(guess.rank(), game.round.actualRank());
+            double accuracy = Math.max(0, 1 - error);
+
+            double pointsRaw = 1000 * Math.pow(accuracy, 1.10);
 
             double finalMultiplier = 1;
             for (ScoreMultiplier multiplier : guess.multipliers()) {
@@ -249,28 +321,38 @@ public final class RankGuessGameService {
 
         FinishedRound finished = new FinishedRound(
                 game.token, groupId, game.fromGroup, game.guessingStartedAt, clock.instant(),
-                SCORING_VERSION, game.round, standings
+                SCORING_VERSION, game.round, standings, game.starterUserId
         );
 
-        final boolean shouldRecord = game.guesses.size() >= MIN_PARTICIPANT_TO_RECORD;
+        EndResult.RankType rankType = EndResult.RankType.RANKED;
 
-        if (shouldRecord) {
-            recordWriter.accept(finished);
+        if (game.guesses.size() < MIN_PARTICIPANT_TO_RECORD) {
+            rankType = EndResult.RankType.NOT_ENOUGH_PARTICIPANT;
+        }
+
+        if (!game.round.standard()) {
+            rankType = EndResult.RankType.NOT_A_STANDARD_GAME;
         }
 
         games.remove(groupId);
         game.markEnded();
+
+        recordWriter.accept(finished);
         weights.recordRound(groupId, game.round.userId(), game.round.scoreId());
 
         return new EndResult(
                 EndResult.EndStatus.FINISHED,
                 finished,
-                shouldRecord
+                rankType
         );
     }
 
     public WishResult wish(String groupId, Long boundUid) {
         return weights.tryWish(groupId, boundUid);
+    }
+
+    public WishResult wishScore(String groupId, Long scoreId) {
+        return weights.tryWishScore(groupId, scoreId);
     }
 
     public void stopAll() {

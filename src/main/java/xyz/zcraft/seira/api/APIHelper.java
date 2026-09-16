@@ -23,11 +23,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
 
 public class APIHelper {
     private static final String ENDPOINT;
@@ -98,14 +96,19 @@ public class APIHelper {
         }
     }
 
+    @SuppressWarnings("unused")
     public static Response<Base64Bytes> getBoNResponse(int n, UserRef userRef) {
         return getBoNResponse(n, userRef, List.of());
     }
 
     public static Response<Base64Bytes> getBoNResponse(int n, UserRef userRef, List<String> filters) {
+        return getBoNResponse(n, 1, userRef, filters);
+    }
+
+    public static Response<Base64Bytes> getBoNResponse(int n, int start, UserRef userRef, List<String> filters) {
         long uid = resolveUid(userRef);
         return getBase64BytesResponse(
-                "/users/" + uid + "/scores/bestof?n=" + n + encodeScoreFilters(filters),
+                "/users/" + uid + "/scores/bestof?n=" + n + encodeScoreRangeStart(start) + encodeScoreFilters(filters),
                 "获取最好成绩失败",
                 null
         );
@@ -120,6 +123,32 @@ public class APIHelper {
         );
     }
 
+    public static UserExtended getUserRaw(UserRef userRef) {
+        long uid = resolveUid(userRef);
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/users/" + uid))
+                    .header("Accept", "application/json")
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw parseHttpError(send.body(), send.statusCode(), "获取用户信息失败");
+            }
+
+            final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
+            ensureApiSuccess(r, "获取用户信息失败");
+            final var data = r.getData().getAsJsonObject();
+
+            return GSON.fromJson(data, UserExtended.class);
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
+        }
+    }
+
+    @SuppressWarnings("unused")
     public static Response<Base64Bytes> getTodayBestResponse(UserRef userRef) {
         return getTodayBestResponse(userRef, 1);
     }
@@ -133,8 +162,7 @@ public class APIHelper {
         );
     }
 
-    public static Response<Base64Bytes> getGroupLeaderboardResponse(ShortcutTarget target, List<Long> uids, String auth) {
-        final long beatmapId = lookupBeatmap(target, auth);
+    public static Response<Base64Bytes> getGroupLeaderboardResponse(long beatmapId, List<Long> uids) {
         return getBase64BytesResponse(
                 "/beatmaps/" + beatmapId + "/leaderboards",
                 "获取群排行失败",
@@ -216,17 +244,33 @@ public class APIHelper {
         }
     }
 
+    @SuppressWarnings("unused")
     public static Response<Base64Bytes> getRecentResponse(int n, UserRef userRef, boolean includeFail) {
         return getRecentResponse(n, userRef, includeFail, List.of());
     }
 
     public static Response<Base64Bytes> getRecentResponse(int n, UserRef userRef, boolean includeFail, List<String> filters) {
+        return getRecentResponse(n, 1, userRef, includeFail, filters);
+    }
+
+    public static Response<Base64Bytes> getRecentResponse(
+            int n,
+            int start,
+            UserRef userRef,
+            boolean includeFail,
+            List<String> filters
+    ) {
         long uid = resolveUid(userRef);
         return getBase64BytesResponse(
-                "/users/" + uid + "/scores/recent?n=" + n + "&fail=" + includeFail + encodeScoreFilters(filters),
+                "/users/" + uid + "/scores/recent?n=" + n + "&fail=" + includeFail
+                        + encodeScoreRangeStart(start) + encodeScoreFilters(filters),
                 "获取最近成绩失败",
                 null
         );
+    }
+
+    private static String encodeScoreRangeStart(int start) {
+        return start > 1 ? "&start=" + start : "";
     }
 
     private static String encodeScoreFilters(List<String> filters) {
@@ -236,13 +280,11 @@ public class APIHelper {
         return "&filters=" + URLEncoder.encode(String.join(",", filters), StandardCharsets.UTF_8);
     }
 
-    public static Response<Base64Bytes> getBeatmapResponse(ShortcutTarget target, String mod, String auth) {
-        final long beatmapId = lookupBeatmap(target, auth);
+    public static Response<Base64Bytes> getBeatmapResponse(long beatmapId, String mod) {
         return getBase64BytesResponse("/beatmaps/" + beatmapId + (mod != null ? "?mod=" + mod : ""), "获取谱面失败", null);
     }
 
-    public static Response<Base64Bytes> getBeatmapAnalysisResponse(ShortcutTarget target, String mod, String auth) {
-        final long beatmapId = lookupBeatmap(target, auth);
+    public static Response<Base64Bytes> getBeatmapAnalysisResponse(long beatmapId, String mod) {
         String query = "/beatmaps/" + beatmapId + "/analysis";
         if (mod != null && !mod.isBlank()) {
             query += "?mod=" + URLEncoder.encode(mod, StandardCharsets.UTF_8);
@@ -250,20 +292,21 @@ public class APIHelper {
         return getBase64BytesResponse(query, "获取谱面分析失败", null);
     }
 
-    public static Response<Base64Bytes> getBeatmapsetBgResponse(ShortcutTarget target, String auth) {
-        final long beatmapsetId = lookupBeatmapset(target, auth);
+    @SuppressWarnings("unused")
+    public static Response<Base64Bytes> getBeatmapsetBgResponse(long beatmapsetId) {
         return getBase64BytesResponse("/beatmapsets/" + beatmapsetId + "/background", "获取谱面集失败", null);
     }
 
-    public static Response<Base64Bytes> getBeatmapBgResponse(ShortcutTarget target, String auth) {
-        final long beatmapId = lookupBeatmap(target, auth);
+    public static Response<Base64Bytes> getBeatmapBgResponse(long beatmapId) {
         return getBase64BytesResponse("/beatmaps/" + beatmapId + "/background", "获取谱面失败", null);
     }
 
     public static long lookupBeatmap(ShortcutTarget target, String auth) {
         long beatmapId;
-        if (target.isLocalScore()) {
-            beatmapId = lookupScoreData(target.localScoreId()).get("beatmap_id").getAsLong();
+        if (target.isLocalScore() || "s".equals(target.macroType())) {
+            beatmapId = lookupScoreData(lookupScoreId(target, List.of(), null)).get("beatmap_id").getAsLong();
+        } else if ("m".equals(target.macroType())) {
+            beatmapId = target.explicitId();
         } else if (!target.isMacro()) {
             beatmapId = target.explicitId();
         } else {
@@ -298,7 +341,7 @@ public class APIHelper {
         String query = "/beatmaps/lookup?";
         if (target.isMacro()) {
             switch (target.macroType().toLowerCase()) {
-                case "rs", "bo", "rp" -> {
+                case "rs", "bp", "rp" -> {
                     query += "&of=" + target.macroType() + "&u=" + resolveUid(target.userRef());
                     query += "&i=" + target.macroIndex();
                 }
@@ -315,8 +358,7 @@ public class APIHelper {
         return query;
     }
 
-    public static Response<Base64Bytes> getBeatmapsetResponse(ShortcutTarget target, String auth) {
-        final long beatmapsetId = lookupBeatmapset(target, auth);
+    public static Response<Base64Bytes> getBeatmapsetResponse(long beatmapsetId) {
         return getBase64BytesResponse("/beatmapsets/" + beatmapsetId, "获取谱面集失败", null);
     }
 
@@ -344,7 +386,9 @@ public class APIHelper {
 
     public static long lookupBeatmapset(ShortcutTarget target, String auth) {
         long beatmapsetId;
-        if (!target.isMacro()) {
+        if (target.isLocalScore() || "s".equals(target.macroType())) {
+            return lookupBeatmapset(new ShortcutTarget(lookupBeatmap(target, auth), null, "m", null, null), auth);
+        } else if (!target.isMacro() || "ms".equals(target.macroType())) {
             beatmapsetId = target.explicitId();
         } else {
             try {
@@ -379,29 +423,23 @@ public class APIHelper {
 
         return switch (target.macroType().toLowerCase()) {
             case "m" -> query + "?m=" + target.explicitId();
-            case "rs", "bo", "rp" ->
+            case "ms" -> query + "?ms=" + target.explicitId();
+            case "rs", "bp", "rp" ->
                     query + "?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + resolveUid(target.userRef());
             case "mp" -> query + "?of=mp";
             case null, default -> throw new ResolutionException("快捷查询格式错误。");
         };
     }
 
-    public static Response<Base64Bytes> getScoreResponse(ShortcutTarget target) {
-        return getScoreResponse(target, List.of());
-    }
-
-    public static Response<Base64Bytes> getScoreResponse(ShortcutTarget target, List<String> filters) {
-        String scoreId = lookupScoreId(target, filters);
+    public static Response<Base64Bytes> getScoreResponse(String scoreId) {
         return getBase64BytesResponse("/scores/" + scoreId, "获取成绩失败", null);
     }
 
-    public static Response<Base64Bytes> getScoreAnalyzeResponse(ShortcutTarget target) {
-        String scoreId = lookupScoreId(target);
+    public static Response<Base64Bytes> getScoreAnalyzeResponse(String scoreId) {
         return getBase64BytesResponse("/scores/" + scoreId + "/analysis", "获取成绩分析失败", null);
     }
 
-    public static Response<Base64Bytes> getMissVisualizeResponse(ShortcutTarget target, int index) {
-        String scoreId = lookupScoreId(target);
+    public static Response<Base64Bytes> getMissVisualizeResponse(String scoreId, int index) {
         return getBase64BytesResponse("/scores/" + scoreId + "/misses/" + index + "/visualize", "获取Miss可视化失败", null);
     }
 
@@ -434,7 +472,7 @@ public class APIHelper {
 
     private static String getScoreQuery(ShortcutTarget target) {
         return switch (target.macroType().toLowerCase()) {
-            case "rs", "bo", "rp" ->
+            case "rs", "bp", "rp" ->
                     "/scores/lookup?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + resolveUid(target.userRef());
             case "m" -> "/scores/lookup?m=" + target.explicitId() + "&u=" + resolveUid(target.userRef());
             case "ms" ->
@@ -443,13 +481,13 @@ public class APIHelper {
         };
     }
 
-    public static Response<?> getLookupBeatmapsetResponse(@NotNull ShortcutTarget target, String s) {
+    public static Response<?> getLookupBeatmapsetResponse(long beatmapsetId, String auth) {
         try {
-            final String query = target.isMacro() ? getBeatmapsetQuery(target) : "/beatmapsets/lookup?ms=" + target.explicitId();
+            final String query = "/beatmapsets/lookup?ms=" + beatmapsetId;
 
             HttpRequest localRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + query))
-                    .header("Authorization", "Bearer " + s)
+                    .header("Authorization", "Bearer " + auth)
                     .GET()
                     .build();
 
@@ -500,16 +538,7 @@ public class APIHelper {
         }
     }
 
-    public static ReplayTaskInfo createReplayRenderTask(ShortcutTarget target, TimeDurationParser.TimeRange timeRange) {
-        return createReplayTask(target, timeRange, null);
-    }
-
-    public static ReplayTaskInfo createReplayRenderTask(ShortcutTarget target,
-                                                        TimeDurationParser.TimeRange timeRange,
-                                                        QqUploadRequest qqUpload) {
-        return createReplayTask(target, timeRange, qqUpload);
-    }
-
+    @SuppressWarnings("unused")
     public static ReplayTaskInfo createObscuredReplayRenderTask(long scoreId) {
         return createObscuredReplayRenderTask(scoreId, null);
     }
@@ -564,14 +593,14 @@ public class APIHelper {
         }
     }
 
-    public static String getRandomScoreWeight(Long userId, JsonObject weights) {
+    public static String getRandomScoreWeight(Long userId, JsonObject weights, boolean all) {
         try {
             JsonObject body = new JsonObject();
 
             body.add("weight_factor", weights);
 
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(ENDPOINT + "/scores/random/users/" + userId + "/weights"))
+                    .uri(URI.create(ENDPOINT + "/scores/random/users/" + userId + "/weights?all=" + all))
                     .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                     .build();
 
@@ -635,13 +664,9 @@ public class APIHelper {
         }
     }
 
-    public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget target, String[] ids, String auth) {
-        return createReplayShowcaseTask(target, ids, auth, null);
-    }
 
-    public static ReplayTaskInfo createBeatmapPreviewTask(ShortcutTarget target, String mods, String auth,
+    public static ReplayTaskInfo createBeatmapPreviewTask(long beatmapId, String mods,
                                                           QqUploadRequest qqUpload) {
-        long beatmapId = lookupBeatmap(target, auth);
         JsonObject body = new JsonObject();
         if (mods != null && !mods.isBlank()) {
             body.addProperty("mods", mods);
@@ -658,20 +683,13 @@ public class APIHelper {
         return getReplayTaskInfo(request);
     }
 
-    public static ReplayTaskInfo createReplayShowcaseTask(ShortcutTarget beatmapTarget, String[] scoreTargets, String auth,
+    public static ReplayTaskInfo createReplayShowcaseTask(long beatmapId, String[] scoreTargets,
                                                           QqUploadRequest qqUpload) {
         scoreTargets = scoreTargets == null ? new String[0] : scoreTargets;
 
-        if (beatmapTarget.isLocalScore()) {
-            scoreTargets = Stream.concat(Stream.of("s" + beatmapTarget.localScoreId()), Arrays.stream(scoreTargets))
-                    .distinct()
-                    .toArray(String[]::new);
-        }
         if (scoreTargets.length == 0) {
             throw new RuntimeException("同屏回放需要至少一个ID。");
         }
-
-        final long beatmapId = lookupBeatmap(beatmapTarget, auth);
 
         JsonObject body = GSON.toJsonTree(Map.of("ids", scoreTargets)).getAsJsonObject();
         if (qqUpload != null) {
@@ -686,17 +704,15 @@ public class APIHelper {
         return getReplayTaskInfo(request);
     }
 
-    public static ReplayRenderResult waitReplayVideo(String taskId) {
-        FileInfo qqFile = waitReplayDone(taskId);
+    public static ReplayRenderResult waitReplayVideo(String taskId, long timeout) {
+        FileInfo qqFile = waitReplayDone(taskId, timeout);
         return new ReplayRenderResult(
                 ENDPOINT + "/replays/" + taskId + "/video/replay.mp4", taskId, qqFile);
     }
 
-    private static ReplayTaskInfo createReplayTask(ShortcutTarget target,
-                                                   TimeDurationParser.TimeRange timeRange,
-                                                   QqUploadRequest qqUpload) {
-        String scoreId = lookupScoreId(target);
-
+    public static ReplayTaskInfo createReplayRenderTask(String scoreId,
+                                                        TimeDurationParser.TimeRange timeRange,
+                                                        QqUploadRequest qqUpload) {
         if (timeRange == null) {
             timeRange = getScoreHighlight(scoreId, 5);
         }
@@ -710,6 +726,7 @@ public class APIHelper {
         return getReplayTaskInfo(request);
     }
 
+    @SuppressWarnings("SameParameterValue")
     private static TimeDurationParser.TimeRange getScoreHighlight(long scoreId, int extend) {
         return getScoreHighlight(String.valueOf(scoreId), extend);
     }
@@ -740,19 +757,16 @@ public class APIHelper {
         }
     }
 
-    private static String lookupScoreId(ShortcutTarget target) {
-        return lookupScoreId(target, List.of());
-    }
-
-    private static String lookupScoreId(ShortcutTarget target, List<String> filters) {
+    public static String lookupScoreId(ShortcutTarget target, List<String> filters, String mod) {
         String scoreId;
         if (target.isLocalScore()) {
             scoreId = target.localScoreId();
-        } else if (!target.isMacro()) {
+        } else if (!target.isMacro() || "s".equals(target.macroType())) {
             scoreId = String.valueOf(target.explicitId());
         } else {
             try {
-                final String query = getScoreQuery(target) + encodeScoreFilters(filters);
+                final String query = getScoreQuery(target) + encodeScoreFilters(filters)
+                        + (mod == null ? "" : "&mod=" + URLEncoder.encode(mod, StandardCharsets.UTF_8));
 
                 HttpRequest localRequest = HttpRequest.newBuilder()
                         .uri(URI.create(ENDPOINT + query))
@@ -775,6 +789,10 @@ public class APIHelper {
             }
         }
         return scoreId;
+    }
+
+    public static long getScoreBeatmapId(String scoreId) {
+        return lookupScoreData(scoreId).get("beatmap_id").getAsLong();
     }
 
     private static JsonObject lookupScoreData(String scoreId) {
@@ -839,7 +857,8 @@ public class APIHelper {
         }
     }
 
-    private static FileInfo waitReplayDone(String taskId) {
+    private static FileInfo waitReplayDone(String taskId, long timeout) {
+        final long start = System.currentTimeMillis();
         for (int attempt = 1; attempt <= REPLAY_MAX_POLL_ATTEMPTS; attempt++) {
             JsonObject statusData = getReplayStatus(taskId);
             String status = statusData.get("status").getAsString();
@@ -855,6 +874,9 @@ public class APIHelper {
                         ? statusData.get("error").getAsString()
                         : null;
                 throw new ReplayRenderException(status, error);
+            }
+            if (timeout > 0 && System.currentTimeMillis() - start > timeout) {
+                throw new RuntimeException("回放渲染超时，请稍后重试。");
             }
             try {
                 Thread.sleep(REPLAY_POLL_INTERVAL_MS);
@@ -994,6 +1016,28 @@ public class APIHelper {
         }
     }
 
+    public static RenderStat cancelReplayRender(String jobId) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(ENDPOINT + "/replays/" + jobId + "/cancel"))
+                    .POST(HttpRequest.BodyPublishers.noBody())
+                    .build();
+
+            HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            if (codeNotOk(response.statusCode())) {
+                throw parseHttpError(response.body(), response.statusCode(), "取消回放渲染失败");
+            }
+            RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
+            ensureApiSuccess(payload, "取消回放渲染失败");
+            return GSON.fromJson(requireDataObject(payload, "取消回放渲染响应缺少data"), RenderStat.class);
+        } catch (IOException e) {
+            throw requestFailure(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Replay cancellation request interrupted", e);
+        }
+    }
+
     public static ServerStatus getServerStatus() {
         boolean oStella = false;
         boolean osu = false;
@@ -1028,8 +1072,7 @@ public class APIHelper {
         return new ServerStatus(true, oStella, oStellaVersion, osu);
     }
 
-    public static Response<List<MissData>> getScoreMissesResponse(ShortcutTarget target) {
-        final String scoreId = lookupScoreId(target);
+    public static Response<List<MissData>> getScoreMissesResponse(String scoreId) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/scores/" + scoreId + "/misses"))
@@ -1201,6 +1244,7 @@ public class APIHelper {
     }
 
     public record ReplayRenderResult(String videoUrl, String taskId, FileInfo qqFile) {
+        @SuppressWarnings("unused")
         public ReplayRenderResult(String videoUrl, String taskId) {
             this(videoUrl, taskId, null);
         }

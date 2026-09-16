@@ -3,7 +3,7 @@ package xyz.zcraft.seira.console;
 import java.util.ArrayList;
 import java.util.List;
 
-final class ConsoleInputParser {
+public final class ConsoleInputParser {
     private ConsoleInputParser() {
     }
 
@@ -56,27 +56,27 @@ final class ConsoleInputParser {
         return new ParsedInput(raw, List.copyOf(tokens));
     }
 
-    record ParsedInput(String raw, List<Token> tokens) {
-        String value(int index) {
+    public record ParsedInput(String raw, List<Token> tokens) {
+        public String value(int index) {
             return tokens.get(index).value();
         }
 
-        int size() {
+        public int size() {
             return tokens.size();
         }
 
-        String remainderAfterTokens(int count) {
+        public String remainderAfterTokens(int count) {
             if (count < 0 || count >= tokens.size()) {
                 return "";
             }
             return raw.substring(tokens.get(count).start()).trim();
         }
 
-        List<String> valuesFrom(int index) {
+        public List<String> valuesFrom(int index) {
             return tokens.stream().skip(index).map(Token::value).toList();
         }
     }
 
-    record Token(String value, int start, int end) {
+    public record Token(String value, int start, int end) {
     }
 }

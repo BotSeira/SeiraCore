@@ -2,6 +2,10 @@ package xyz.zcraft.seira.command.parse;
 
 import xyz.zcraft.seira.data.UserRef;
 
+/**
+ * 用户输入或 API 目标。解析后的普通目标只包含 explicitId；
+ * 本地成绩使用 localScoreId。跨类型查找时 m/ms/s 标明原始 ID 的类型。
+ */
 public record ShortcutTarget(
         Long explicitId,
         String localScoreId,

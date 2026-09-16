@@ -4,13 +4,13 @@ import xyz.zcraft.seira.rankguess.data.FinishedRound;
 import xyz.zcraft.seira.rankguess.data.Standing;
 
 import java.sql.*;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 
 import static xyz.zcraft.seira.rankguess.RankGuessGameService.MIN_GAMES_TO_RANK;
 
 public class RankGuessRecordStore {
-    public static final int TOP_TWENTY_MIN_PARTICIPANTS = 1;
-
     /**
      * Returns false when this round has already been saved. All rows are committed together.
      */
@@ -19,8 +19,8 @@ public class RankGuessRecordStore {
         String gameSql = """
                 INSERT INTO rank_guess_games (
                     round_id, group_id, source_mode, target_user_id, target_score_id, actual_rank,
-                    started_at, ended_at, participant_count, scoring_version
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    started_at, ended_at, participant_count, scoring_version, starter_open_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(round_id) DO NOTHING
                 """;
         String resultSql = """
@@ -43,6 +43,7 @@ public class RankGuessRecordStore {
                     statement.setLong(8, finished.endedAt().toEpochMilli());
                     statement.setInt(9, finished.standings().size());
                     statement.setInt(10, finished.scoringVersion());
+                    statement.setString(11, finished.starterOpenId());
                     if (statement.executeUpdate() == 0) {
                         connection.rollback();
                         return false;
@@ -97,6 +98,26 @@ public class RankGuessRecordStore {
         }
     }
 
+    public static long getGamesStarted(Long osuUid, String groupId) {
+        String sql = """
+                SELECT COUNT(*)
+                FROM rank_guess_games g
+                WHERE g.starter_open_id = ?
+                """;
+        if (groupId != null) sql += " AND g.group_id = ?";
+        try (Connection connection = SqliteDatabase.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, osuUid);
+            if (groupId != null) statement.setString(2, groupId);
+            try (ResultSet result = statement.executeQuery()) {
+                result.next();
+                return result.getLong(1);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to query games started", e);
+        }
+    }
+
     public static long getGroupGameCount(String groupId, Integer scoringVersion) {
         requireText(groupId, "groupId");
         if (scoringVersion != null && scoringVersion < 1) {
@@ -145,21 +166,24 @@ public class RankGuessRecordStore {
         }
     }
 
-    public static Statistics.Personal getPersonalStatistics(String userId, String groupId, Integer scoringVersion) {
-        return getPersonalStatistics(userId, groupId, scoringVersion, null);
+    public static Statistics.Personal getPersonalStatistics(String userId, String groupId, Integer scoringVersion, Integer minParticipants) {
+        return getPersonalStatistics(userId, groupId, scoringVersion, null, minParticipants);
     }
 
     public static Statistics.Personal getRecentPersonalStatistics(
-            String userId, String groupId, Integer scoringVersion, int gameLimit
+            String userId, String groupId, Integer scoringVersion, int gameLimit, Integer minParticipants
     ) {
         if (gameLimit < 1) {
             throw new IllegalArgumentException("gameLimit must be positive");
         }
-        return getPersonalStatistics(userId, groupId, scoringVersion, gameLimit);
+        if (minParticipants != null && minParticipants < 1) {
+            throw new IllegalArgumentException("minParticipants must be positive");
+        }
+        return getPersonalStatistics(userId, groupId, scoringVersion, gameLimit, minParticipants);
     }
 
     private static Statistics.Personal getPersonalStatistics(
-            String userId, String groupId, Integer scoringVersion, Integer gameLimit
+            String userId, String groupId, Integer scoringVersion, Integer gameLimit, Integer minParticipants
     ) {
         requireText(userId, "userId");
         if (groupId != null) requireText(groupId, "groupId");
@@ -169,9 +193,7 @@ public class RankGuessRecordStore {
         String sql = """
                 SELECT COUNT(*) AS participation,
                        COALESCE(SUM(CASE WHEN recent.placement = 1 THEN 1 ELSE 0 END), 0) AS wins,
-                       COALESCE(SUM(CASE WHEN recent.participant_count >= ?
-                           AND recent.placement <= (recent.participant_count + 4) / 5 THEN 1 ELSE 0 END), 0) AS top_twenty,
-                       COALESCE(SUM(CASE WHEN recent.participant_count >= ? THEN 1 ELSE 0 END), 0) AS top_twenty_eligible,
+                       COALESCE(SUM(CASE WHEN recent.placement <= (recent.participant_count + 4) / 5 THEN 1 ELSE 0 END), 0) AS top_twenty,
                        COALESCE(SUM(recent.final_score), 0) AS total_score,
                        COALESCE(AVG(recent.final_score), 0) AS average_score,
                        COALESCE(MAX(recent.final_score), 0) AS highest_score,
@@ -182,16 +204,16 @@ public class RankGuessRecordStore {
                     JOIN rank_guess_games g ON g.round_id = r.round_id
                     WHERE r.user_id = ?
                 """;
+        if (minParticipants != null) sql += " AND g.participant_count >= ?";
         if (groupId != null) sql += " AND g.group_id = ?";
         if (scoringVersion != null) sql += " AND g.scoring_version = ?";
         if (gameLimit != null) sql += " ORDER BY g.ended_at DESC, g.round_id DESC LIMIT ?";
         sql += ") recent";
         try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setInt(1, TOP_TWENTY_MIN_PARTICIPANTS);
-            statement.setInt(2, TOP_TWENTY_MIN_PARTICIPANTS);
-            statement.setString(3, userId);
-            int index = 4;
+            statement.setString(1, userId);
+            int index = 2;
+            if (minParticipants != null) statement.setInt(index++, minParticipants);
             if (groupId != null) statement.setString(index++, groupId);
             if (scoringVersion != null) statement.setInt(index++, scoringVersion);
             if (gameLimit != null) statement.setInt(index, gameLimit);
@@ -199,13 +221,189 @@ public class RankGuessRecordStore {
                 result.next();
                 return new Statistics.Personal(
                         result.getLong("participation"), result.getLong("wins"),
-                        result.getLong("top_twenty"), result.getLong("top_twenty_eligible"),
+                        result.getLong("top_twenty"),
                         result.getDouble("total_score"), result.getDouble("average_score"),
                         result.getDouble("highest_score"), result.getDouble("average_placement")
                 );
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Failed to query rank guess statistics", e);
+        }
+    }
+
+    public static Map<String, RankData> getGroupRankData(
+            String groupId, Integer scoringVersion, int recentGameLimit, Integer minParticipants, Integer gameLimit
+    ) {
+        if (groupId != null) {
+            requireText(groupId, "groupId");
+        }
+
+        if (scoringVersion != null && scoringVersion < 1) {
+            throw new IllegalArgumentException("scoringVersion must be positive");
+        }
+
+        if (recentGameLimit <= 0) {
+            throw new IllegalArgumentException("recentGameLimit must be positive");
+        }
+
+        String sql = """
+                WITH ranked AS (
+                    SELECT
+                        r.user_id,
+                        r.placement,
+                        r.final_score,
+                        g.participant_count,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY r.user_id
+                            ORDER BY g.ended_at DESC, g.round_id DESC
+                        ) AS rn
+                    FROM rank_guess_results r
+                    JOIN rank_guess_games g
+                        ON g.round_id = r.round_id
+                    WHERE 1 = 1
+                """;
+
+        if (groupId != null) {
+            sql += " AND g.group_id = ?";
+        }
+
+        if (minParticipants != null) {
+            sql += " AND g.participant_count >= ?";
+        }
+
+        if (scoringVersion != null) {
+            sql += " AND g.scoring_version = ?";
+        }
+
+        sql += """
+                ),
+                all_stats AS (
+                    SELECT
+                        user_id,
+                        COUNT(*) AS participation,
+                        SUM(CASE WHEN placement = 1 THEN 1 ELSE 0 END) AS wins,
+                        SUM(
+                            CASE
+                                WHEN placement <= (participant_count + 4) / 5
+                                THEN 1
+                                ELSE 0
+                            END
+                        ) AS top_twenty,
+                        SUM(final_score) AS total_score,
+                        AVG(final_score) AS average_score,
+                        MAX(final_score) AS highest_score,
+                        AVG(placement) AS average_placement
+                    FROM ranked
+                    GROUP BY user_id
+                ),
+                recent_stats AS (
+                    SELECT
+                        user_id,
+                        COUNT(*) AS participation,
+                        SUM(CASE WHEN placement = 1 THEN 1 ELSE 0 END) AS wins,
+                        SUM(
+                            CASE
+                                WHEN placement <= (participant_count + 4) / 5
+                                THEN 1
+                                ELSE 0
+                            END
+                        ) AS top_twenty,
+                        SUM(final_score) AS total_score,
+                        AVG(final_score) AS average_score,
+                        MAX(final_score) AS highest_score,
+                        AVG(placement) AS average_placement
+                    FROM ranked
+                    WHERE rn <= ?
+                    GROUP BY user_id
+                )
+                SELECT
+                    a.user_id,
+                
+                    a.participation AS all_participation,
+                    a.wins AS all_wins,
+                    a.top_twenty AS all_top_twenty,
+                    a.total_score AS all_total_score,
+                    a.average_score AS all_average_score,
+                    a.highest_score AS all_highest_score,
+                    a.average_placement AS all_average_placement,
+                
+                    COALESCE(r.participation, 0) AS recent_participation,
+                    COALESCE(r.wins, 0) AS recent_wins,
+                    COALESCE(r.top_twenty, 0) AS recent_top_twenty,
+                    COALESCE(r.total_score, 0) AS recent_total_score,
+                    COALESCE(r.average_score, 0) AS recent_average_score,
+                    COALESCE(r.highest_score, 0) AS recent_highest_score,
+                    COALESCE(r.average_placement, 0) AS recent_average_placement
+                
+                FROM all_stats a
+                LEFT JOIN recent_stats r
+                    ON r.user_id = a.user_id
+                """;
+
+        if (gameLimit != null) {
+            sql += " WHERE a.participation > ?";
+        }
+
+        try (Connection connection = SqliteDatabase.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            int index = 1;
+
+            if (groupId != null) {
+                statement.setString(index++, groupId);
+            }
+
+            if (minParticipants != null) {
+                statement.setInt(index++, minParticipants);
+            }
+
+            if (scoringVersion != null) {
+                statement.setInt(index++, scoringVersion);
+            }
+
+            statement.setInt(index++, recentGameLimit);
+
+            if (gameLimit != null) {
+                statement.setInt(index, gameLimit);
+            }
+
+            Map<String, RankData> resultMap = new HashMap<>();
+
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    Statistics.Personal all = new Statistics.Personal(
+                            result.getLong("all_participation"),
+                            result.getLong("all_wins"),
+                            result.getLong("all_top_twenty"),
+                            result.getDouble("all_total_score"),
+                            result.getDouble("all_average_score"),
+                            result.getDouble("all_highest_score"),
+                            result.getDouble("all_average_placement")
+                    );
+
+                    Statistics.Personal recent = new Statistics.Personal(
+                            result.getLong("recent_participation"),
+                            result.getLong("recent_wins"),
+                            result.getLong("recent_top_twenty"),
+                            result.getDouble("recent_total_score"),
+                            result.getDouble("recent_average_score"),
+                            result.getDouble("recent_highest_score"),
+                            result.getDouble("recent_average_placement")
+                    );
+
+                    resultMap.put(
+                            result.getString("user_id"),
+                            new RankData(all, recent)
+                    );
+                }
+            }
+
+            return resultMap;
+        } catch (SQLException e) {
+            throw new IllegalStateException(
+                    "Failed to query rank guess data",
+                    e
+            );
         }
     }
 
@@ -282,9 +480,143 @@ public class RankGuessRecordStore {
         }
     }
 
+    public static RankGuessed getAverageRankGuessed(Long osuUid, String groupId) {
+        String sql = """
+                WITH ranked AS (
+                    SELECT
+                        g.round_id,
+                        g.target_user_id,
+                        r.guessed_rank,
+                
+                        ROW_NUMBER() OVER (
+                            PARTITION BY g.round_id
+                            ORDER BY r.guessed_rank ASC, r.user_id ASC
+                        ) AS low_rank,
+                
+                        ROW_NUMBER() OVER (
+                            PARTITION BY g.round_id
+                            ORDER BY r.guessed_rank DESC, r.user_id DESC
+                        ) AS high_rank
+                
+                    FROM rank_guess_games g
+                    JOIN rank_guess_results r
+                        ON r.round_id = g.round_id
+                
+                    WHERE g.target_user_id = ?
+                """;
+
+        if (groupId != null) {
+            sql += " AND g.group_id = ?";
+        }
+
+        sql += """
+                )
+                SELECT
+                    AVG(guessed_rank) AS avg_guessed_rank,
+                    POW(10, AVG(LOG10(guessed_rank))) AS log_avg_guessed_rank
+                FROM ranked
+                WHERE low_rank > 1
+                  AND high_rank > 1
+                """;
+
+        try (Connection connection = SqliteDatabase.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setLong(1, osuUid);
+
+            if (groupId != null) {
+                statement.setString(2, groupId);
+            }
+
+            try (ResultSet result = statement.executeQuery()) {
+                result.next();
+
+                return new RankGuessed(
+                        result.getDouble("avg_guessed_rank"),
+                        result.getDouble("log_avg_guessed_rank")
+                );
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to query average rank guessed", e);
+        }
+    }
+
+    public static long getTotalGamesCount(String groupId) {
+        String sql = """
+                SELECT COUNT(*)
+                FROM rank_guess_games g
+                """;
+        if (groupId != null) sql += " AND g.group_id = ?";
+        try (Connection connection = SqliteDatabase.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            if (groupId != null) statement.setString(1, groupId);
+            try (ResultSet result = statement.executeQuery()) {
+                result.next();
+                return result.getLong(1);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to query picked times", e);
+        }
+    }
+
+    public static Map<Long, Integer> getGamesSincePicked(String groupId) {
+        String sql = """
+                WITH group_games AS (
+                    SELECT
+                        target_user_id,
+                        ROW_NUMBER() OVER (
+                            ORDER BY ended_at ASC, round_id ASC
+                        ) AS game_no
+                    FROM rank_guess_games
+                    WHERE group_id = ?
+                    AND source_mode = 'group'
+                ),
+                latest_pick AS (
+                    SELECT
+                        target_user_id,
+                        MAX(game_no) AS last_game_no
+                    FROM group_games
+                    GROUP BY target_user_id
+                ),
+                total AS (
+                    SELECT COALESCE(MAX(game_no), 0) AS current_game_no
+                    FROM group_games
+                )
+                SELECT
+                    latest_pick.target_user_id,
+                    total.current_game_no - latest_pick.last_game_no AS games_since_picked
+                FROM latest_pick
+                CROSS JOIN total;
+                """;
+
+        Map<Long, Integer> gamesSincePicked = new HashMap<>();
+        try (Connection connection = SqliteDatabase.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            if (groupId != null) statement.setString(1, groupId);
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    gamesSincePicked.put(
+                            result.getLong("target_user_id"),
+                            result.getInt("games_since_picked")
+                    );
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to query picked times", e);
+        }
+
+        return gamesSincePicked;
+    }
+
+    public record RankData(
+            Statistics.Personal all,
+            Statistics.Personal recent
+    ) {
+    }
+
     public static class Statistics {
         public record Personal(
-                long participation, long wins, long topTwentyCount, long topTwentyEligibleParticipation,
+                long participation, long wins, long topTwentyCount,
                 double totalScore, double averageScore, double highestScore, double averagePlacement
         ) {
             public double winRate() {
@@ -292,8 +624,8 @@ public class RankGuessRecordStore {
             }
 
             public double topTwentyRate() {
-                return topTwentyEligibleParticipation == 0 ? 0
-                        : topTwentyCount / (double) topTwentyEligibleParticipation;
+                return participation == 0 ? 0
+                        : topTwentyCount / (double) participation;
             }
         }
     }
@@ -302,5 +634,8 @@ public class RankGuessRecordStore {
         public RecordSaveException(String message, Throwable cause) {
             super(message, cause);
         }
+    }
+
+    public record RankGuessed(double average, double logAverage) {
     }
 }

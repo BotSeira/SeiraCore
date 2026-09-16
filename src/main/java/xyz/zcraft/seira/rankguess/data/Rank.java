@@ -4,6 +4,7 @@ import xyz.zcraft.seira.db.RankGuessRecordStore;
 
 public record Rank(double rating, double ratingRaw, String rank) {
     public static final int RECENT_GAME_LIMIT = 10;
+    public static final int STATS_MIN_PARTICIPANTS = 3;
 
     public static Rank from(RankGuessRecordStore.Statistics.Personal recent,
                             RankGuessRecordStore.Statistics.Personal all) {
@@ -14,6 +15,10 @@ public record Rank(double rating, double ratingRaw, String rank) {
         return new Rank(pendingRating, pendingRatingRaw, pendingRank);
     }
 
+    public static Rank from(RankGuessRecordStore.RankData rankData) {
+        return from(rankData.recent(), rankData.all());
+    }
+
     private static double getRatingRaw(RankGuessRecordStore.Statistics.Personal recent,
                                        RankGuessRecordStore.Statistics.Personal all) {
         double averageScoreRate = Math.clamp(
@@ -21,9 +26,9 @@ public record Rank(double rating, double ratingRaw, String rank) {
                 0.0, 1.0
         );
 
-        double rawRating = averageScoreRate * 0.55
-                + recent.winRate() * 0.10
-                + recent.topTwentyRate() * 0.35;
+        double rawRating = averageScoreRate * 0.56
+                + recent.winRate() * 0.08
+                + recent.topTwentyRate() * 0.36;
 
         rawRating *= 1.025;
 
@@ -47,7 +52,7 @@ public record Rank(double rating, double ratingRaw, String rank) {
         String rank;
 
         if (rawRating >= 1.00) rank = "SS";
-        else if (rawRating >= 0.82) rank = "S";
+        else if (rawRating >= 0.80) rank = "S";
         else if (rawRating >= 0.68) rank = "A";
         else if (rawRating >= 0.57) rank = "B";
         else if (rawRating >= 0.42) rank = "C";
