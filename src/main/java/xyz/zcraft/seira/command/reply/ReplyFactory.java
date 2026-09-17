@@ -823,20 +823,19 @@ public final class ReplyFactory {
                 }
             }
 
-            return at(selfOpenId) + """
-                    你们的好友状态:
-                    > %s:
-                    > ![image #30px #30px](%s) __ | %s__
+            return """
+                    %s 和 %s 的好友状态:
+                    > # ![image #30px #30px](%s) __ | %s__
                     
-                    %s
+                    # %s
                     
-                    > %s:
-                    > ![image #30px #30px](%s) __ | %s__
+                    > # ![image #30px #30px](%s) __ | %s__
                     """.formatted(
-                    at(selfOpenId), selfOsuAvatar, url(selfUsername, "https://osu.ppy.sh/users/" + selfUid),
+                    at(selfOpenId), at(targetOpenId),
+                    selfOsuAvatar, url(selfUsername, "https://osu.ppy.sh/users/" + selfUid),
                     status,
-                    at(targetOpenId), targetOsuAvatar, url(targetUsername, "https://osu.ppy.sh/users/" + targetUid)
-            );
+                    targetOsuAvatar, url(targetUsername, "https://osu.ppy.sh/users/" + targetUid)
+            ).trim();
         }
 
         public static String missImageContent(Context ctx, String scoreId, Integer index, int size) {
