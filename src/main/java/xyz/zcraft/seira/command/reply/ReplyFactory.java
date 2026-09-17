@@ -651,7 +651,7 @@ public final class ReplyFactory {
 
             sb.append("\n> 仅粉丝← (");
             sb.append(onlyFollower.size()).append(" 已知");
-            if (all) sb.append(" 共 ").append(self.getFollowerCount() - allMutualCount);
+            if (all) sb.append(" 共 ").append(Math.max(self.getFollowerCount() - allMutualCount, 0));
             sb.append(")\n>");
             collapsed |= appendFriends(ctx, onlyFollower, sb);
 
