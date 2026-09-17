@@ -103,15 +103,14 @@ public final class SocialCommandHandler {
         }
 
         final UserExtended targetUser = APIHelper.getUserRaw(targetRef.userRef());
+        final String targetOsuAvatar = targetUser.getAvatarUrl();
 
         boolean selfFollowed;
         final AtomicReference<Boolean> targetFollowed = new AtomicReference<>();
 
-        AtomicReference<String> selfOsuAvatar = new AtomicReference<>("https://osu.ppy.sh/images/layout/avatar-guest.png");
-        AtomicReference<String> targetOsuAvatar = new AtomicReference<>("https://osu.ppy.sh/images/layout/avatar-guest.png");
-
         final OsuToken selfToken = authHelper.updateTokenAndGet(ctx.senderUserId());
         final var selfUser = APIHelper.getSelf(selfToken.accessToken()).getContent();
+        final String selfOsuAvatar = selfUser.getAvatarUrl();
 
         final List<FriendEntry> selfFollowedList = APIHelper.getFollowed(selfToken.accessToken()).getContent();
         updateFriends(selfId, selfFollowedList);
@@ -142,14 +141,12 @@ public final class SocialCommandHandler {
 
         UserDataStore.storeUserInfo(users);
 
-        users.stream().filter(u -> u.getId() == selfId).findFirst().ifPresent(u -> selfOsuAvatar.set(u.getAvatarUrl()));
-
         ctx.sendReply(replyFactory.friendStatusMessage(
-                        ctx.senderUserId(), selfId, selfOsuAvatar.get(),
+                        ctx.senderUserId(), selfId, selfOsuAvatar,
                         UserDataStore.findUsername(selfId).orElse("未知"),
                         avatarProvider.apply(ctx.senderUserId()),
 
-                        targetOpenId, targetUser.getId(), targetOsuAvatar.get(),
+                        targetOpenId, targetUser.getId(), targetOsuAvatar,
                         targetUser.getUsername(),
                         avatarProvider.apply(targetOpenId),
 
