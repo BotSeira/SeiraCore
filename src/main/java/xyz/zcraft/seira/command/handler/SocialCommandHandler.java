@@ -112,6 +112,11 @@ public final class SocialCommandHandler {
         final var selfUser = APIHelper.getSelf(selfToken.accessToken()).getContent();
         final String selfOsuAvatar = selfUser.getAvatarUrl();
 
+        if (targetUser.getId() == selfUser.getId()) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + " 和 `" + targetUser.getUsername() + "` 是一个人喵。"));
+            return;
+        }
+
         final List<FriendEntry> selfFollowedList = APIHelper.getFollowed(selfToken.accessToken()).getContent();
         updateFriends(selfId, selfFollowedList);
         final Set<User> users = new HashSet<>(selfFollowedList.stream().map(FriendEntry::user).toList());
