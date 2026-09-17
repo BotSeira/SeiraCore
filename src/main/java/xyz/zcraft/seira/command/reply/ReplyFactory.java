@@ -825,11 +825,11 @@ public final class ReplyFactory {
 
             return """
                     %s 和 %s 的好友状态:
-                    > # ![image #30px #30px](%s) __ | %s__
+                    > # ![image #30px #30px](%s)&ensp;__|__&ensp;%s
                     
                     # %s
                     
-                    > # ![image #30px #30px](%s) __ | %s__
+                    > # ![image #30px #30px](%s)&ensp;__|__&ensp;%s
                     """.formatted(
                     at(selfOpenId), at(targetOpenId),
                     selfOsuAvatar, url(selfUsername, "https://osu.ppy.sh/users/" + selfUid),
