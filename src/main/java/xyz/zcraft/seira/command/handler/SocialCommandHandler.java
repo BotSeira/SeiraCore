@@ -95,13 +95,14 @@ public final class SocialCommandHandler {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/mu @someone\n> 注: 读取@需要开启权限。"));
         }
 
-        final String s = resolver.extractMentionedUserId(ctx.argument(0));
-        final Long targetId = resolver.resolveBoundUid(s);
+        final UserRefResolution targetRef = resolver.resolveUserRefArgument(ctx.argument(0));
 
-        if (targetId == null) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "对方还未绑定喵"));
+        if (targetRef.errorMessage() != null) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + targetRef.errorMessage()));
             return;
         }
+
+        final UserExtended targetUser = APIHelper.getUserRaw(targetRef.userRef());
 
         boolean selfFollowed;
         final AtomicReference<Boolean> targetFollowed = new AtomicReference<>();
@@ -117,18 +118,21 @@ public final class SocialCommandHandler {
         final Set<User> users = new HashSet<>(selfFollowedList.stream().map(FriendEntry::user).toList());
 
         users.add(selfUser);
+        users.add(targetUser);
 
         selfFollowed = selfFollowedList.stream()
-                .anyMatch(e -> e.user().getId() == targetId);
+                .anyMatch(e -> e.user().getId() == targetUser.getId());
 
         selfFollowedList.stream()
-                .filter(e -> e.user().getId() == targetId)
+                .filter(e -> e.user().getId() == targetUser.getId())
                 .findFirst()
                 .ifPresent(e -> targetFollowed.set(e.mutual()));
 
-        if (targetFollowed.get() == null) {
+        final var targetOpenId = UserDataStore.findGroupOpenIdByUid(ctx.groupId(), targetUser.getId()).orElse(null);
+
+        if (targetFollowed.get() == null && targetOpenId != null) {
             final List<FriendEntry> targetFollowedList;
-            final OsuToken target = authHelper.updateTokenAndGet(s);
+            final OsuToken target = authHelper.updateTokenAndGet(targetOpenId);
             if (target != null) {
                 targetFollowedList = APIHelper.getFollowed(target.accessToken()).getContent();
                 targetFollowed.set(targetFollowedList.stream().anyMatch(e -> e.user().getId() == selfId));
@@ -140,28 +144,14 @@ public final class SocialCommandHandler {
 
         users.stream().filter(u -> u.getId() == selfId).findFirst().ifPresent(u -> selfOsuAvatar.set(u.getAvatarUrl()));
 
-        final var targetUser = users.stream()
-                .filter(u -> u.getId() == targetId)
-                .findFirst()
-                .orElseGet(() -> APIHelper.getUsers(List.of(targetId))
-                        .stream()
-                        .filter(u -> u.getId() == targetId)
-                        .findFirst()
-                        .orElse(null)
-                );
-
-        if (targetUser != null) {
-            targetOsuAvatar.set(targetUser.getAvatarUrl());
-        }
-
         ctx.sendReply(replyFactory.friendStatusMessage(
                         ctx.senderUserId(), selfId, selfOsuAvatar.get(),
                         UserDataStore.findUsername(selfId).orElse("未知"),
                         avatarProvider.apply(ctx.senderUserId()),
 
-                        s, targetId, targetOsuAvatar.get(),
-                        UserDataStore.findUsername(targetId).orElse("未知"),
-                        avatarProvider.apply(s),
+                        targetOpenId, targetUser.getId(), targetOsuAvatar.get(),
+                        targetUser.getUsername(),
+                        avatarProvider.apply(targetOpenId),
 
                         selfFollowed, targetFollowed.get()
                 )

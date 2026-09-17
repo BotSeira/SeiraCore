@@ -831,7 +831,7 @@ public final class ReplyFactory {
                     
                     > # ![image #30px #30px](%s)&ensp;__|__&ensp;%s
                     """.formatted(
-                    at(selfOpenId), at(targetOpenId),
+                    at(selfOpenId), targetAvatar == null ? targetUsername : at(targetOpenId),
                     selfOsuAvatar, url(selfUsername, "https://osu.ppy.sh/users/" + selfUid),
                     status,
                     targetOsuAvatar, url(targetUsername, "https://osu.ppy.sh/users/" + targetUid)
