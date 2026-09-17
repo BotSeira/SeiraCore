@@ -653,4 +653,8 @@ public class QQApi {
     private record UploadPrepare(String uploadId, long blockSize, List<UploadPart> parts, int concurrency,
                                  int retryTimeoutSeconds, int retryDelaySeconds) {
     }
+
+    public static String getAvatarUrl(String appId, String openId) {
+        return "https://thirdqq.qlogo.cn/qqapp/" + appId + "/" + openId + "/100";
+    }
 }

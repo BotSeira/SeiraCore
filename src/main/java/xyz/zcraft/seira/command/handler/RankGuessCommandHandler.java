@@ -13,6 +13,7 @@ import xyz.zcraft.seira.command.parse.ShortcutTarget;
 import xyz.zcraft.seira.command.parse.UserRefResolution;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.data.SendResult;
+import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.db.RankGuessRecordStore;
 import xyz.zcraft.seira.db.UserDataStore;
@@ -26,7 +27,9 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -44,6 +47,8 @@ public final class RankGuessCommandHandler {
     private final RankGuessGameService games;
     private final Resolver resolver;
     private final Predicate<String> adminAuthorizer;
+    private final Function<String, String> avatarUrlGetter;
+    private final Function<byte[], UploadedImage> imageUploader;
     private final Pattern BP_PATTERN = Pattern.compile("^bp(\\d+)$");
 
     public RankGuessCommandHandler(
@@ -51,13 +56,17 @@ public final class RankGuessCommandHandler {
             ReplyFactory replyFactory,
             RankGuessGameService games,
             Resolver resolver,
-            Predicate<String> adminAuthorizer
+            Predicate<String> adminAuthorizer,
+            Function<String, String> avatarUrlGetter,
+            Function<byte[], UploadedImage> imageUploader
     ) {
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
         this.games = games;
         this.resolver = resolver;
         this.adminAuthorizer = adminAuthorizer;
+        this.avatarUrlGetter = avatarUrlGetter;
+        this.imageUploader = imageUploader;
     }
 
     private static Long parseRank(String argument) {
@@ -543,7 +552,8 @@ public final class RankGuessCommandHandler {
             hintSource.addAll(round.getNormalHints());
 
             if (fromGroup) {
-                hintSource.addAll(round.getGroupHints());
+                final Optional<String> groupOpenIdByUid = UserDataStore.findGroupOpenIdByUid(ctx.groupId(), round.userId());
+                hintSource.addAll(round.getGroupHints(avatarUrlGetter.apply(groupOpenIdByUid.orElse(null)), imageUploader));
             }
 
             var hints = HintUtil.prepareHints(hintSource, maxHintCount);

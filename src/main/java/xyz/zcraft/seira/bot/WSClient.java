@@ -9,6 +9,7 @@ import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import xyz.zcraft.seira.bot.data.AccessToken;
 import xyz.zcraft.seira.bot.data.Attachment;
+import xyz.zcraft.seira.bot.data.QQUser;
 import xyz.zcraft.seira.command.AttachmentHandler;
 import xyz.zcraft.seira.command.route.Router;
 import xyz.zcraft.seira.config.AppConfig;

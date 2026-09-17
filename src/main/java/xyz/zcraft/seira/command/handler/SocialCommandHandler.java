@@ -32,19 +32,22 @@ public final class SocialCommandHandler {
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
     private final Function<String, String> accessTokenProvider;
+    private final Function<String, String> avatarProvider;
 
     public SocialCommandHandler(
             Resolver resolver,
             OsuAuthHelper authHelper,
             TaskCoordinator taskCoordinator,
             ReplyFactory replyFactory,
-            Function<String, String> accessTokenProvider
+            Function<String, String> accessTokenProvider,
+            Function<String, String> avatarProvider
     ) {
         this.resolver = resolver;
         this.authHelper = authHelper;
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
         this.accessTokenProvider = accessTokenProvider;
+        this.avatarProvider = avatarProvider;
     }
 
     public void handleMp(Context ctx) {
@@ -103,10 +106,17 @@ public final class SocialCommandHandler {
         boolean selfFollowed;
         final AtomicReference<Boolean> targetFollowed = new AtomicReference<>();
 
-        final OsuToken self = authHelper.updateTokenAndGet(ctx.senderUserId());
-        final List<FriendEntry> selfFollowedList = APIHelper.getFollowed(self.accessToken()).getContent();
+        AtomicReference<String> selfOsuAvatar = new AtomicReference<>("https://osu.ppy.sh/images/layout/avatar-guest.png");
+        AtomicReference<String> targetOsuAvatar = new AtomicReference<>("https://osu.ppy.sh/images/layout/avatar-guest.png");
+
+        final OsuToken selfToken = authHelper.updateTokenAndGet(ctx.senderUserId());
+        final var selfUser = APIHelper.getSelf(selfToken.accessToken()).getContent();
+
+        final List<FriendEntry> selfFollowedList = APIHelper.getFollowed(selfToken.accessToken()).getContent();
         updateFriends(selfId, selfFollowedList);
         final Set<User> users = new HashSet<>(selfFollowedList.stream().map(FriendEntry::user).toList());
+
+        users.add(selfUser);
 
         selfFollowed = selfFollowedList.stream().anyMatch(e -> e.user().getId() == targetId);
 
@@ -127,9 +137,23 @@ public final class SocialCommandHandler {
 
         UserDataStore.storeUserInfo(users);
 
+        users.stream().filter(u -> u.getId() == selfId).findFirst().ifPresent(u -> {
+            selfOsuAvatar.set(u.getAvatarUrl());
+        });
+
+        users.stream().filter(u -> u.getId() == targetId).findFirst().ifPresent(u -> {
+            targetOsuAvatar.set(u.getAvatarUrl());
+        });
+
         ctx.sendReply(replyFactory.friendStatusMessage(
-                        ctx.senderUserId(), selfId, UserDataStore.findUsername(selfId).orElse("未知"),
-                        s, targetId, UserDataStore.findUsername(targetId).orElse("未知"),
+                        ctx.senderUserId(), selfId, selfOsuAvatar.get(),
+                        UserDataStore.findUsername(selfId).orElse("未知"),
+                        avatarProvider.apply(ctx.senderUserId()),
+
+                        s, targetId, targetOsuAvatar.get(),
+                        UserDataStore.findUsername(targetId).orElse("未知"),
+                        avatarProvider.apply(s),
+
                         selfFollowed, targetFollowed.get()
                 )
         );

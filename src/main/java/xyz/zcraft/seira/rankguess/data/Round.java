@@ -3,13 +3,20 @@ package xyz.zcraft.seira.rankguess.data;
 import xyz.zcraft.osu.model.Score;
 import xyz.zcraft.osu.model.UserExtended;
 import xyz.zcraft.seira.api.data.RandomScore;
+import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.rankguess.RankGuessGame;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
+import xyz.zcraft.seira.util.ImageUtil;
+import xyz.zcraft.seira.util.WeightedRandom;
 
+import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 public record Round(long userId, long scoreId, int bestIndex, long actualRank, Double pp,
                     RandomScore randomScore, boolean standard) {
@@ -191,80 +198,111 @@ public record Round(long userId, long scoreId, int bestIndex, long actualRank, D
         return hints;
     }
 
-    public LinkedList<RankGuessGame.Hint> getGroupHints() {
-        LinkedList<RankGuessGame.Hint> hints = new LinkedList<>();
+    public List<RankGuessGame.Hint> getGroupHints(String avatarUrl, Function<byte[], UploadedImage> imageUploader) {
+        WeightedRandom<RankGuessGame.Hint> hintRandom = new WeightedRandom<>();
 
         final UserExtended user = this.randomScore.user();
 
         final UserExtended.Team team = user.getTeam();
         if (team != null && team.getName() != null && team.getShortName() != null) {
-            hints.add(new RankGuessGame.Hint(
+            hintRandom.add(new RankGuessGame.Hint(
                     "该玩家所处的队伍缩写为 `%s`".formatted(team.getShortName()),
                     "玩家队伍缩写",
                     RankGuessGame.Hint.HintCategory.USER,
                     RankGuessGame.Hint.HintStrength.SPECIAL
-            ));
+            ), 2.0);
         }
 
         if (user.getHasSupported() && user.isSupporter()) {
-            hints.add(new RankGuessGame.Hint(
+            hintRandom.add(new RankGuessGame.Hint(
                     "该玩家是尊贵的撒泼特！",
                     "支持者状态",
                     RankGuessGame.Hint.HintCategory.USER,
                     RankGuessGame.Hint.HintStrength.SPECIAL
-            ));
+            ), 1.5);
         } else if (user.getHasSupported() && !user.isSupporter()) {
-            hints.add(new RankGuessGame.Hint(
+            hintRandom.add(new RankGuessGame.Hint(
                     "该玩家的撒泼特已经过期了。",
                     "支持者状态",
                     RankGuessGame.Hint.HintCategory.USER,
                     RankGuessGame.Hint.HintStrength.SPECIAL
-            ));
+            ), 1.5);
         }
 
         if (user.getInterests() != null && !user.getInterests().isBlank()) {
-            hints.add(new RankGuessGame.Hint(
+            hintRandom.add(new RankGuessGame.Hint(
                     "该玩家填写的兴趣爱好为 `%s`".formatted(user.getInterests()),
                     "玩家自述兴趣",
                     RankGuessGame.Hint.HintCategory.USER,
                     RankGuessGame.Hint.HintStrength.SPECIAL
-            ));
+            ), 0.5);
         }
 
         if (user.getLocation() != null && !user.getLocation().isBlank()) {
-            hints.add(new RankGuessGame.Hint(
+            hintRandom.add(new RankGuessGame.Hint(
                     "该玩家填写的位置为 `%s`".formatted(user.getLocation()),
                     "玩家自述位置",
                     RankGuessGame.Hint.HintCategory.USER,
                     RankGuessGame.Hint.HintStrength.SPECIAL
-            ));
+            ), 0.5);
         }
 
         if (user.getOccupation() != null && !user.getOccupation().isBlank()) {
-            hints.add(new RankGuessGame.Hint(
+            hintRandom.add(new RankGuessGame.Hint(
                     "该玩家填写的职业为 `%s`".formatted(user.getOccupation()),
                     "玩家自述职业",
                     RankGuessGame.Hint.HintCategory.USER,
                     RankGuessGame.Hint.HintStrength.SPECIAL
-            ));
+            ), 0.5);
         }
 
-        final List<String> features = new ArrayList<>(RankGuessGameService.getUsernameFeature(user.getUsername()));
+        final var features = new ArrayList<>(RankGuessGameService.getUsernameFeature(user.getUsername()));
 
         if (!features.isEmpty()) {
             Collections.shuffle(features);
 
             for (int i = 0; i < Math.min(features.size(), 4); i++) {
-                final String s = features.get(i);
-                hints.add(new RankGuessGame.Hint(
-                        "该玩家用户名" + s,
+                final var s = features.get(i);
+                hintRandom.add(new RankGuessGame.Hint(
+                        "该玩家用户名" + s.getKey(),
                         "用户名特征",
                         RankGuessGame.Hint.HintCategory.USER,
                         RankGuessGame.Hint.HintStrength.SPECIAL
-                ));
+                ), s.getValue());
             }
         }
 
-        return hints;
+        if (avatarUrl != null) {
+            try {
+                final BufferedImage original = ImageUtil.readImage(avatarUrl);
+
+                final BufferedImage mosaic = ImageUtil.mosaic(original, 15);
+                final BufferedImage blur = ImageUtil.gaussianBlur(original, 50);
+
+                final byte[] mosaicBytes = ImageUtil.toPngBytes(mosaic);
+                final byte[] blurBytes = ImageUtil.toPngBytes(blur);
+
+                final var mosaicImage = imageUploader.apply(mosaicBytes);
+                final var blurImage = imageUploader.apply(blurBytes);
+
+                hintRandom.add(new RankGuessGame.Hint(
+                        "该玩家头像: " + mosaicImage.toMarkdown(25, 25),
+                        "玩家头像",
+                        RankGuessGame.Hint.HintCategory.USER,
+                        RankGuessGame.Hint.HintStrength.SPECIAL
+                ), 1.25);
+
+                hintRandom.add(new RankGuessGame.Hint(
+                        "该玩家头像: " + blurImage.toMarkdown(25, 25),
+                        "玩家头像",
+                        RankGuessGame.Hint.HintCategory.USER,
+                        RankGuessGame.Hint.HintStrength.SPECIAL
+                ), 1.25);
+            } catch (Exception ignored) {
+                // Ignored
+            }
+        }
+
+        return List.of(hintRandom.next());
     }
 }

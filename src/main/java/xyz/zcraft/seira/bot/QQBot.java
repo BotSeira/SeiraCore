@@ -58,6 +58,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicReference<WSClient> activeClient = new AtomicReference<>();
     private volatile Thread runnerThread;
+    final AtomicReference<QQUser> self = new AtomicReference<>();
 
     public QQBot(
             RuntimeConfig runtimeConfig,
@@ -99,6 +100,8 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                 Duration.ofSeconds(config.seira().effectiveMultiplayerWatchIntervalSeconds())
         );
 
+
+
         LOG.info("Initializing rank guess service");
         this.rankGuessGameService = new RankGuessGameService();
         this.attachmentHandler = new AttachmentHandler(executors.attachmentDownloads());
@@ -112,7 +115,16 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                 discordBridgeService,
                 rankGuessGameService,
                 executors.commandTasks(),
-                BotStat::incrementCommands
+                BotStat::incrementCommands,
+                bytes -> {
+                    try {
+                        return cos.uploadImage(bytes);
+                    } catch (Exception e) {
+                        LOG.error("Error uploading image", e);
+                        return null;
+                    }
+                },
+                self::get
         );
     }
 
@@ -141,9 +153,9 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                 String wssEndpoint = QQApi.getWSSEndpoint(tokenManager.getToken());
                 LOG.info("Endpoint: {}", wssEndpoint);
 
-                final QQUser self = QQApi.getSelf(tokenManager.getToken());
+                self.set(QQApi.getSelf(tokenManager.getToken()));
 
-                LOG.info("Self info: id={}, nickname={}", self.id(), self.username());
+                LOG.info("Self info: id={}, nickname={}", self.get().id(), self.get().username());
 
                 WSClient client = new WSClient(
                         URI.create(wssEndpoint),

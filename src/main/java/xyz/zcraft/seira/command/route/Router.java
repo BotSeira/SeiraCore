@@ -6,13 +6,16 @@ import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.MessageSender;
+import xyz.zcraft.seira.bot.QQApi;
 import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.QQUser;
 import xyz.zcraft.seira.command.*;
 import xyz.zcraft.seira.command.handler.*;
 import xyz.zcraft.seira.command.parse.CommandParser;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.config.AppConfig;
+import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.discord.DiscordBridgeService;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
@@ -27,6 +30,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
@@ -44,22 +48,18 @@ public class Router {
     private final Runnable commandMetric;
     private final CommandHandler unknownCommand;
     private final Executor commandExecutor;
+    private final Supplier<QQUser> selfSupplier;
 
     public Router(
-            MessageSender messageSender,
-            Supplier<AppConfig> configSupplier,
-            AdminRegistry admins,
-            BindingService bindingService,
-            ScoreWatchService watchService,
-            MultiplayerRoomWatchService multiplayerRoomWatchService,
-            DiscordBridgeService discordBridgeService,
-            RankGuessGameService rankGuessGameService,
-            Executor commandExecutor,
-            Runnable commandMetric
+            MessageSender messageSender, Supplier<AppConfig> configSupplier, AdminRegistry admins,
+            BindingService bindingService, ScoreWatchService watchService, MultiplayerRoomWatchService multiplayerRoomWatchService,
+            DiscordBridgeService discordBridgeService, RankGuessGameService rankGuessGameService, Executor commandExecutor,
+            Runnable commandMetric, Function<byte[], UploadedImage> imageUploader, Supplier<QQUser> selfSupplier
     ) {
         this.configSupplier = java.util.Objects.requireNonNull(configSupplier);
         this.commandExecutor = commandExecutor;
         this.commandMetric = java.util.Objects.requireNonNull(commandMetric);
+        this.selfSupplier = selfSupplier;
         AppConfig startupConfig = configSupplier.get();
         ReplyFactory replyFactory = new ReplyFactory(configSupplier);
         Resolver resolver = new Resolver();
@@ -76,15 +76,10 @@ public class Router {
                 resolver, history, taskCoordinator, replyFactory, videoRenderRecord, this::getAccessTokenFor
         );
         SocialCommandHandler socialCommands = new SocialCommandHandler(
-                resolver, authHelper, taskCoordinator, replyFactory, this::getAccessTokenFor
+                resolver, authHelper, taskCoordinator, replyFactory, this::getAccessTokenFor, this::getAvatar
         );
         ReplayCommandHandler replayCommands = new ReplayCommandHandler(
-                resolver,
-                history,
-                taskCoordinator,
-                replyFactory,
-                videoRenderRecord,
-                replayResults
+                resolver, history, taskCoordinator, replyFactory, videoRenderRecord, replayResults
         );
         GeneralCommandHandler generalCommands = new GeneralCommandHandler(
                 messageSender, taskCoordinator, replyFactory, resolver, admins::isAdmin
@@ -96,45 +91,31 @@ public class Router {
                 new MultiplayerRoomWatchCommandHandler(taskCoordinator, multiplayerRoomWatchService);
         DcsCommandHandler dcsCommands = new DcsCommandHandler(discordBridgeService);
         RankGuessCommandHandler rankGuessCommands = new RankGuessCommandHandler(
-                taskCoordinator, replyFactory, rankGuessGameService, resolver, admins::isAdmin
+                taskCoordinator, replyFactory, rankGuessGameService, resolver, admins::isAdmin, this::getAvatar, imageUploader
         );
         this.unknownCommand = generalCommands::handleUnknown;
         this.commandParser = new CommandParser(resolver::sanitize);
         this.commandRegistry = createCommandRegistry(
-                bindingCommands,
-                scoreCommands,
-                beatmapCommands,
-                socialCommands,
-                replayCommands,
-                generalCommands,
-                watchCommands,
-                specificScoreWatchCommands,
-                multiplayerRoomWatchCommands,
-                dcsCommands,
-                rankGuessCommands
+                bindingCommands, scoreCommands, beatmapCommands, socialCommands,
+                replayCommands, generalCommands, watchCommands, specificScoreWatchCommands,
+                multiplayerRoomWatchCommands, dcsCommands, rankGuessCommands
         );
         this.debugRoutes = new DebugRoutes(
-                configSupplier,
-                messageSender,
-                replyFactory,
-                taskCoordinator,
-                authHelper,
-                admins::isAdmin,
-                unknownCommand
+                configSupplier, messageSender, replyFactory, taskCoordinator,
+                authHelper, admins::isAdmin, unknownCommand
         );
     }
 
+    private String getAvatar(String openId) {
+        return QQApi.getAvatarUrl(configSupplier.get().qq().appId(), openId);
+    }
+
     private static CommandRegistry createCommandRegistry(
-            BindingCommandHandler bindingCommands,
-            ScoreCommandHandler scoreCommands,
-            BeatmapCommandHandler beatmapCommands,
-            SocialCommandHandler socialCommands,
-            ReplayCommandHandler replayCommands,
-            GeneralCommandHandler generalCommands,
-            WatchCommandHandler watchCommands,
-            SpecificScoreWatchCommandHandler specificScoreWatchCommands,
-            MultiplayerRoomWatchCommandHandler multiplayerRoomWatchCommands,
-            DcsCommandHandler dcsCommands,
+            BindingCommandHandler bindingCommands, ScoreCommandHandler scoreCommands,
+            BeatmapCommandHandler beatmapCommands, SocialCommandHandler socialCommands,
+            ReplayCommandHandler replayCommands, GeneralCommandHandler generalCommands,
+            WatchCommandHandler watchCommands, SpecificScoreWatchCommandHandler specificScoreWatchCommands,
+            MultiplayerRoomWatchCommandHandler multiplayerRoomWatchCommands, DcsCommandHandler dcsCommands,
             RankGuessCommandHandler rankGuessCommands
     ) {
         return CommandRegistry.builder()
@@ -205,6 +186,14 @@ public class Router {
             final String selfAt = "<@" + config.qq().selfId() + ">";
             if (rawContent.startsWith(selfAt)) {
                 rawContent = rawContent.substring(selfAt.length()).trim();
+            }
+
+            final QQUser qqUser = selfSupplier.get();
+            if (qqUser != null) {
+                final String selfLiteralAt = "@" + qqUser.username();
+                if (rawContent.startsWith(selfLiteralAt)) {
+                    rawContent = rawContent.substring(selfLiteralAt.length()).trim();
+                }
             }
 
             CommandParser.ParseResult parseResult = commandParser.parse(

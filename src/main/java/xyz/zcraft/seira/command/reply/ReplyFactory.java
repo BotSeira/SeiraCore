@@ -100,7 +100,7 @@ public final class ReplyFactory {
     }
 
     @SuppressWarnings("unused")
-    static String url(String text, String url) {
+    public static String url(String text, String url) {
         return "[" + text + "](" + url + ")";
     }
 
@@ -119,13 +119,13 @@ public final class ReplyFactory {
                 || "upload_queued".equals(status) || "uploading".equals(status);
     }
 
-    public PendingMessage friendStatusMessage(String selfOpenId, Long selfUid, String selfUsername,
-                                              String targetOpenId, Long targetUid, String targetUsername,
+    public PendingMessage friendStatusMessage(String selfOpenId, Long selfUid, String selfOsuAvatar, String selfUsername, String selfAvatar,
+                                              String targetOpenId, Long targetUid, String targetOsuAvatar, String targetUsername, String targetAvatar,
                                               boolean selfFollowed, Boolean targetFollowed) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.friendStatusContent(
-                        selfOpenId, selfUid, selfUsername,
-                        targetOpenId, targetUid, targetUsername,
+                        selfOpenId, selfUid, selfOsuAvatar, selfUsername, selfAvatar,
+                        targetOpenId, targetUid, targetOsuAvatar, targetUsername, targetAvatar,
                         selfFollowed, targetFollowed
                 )
         );
@@ -801,8 +801,8 @@ public final class ReplyFactory {
             return sb.trim();
         }
 
-        public static String friendStatusContent(String selfOpenId, Long selfUid, String selfUsername,
-                                                 String targetOpenId, Long targetUid, String targetUsername,
+        public static String friendStatusContent(String selfOpenId, Long selfUid, String selfOsuAvatar, String selfUsername, String selfAvatar,
+                                                 String targetOpenId, Long targetUid, String targetOsuAvatar, String targetUsername, String targetAvatar,
                                                  boolean selfFollowed, Boolean targetFollowed) {
             final String status;
             if (targetFollowed == null) {
@@ -822,10 +822,21 @@ public final class ReplyFactory {
                     status = "✕ 路人 ✕";
                 }
             }
-            return at(selfOpenId) + "你们的好友状态(点击打开个人主页):" + "\n" +
-                    url(selfUsername, "https://osu.ppy.sh/users/" + selfUid) + " (" + at(selfOpenId) + ")\n" +
-                    "  " + status + "\n" +
-                    url(targetUsername, "https://osu.ppy.sh/users/" + targetUid) + " (" + at(targetOpenId) + ")";
+
+            return at(selfOpenId) + """
+                    你们的好友状态:
+                    > %s:
+                    > ![image #30px #30px](%s) __ | %s__
+                    
+                    %s
+                    
+                    > %s:
+                    > ![image #30px #30px](%s) __ | %s__
+                    """.formatted(
+                    at(selfOpenId), selfOsuAvatar, url(selfUsername, "https://osu.ppy.sh/users/" + selfUid),
+                    status,
+                    at(targetOpenId), targetOsuAvatar, url(targetUsername, "https://osu.ppy.sh/users/" + targetUid)
+            );
         }
 
         public static String missImageContent(Context ctx, String scoreId, Integer index, int size) {
