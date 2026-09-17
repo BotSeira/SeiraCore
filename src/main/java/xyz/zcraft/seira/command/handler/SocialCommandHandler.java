@@ -118,12 +118,13 @@ public final class SocialCommandHandler {
 
         users.add(selfUser);
 
-        selfFollowed = selfFollowedList.stream().anyMatch(e -> e.user().getId() == targetId);
+        selfFollowed = selfFollowedList.stream()
+                .anyMatch(e -> e.user().getId() == targetId);
 
-        selfFollowedList.stream().filter(e -> e.user().getId() == targetId).findFirst().ifPresentOrElse(
-                e -> targetFollowed.set(e.mutual()), () -> {
-                }
-        );
+        selfFollowedList.stream()
+                .filter(e -> e.user().getId() == targetId)
+                .findFirst()
+                .ifPresent(e -> targetFollowed.set(e.mutual()));
 
         if (targetFollowed.get() == null) {
             final List<FriendEntry> targetFollowedList;
@@ -137,13 +138,21 @@ public final class SocialCommandHandler {
 
         UserDataStore.storeUserInfo(users);
 
-        users.stream().filter(u -> u.getId() == selfId).findFirst().ifPresent(u -> {
-            selfOsuAvatar.set(u.getAvatarUrl());
-        });
+        users.stream().filter(u -> u.getId() == selfId).findFirst().ifPresent(u -> selfOsuAvatar.set(u.getAvatarUrl()));
 
-        users.stream().filter(u -> u.getId() == targetId).findFirst().ifPresent(u -> {
-            targetOsuAvatar.set(u.getAvatarUrl());
-        });
+        final var targetUser = users.stream()
+                .filter(u -> u.getId() == targetId)
+                .findFirst()
+                .orElseGet(() -> APIHelper.getUsers(List.of(targetId))
+                        .stream()
+                        .filter(u -> u.getId() == targetId)
+                        .findFirst()
+                        .orElse(null)
+                );
+
+        if (targetUser != null) {
+            targetOsuAvatar.set(targetUser.getAvatarUrl());
+        }
 
         ctx.sendReply(replyFactory.friendStatusMessage(
                         ctx.senderUserId(), selfId, selfOsuAvatar.get(),

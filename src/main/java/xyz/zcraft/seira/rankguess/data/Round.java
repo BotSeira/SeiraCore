@@ -198,7 +198,7 @@ public record Round(long userId, long scoreId, int bestIndex, long actualRank, D
         return hints;
     }
 
-    public List<RankGuessGame.Hint> getGroupHints(String avatarUrl, Function<byte[], UploadedImage> imageUploader) {
+    public List<RankGuessGame.Hint> getGroupHints(String qqAvatarUrl, Function<byte[], UploadedImage> imageUploader) {
         WeightedRandom<RankGuessGame.Hint> hintRandom = new WeightedRandom<>();
 
         final UserExtended user = this.randomScore.user();
@@ -235,7 +235,7 @@ public record Round(long userId, long scoreId, int bestIndex, long actualRank, D
                     "玩家自述兴趣",
                     RankGuessGame.Hint.HintCategory.USER,
                     RankGuessGame.Hint.HintStrength.SPECIAL
-            ), 0.5);
+            ), 0.4);
         }
 
         if (user.getLocation() != null && !user.getLocation().isBlank()) {
@@ -244,7 +244,7 @@ public record Round(long userId, long scoreId, int bestIndex, long actualRank, D
                     "玩家自述位置",
                     RankGuessGame.Hint.HintCategory.USER,
                     RankGuessGame.Hint.HintStrength.SPECIAL
-            ), 0.5);
+            ), 0.4);
         }
 
         if (user.getOccupation() != null && !user.getOccupation().isBlank()) {
@@ -253,7 +253,7 @@ public record Round(long userId, long scoreId, int bestIndex, long actualRank, D
                     "玩家自述职业",
                     RankGuessGame.Hint.HintCategory.USER,
                     RankGuessGame.Hint.HintStrength.SPECIAL
-            ), 0.5);
+            ), 0.4);
         }
 
         final var features = new ArrayList<>(RankGuessGameService.getUsernameFeature(user.getUsername()));
@@ -272,35 +272,58 @@ public record Round(long userId, long scoreId, int bestIndex, long actualRank, D
             }
         }
 
-        if (avatarUrl != null) {
+        if (qqAvatarUrl != null) {
             try {
-                final BufferedImage original = ImageUtil.readImage(avatarUrl);
+                final BufferedImage original = ImageUtil.readImage(qqAvatarUrl);
 
-                final BufferedImage mosaic = ImageUtil.mosaic(original, 15);
-                final BufferedImage blur = ImageUtil.gaussianBlur(original, 50);
-
-                final byte[] mosaicBytes = ImageUtil.toPngBytes(mosaic);
-                final byte[] blurBytes = ImageUtil.toPngBytes(blur);
+                final byte[] mosaicBytes = ImageUtil.toPngBytes(ImageUtil.mosaic(original, 15));
+                final byte[] blurBytes = ImageUtil.toPngBytes(ImageUtil.gaussianBlur(original, 50));
 
                 final var mosaicImage = imageUploader.apply(mosaicBytes);
                 final var blurImage = imageUploader.apply(blurBytes);
 
                 hintRandom.add(new RankGuessGame.Hint(
-                        "该玩家头像: " + mosaicImage.toMarkdown(25, 25),
-                        "玩家头像",
+                        "该玩家 QQ 头像: " + mosaicImage.toMarkdown(25, 25),
+                        "玩家 QQ 头像",
                         RankGuessGame.Hint.HintCategory.USER,
                         RankGuessGame.Hint.HintStrength.SPECIAL
                 ), 1.25);
 
                 hintRandom.add(new RankGuessGame.Hint(
-                        "该玩家头像: " + blurImage.toMarkdown(25, 25),
-                        "玩家头像",
+                        "该玩家 QQ 头像: " + blurImage.toMarkdown(25, 25),
+                        "玩家 QQ 头像",
                         RankGuessGame.Hint.HintCategory.USER,
                         RankGuessGame.Hint.HintStrength.SPECIAL
                 ), 1.25);
             } catch (Exception ignored) {
                 // Ignored
             }
+        }
+
+        try {
+            final BufferedImage original = ImageUtil.readImage(randomScore.user().getAvatarUrl());
+
+            final byte[] mosaicBytes = ImageUtil.toPngBytes(ImageUtil.mosaic(original, 15));
+            final byte[] blurBytes = ImageUtil.toPngBytes(ImageUtil.gaussianBlur(original, 50));
+
+            final var mosaicImage = imageUploader.apply(mosaicBytes);
+            final var blurImage = imageUploader.apply(blurBytes);
+
+            hintRandom.add(new RankGuessGame.Hint(
+                    "该玩家 osu! 头像: " + mosaicImage.toMarkdown(25, 25),
+                    "玩家 osu! 头像",
+                    RankGuessGame.Hint.HintCategory.USER,
+                    RankGuessGame.Hint.HintStrength.SPECIAL
+            ), 1.25);
+
+            hintRandom.add(new RankGuessGame.Hint(
+                    "该玩家 osu! 头像: " + blurImage.toMarkdown(25, 25),
+                    "玩家 osu! 头像",
+                    RankGuessGame.Hint.HintCategory.USER,
+                    RankGuessGame.Hint.HintStrength.SPECIAL
+            ), 1.25);
+        } catch (Exception ignored) {
+            // Ignored
         }
 
         return List.of(hintRandom.next());
