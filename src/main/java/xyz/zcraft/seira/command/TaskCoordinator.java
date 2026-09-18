@@ -164,12 +164,12 @@ public final class TaskCoordinator {
 
         if (pendingMsg instanceof MDMessage md) {
             message.setMsgType(PendingMessage.MSG_TYPE_MARKDOWN);
-            message.setMarkdown(new Gson().toJsonTree(Map.of("content", md.getMarkdown())).getAsJsonObject());
+            message.setMarkdown(Message.MessageMarkdown.of(md.getMarkdown()));
             if (md.hasKeyboard()) {
                 message.setKeyboard(md.getKeyboard());
             }
         } else if (pendingMsg.getMsgType() == PendingMessage.MSG_TYPE_MARKDOWN) {
-            message.setMarkdown(new Gson().toJsonTree(Map.of("content", pendingMsg.getContent())).getAsJsonObject());
+            message.setMarkdown(Message.MessageMarkdown.of(pendingMsg.getContent()));
         } else {
             message.setContent(pendingMsg.getContent());
         }

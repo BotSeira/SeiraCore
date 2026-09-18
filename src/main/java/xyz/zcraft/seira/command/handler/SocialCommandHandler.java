@@ -102,6 +102,14 @@ public final class SocialCommandHandler {
             return;
         }
 
+        if (targetRef.userRef() instanceof UserRef.ByUid byUid) {
+            final long uid = byUid.getUid();
+            final String at = UserDataStore.findGroupOpenIdByUid(ctx.groupId(), uid)
+                    .map(ReplyFactory::at)
+                    .orElse("");
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at) + ": [%d](%s)".formatted(uid, "https://osu.ppy.sh/users/" + uid));
+        }
+
         final UserExtended targetUser = APIHelper.getUserRaw(targetRef.userRef());
         final String targetOsuAvatar = targetUser.getAvatarUrl();
 
@@ -288,13 +296,13 @@ public final class SocialCommandHandler {
             }
         } else if (ctx.args().length == 1 || ctx.args().length == 2) {
             TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
-            ShortcutTarget target = targetResolution.target();
+            ShortcutTarget target = targetResolution.getTarget();
             if (target.isError()) {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
                 return;
             }
 
-            int remainingArgs = ctx.args().length - targetResolution.consumedArgs();
+            int remainingArgs = ctx.args().length - targetResolution.getConsumedArgs();
             if (remainingArgs == 0) {
                 if (ctx.groupId() != null && !ctx.groupId().isBlank()) {
                     List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(ctx.groupId());
@@ -328,7 +336,7 @@ public final class SocialCommandHandler {
                 return;
             }
 
-            String[] uidTokens = ctx.args()[targetResolution.consumedArgs()].split(",");
+            String[] uidTokens = ctx.args()[targetResolution.getConsumedArgs()].split(",");
             if (uidTokens.length == 0) {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "玩家ID列表不能为空。用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
                 return;

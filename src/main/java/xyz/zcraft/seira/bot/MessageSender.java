@@ -149,7 +149,7 @@ public class MessageSender {
     public SentMessage sendGroupMarkdown(String groupId, String content) {
         Message message = new Message();
         message.setMsgType(PendingMessage.MSG_TYPE_MARKDOWN);
-        message.setMarkdown(new Gson().toJsonTree(Map.of("content", content)).getAsJsonObject());
+        message.setMarkdown(Message.MessageMarkdown.of(content));
         return sendGroupMessage(groupId, message);
     }
 

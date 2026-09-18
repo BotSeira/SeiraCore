@@ -17,6 +17,7 @@ import xyz.zcraft.seira.util.TimeDurationParser;
 
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 import static xyz.zcraft.seira.command.TargetHistory.Type.BEATMAP;
 import static xyz.zcraft.seira.command.TargetHistory.Type.SCORE;
@@ -29,6 +30,7 @@ public final class ReplayCommandHandler {
     private final ReplyFactory replyFactory;
     private final VideoRenderRecord videoRenderRecord;
     private final ReplayResultStore replayResults;
+    private final Predicate<String> adminAuthorizer;
 
     public ReplayCommandHandler(
             Resolver resolver,
@@ -36,7 +38,8 @@ public final class ReplayCommandHandler {
             TaskCoordinator taskCoordinator,
             ReplyFactory replyFactory,
             VideoRenderRecord videoRenderRecord,
-            ReplayResultStore replayResults
+            ReplayResultStore replayResults,
+            Predicate<String> adminAuthorizer
     ) {
         this.resolver = resolver;
         this.history = history;
@@ -44,6 +47,7 @@ public final class ReplayCommandHandler {
         this.replyFactory = replyFactory;
         this.videoRenderRecord = videoRenderRecord;
         this.replayResults = replayResults;
+        this.adminAuthorizer = adminAuthorizer;
     }
 
     public void handleR(Context ctx) {
@@ -52,9 +56,9 @@ public final class ReplayCommandHandler {
 
         TimeDurationParser.TimeRange range = null;
 
-        if (ctx.args().length > target.consumedArgs()) {
+        if (ctx.args().length > target.getConsumedArgs()) {
             try {
-                range = TimeDurationParser.parseRange(ctx.args()[target.consumedArgs()]);
+                range = TimeDurationParser.parseRange(ctx.args()[target.getConsumedArgs()]);
             } catch (IllegalArgumentException e) {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "无法解析时间范围"));
                 return;
@@ -104,7 +108,7 @@ public final class ReplayCommandHandler {
 
         String extraUidArg = null;
 
-        int i = target.consumedArgs();
+        int i = target.getConsumedArgs();
 
         if (i < ctx.args().length) {
             if (ctx.args()[i].startsWith("+") || ctx.args()[i].startsWith("=")) {
@@ -214,6 +218,15 @@ public final class ReplayCommandHandler {
             return;
         }
 
+        final String owner = videoRenderRecord.getTaskOwner(jobId);
+        if (owner != null) {
+            if (!owner.equalsIgnoreCase(ctx.senderUserId())
+                    && !adminAuthorizer.test(ctx.senderUserId())) {
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "你无权取消此任务喵。"));
+                return;
+            }
+        }
+
         var result = APIHelper.cancelReplayRender(jobId);
         String status = Objects.toString(result.getStatus(), "unknown").toLowerCase();
         String message = switch (status) {
@@ -229,5 +242,4 @@ public final class ReplayCommandHandler {
         }
         ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + message));
     }
-
 }

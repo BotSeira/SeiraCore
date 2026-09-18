@@ -74,13 +74,13 @@ public final class TargetHistory {
      * 查找只修改本次结果；调用者显式 remember 后才更新历史。
      */
     public Ids resolve(Context ctx, Type type, TargetResolution args, List<String> filters, String mod) {
-        ShortcutTarget target = args.target();
+        ShortcutTarget target = args.getTarget();
         if (target != null && target.isError()) throw new ResolutionException(target.errorMessage());
 
         Ids previous = users.get(ctx.senderUserId());
         // 省略目标时沿用三个 ID；显式输入目标时从空记忆开始。
         Ids ids = target == null ? new Ids(previous) : new Ids();
-        UserRef player = args.userOverride() != null ? args.userOverride()
+        UserRef player = args.getUserOverride() != null ? args.getUserOverride()
                 : target == null ? null : target.userRef();
         boolean selectedPlayerScore = false;
 
@@ -132,7 +132,7 @@ public final class TargetHistory {
 
         // 指定用户或 Mods 时，按同一谱面重新查成绩，不能直接沿用旧成绩 ID。
         // /s rs2 @用户 已经选好了该用户的 rs2，不再改查谱面最佳成绩。
-        if (type == Type.SCORE && (args.userOverride() != null || mod != null)
+        if (type == Type.SCORE && (args.getUserOverride() != null || mod != null)
                 && ids.scoreId != null && !selectedPlayerScore) {
             if (ids.beatmapId == null) {
                 ids.beatmapId = APIHelper.getScoreBeatmapId(ids.scoreId);
@@ -180,7 +180,7 @@ public final class TargetHistory {
      * 同屏回放需要保留本地成绩本身，以便把它加入回放列表。
      */
     public boolean isLocalScore(Context ctx, TargetResolution args) {
-        if (args.target() != null) return args.target().isLocalScore();
+        if (args.getTarget() != null) return args.getTarget().isLocalScore();
         Ids ids = users.get(ctx.senderUserId());
         return ids != null && ids.scoreId != null && isLocalId(ids.scoreId);
     }
@@ -190,7 +190,7 @@ public final class TargetHistory {
     }
 
     /**
-     * optional 判断首个参数是否是省略目标后的选项；返回的 consumedArgs 标记选项起点。
+     * optional 判断首个参数是否是省略目标后的选项；返回的 getConsumedArgs 标记选项起点。
      */
     public TargetResolution parseArguments(Context ctx, String usage, int maxOptions, Predicate<String> optional) {
         try {
@@ -200,9 +200,9 @@ public final class TargetHistory {
                 args = new TargetResolution(null, 0);
             } else {
                 args = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
-                if (args.target().isError()) throw new ResolutionException(args.target().errorMessage());
+                if (args.getTarget().isError()) throw new ResolutionException(args.getTarget().errorMessage());
             }
-            if (ctx.argumentCount() - args.consumedArgs() > maxOptions) throw new ResolutionException(usage);
+            if (ctx.argumentCount() - args.getConsumedArgs() > maxOptions) throw new ResolutionException(usage);
             return args;
         } catch (ResolutionException e) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + e.getMessage()));
@@ -230,11 +230,11 @@ public final class TargetHistory {
                 if (args == null) return null;
                 String next = args.nextArgument(ctx);
                 if (next != null && !optional.test(next)) {
-                    args = new TargetResolution(args.target(), args.consumedArgs() + 1, parsePlayer(next, usage));
+                    args = new TargetResolution(args.getTarget(), args.getConsumedArgs(), parsePlayer(next, usage));
                 }
             }
-            if (ctx.argumentCount() - args.consumedArgs() > maxOptions) throw new ResolutionException(usage);
-            for (int i = args.consumedArgs(); i < ctx.argumentCount(); i++) {
+            if (ctx.argumentCount() - args.getConsumedArgs() > maxOptions) throw new ResolutionException(usage);
+            for (int i = args.getConsumedArgs(); i < ctx.argumentCount(); i++) {
                 if (!optional.test(ctx.argument(i))) throw new ResolutionException(usage);
             }
             return args;

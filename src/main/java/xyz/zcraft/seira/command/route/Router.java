@@ -79,7 +79,7 @@ public class Router {
                 resolver, authHelper, taskCoordinator, replyFactory, this::getAccessTokenFor, this::getAvatar
         );
         ReplayCommandHandler replayCommands = new ReplayCommandHandler(
-                resolver, history, taskCoordinator, replyFactory, videoRenderRecord, replayResults
+                resolver, history, taskCoordinator, replyFactory, videoRenderRecord, replayResults, admins::isAdmin
         );
         GeneralCommandHandler generalCommands = new GeneralCommandHandler(
                 messageSender, taskCoordinator, replyFactory, resolver, admins::isAdmin

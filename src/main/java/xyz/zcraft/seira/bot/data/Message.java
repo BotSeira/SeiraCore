@@ -17,7 +17,7 @@ public class Message {
     @SerializedName("msg_type")
     private int msgType;
 
-    private JsonObject markdown;
+    private MessageMarkdown markdown;
 
     private JsonObject keyboard;
 
@@ -39,4 +39,13 @@ public class Message {
 
     @SerializedName("message_reference")
     private MessageReference messageReference;
+
+    public record MessageMarkdown(
+            String content,
+            @SerializedName("force_verify_image_resource") Boolean forceVerifyImageResource
+    ) {
+        public static MessageMarkdown of(String content) {
+            return new MessageMarkdown(content, null);
+        }
+    }
 }

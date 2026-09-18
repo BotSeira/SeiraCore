@@ -14,6 +14,7 @@ import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.data.SendResult;
+import xyz.zcraft.seira.util.TimeDurationParser;
 
 import java.util.List;
 import java.util.function.Function;
@@ -56,7 +57,7 @@ public final class BeatmapCommandHandler {
     public void handleM(Context ctx) {
         var target = history.parseArguments(ctx, CommandUsage.M, 1);
         if (target == null) return;
-        try (var timing = taskCoordinator.beginRequest(ctx, "Beatmap")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "Beatmap")) {
             var ids = history.resolve(ctx, BEATMAP, target);
             history.remember(ctx, ids);
             var response = APIHelper.getBeatmapResponse(ids.beatmapId(), target.nextArgument(ctx));
@@ -87,14 +88,30 @@ public final class BeatmapCommandHandler {
     }
 
     public void handleBpv(Context ctx) {
-        var target = history.parseArguments(ctx, CommandUsage.BPV, 1, arg -> arg.startsWith("+"));
+        var target = history.parseArguments(
+                ctx, CommandUsage.BPV, 2,
+                arg -> arg.startsWith("+") || TimeDurationParser.isTimeRange(arg)
+        );
+
         if (target == null) return;
-        try (var timing = taskCoordinator.beginRequest(ctx, "Beatmap Preview Render")) {
+
+        TimeDurationParser.TimeRange range = null;
+
+        if (ctx.args().length > target.getConsumedArgs()) {
+            try {
+                range = TimeDurationParser.parseRange(ctx.args()[target.getConsumedArgs()]);
+            } catch (IllegalArgumentException e) {
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "无法解析时间范围"));
+                return;
+            }
+        }
+
+        try (var _ = taskCoordinator.beginRequest(ctx, "Beatmap Preview Render")) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "正在获取谱面以及回放文件，请稍作等待喵..."));
             var qqUpload = taskCoordinator.createVideoUploadRequest(ctx);
             var ids = history.resolve(ctx, BEATMAP, target);
             history.remember(ctx, ids);
-            var task = APIHelper.createBeatmapPreviewTask(ids.beatmapId(), target.nextArgument(ctx), qqUpload);
+            var task = APIHelper.createBeatmapPreviewTask(ids.beatmapId(), target.nextArgument(ctx), range, qqUpload);
             videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
             ctx.sendReply(replyFactory.replayMessage(ctx, task));
 

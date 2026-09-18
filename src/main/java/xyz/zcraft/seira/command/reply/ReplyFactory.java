@@ -1057,7 +1057,9 @@ public final class ReplyFactory {
             return Button.keyboard(cancelable
                     ? Button.row(
                     Button.command(1, "查询渲染进度", "/rstat " + jobId),
-                    Button.command(2, "取消渲染", "/rcancel " + jobId).permit(userId)
+                    Button.command(2, "取消渲染", "/rcancel " + jobId)
+                            .permit(userId)
+                            .modal("确定要取消渲染吗")
             )
                     : Button.row(Button.command(1, "查询渲染进度", "/rstat " + jobId)));
         }

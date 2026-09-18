@@ -665,7 +665,7 @@ public class APIHelper {
     }
 
 
-    public static ReplayTaskInfo createBeatmapPreviewTask(long beatmapId, String mods,
+    public static ReplayTaskInfo createBeatmapPreviewTask(long beatmapId, String mods, TimeDurationParser.TimeRange range,
                                                           QqUploadRequest qqUpload) {
         JsonObject body = new JsonObject();
         if (mods != null && !mods.isBlank()) {
@@ -675,8 +675,14 @@ public class APIHelper {
             body.add("qqUpload", GSON.toJsonTree(qqUpload));
         }
 
+        String rangeQuery = "?";
+
+        if (range != null) {
+            rangeQuery += range.toQueryString();
+        }
+
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(ENDPOINT + "/replays/renders/preview/" + beatmapId))
+                .uri(URI.create(ENDPOINT + "/replays/renders/preview/" + beatmapId + rangeQuery))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                 .build();

@@ -309,7 +309,7 @@ public final class ScoreCommandHandler {
         if (target == null) return;
         String indexArgument = target.nextArgument(ctx);
         if (indexArgument != null) {
-            Integer index = parseMissIndex(indexArgument, target.consumedArgs() == 0);
+            Integer index = parseMissIndex(indexArgument, target.getConsumedArgs() == 1);
             if (index == null) {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.MA));
                 return;
