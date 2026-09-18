@@ -21,6 +21,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 public final class ConsoleCommandProcessor {
@@ -30,20 +31,25 @@ public final class ConsoleCommandProcessor {
     private static final Pattern SQL_IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
     private static final List<String> ROOT_COMMANDS = List.of(
             "help", "status", "metrics", "system", "config", "admin", "data", "send",
-            "watch", "cache", "gateway", "log", "inspect", "stop", "panel", "notice"
+            "watch", "cache", "gateway", "log", "inspect", "stop", "panel", "notice", "group"
     );
-    private static final Map<String, List<String>> SUBCOMMANDS = Map.of(
-            "config", List.of("show", "check", "reload"),
-            "admin", List.of("list", "check", "add", "remove"),
-            "data", List.of("stats", "tables", "describe", "query"),
-            "send", List.of("group", "private"),
-            "watch", List.of("status", "list", "poll", "remove", "clear"),
-            "cache", List.of("query", "delete", "get", "fetch"),
-            "gateway", List.of("status", "reconnect"),
-            "log", List.of("show", "level"),
-            "panel", List.of("list", "create", "delete", "edit", "get"),
-            "notice", List.of("new", "reload", "publish", "revoke", "list")
-    );
+
+    private static final Map<String, List<String>> SUBCOMMANDS;
+
+    static {
+        SUBCOMMANDS = new HashMap<>();
+        SUBCOMMANDS.put("config", List.of("show", "check", "reload"));
+        SUBCOMMANDS.put("admin", List.of("list", "check", "add", "remove"));
+        SUBCOMMANDS.put("data", List.of("stats", "tables", "describe", "query"));
+        SUBCOMMANDS.put("send", List.of("group", "private"));
+        SUBCOMMANDS.put("watch", List.of("status", "list", "poll", "remove", "clear"));
+        SUBCOMMANDS.put("cache", List.of("query", "delete", "get", "fetch"));
+        SUBCOMMANDS.put("gateway", List.of("status", "reconnect"));
+        SUBCOMMANDS.put("log", List.of("show", "level"));
+        SUBCOMMANDS.put("panel", List.of("list", "create", "delete", "edit", "get"));
+        SUBCOMMANDS.put("notice", List.of("new", "reload", "publish", "revoke", "list"));
+        SUBCOMMANDS.put("group", List.of("info", "state"));
+    }
 
     private final RuntimeConfig runtimeConfig;
     private final AdminRegistry admins;
@@ -93,10 +99,7 @@ public final class ConsoleCommandProcessor {
     }
 
     private static ConsoleResult exact(
-            ConsoleInputParser.ParsedInput input,
-            int size,
-            java.util.function.Supplier<ConsoleResult> action,
-            String usage
+            ConsoleInputParser.ParsedInput input, int size, Supplier<ConsoleResult> action, String usage
     ) {
         return input.size() == size ? action.get() : ConsoleResult.failure(usage);
     }
@@ -236,6 +239,7 @@ public final class ConsoleCommandProcessor {
                 case "watch" -> watch(input);
                 case "cache" -> cache(input);
                 case "panel" -> panel(input);
+                case "group" -> group(input);
                 case "gateway" -> gateway(input);
                 case "log" -> log(input);
                 case "inspect" -> exact(input, 1, this::inspect, "Usage: inspect");
@@ -439,6 +443,18 @@ public final class ConsoleCommandProcessor {
             case "remove" -> input.size() == 3 ? removeAdmin(input.value(2))
                     : ConsoleResult.failure("Usage: admin remove <openid>");
             default -> ConsoleResult.failure("Usage: admin <list|check|add|remove> [openid]");
+        };
+    }
+
+    private ConsoleResult group(ConsoleInputParser.ParsedInput input) {
+        if (input.size() < 2) {
+            return ConsoleResult.failure("Usage: group <info|state> [args]");
+        }
+
+        return switch (input.value(1).toLowerCase(Locale.ROOT)) {
+            case "info" -> input.size() == 3 ? runtimeControl.getGroupInfo(input.value(2)) : ConsoleResult.failure("Usage: group info <group-id>");
+            case "state" -> input.size() == 3 ? runtimeControl.getGroupBotState(input.value(2)) : ConsoleResult.failure("Usage: group state <group-id>");
+            default -> ConsoleResult.failure("Usage: group <info|state> [args]");
         };
     }
 
@@ -721,6 +737,10 @@ public final class ConsoleCommandProcessor {
         }
         CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS).execute(runtimeControl::requestStop);
         return ConsoleResult.success("Graceful shutdown requested.");
+    }
+
+    public RuntimeConfig getRuntimeConfig() {
+        return runtimeConfig;
     }
 
     public record ConsoleResult(boolean success, String message) {

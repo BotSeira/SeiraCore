@@ -1,5 +1,6 @@
 package xyz.zcraft.seira.console;
 
+import xyz.zcraft.seira.bot.data.GroupInfo;
 import xyz.zcraft.seira.watch.WatchView;
 
 import java.time.Duration;
@@ -36,6 +37,10 @@ public interface ConsoleRuntimeControl {
     ConsoleCommandProcessor.ConsoleResult deletePanel(String panelId);
 
     ConsoleCommandProcessor.ConsoleResult editPanel(String panelId, String jsonPath);
+
+    ConsoleCommandProcessor.ConsoleResult getGroupInfo(String groupId);
+
+    ConsoleCommandProcessor.ConsoleResult getGroupBotState(String groupId);
 
     record RuntimeStatus(
             boolean running,

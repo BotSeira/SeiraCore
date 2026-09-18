@@ -644,6 +644,50 @@ public class QQApi {
         }
     }
 
+    public static String getAvatarUrl(String appId, String openId) {
+        return "https://thirdqq.qlogo.cn/qqapp/" + appId + "/" + openId + "/100";
+    }
+
+    public static GroupInfo getGroupInfo(AccessToken accessToken, String groupId) {
+        try {
+            final var request = newRequestBuilder(accessToken)
+                    .uri(URI.create(ENDPOINT + "/v2/groups/" + groupId + "/info"))
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                LOG.error("Failed to get group info, status code: {} body={}", response.statusCode(), response.body());
+                throw new RuntimeException("Failed to get group info, status code: " + response.statusCode() + " body=" + response.body());
+            }
+
+            return GSON.fromJson(response.body(), GroupInfo.class);
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
+        }
+    }
+
+    public static GroupBotState getGroupBotState(AccessToken accessToken, String groupId) {
+        try {
+            final var request = newRequestBuilder(accessToken)
+                    .uri(URI.create(ENDPOINT + "/v2/groups/" + groupId + "/bot_state"))
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                LOG.error("Failed to get group bot state, status code: {} body={}", response.statusCode(), response.body());
+                throw new RuntimeException("Failed to get group bot state, status code: " + response.statusCode() + " body=" + response.body());
+            }
+
+            return GSON.fromJson(response.body(), GroupBotState.class);
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
+        }
+    }
+
     private record MediaDigests(String md5, String sha1, String md5First10m) {
     }
 
@@ -652,9 +696,5 @@ public class QQApi {
 
     private record UploadPrepare(String uploadId, long blockSize, List<UploadPart> parts, int concurrency,
                                  int retryTimeoutSeconds, int retryDelaySeconds) {
-    }
-
-    public static String getAvatarUrl(String appId, String openId) {
-        return "https://thirdqq.qlogo.cn/qqapp/" + appId + "/" + openId + "/100";
     }
 }

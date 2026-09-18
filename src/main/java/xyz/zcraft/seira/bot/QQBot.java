@@ -4,10 +4,7 @@ import com.google.gson.Gson;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.seira.bot.data.Panel;
-import xyz.zcraft.seira.bot.data.PanelItem;
-import xyz.zcraft.seira.bot.data.PanelRecord;
-import xyz.zcraft.seira.bot.data.QQUser;
+import xyz.zcraft.seira.bot.data.*;
 import xyz.zcraft.seira.command.AttachmentHandler;
 import xyz.zcraft.seira.command.route.Router;
 import xyz.zcraft.seira.config.AppConfig;
@@ -37,7 +34,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
     private static final Logger LOG = LogManager.getLogger(QQBot.class);
-
+    final AtomicReference<QQUser> self = new AtomicReference<>();
     @Getter
     private final TokenManager tokenManager;
     @Getter
@@ -58,7 +55,6 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicReference<WSClient> activeClient = new AtomicReference<>();
     private volatile Thread runnerThread;
-    final AtomicReference<QQUser> self = new AtomicReference<>();
 
     public QQBot(
             RuntimeConfig runtimeConfig,
@@ -99,7 +95,6 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                 new QqMultiplayerRoomNotifier(sender),
                 Duration.ofSeconds(config.seira().effectiveMultiplayerWatchIntervalSeconds())
         );
-
 
 
         LOG.info("Initializing rank guess service");
@@ -413,6 +408,46 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
             return ConsoleCommandProcessor.ConsoleResult.success("Panel edited with ID: " + panelId + ", version: " + version);
         } catch (Exception e) {
             return ConsoleCommandProcessor.ConsoleResult.failure("Error editing panel: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public ConsoleCommandProcessor.ConsoleResult getGroupInfo(String groupId) {
+        try {
+            final GroupInfo groupInfo = QQApi.getGroupInfo(tokenManager.getToken(), groupId);
+
+            String sb = "=== Group info ===\n" +
+                    "group_id: " + groupId + "\n" +
+                    "group_name: " + groupInfo.groupName() + "\n" +
+                    "group_finger_memo: " + groupInfo.groupFingerMemo() + "\n" +
+                    "group_class_text: " + groupInfo.groupClassText() + "\n" +
+                    "group_tags: " + String.join(", ", groupInfo.groupTags()) + "\n" +
+                    "group_member_num: " + groupInfo.groupMemberNum() + "\n" +
+                    "==================";
+
+            return ConsoleCommandProcessor.ConsoleResult.success(sb);
+        } catch (Exception e) {
+            return ConsoleCommandProcessor.ConsoleResult.failure("Error editing panel: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public ConsoleCommandProcessor.ConsoleResult getGroupBotState(String groupId) {
+        try {
+            final GroupBotState groupBotState = QQApi.getGroupBotState(tokenManager.getToken(), groupId);
+
+            String sb = "=== Group bot state ===\n" +
+                    "group_id: " + groupId + "\n" +
+                    "member_openid: " + groupBotState.memberOpenId() + "\n" +
+                    "joined_at: " + groupBotState.joinedAt() + "\n" +
+                    "allow_proactive_msg: " + groupBotState.allowProactiveMsg() + "\n" +
+                    "recv_msg_setting: " + groupBotState.receiveMsgSetting() + "\n" +
+                    "member_role: " + groupBotState.memberRole() + "\n" +
+                    "=======================";
+
+            return ConsoleCommandProcessor.ConsoleResult.success(sb);
+        } catch (Exception e) {
+            return ConsoleCommandProcessor.ConsoleResult.failure("Error getting group bot state: " + e.getMessage());
         }
     }
 }

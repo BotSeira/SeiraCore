@@ -41,6 +41,18 @@ public final class Resolver {
             }
         }
 
+        matcher = Patterns.SPACE_MISSING_COMMAND_PATTERN.matcher(rawContent);
+        if (matcher.find()) {
+            String command = matcher.group(1).toLowerCase(Locale.ROOT);
+            String target = matcher.group(2);
+            String remaining = rawContent.substring(matcher.end());
+            if (command.equals("sm")) {
+                rawContent = "s m" + target + " " + remaining;
+            } else {
+                rawContent = command + " " + target + " " + remaining;
+            }
+        }
+
         return rawContent;
     }
 
@@ -314,6 +326,9 @@ public final class Resolver {
         private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo|rp|bp)(\\d+)?$");
         private static final Pattern COMPACT_SCORE_COMMAND_PATTERN = Pattern.compile(
                 "(?i)^(rs|rp|bp)(\\d+)(?:-(\\d+))?(?=\\s|$)"
+        );
+        private static final Pattern SPACE_MISSING_COMMAND_PATTERN = Pattern.compile(
+                "^([a-zA-Z]+)(\\d+(?:#\\d+)?)"
         );
         private static final Pattern SET_MACRO_PATTERN = Pattern.compile("^(\\d+)#(\\d+)$");
         private static final Pattern BEATMAP_MACRO_PATTERN = Pattern.compile("^m(\\d+)$");
