@@ -1,6 +1,7 @@
 package xyz.zcraft.seira.command.handler;
 
 import xyz.zcraft.seira.api.APIHelper;
+import xyz.zcraft.seira.api.data.MissData;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.TargetHistory;
@@ -52,6 +53,21 @@ public final class ScoreCommandHandler {
         }
         if (args.length - targetIndex > 1) return null;
         return new TbArguments(days, args.length > targetIndex ? args[targetIndex] : null);
+    }
+
+    static ScoreListRange parseScoreListRange(String value) {
+        Matcher matcher = SCORE_LIST_RANGE_PATTERN.matcher(value);
+        if (!matcher.matches()) return null;
+        try {
+            int first = Integer.parseInt(matcher.group(1));
+            String endGroup = matcher.group(2);
+            int start = endGroup == null ? 1 : first;
+            int end = endGroup == null ? first : Integer.parseInt(endGroup);
+            if (start <= 0 || start > end || end > MAX_SCORE_LIST_COUNT) return null;
+            return new ScoreListRange(start, end);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     public void handleBp(Context ctx) {
@@ -249,21 +265,6 @@ public final class ScoreCommandHandler {
         return new ScoreListRequest(range, userRef, filters.filters());
     }
 
-    static ScoreListRange parseScoreListRange(String value) {
-        Matcher matcher = SCORE_LIST_RANGE_PATTERN.matcher(value);
-        if (!matcher.matches()) return null;
-        try {
-            int first = Integer.parseInt(matcher.group(1));
-            String endGroup = matcher.group(2);
-            int start = endGroup == null ? 1 : first;
-            int end = endGroup == null ? first : Integer.parseInt(endGroup);
-            if (start <= 0 || start > end || end > MAX_SCORE_LIST_COUNT) return null;
-            return new ScoreListRange(start, end);
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
-    }
-
     public void handleS(Context ctx) {
         var target = history.parseScoreArguments(ctx, CommandUsage.S, 1, arg -> arg.startsWith("+"));
         if (target == null) return;
@@ -337,7 +338,12 @@ public final class ScoreCommandHandler {
             history.remember(ctx, ids);
             String scoreId = ids.scoreId();
             var response = APIHelper.getScoreMissesResponse(scoreId);
-            ctx.sendReply(replyFactory.scoreMissesMessage(ctx, response));
+            final List<MissData> content = response.getContent();
+            if (content.size() == 1) {
+                handleMa(ctx.asCommand("ma", new String[]{scoreId, "#1"}, scoreId + " #1"));
+            } else {
+                ctx.sendReply(replyFactory.scoreMissesMessage(ctx, response));
+            }
         }
     }
 
