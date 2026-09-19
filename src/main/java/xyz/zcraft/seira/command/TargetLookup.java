@@ -34,6 +34,15 @@ public final class TargetLookup {
         return lookup(ctx, input, previous, Type.SCORE, userOverride, filters, mod);
     }
 
+    public TargetHistory.Ids scoreOnBeatmap(Context ctx, ShortcutTarget input, TargetHistory.Ids previous,
+                                            UserRef player, List<String> filters, String mod) {
+        UserRef targetPlayer = requirePlayer(ctx, player);
+        var map = beatmap(ctx, input, previous);
+        String scoreId = APIHelper.lookupBeatmapScore(map.beatmapId(), APIHelper.resolveUid(targetPlayer), filters, mod);
+        return new TargetHistory.Ids(map.beatmapsetId(), map.beatmapId(), scoreId);
+    }
+
+
     private TargetHistory.Ids lookup(Context ctx, ShortcutTarget input, TargetHistory.Ids previous,
                                      Type type, UserRef userOverride, List<String> filters, String mod) {
         if (input != null) previous = null;
@@ -120,5 +129,5 @@ public final class TargetLookup {
         return new UserRef.ByUid(uid);
     }
 
-    private enum Type { BEATMAP, BEATMAPSET, SCORE }
+    private enum Type {BEATMAP, BEATMAPSET, SCORE}
 }

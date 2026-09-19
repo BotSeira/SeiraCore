@@ -234,7 +234,15 @@ public final class ScoreCommandHandler {
     }
 
     public void handleS(Context ctx) {
-        // /s [目标] [玩家] [+Mods]；只有真正消费的参数才推进下标。
+        handleScore(ctx, false);
+    }
+
+    public void handleSm(Context ctx) {
+        handleScore(ctx, true);
+    }
+
+    private void handleScore(Context ctx, boolean onBeatmap) {
+        String usage = onBeatmap ? CommandUsage.SM : CommandUsage.S;
         TargetResolution target;
         UserRef userOverride = null;
         int optionIndex;
@@ -254,7 +262,7 @@ public final class ScoreCommandHandler {
             var playerArgument = resolver.resolveUserRefArgument(ctx.argument(optionIndex));
             if (playerArgument.errorMessage() != null || playerArgument.userRef() == null) {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx)
-                        + (playerArgument.errorMessage() == null ? CommandUsage.S : playerArgument.errorMessage())));
+                        + (playerArgument.errorMessage() == null ? usage : playerArgument.errorMessage())));
                 return;
             }
             userOverride = playerArgument.userRef();
@@ -263,7 +271,7 @@ public final class ScoreCommandHandler {
         if ((target.target() == null && history.get(ctx) == null)
                 || ctx.argumentCount() - optionIndex > 1
                 || (optionIndex < ctx.argumentCount() && !ctx.argument(optionIndex).startsWith("+"))) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.S));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + usage));
             return;
         }
         String option = optionIndex < ctx.argumentCount() ? ctx.argument(optionIndex) : null;
@@ -278,7 +286,9 @@ public final class ScoreCommandHandler {
             filters = parsed.filters();
         }
         try (var _ = taskCoordinator.beginRequest(ctx, "Score")) {
-            var resolvedTarget = targetLookup.score(ctx, target.target(), history.get(ctx), userOverride, filters, mod);
+            var resolvedTarget = onBeatmap
+                    ? targetLookup.scoreOnBeatmap(ctx, target.target(), history.get(ctx), userOverride, filters, mod)
+                    : targetLookup.score(ctx, target.target(), history.get(ctx), userOverride, filters, mod);
             history.remember(ctx, resolvedTarget);
             String scoreId = resolvedTarget.scoreId();
             var response = APIHelper.getScoreResponse(scoreId);
@@ -286,7 +296,7 @@ public final class ScoreCommandHandler {
         } catch (Exception e) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + TaskCoordinator.resolveErrorMessage(e)));
             org.apache.logging.log4j.LogManager.getLogger(ScoreCommandHandler.class)
-                    .error("Failed to execute /s", e);
+                    .error("Failed to execute /{}", ctx.command(), e);
         }
     }
 

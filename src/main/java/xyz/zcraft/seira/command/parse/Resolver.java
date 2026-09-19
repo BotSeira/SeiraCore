@@ -46,11 +46,7 @@ public final class Resolver {
             String command = matcher.group(1).toLowerCase(Locale.ROOT);
             String target = matcher.group(2);
             String remaining = rawContent.substring(matcher.end());
-            if (command.equals("sm")) {
-                rawContent = "s m" + target + " " + remaining;
-            } else {
-                rawContent = command + " " + target + " " + remaining;
-            }
+            rawContent = command + " " + target + " " + remaining;
         }
 
         return rawContent;

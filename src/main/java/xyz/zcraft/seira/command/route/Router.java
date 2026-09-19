@@ -140,6 +140,7 @@ public class Router {
                 .register(socialCommands::handleFclear, "fclear")
                 .register(beatmapCommands::handleDl, "dl")
                 .register(scoreCommands::handleS, "s")
+                .register(scoreCommands::handleSm, "sm")
                 .register(scoreCommands::handleSa, "sa")
                 .register(scoreCommands::handleMa, "ma")
                 .register(replayCommands::handleR, "r")
