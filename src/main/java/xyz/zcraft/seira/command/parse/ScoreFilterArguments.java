@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 public final class ScoreFilterArguments {
     private static final Pattern FILTER_PATTERN = Pattern.compile(
             "(?i)^(acc(?:uracy)?|combo|pp|time|length|len|star|stars|sr|bpm|miss|misses|score|mod|mods|rank|replay"
-                    + "|any|title|artist|mapper|genre|language|tag|source|video|storyboard|fullcombo|ar|od|cs|hp)"
+                    + "|any|title|artist|mapper|genre|language|tag|source|nsfw|video|storyboard|fullcombo|ar|od|cs|hp)"
                     + "(>=|<=|!=|!~|>|<|=|~)(.+)$"
     );
     private static final Pattern MISS_SHORTHAND_PATTERN = Pattern.compile("(?i)^(!?)(\\d+)miss(?:es)?$");
@@ -95,7 +95,7 @@ public final class ScoreFilterArguments {
                     throw new IllegalArgumentException("正则表达式无效：" + e.getDescription());
                 }
             }
-        } else if (Set.of("video", "storyboard", "fullcombo", "replay").contains(field)) {
+        } else if (Set.of("nsfw", "video", "storyboard", "fullcombo", "replay").contains(field)) {
             if (!Set.of("=", "!=").contains(operator)) {
                 throw new IllegalArgumentException(field + " 仅支持 =、!=");
             }
@@ -143,6 +143,7 @@ public final class ScoreFilterArguments {
             case "language" -> "language";
             case "tag", "tags" -> "tag";
             case "source" -> "source";
+            case "nsfw" -> "nsfw";
             case "video", "vid" -> "video";
             case "storyboard", "sb" -> "storyboard";
             case "fullcombo", "fc" -> "fullcombo";
@@ -162,6 +163,8 @@ public final class ScoreFilterArguments {
             case "!video" -> "video=false";
             case "sb", "storyboard" -> "storyboard=true";
             case "!sb", "!storyboard" -> "storyboard=false";
+            case "nsfw" -> "nsfw=true";
+            case "!nsfw" -> "nsfw=false";
             case "fc", "fullcombo" -> "fullcombo=true";
             case "replay" -> "replay=true";
             case "!replay" -> "replay=false";
