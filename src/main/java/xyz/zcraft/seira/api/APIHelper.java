@@ -11,7 +11,6 @@ import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.command.ResolutionException;
-import xyz.zcraft.seira.command.parse.ShortcutTarget;
 import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
@@ -301,63 +300,6 @@ public class APIHelper {
         return getBase64BytesResponse("/beatmaps/" + beatmapId + "/background", "获取谱面失败", null);
     }
 
-    public static long lookupBeatmap(ShortcutTarget target, String auth) {
-        long beatmapId;
-        if (target.isLocalScore() || "s".equals(target.macroType())) {
-            beatmapId = lookupScoreData(lookupScoreId(target, List.of(), null)).get("beatmap_id").getAsLong();
-        } else if ("m".equals(target.macroType())) {
-            beatmapId = target.explicitId();
-        } else if (!target.isMacro()) {
-            beatmapId = target.explicitId();
-        } else {
-            try {
-                final String query = getBeatmapQuery(target);
-
-                HttpRequest localRequest = HttpRequest.newBuilder()
-                        .uri(URI.create(ENDPOINT + query))
-                        .header("Authorization", "Bearer " + auth)
-                        .GET()
-                        .build();
-
-                final HttpResponse<String> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
-
-                if (send.statusCode() != 200) {
-                    throw parseHttpError(send.body(), send.statusCode(), "查找谱面失败");
-                }
-
-                final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
-
-                ensureApiSuccess(rawResponse, "查找谱面失败");
-
-                beatmapId = rawResponse.getData().getAsJsonObject().get("beatmap_id").getAsLong();
-            } catch (IOException | InterruptedException e) {
-                throw requestFailure(e);
-            }
-        }
-        return beatmapId;
-    }
-
-    private static String getBeatmapQuery(ShortcutTarget target) {
-        String query = "/beatmaps/lookup?";
-        if (target.isMacro()) {
-            switch (target.macroType().toLowerCase()) {
-                case "rs", "bp", "rp" -> {
-                    query += "&of=" + target.macroType() + "&u=" + resolveUid(target.userRef());
-                    query += "&i=" + target.macroIndex();
-                }
-                case "ms" -> {
-                    query += "&ms=" + target.explicitId();
-                    query += "&i=" + target.macroIndex();
-                }
-                case "mp" -> query += "&of=mp";
-            }
-        } else {
-            query = "/beatmap/lookup?m=" + target.explicitId();
-        }
-
-        return query;
-    }
-
     public static Response<Base64Bytes> getBeatmapsetResponse(long beatmapsetId) {
         return getBase64BytesResponse("/beatmapsets/" + beatmapsetId, "获取谱面集失败", null);
     }
@@ -382,53 +324,6 @@ public class APIHelper {
         } catch (IOException | InterruptedException e) {
             throw requestFailure(e);
         }
-    }
-
-    public static long lookupBeatmapset(ShortcutTarget target, String auth) {
-        long beatmapsetId;
-        if (target.isLocalScore() || "s".equals(target.macroType())) {
-            return lookupBeatmapset(new ShortcutTarget(lookupBeatmap(target, auth), null, "m", null, null), auth);
-        } else if (!target.isMacro() || "ms".equals(target.macroType())) {
-            beatmapsetId = target.explicitId();
-        } else {
-            try {
-                final String query = getBeatmapsetQuery(target);
-
-                HttpRequest localRequest = HttpRequest.newBuilder()
-                        .uri(URI.create(ENDPOINT + query))
-                        .header("Authorization", "Bearer " + auth)
-                        .GET()
-                        .build();
-
-                final HttpResponse<String> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
-
-                if (send.statusCode() != 200) {
-                    throw parseHttpError(send.body(), send.statusCode(), "查找谱面集失败");
-                }
-
-                final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
-
-                ensureApiSuccess(rawResponse, "查找谱面集失败");
-
-                beatmapsetId = rawResponse.getData().getAsJsonObject().get("beatmapset_id").getAsLong();
-            } catch (IOException | InterruptedException e) {
-                throw requestFailure(e);
-            }
-        }
-        return beatmapsetId;
-    }
-
-    private static String getBeatmapsetQuery(ShortcutTarget target) {
-        String query = "/beatmapsets/lookup";
-
-        return switch (target.macroType().toLowerCase()) {
-            case "m" -> query + "?m=" + target.explicitId();
-            case "ms" -> query + "?ms=" + target.explicitId();
-            case "rs", "bp", "rp" ->
-                    query + "?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + resolveUid(target.userRef());
-            case "mp" -> query + "?of=mp";
-            case null, default -> throw new ResolutionException("快捷查询格式错误。");
-        };
     }
 
     public static Response<Base64Bytes> getScoreResponse(String scoreId) {
@@ -468,17 +363,6 @@ public class APIHelper {
         } catch (IOException | InterruptedException e) {
             throw requestFailure(e);
         }
-    }
-
-    private static String getScoreQuery(ShortcutTarget target) {
-        return switch (target.macroType().toLowerCase()) {
-            case "rs", "bp", "rp" ->
-                    "/scores/lookup?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + resolveUid(target.userRef());
-            case "m" -> "/scores/lookup?m=" + target.explicitId() + "&u=" + resolveUid(target.userRef());
-            case "ms" ->
-                    "/scores/lookup?ms=" + target.explicitId() + "&i=" + target.macroIndex() + "&u=" + resolveUid(target.userRef());
-            case null, default -> throw new IllegalArgumentException("Invalid macro type");
-        };
     }
 
     public static Response<?> getLookupBeatmapsetResponse(long beatmapsetId, String auth) {
@@ -664,7 +548,6 @@ public class APIHelper {
         }
     }
 
-
     public static ReplayTaskInfo createBeatmapPreviewTask(long beatmapId, String mods, TimeDurationParser.TimeRange range,
                                                           QqUploadRequest qqUpload) {
         JsonObject body = new JsonObject();
@@ -763,38 +646,62 @@ public class APIHelper {
         }
     }
 
-    public static String lookupScoreId(ShortcutTarget target, List<String> filters, String mod) {
-        String scoreId;
-        if (target.isLocalScore()) {
-            scoreId = target.localScoreId();
-        } else if (!target.isMacro() || "s".equals(target.macroType())) {
-            scoreId = String.valueOf(target.explicitId());
-        } else {
-            try {
-                final String query = getScoreQuery(target) + encodeScoreFilters(filters)
-                        + (mod == null ? "" : "&mod=" + URLEncoder.encode(mod, StandardCharsets.UTF_8));
+    /** 每个查找方法只请求一个接口；目标类型转换和记忆由指令处理方法决定。 */
+    public static long lookupBeatmapInSet(long setId, long index, String auth) {
+        return lookupTargetData("/beatmaps/lookup?ms=" + setId + "&i=" + index, auth, "查找谱面失败")
+                .get("beatmap_id").getAsLong();
+    }
 
-                HttpRequest localRequest = HttpRequest.newBuilder()
-                        .uri(URI.create(ENDPOINT + query))
-                        .GET()
-                        .build();
+    public static long lookupMultiplayerBeatmap(String auth) {
+        return lookupTargetData("/beatmaps/lookup?of=mp", auth, "查找谱面失败").get("beatmap_id").getAsLong();
+    }
 
-                final HttpResponse<String> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
+    public static long lookupPlayerScoreBeatmap(long uid, String list, long index, String auth) {
+        if (!List.of("rs", "rp", "bp").contains(list)) throw new IllegalArgumentException("Invalid score list");
+        return lookupTargetData("/beatmaps/lookup?of=" + list + "&u=" + uid + "&i=" + index,
+                auth, "查找谱面失败").get("beatmap_id").getAsLong();
+    }
 
-                if (send.statusCode() != 200) {
-                    throw parseHttpError(send.body(), send.statusCode(), "获取成绩失败");
-                }
+    public static long lookupMultiplayerBeatmapset(String auth) {
+        return lookupTargetData("/beatmapsets/lookup?of=mp", auth, "查找谱面集失败").get("beatmapset_id").getAsLong();
+    }
 
-                final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
+    public static long lookupBeatmapsetForBeatmap(long beatmapId, String auth) {
+        return lookupTargetData("/beatmapsets/lookup?m=" + beatmapId, auth, "查找谱面集失败")
+                .get("beatmapset_id").getAsLong();
+    }
 
-                ensureApiSuccess(rawResponse, "获取成绩失败");
+    public static String lookupPlayerScore(long uid, String list, long index, List<String> filters, String mod) {
+        if (!List.of("rs", "rp", "bp").contains(list)) throw new IllegalArgumentException("Invalid score list");
+        return lookupScore("/scores/lookup?of=" + list + "&i=" + index + "&u=" + uid, filters, mod);
+    }
 
-                scoreId = rawResponse.getData().getAsJsonObject().get("score_id").getAsString();
-            } catch (IOException | InterruptedException e) {
-                throw requestFailure(e);
-            }
+    public static String lookupBeatmapScore(long beatmapId, long uid, List<String> filters, String mod) {
+        return lookupScore("/scores/lookup?m=" + beatmapId + "&u=" + uid, filters, mod);
+    }
+
+    public static String lookupBeatmapsetScore(long setId, long index, long uid, List<String> filters, String mod) {
+        return lookupScore("/scores/lookup?ms=" + setId + "&i=" + index + "&u=" + uid, filters, mod);
+    }
+
+    private static String lookupScore(String query, List<String> filters, String mod) {
+        return lookupTargetData(query + encodeScoreFilters(filters)
+                + (mod == null ? "" : "&mod=" + URLEncoder.encode(mod, StandardCharsets.UTF_8)),
+                null, "获取成绩失败").get("score_id").getAsString();
+    }
+
+    private static JsonObject lookupTargetData(String query, String auth, String error) {
+        try {
+            var request = HttpRequest.newBuilder().uri(URI.create(ENDPOINT + query)).GET();
+            if (auth != null) request.header("Authorization", "Bearer " + auth);
+            var response = CLIENT.send(request.build(), HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) throw parseHttpError(response.body(), response.statusCode(), error);
+            RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
+            ensureApiSuccess(payload, error);
+            return requireDataObject(payload, error);
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
         }
-        return scoreId;
     }
 
     public static long getScoreBeatmapId(String scoreId) {

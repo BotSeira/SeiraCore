@@ -7,9 +7,11 @@ import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.ReplayResultStore;
 import xyz.zcraft.seira.command.TargetHistory;
+import xyz.zcraft.seira.command.TargetLookup;
+import xyz.zcraft.seira.command.parse.TargetArguments;
+import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
-import xyz.zcraft.seira.command.parse.RscTarget;
 import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.data.SendResult;
@@ -19,13 +21,12 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Predicate;
 
-import static xyz.zcraft.seira.command.TargetHistory.Type.BEATMAP;
-import static xyz.zcraft.seira.command.TargetHistory.Type.SCORE;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class ReplayCommandHandler {
     private final Resolver resolver;
     private final TargetHistory history;
+    private final TargetLookup targetLookup;
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
     private final VideoRenderRecord videoRenderRecord;
@@ -39,10 +40,12 @@ public final class ReplayCommandHandler {
             ReplyFactory replyFactory,
             VideoRenderRecord videoRenderRecord,
             ReplayResultStore replayResults,
-            Predicate<String> adminAuthorizer
+            Predicate<String> adminAuthorizer,
+            java.util.function.Function<String, String> accessTokenProvider
     ) {
         this.resolver = resolver;
         this.history = history;
+        this.targetLookup = new TargetLookup(resolver, accessTokenProvider);
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
         this.videoRenderRecord = videoRenderRecord;
@@ -51,14 +54,14 @@ public final class ReplayCommandHandler {
     }
 
     public void handleR(Context ctx) {
-        var target = history.parseArguments(ctx, CommandUsage.R, 1, TimeDurationParser::isTimeRange);
+        var target = TargetArguments.parse(ctx, resolver, history.get(ctx), CommandUsage.R, 1, TimeDurationParser::isTimeRange);
         if (target == null) return;
 
         TimeDurationParser.TimeRange range = null;
 
-        if (ctx.args().length > target.getConsumedArgs()) {
+        if (ctx.args().length > target.consumedArgs()) {
             try {
-                range = TimeDurationParser.parseRange(ctx.args()[target.getConsumedArgs()]);
+                range = TimeDurationParser.parseRange(ctx.args()[target.consumedArgs()]);
             } catch (IllegalArgumentException e) {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "无法解析时间范围"));
                 return;
@@ -67,10 +70,11 @@ public final class ReplayCommandHandler {
 
         try (var _ = taskCoordinator.beginRequest(ctx, "Score Render")) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "正在获取谱面以及回放文件，请稍作等待喵..."));
-            var ids = history.resolve(ctx, SCORE, target);
-            history.remember(ctx, ids);
+            var resolvedTarget = targetLookup.score(ctx, target.target(), history.get(ctx));
+            history.remember(ctx, resolvedTarget);
+            String scoreId = resolvedTarget.scoreId();
             var upload = taskCoordinator.createVideoUploadRequest(ctx);
-            var task = APIHelper.createReplayRenderTask(ids.scoreId(), range, upload);
+            var task = APIHelper.createReplayRenderTask(scoreId, range, upload);
             videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
             ctx.sendReply(replyFactory.replayMessage(ctx, task));
 
@@ -102,13 +106,12 @@ public final class ReplayCommandHandler {
             return;
         }
 
-        var target = history.parseArguments(ctx, CommandUsage.RSC, Integer.MAX_VALUE,
-                arg -> arg.startsWith("+") || arg.startsWith("="));
+        var target = TargetArguments.parse(ctx, resolver, history.get(ctx), CommandUsage.RSC, Integer.MAX_VALUE, arg -> arg.startsWith("+") || arg.startsWith("="));
         if (target == null) return;
 
         String extraUidArg = null;
 
-        int i = target.getConsumedArgs();
+        int i = target.consumedArgs();
 
         if (i < ctx.args().length) {
             if (ctx.args()[i].startsWith("+") || ctx.args()[i].startsWith("=")) {
@@ -119,30 +122,59 @@ public final class ReplayCommandHandler {
             }
         }
 
-        RscTarget rscTarget = history.isLocalScore(ctx, target) && extraUidArg == null
-                ? new RscTarget(new String[0], null)
-                : resolver.resolveRscTarget(ctx.groupId(), extraUidArg);
-        if (rscTarget.errorMessage() != null) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + rscTarget.errorMessage()));
-            return;
+        var remembered = history.get(ctx);
+        String localScoreId = target.target() != null
+                ? target.target().localScoreId()
+                : remembered == null ? null : remembered.scoreId();
+        boolean localScore = localScoreId != null && localScoreId.startsWith("loc");
+        var participants = new java.util.LinkedHashSet<String>();
+        if (!(localScore && extraUidArg == null)) {
+            if (extraUidArg == null || extraUidArg.trim().startsWith("+")) {
+                var groupUids = xyz.zcraft.seira.db.UserDataStore.findBoundUidsByGroup(ctx.groupId());
+                if (groupUids.isEmpty()) {
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "本群还没有已绑定的玩家，请先使用 /bind"));
+                    return;
+                }
+                groupUids.stream().map(String::valueOf).forEach(participants::add);
+            }
+            if (extraUidArg != null) {
+                String body = extraUidArg.trim().substring(1).trim();
+                if (body.isEmpty()) {
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "追加ID列表不能为空。"));
+                    return;
+                }
+                for (String token : body.split(",")) {
+                    if (token.trim().matches("[us]?[0-9]+")) {
+                        participants.add(token.trim());
+                    } else if (resolver.looksLikeMention(token)) {
+                        var participant = resolver.resolveUserRefArgument(token);
+                        if (participant.errorMessage() != null) {
+                            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "解析 " + token + " 时出错:" + participant.errorMessage()));
+                            return;
+                        }
+                        if (participant.userRef() instanceof UserRef.ByUid ref) participants.add("u" + ref.getUid());
+                        else if (participant.userRef() instanceof UserRef.ByUsername ref) participants.add("@" + ref.getUsername());
+                    } else {
+                        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "追加ID列表包含非法值。"));
+                        return;
+                    }
+                }
+            }
         }
 
         try (var _ = taskCoordinator.beginRequest(ctx, "Showcase Render")) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "正在获取谱面以及回放文件，请稍作等待喵..."));
-            var targetType = history.isLocalScore(ctx, target) ? SCORE : BEATMAP;
-            var resolved = history.resolve(ctx, targetType, target);
-            history.remember(ctx, resolved);
+            var resolvedTarget = targetLookup.beatmap(ctx, target.target(), history.get(ctx));
+            history.remember(ctx, resolvedTarget);
+            long beatmapId = resolvedTarget.beatmapId();
             var upload = taskCoordinator.createVideoUploadRequest(ctx);
-            String[] scoreTargets = rscTarget.targets();
-            long beatmapId;
-            if (targetType == SCORE) {
+            String[] scoreTargets = participants.toArray(String[]::new);
+            if (localScore) {
                 var ids = new java.util.LinkedHashSet<String>();
-                ids.add("s" + resolved.scoreId());
+                ids.add("s" + localScoreId);
                 java.util.Collections.addAll(ids, scoreTargets);
                 scoreTargets = ids.toArray(String[]::new);
-                beatmapId = APIHelper.getScoreBeatmapId(resolved.scoreId());
-            } else {
-                beatmapId = resolved.beatmapId();
+
             }
             var task = APIHelper.createReplayShowcaseTask(beatmapId, scoreTargets, upload);
             videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());

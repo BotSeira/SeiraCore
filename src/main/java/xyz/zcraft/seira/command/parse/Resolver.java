@@ -139,47 +139,6 @@ public final class Resolver {
         return new UserRefResolution(new UserRef.ByUsername(username), null);
     }
 
-    public RscTarget resolveRscTarget(String groupId, String extraUidArg) {
-        Set<String> merged = new LinkedHashSet<>();
-
-        if (extraUidArg == null || extraUidArg.trim().startsWith("+")) {
-            List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(groupId);
-            if (groupBoundUids.isEmpty()) {
-                return new RscTarget(null, "本群还没有已绑定的玩家，请先使用 /bind");
-            }
-            groupBoundUids.stream().map(String::valueOf).forEach(merged::add);
-        }
-
-        if (extraUidArg == null) return new RscTarget(merged.toArray(String[]::new), null);
-
-        String trimmed = extraUidArg.trim();
-        String body = trimmed.substring(1).trim();
-        if (body.isEmpty()) {
-            return new RscTarget(null, "追加ID列表不能为空。");
-        }
-
-        String[] extraTokens = body.split(",");
-        for (String token : extraTokens) {
-            if (Patterns.RSC_TARGET_PATTERN.matcher(token.trim()).matches()) {
-                merged.add(token);
-            } else if (looksLikeMention(token)) {
-                final UserRefResolution userRefResolution = resolveUserRefArgument(token);
-                if (userRefResolution.errorMessage() != null) {
-                    return new RscTarget(null, "解析 " + token + " 时出错:" + userRefResolution.errorMessage());
-                }
-                if (userRefResolution.userRef() instanceof UserRef.ByUid ref) {
-                    merged.add("u" + ref.getUid());
-                } else if (userRefResolution.userRef() instanceof UserRef.ByUsername ref) {
-                    merged.add("@" + ref.getUsername());
-                }
-            } else {
-                return new RscTarget(null, "追加ID列表包含非法值。");
-            }
-        }
-
-        return new RscTarget(merged.toArray(String[]::new), null);
-    }
-
     public Long resolveBoundUid(String senderUserId) {
         if (senderUserId == null || senderUserId.isBlank()) {
             return null;
@@ -337,7 +296,6 @@ public final class Resolver {
         private static final Pattern QQ_INLINE_AT_PATTERN = Pattern.compile("(<@[A-Z|0-9]{32}>)");
         private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
         private static final Pattern SEARCH_PATTERN = Pattern.compile("^(?:#(\\d+) )?(.+)$");
-        private static final Pattern RSC_TARGET_PATTERN = Pattern.compile("^[us]?\\d+$");
     }
 }
 

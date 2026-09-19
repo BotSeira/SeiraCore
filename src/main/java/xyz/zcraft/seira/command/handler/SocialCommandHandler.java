@@ -11,6 +11,7 @@ import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.parse.ShortcutTarget;
+import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.command.parse.TargetResolution;
 import xyz.zcraft.seira.command.parse.UserRefResolution;
 import xyz.zcraft.seira.command.reply.CommandUsage;
@@ -296,64 +297,66 @@ public final class SocialCommandHandler {
             }
         } else if (ctx.args().length == 1 || ctx.args().length == 2) {
             TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
-            ShortcutTarget target = targetResolution.getTarget();
+            ShortcutTarget target = targetResolution.target();
             if (target.isError()) {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
                 return;
             }
 
-            int remainingArgs = ctx.args().length - targetResolution.getConsumedArgs();
-            if (remainingArgs == 0) {
-                if (ctx.groupId() != null && !ctx.groupId().isBlank()) {
-                    List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(ctx.groupId());
-                    if (groupBoundUids.isEmpty()) {
-                        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "本群还没有已绑定的玩家，请先使用 /bind"));
-                        return;
-                    }
-                    try (var _ = taskCoordinator.beginRequest(ctx, "Map Leaderboard")) {
-                        long beatmapId = APIHelper.lookupBeatmap(target, accessTokenProvider.apply(ctx.senderUserId()));
-                        var response = APIHelper.getGroupLeaderboardResponse(beatmapId, groupBoundUids);
-                        ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
-                    }
+            int remainingArgs = ctx.argumentCount() - targetResolution.consumedArgs();
+            List<Long> uids = new LinkedList<>();
+            if (remainingArgs == 1) {
+                String[] uidTokens = ctx.argument(targetResolution.consumedArgs()).split(",");
+                if (uidTokens.length == 0) {
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "玩家ID列表不能为空。"));
                     return;
                 }
+                for (String token : uidTokens) {
+                    Long uid = resolver.parsePositiveLong(token.trim());
+                    if (uid == null) {
+                        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "玩家ID列表包含非法值。"));
+                        return;
+                    }
+                    uids.add(uid);
+                }
+            } else if (remainingArgs != 0) {
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
+                return;
+            } else if (ctx.inGroup()) {
+                uids.addAll(UserDataStore.findBoundUidsByGroup(ctx.groupId()));
+                if (uids.isEmpty()) {
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "本群还没有已绑定的玩家，请先使用 /bind"));
+                    return;
+                }
+            } else {
                 Long uid = resolver.resolveBoundUid(ctx.senderUserId());
                 if (uid == null) {
                     ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.NO_BIND));
-                    return;
-                }
-
-                try (var _ = taskCoordinator.beginRequest(ctx, "Map Leaderboard")) {
-                    long beatmapId = APIHelper.lookupBeatmap(target, accessTokenProvider.apply(ctx.senderUserId()));
-                    var response = APIHelper.getGroupLeaderboardResponse(beatmapId, List.of(uid));
-                    ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
-                }
-                return;
-            }
-
-            if (remainingArgs != 1) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
-                return;
-            }
-
-            String[] uidTokens = ctx.args()[targetResolution.getConsumedArgs()].split(",");
-            if (uidTokens.length == 0) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "玩家ID列表不能为空。用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
-                return;
-            }
-
-            List<Long> uids = new LinkedList<>();
-            for (String uidToken : uidTokens) {
-                Long uid = resolver.parsePositiveLong(uidToken.trim());
-                if (uid == null) {
-                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "玩家ID列表包含非法值。用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
                     return;
                 }
                 uids.add(uid);
             }
 
             try (var _ = taskCoordinator.beginRequest(ctx, "Map Leaderboard")) {
-                long beatmapId = APIHelper.lookupBeatmap(target, accessTokenProvider.apply(ctx.senderUserId()));
+                long beatmapId;
+                if (target.isLocalScore()) {
+                    beatmapId = APIHelper.getScoreBeatmapId(target.localScoreId());
+                } else if (!target.isMacro() || "m".equals(target.macroType())) {
+                    beatmapId = target.explicitId();
+                } else {
+                    switch (target.macroType()) {
+                        case "s" -> beatmapId = APIHelper.getScoreBeatmapId(target.explicitId().toString());
+                        case "ms" -> beatmapId = APIHelper.lookupBeatmapInSet(target.explicitId(), target.macroIndex(),
+                                accessTokenProvider.apply(ctx.senderUserId()));
+                        case "rs", "rp", "bp" -> {
+                            long uid = APIHelper.resolveUid(target.userRef());
+                            beatmapId = APIHelper.lookupPlayerScoreBeatmap(uid, target.macroType(), target.macroIndex(), accessTokenProvider.apply(ctx.senderUserId()));
+
+                        }
+                        case "mp" -> beatmapId = APIHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                        default -> throw new ResolutionException("未知的快捷查询");
+                    }
+                }
                 var response = APIHelper.getGroupLeaderboardResponse(beatmapId, uids);
                 ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
             }

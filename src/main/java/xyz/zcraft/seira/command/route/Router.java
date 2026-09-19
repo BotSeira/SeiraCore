@@ -63,14 +63,14 @@ public class Router {
         AppConfig startupConfig = configSupplier.get();
         ReplyFactory replyFactory = new ReplyFactory(configSupplier);
         Resolver resolver = new Resolver();
-        TargetHistory history = new TargetHistory(resolver, this::getAccessTokenFor);
+        TargetHistory history = new TargetHistory();
         ReplayResultStore replayResults = new ReplayResultStore();
         VideoRenderRecord videoRenderRecord = new VideoRenderRecord();
         this.taskCoordinator = new TaskCoordinator(messageSender, replayResults, discordBridgeService);
         this.authHelper = new OsuAuthHelper(startupConfig.binding());
         BindingCommandHandler bindingCommands = new BindingCommandHandler(startupConfig, replyFactory, bindingService);
         ScoreCommandHandler scoreCommands = new ScoreCommandHandler(
-                resolver, history, taskCoordinator, replyFactory
+                resolver, history, taskCoordinator, replyFactory, this::getAccessTokenFor
         );
         BeatmapCommandHandler beatmapCommands = new BeatmapCommandHandler(
                 resolver, history, taskCoordinator, replyFactory, videoRenderRecord, this::getAccessTokenFor
@@ -79,7 +79,7 @@ public class Router {
                 resolver, authHelper, taskCoordinator, replyFactory, this::getAccessTokenFor, this::getAvatar
         );
         ReplayCommandHandler replayCommands = new ReplayCommandHandler(
-                resolver, history, taskCoordinator, replyFactory, videoRenderRecord, replayResults, admins::isAdmin
+                resolver, history, taskCoordinator, replyFactory, videoRenderRecord, replayResults, admins::isAdmin, this::getAccessTokenFor
         );
         GeneralCommandHandler generalCommands = new GeneralCommandHandler(
                 messageSender, taskCoordinator, replyFactory, resolver, admins::isAdmin

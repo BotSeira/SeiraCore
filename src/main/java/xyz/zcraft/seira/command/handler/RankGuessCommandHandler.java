@@ -9,7 +9,6 @@ import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
-import xyz.zcraft.seira.command.parse.ShortcutTarget;
 import xyz.zcraft.seira.command.parse.UserRefResolution;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.data.SendResult;
@@ -417,9 +416,7 @@ public final class RankGuessCommandHandler {
 
         try {
             scoreId = Long.parseLong(
-                    APIHelper.lookupScoreId(new ShortcutTarget(
-                                    null, new UserRef.ByUid(boundUid), "bp", (long) index, null)
-                            , List.of(), null)
+                    APIHelper.lookupPlayerScore(boundUid, "bp", index, List.of(), null)
             );
         } catch (Exception e) {
             LOG.error("Failed to lookup score id", e);
