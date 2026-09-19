@@ -9,11 +9,9 @@ import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
-import xyz.zcraft.seira.command.parse.UserRefResolution;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.data.SendResult;
 import xyz.zcraft.seira.data.UploadedImage;
-import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.db.RankGuessRecordStore;
 import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.rankguess.HintUtil;
@@ -269,16 +267,9 @@ public final class RankGuessCommandHandler {
         Long rank;
 
         if (resolver.looksLikeMention(argument)) {
-            final UserRefResolution userRefResolution = resolver.resolveUserRefArgument(argument);
-
-            if (userRefResolution.errorMessage() != null) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + userRefResolution.errorMessage()));
-                return;
-            }
-
-            final UserRef userRef = userRefResolution.userRef();
-
-            rank = APIHelper.getUserRank(userRef);
+            String player = resolver.player(argument, ctx.senderUserId());
+            long uid = APIHelper.resolveUid(player);
+            rank = APIHelper.getUserRank(uid);
         } else {
             rank = parseRank(argument);
             if (rank == null) {

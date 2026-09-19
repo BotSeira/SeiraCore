@@ -11,7 +11,6 @@ import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.command.ResolutionException;
-import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
 import java.io.IOException;
@@ -96,16 +95,15 @@ public class APIHelper {
     }
 
     @SuppressWarnings("unused")
-    public static Response<Base64Bytes> getBoNResponse(int n, UserRef userRef) {
-        return getBoNResponse(n, userRef, List.of());
+    public static Response<Base64Bytes> getBoNResponse(int n, long uid) {
+        return getBoNResponse(n, uid, List.of());
     }
 
-    public static Response<Base64Bytes> getBoNResponse(int n, UserRef userRef, List<String> filters) {
-        return getBoNResponse(n, 1, userRef, filters);
+    public static Response<Base64Bytes> getBoNResponse(int n, long uid, List<String> filters) {
+        return getBoNResponse(n, 1, uid, filters);
     }
 
-    public static Response<Base64Bytes> getBoNResponse(int n, int start, UserRef userRef, List<String> filters) {
-        long uid = resolveUid(userRef);
+    public static Response<Base64Bytes> getBoNResponse(int n, int start, long uid, List<String> filters) {
         return getBase64BytesResponse(
                 "/users/" + uid + "/scores/bestof?n=" + n + encodeScoreRangeStart(start) + encodeScoreFilters(filters),
                 "获取最好成绩失败",
@@ -113,8 +111,7 @@ public class APIHelper {
         );
     }
 
-    public static Response<Base64Bytes> getUserInfoResponse(UserRef userRef) {
-        long uid = resolveUid(userRef);
+    public static Response<Base64Bytes> getUserInfoResponse(long uid) {
         return getBase64BytesResponse(
                 "/users/" + uid,
                 "获取玩家资料失败",
@@ -122,8 +119,7 @@ public class APIHelper {
         );
     }
 
-    public static UserExtended getUserRaw(UserRef userRef) {
-        long uid = resolveUid(userRef);
+    public static UserExtended getUserRaw(long uid) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/users/" + uid))
@@ -148,12 +144,11 @@ public class APIHelper {
     }
 
     @SuppressWarnings("unused")
-    public static Response<Base64Bytes> getTodayBestResponse(UserRef userRef) {
-        return getTodayBestResponse(userRef, 1);
+    public static Response<Base64Bytes> getTodayBestResponse(long uid) {
+        return getTodayBestResponse(uid, 1);
     }
 
-    public static Response<Base64Bytes> getTodayBestResponse(UserRef userRef, int days) {
-        long uid = resolveUid(userRef);
+    public static Response<Base64Bytes> getTodayBestResponse(long uid, int days) {
         return getBase64BytesResponse(
                 "/users/" + uid + "/scores/today-best?days=" + days,
                 "获取近期BP失败",
@@ -244,22 +239,21 @@ public class APIHelper {
     }
 
     @SuppressWarnings("unused")
-    public static Response<Base64Bytes> getRecentResponse(int n, UserRef userRef, boolean includeFail) {
-        return getRecentResponse(n, userRef, includeFail, List.of());
+    public static Response<Base64Bytes> getRecentResponse(int n, long uid, boolean includeFail) {
+        return getRecentResponse(n, uid, includeFail, List.of());
     }
 
-    public static Response<Base64Bytes> getRecentResponse(int n, UserRef userRef, boolean includeFail, List<String> filters) {
-        return getRecentResponse(n, 1, userRef, includeFail, filters);
+    public static Response<Base64Bytes> getRecentResponse(int n, long uid, boolean includeFail, List<String> filters) {
+        return getRecentResponse(n, 1, uid, includeFail, filters);
     }
 
     public static Response<Base64Bytes> getRecentResponse(
             int n,
             int start,
-            UserRef userRef,
+            long uid,
             boolean includeFail,
             List<String> filters
     ) {
-        long uid = resolveUid(userRef);
         return getBase64BytesResponse(
                 "/users/" + uid + "/scores/recent?n=" + n + "&fail=" + includeFail
                         + encodeScoreRangeStart(start) + encodeScoreFilters(filters),
@@ -1020,18 +1014,17 @@ public class APIHelper {
         }
     }
 
-    public static long resolveUid(UserRef userRef) {
-        if (userRef instanceof UserRef.ByUid byUid) {
-            return byUid.getUid();
+    public static long resolveUid(String player) {
+        if (player == null || player.isBlank()) throw new ResolutionException("无法识别指定的玩家");
+        try {
+            long uid = Long.parseLong(player);
+            if (uid > 0) return uid;
+        } catch (NumberFormatException ignored) {
         }
-        if (userRef instanceof UserRef.ByUsername byUsername) {
-            return lookupUser(byUsername.getUsername()).getContent().getId();
-        }
-        throw new ResolutionException("无法识别指定的玩家");
+        return lookupUser(player).getContent().getId();
     }
 
-    public static long getUserRank(UserRef userRef) {
-        long uid = resolveUid(userRef);
+    public static long getUserRank(long uid) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(ENDPOINT + "/users/" + uid + "/rank"))

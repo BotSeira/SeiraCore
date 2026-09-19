@@ -4,13 +4,12 @@ import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.data.MissData;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
+import xyz.zcraft.seira.command.ResolutionException;
+import xyz.zcraft.seira.command.parse.TargetInput;
 import xyz.zcraft.seira.command.TargetHistory;
-import xyz.zcraft.seira.command.TargetLookup;
-import xyz.zcraft.seira.command.parse.TargetArguments;
-import xyz.zcraft.seira.command.parse.TargetResolution;
-import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.command.TaskCoordinator;
-import xyz.zcraft.seira.command.parse.*;
+import xyz.zcraft.seira.command.parse.Resolver;
+import xyz.zcraft.seira.command.parse.ScoreFilterArguments;
 import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 
@@ -24,9 +23,9 @@ public final class ScoreCommandHandler {
     private static final int MAX_SCORE_LIST_COUNT = 200;
     private static final Pattern SCORE_LIST_RANGE_PATTERN = Pattern.compile("^(\\d+)(?:-(\\d+))?$");
 
+    private final java.util.function.Function<String, String> accessTokenProvider;
     private final Resolver resolver;
     private final TargetHistory history;
-    private final TargetLookup targetLookup;
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
 
@@ -38,8 +37,8 @@ public final class ScoreCommandHandler {
             java.util.function.Function<String, String> accessTokenProvider
     ) {
         this.resolver = resolver;
+        this.accessTokenProvider = accessTokenProvider;
         this.history = history;
-        this.targetLookup = new TargetLookup(resolver, accessTokenProvider);
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
     }
@@ -77,15 +76,12 @@ public final class ScoreCommandHandler {
 
     public void handleBp(Context ctx) {
         if (ctx.args().length == 0) {
-            ShortcutTarget target = resolver.parseTarget("bp1", ctx.senderUserId());
-            if (target.isError()) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
-                return;
-            }
+            String player = resolver.player(null, ctx.senderUserId());
             try (var _ = taskCoordinator.beginRequest(ctx, "Score")) {
-                String scoreId = APIHelper.lookupPlayerScore(APIHelper.resolveUid(target.userRef()), target.macroType(), target.macroIndex(), List.of(), null);
-                history.remember(ctx, null, null, scoreId);
+                long uid = APIHelper.resolveUid(player);
+                String scoreId = APIHelper.lookupPlayerScore(uid, "bp", 1, List.of(), null);
                 var response = APIHelper.getScoreResponse(scoreId);
+                history.remember(ctx, null, null, scoreId);
                 ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.scoreMessage(ctx, response)));
             }
             return;
@@ -104,13 +100,14 @@ public final class ScoreCommandHandler {
         var request = parseScoreListRequest(ctx, CommandUsage.BP);
         if (request == null) return;
         var range = request.range();
-        var userRef = request.userRef();
+        var player = request.player();
         var filters = request.filters();
         try (var _ = taskCoordinator.beginRequest(ctx, "Best Scores")) {
+            long uid = APIHelper.resolveUid(player);
             var response = APIHelper.getBoNResponse(
                     range.end(),
                     range.start(),
-                    userRef,
+                    uid,
                     filters.filters()
             );
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.bpMessage(ctx, response)));
@@ -119,15 +116,12 @@ public final class ScoreCommandHandler {
 
     public void handleRs(Context ctx, boolean includeFail) {
         if (ctx.args().length == 0) {
-            ShortcutTarget target = resolver.parseTarget(ctx.command() + "1", ctx.senderUserId());
-            if (target.isError()) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
-                return;
-            }
+            String player = resolver.player(null, ctx.senderUserId());
             try (var _ = taskCoordinator.beginRequest(ctx, "Score")) {
-                String scoreId = APIHelper.lookupPlayerScore(APIHelper.resolveUid(target.userRef()), target.macroType(), target.macroIndex(), List.of(), null);
-                history.remember(ctx, null, null, scoreId);
+                long uid = APIHelper.resolveUid(player);
+                String scoreId = APIHelper.lookupPlayerScore(uid, ctx.command(), 1, List.of(), null);
                 var response = APIHelper.getScoreResponse(scoreId);
+                history.remember(ctx, null, null, scoreId);
                 ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.scoreMessage(ctx, response)));
             }
             return;
@@ -146,13 +140,14 @@ public final class ScoreCommandHandler {
         var request = parseScoreListRequest(ctx, CommandUsage.RS);
         if (request == null) return;
         var range = request.range();
-        var userRef = request.userRef();
+        var player = request.player();
         var filters = request.filters();
         try (var _ = taskCoordinator.beginRequest(ctx, "Recent Score")) {
+            long uid = APIHelper.resolveUid(player);
             var response = APIHelper.getRecentResponse(
                     range.end(),
                     range.start(),
-                    userRef,
+                    uid,
                     includeFail,
                     filters.filters()
             );
@@ -167,45 +162,20 @@ public final class ScoreCommandHandler {
             return;
         }
 
-        UserRef userRef;
-        if (request.target() != null) {
-            UserRefResolution resolution = resolver.resolveUserRefArgument(request.target());
-            if (resolution.errorMessage() != null) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + resolution.errorMessage()));
-                return;
-            }
-            if (resolution.userRef() == null) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.TB));
-                return;
-            }
-            userRef = resolution.userRef();
-        } else {
-            Long uid = resolver.resolveBoundUid(ctx.senderUserId());
-            if (uid == null) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.NO_BIND));
-                return;
-            }
-            userRef = new UserRef.ByUid(uid);
-        }
-
-        UserRef target = userRef;
+        String player = resolver.player(request.target(), ctx.senderUserId());
         try (var _ = taskCoordinator.beginRequest(ctx, "Recent Best Scores")) {
-            var response = APIHelper.getTodayBestResponse(target, request.days());
+            long uid = APIHelper.resolveUid(player);
+            var response = APIHelper.getTodayBestResponse(uid, request.days());
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.tbMessage(ctx, response)));
         }
     }
 
     private void handleFilteredSingleScore(Context ctx, String macroType) {
-        UserRef targetUser = null;
+        String targetUser = null;
         int startIndex = 0;
 
         if (resolver.looksLikeMention(ctx.args()[0]) || resolver.looksLikeUid(ctx.args()[0])) {
-            final UserRefResolution userRefResolution = resolver.resolveUserRefArgument(ctx.args()[0]);
-            if (userRefResolution.errorMessage() != null) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + userRefResolution.errorMessage()));
-                return;
-            }
-            targetUser = userRefResolution.userRef();
+            targetUser = resolver.player(ctx.args()[0], ctx.senderUserId());
             startIndex = 1;
         }
 
@@ -215,60 +185,36 @@ public final class ScoreCommandHandler {
             return;
         }
 
-        if (targetUser == null) {
-            Long uid = resolver.resolveBoundUid(ctx.senderUserId());
-            if (uid == null) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.NO_BIND));
-                return;
-            }
-            targetUser = new UserRef.ByUid(uid);
-        }
+        if (targetUser == null) targetUser = resolver.player(null, ctx.senderUserId());
 
-        ShortcutTarget target = new ShortcutTarget(null, targetUser, macroType, 1L, null);
         try (var _ = taskCoordinator.beginRequest(ctx, "Score")) {
-            String scoreId = APIHelper.lookupPlayerScore(APIHelper.resolveUid(target.userRef()), target.macroType(), target.macroIndex(), filters.filters(), null);
-            history.remember(ctx, null, null, scoreId);
+            long uid = APIHelper.resolveUid(targetUser);
+            String scoreId = APIHelper.lookupPlayerScore(uid, macroType, 1, filters.filters(), null);
             var response = APIHelper.getScoreResponse(scoreId);
+            history.remember(ctx, null, null, scoreId);
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.scoreMessage(ctx, response)));
         }
     }
 
     public void handleS(Context ctx) {
-        handleScore(ctx, false);
-    }
-
-    public void handleSm(Context ctx) {
-        handleScore(ctx, true);
-    }
-
-    private void handleScore(Context ctx, boolean onBeatmap) {
-        String usage = onBeatmap ? CommandUsage.SM : CommandUsage.S;
-        TargetResolution target;
-        UserRef userOverride = null;
+        String usage = CommandUsage.S;
+        TargetInput target;
+        String userOverride = null;
         int optionIndex;
         boolean playerOnly = ctx.argumentCount() > 0 && resolver.looksLikeMention(ctx.argument(0))
                 && (ctx.argumentCount() == 1 || ctx.argument(1).startsWith("+"));
         if (playerOnly || ctx.argumentCount() == 0 || ctx.argument(0).startsWith("+")) {
-            target = new TargetResolution(null, 0);
+            target = TargetInput.memory();
         } else {
-            target = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
-            if (target.target().isError()) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.target().errorMessage()));
-                return;
-            }
+            target = TargetInput.read(ctx.args());
         }
         optionIndex = target.consumedArgs();
         if (optionIndex < ctx.argumentCount() && !ctx.argument(optionIndex).startsWith("+")) {
-            var playerArgument = resolver.resolveUserRefArgument(ctx.argument(optionIndex));
-            if (playerArgument.errorMessage() != null || playerArgument.userRef() == null) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx)
-                        + (playerArgument.errorMessage() == null ? usage : playerArgument.errorMessage())));
-                return;
-            }
-            userOverride = playerArgument.userRef();
+            userOverride = resolver.player(ctx.argument(optionIndex), ctx.senderUserId());
             optionIndex++;
         }
-        if ((target.target() == null && history.get(ctx) == null)
+        var remembered = history.get(ctx);
+        if ((target.kind() == TargetInput.Kind.MEMORY && remembered == null)
                 || ctx.argumentCount() - optionIndex > 1
                 || (optionIndex < ctx.argumentCount() && !ctx.argument(optionIndex).startsWith("+"))) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + usage));
@@ -286,12 +232,112 @@ public final class ScoreCommandHandler {
             filters = parsed.filters();
         }
         try (var _ = taskCoordinator.beginRequest(ctx, "Score")) {
-            var resolvedTarget = onBeatmap
-                    ? targetLookup.scoreOnBeatmap(ctx, target.target(), history.get(ctx), userOverride, filters, mod)
-                    : targetLookup.score(ctx, target.target(), history.get(ctx), userOverride, filters, mod);
-            history.remember(ctx, resolvedTarget);
-            String scoreId = resolvedTarget.scoreId();
+            var previous = target.kind() == TargetInput.Kind.MEMORY ? remembered : null;
+            Long beatmapId = previous == null ? null : previous.beatmapId();
+            Long beatmapsetId = previous == null ? null : previous.beatmapsetId();
+            String scoreId = previous == null ? null : previous.scoreId();
+            boolean selectedPlayerScore = false;
+            switch (target.kind()) {
+                case ID, SCORE -> scoreId = target.id();
+                case MAP -> beatmapId = Long.parseLong(target.id());
+                case SET -> {
+                    beatmapsetId = Long.parseLong(target.id());
+                    String player = userOverride == null ? resolver.player(null, ctx.senderUserId()) : userOverride;
+                    long uid = APIHelper.resolveUid(player);
+                    scoreId = APIHelper.lookupBeatmapsetScore(beatmapsetId, target.index(), uid, filters, mod);
+                    selectedPlayerScore = true;
+                }
+                case RS, RP, BP -> {
+                    String player = userOverride == null ? resolver.player(target.player(), ctx.senderUserId()) : userOverride;
+                    long uid = APIHelper.resolveUid(player);
+                    scoreId = APIHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), filters, mod);
+                    selectedPlayerScore = true;
+                }
+                case MP -> beatmapId = APIHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                case MEMORY -> {}
+            }
+            if ((userOverride != null || mod != null) && scoreId != null && !selectedPlayerScore) {
+                if (beatmapId == null && scoreId != null) beatmapId = APIHelper.getScoreBeatmapId(scoreId);
+                scoreId = null;
+            }
+            if (scoreId == null) {
+                if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
+                String player = userOverride == null ? resolver.player(null, ctx.senderUserId()) : userOverride;
+                long uid = APIHelper.resolveUid(player);
+                scoreId = APIHelper.lookupBeatmapScore(beatmapId, uid, filters, mod);
+            }
             var response = APIHelper.getScoreResponse(scoreId);
+            history.remember(ctx, beatmapsetId, beatmapId, scoreId);
+            ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.scoreMessage(ctx, response)));
+        } catch (Exception e) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + TaskCoordinator.resolveErrorMessage(e)));
+            org.apache.logging.log4j.LogManager.getLogger(ScoreCommandHandler.class)
+                    .error("Failed to execute /{}", ctx.command(), e);
+        }
+    }
+
+    public void handleSm(Context ctx) {
+        String usage = CommandUsage.SM;
+        TargetInput target;
+        String userOverride = null;
+        int optionIndex;
+        boolean playerOnly = ctx.argumentCount() > 0 && resolver.looksLikeMention(ctx.argument(0))
+                && (ctx.argumentCount() == 1 || ctx.argument(1).startsWith("+"));
+        if (playerOnly || ctx.argumentCount() == 0 || ctx.argument(0).startsWith("+")) {
+            target = TargetInput.memory();
+        } else {
+            target = TargetInput.read(ctx.args());
+        }
+        optionIndex = target.consumedArgs();
+        if (optionIndex < ctx.argumentCount() && !ctx.argument(optionIndex).startsWith("+")) {
+            userOverride = resolver.player(ctx.argument(optionIndex), ctx.senderUserId());
+            optionIndex++;
+        }
+        var remembered = history.get(ctx);
+        if ((target.kind() == TargetInput.Kind.MEMORY && remembered == null)
+                || ctx.argumentCount() - optionIndex > 1
+                || (optionIndex < ctx.argumentCount() && !ctx.argument(optionIndex).startsWith("+"))) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + usage));
+            return;
+        }
+        String option = optionIndex < ctx.argumentCount() ? ctx.argument(optionIndex) : null;
+        String mod = option == null ? null : option.substring(1).toUpperCase(java.util.Locale.ROOT);
+        List<String> filters = List.of();
+        if (mod != null) {
+            var parsed = ScoreFilterArguments.parse(new String[]{"mod=" + mod}, 0);
+            if (parsed.isError()) {
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + parsed.errorMessage()));
+                return;
+            }
+            filters = parsed.filters();
+        }
+        try (var _ = taskCoordinator.beginRequest(ctx, "Score")) {
+            var previous = target.kind() == TargetInput.Kind.MEMORY ? remembered : null;
+            Long beatmapId = previous == null ? null : previous.beatmapId();
+            Long beatmapsetId = previous == null ? null : previous.beatmapsetId();
+            String scoreId = previous == null ? null : previous.scoreId();
+            switch (target.kind()) {
+                case ID, MAP -> beatmapId = Long.parseLong(target.id());
+                case SCORE -> scoreId = target.id();
+                case SET -> {
+                    beatmapsetId = Long.parseLong(target.id());
+                    beatmapId = APIHelper.lookupBeatmapInSet(beatmapsetId, target.index(), accessTokenProvider.apply(ctx.senderUserId()));
+                }
+                case RS, RP, BP -> {
+                    String player = resolver.player(target.player(), ctx.senderUserId());
+                    long uid = APIHelper.resolveUid(player);
+                    scoreId = APIHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
+                }
+                case MP -> beatmapId = APIHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                case MEMORY -> {}
+            }
+            if (beatmapId == null && scoreId != null) beatmapId = APIHelper.getScoreBeatmapId(scoreId);
+            if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
+            String player = userOverride == null ? resolver.player(null, ctx.senderUserId()) : userOverride;
+            long uid = APIHelper.resolveUid(player);
+            scoreId = APIHelper.lookupBeatmapScore(beatmapId, uid, filters, mod);
+            var response = APIHelper.getScoreResponse(scoreId);
+            history.remember(ctx, beatmapsetId, beatmapId, scoreId);
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.scoreMessage(ctx, response)));
         } catch (Exception e) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + TaskCoordinator.resolveErrorMessage(e)));
@@ -301,31 +347,93 @@ public final class ScoreCommandHandler {
     }
 
     public void handleSa(Context ctx) {
-        var target = TargetArguments.parse(ctx, resolver, history.get(ctx), CommandUsage.SA, 0);
-        if (target == null) return;
+        var target = ctx.argumentCount() == 0
+                ? TargetInput.memory() : TargetInput.read(ctx.args());
+        var remembered = history.get(ctx);
+        if ((target.kind() == TargetInput.Kind.MEMORY && remembered == null)
+                || ctx.argumentCount() - target.consumedArgs() > 0) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.SA));
+            return;
+        }
         try (var _ = taskCoordinator.beginRequest(ctx, "Score Analysis")) {
-            var resolvedTarget = targetLookup.score(ctx, target.target(), history.get(ctx));
-            history.remember(ctx, resolvedTarget);
-            String scoreId = resolvedTarget.scoreId();
+            var previous = target.kind() == TargetInput.Kind.MEMORY ? remembered : null;
+            Long beatmapId = previous == null ? null : previous.beatmapId();
+            Long beatmapsetId = previous == null ? null : previous.beatmapsetId();
+            String scoreId = previous == null ? null : previous.scoreId();
+            switch (target.kind()) {
+                case ID, SCORE -> scoreId = target.id();
+                case MAP -> beatmapId = Long.parseLong(target.id());
+                case SET -> {
+                    beatmapsetId = Long.parseLong(target.id());
+                    String player = resolver.player(target.player(), ctx.senderUserId());
+                    long uid = APIHelper.resolveUid(player);
+                    scoreId = APIHelper.lookupBeatmapsetScore(beatmapsetId, target.index(), uid, List.of(), null);
+                }
+                case RS, RP, BP -> {
+                    String player = resolver.player(target.player(), ctx.senderUserId());
+                    long uid = APIHelper.resolveUid(player);
+                    scoreId = APIHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
+                }
+                case MP -> beatmapId = APIHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                case MEMORY -> {}
+            }
+            if (scoreId == null) {
+                if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
+                String player = resolver.player(target.player(), ctx.senderUserId());
+                long uid = APIHelper.resolveUid(player);
+                scoreId = APIHelper.lookupBeatmapScore(beatmapId, uid, List.of(), null);
+            }
             var response = APIHelper.getScoreAnalyzeResponse(scoreId);
+            history.remember(ctx, beatmapsetId, beatmapId, scoreId);
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.scoreAnalyzeMessage(ctx, response)));
         }
     }
 
     public void handleMa(Context ctx) {
-        var target = TargetArguments.parse(ctx, resolver, history.get(ctx), CommandUsage.MA, 1, arg -> arg.startsWith("#"));
-        if (target == null) return;
+        var target = ctx.argumentCount() == 0 || ctx.argument(0).startsWith("#")
+                ? TargetInput.memory() : TargetInput.read(ctx.args());
+        var remembered = history.get(ctx);
+        if ((target.kind() == TargetInput.Kind.MEMORY && remembered == null)
+                || ctx.argumentCount() - target.consumedArgs() > 1) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.MA));
+            return;
+        }
         String indexArgument = (ctx.argumentCount() > target.consumedArgs() ? ctx.argument(target.consumedArgs()) : null);
-        Integer index = indexArgument == null ? null : parseMissIndex(indexArgument, target.target() == null);
+        Integer index = indexArgument == null ? null : parseMissIndex(indexArgument, target.kind() == TargetInput.Kind.MEMORY);
         if (indexArgument != null && index == null) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.MA));
             return;
         }
         try (var _ = taskCoordinator.beginRequest(ctx, "Score Misses")) {
-            var resolvedTarget = targetLookup.score(ctx, target.target(), history.get(ctx));
-            history.remember(ctx, resolvedTarget);
-            String scoreId = resolvedTarget.scoreId();
+            var previous = target.kind() == TargetInput.Kind.MEMORY ? remembered : null;
+            Long beatmapId = previous == null ? null : previous.beatmapId();
+            Long beatmapsetId = previous == null ? null : previous.beatmapsetId();
+            String scoreId = previous == null ? null : previous.scoreId();
+            switch (target.kind()) {
+                case ID, SCORE -> scoreId = target.id();
+                case MAP -> beatmapId = Long.parseLong(target.id());
+                case SET -> {
+                    beatmapsetId = Long.parseLong(target.id());
+                    String player = resolver.player(target.player(), ctx.senderUserId());
+                    long uid = APIHelper.resolveUid(player);
+                    scoreId = APIHelper.lookupBeatmapsetScore(beatmapsetId, target.index(), uid, List.of(), null);
+                }
+                case RS, RP, BP -> {
+                    String player = resolver.player(target.player(), ctx.senderUserId());
+                    long uid = APIHelper.resolveUid(player);
+                    scoreId = APIHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
+                }
+                case MP -> beatmapId = APIHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                case MEMORY -> {}
+            }
+            if (scoreId == null) {
+                if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
+                String player = resolver.player(target.player(), ctx.senderUserId());
+                long uid = APIHelper.resolveUid(player);
+                scoreId = APIHelper.lookupBeatmapScore(beatmapId, uid, List.of(), null);
+            }
             var response = APIHelper.getScoreMissesResponse(scoreId);
+            history.remember(ctx, beatmapsetId, beatmapId, scoreId);
             List<MissData> misses = response.getContent();
             if (index == null && misses.size() != 1) {
                 ctx.sendReply(replyFactory.scoreMissesMessage(ctx, response));
@@ -366,26 +474,12 @@ public final class ScoreCommandHandler {
         }
 
         int nextArg = 1;
-        UserRef userRef;
+        String player;
         if (nextArg < args.length && (resolver.looksLikeMention(args[nextArg]) || resolver.looksLikeUid(args[nextArg]))) {
-            UserRefResolution resolution = resolver.resolveUserRefArgument(args[nextArg]);
-            if (resolution.errorMessage() != null) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + resolution.errorMessage()));
-                return null;
-            }
-            if (resolution.userRef() == null) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + usage));
-                return null;
-            }
-            userRef = resolution.userRef();
+            player = resolver.player(args[nextArg], ctx.senderUserId());
             nextArg++;
         } else {
-            Long uid = resolver.resolveBoundUid(ctx.senderUserId());
-            if (uid == null) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.NO_BIND));
-                return null;
-            }
-            userRef = new UserRef.ByUid(uid);
+            player = resolver.player(null, ctx.senderUserId());
         }
 
         ScoreFilterArguments.ParseResult filters = ScoreFilterArguments.parse(args, nextArg);
@@ -393,10 +487,10 @@ public final class ScoreCommandHandler {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + filters.errorMessage() + "\n" + CommandUsage.SCORE_FILTERS));
             return null;
         }
-        return new ScoreListRequest(range, userRef, filters);
+        return new ScoreListRequest(range, player, filters);
     }
 
-    private record ScoreListRequest(ScoreListRange range, UserRef userRef, ScoreFilterArguments.ParseResult filters) {}
+    private record ScoreListRequest(ScoreListRange range, String player, ScoreFilterArguments.ParseResult filters) {}
 
     record TbArguments(int days, String target) {
     }

@@ -10,13 +10,10 @@ import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
-import xyz.zcraft.seira.command.parse.ShortcutTarget;
+import xyz.zcraft.seira.command.parse.TargetInput;
 import xyz.zcraft.seira.command.ResolutionException;
-import xyz.zcraft.seira.command.parse.TargetResolution;
-import xyz.zcraft.seira.command.parse.UserRefResolution;
 import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
-import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 
@@ -94,24 +91,16 @@ public final class SocialCommandHandler {
 
         if (ctx.argumentCount() == 0) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/mu @someone\n> 注: 读取@需要开启权限。"));
-        }
-
-        final UserRefResolution targetRef = resolver.resolveUserRefArgument(ctx.argument(0));
-
-        if (targetRef.errorMessage() != null) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + targetRef.errorMessage()));
             return;
         }
 
-        if (targetRef.userRef() instanceof UserRef.ByUid byUid) {
-            final long uid = byUid.getUid();
-            final String at = UserDataStore.findGroupOpenIdByUid(ctx.groupId(), uid)
-                    .map(ReplyFactory::at)
-                    .orElse("");
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at) + ": [%d](%s)".formatted(uid, "https://osu.ppy.sh/users/" + uid));
-        }
-
-        final UserExtended targetUser = APIHelper.getUserRaw(targetRef.userRef());
+        String player = resolver.player(ctx.argument(0), ctx.senderUserId());
+        long uid = APIHelper.resolveUid(player);
+        final String mention = UserDataStore.findGroupOpenIdByUid(ctx.groupId(), uid)
+                .map(ReplyFactory::at)
+                .orElse("");
+        ctx.sendReply(PendingMessage.ofMarkdownRaw(mention) + ": [%d](%s)".formatted(uid, "https://osu.ppy.sh/users/" + uid));
+        final UserExtended targetUser = APIHelper.getUserRaw(uid);
         final String targetOsuAvatar = targetUser.getAvatarUrl();
 
         boolean selfFollowed;
@@ -296,17 +285,11 @@ public final class SocialCommandHandler {
                 ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
             }
         } else if (ctx.args().length == 1 || ctx.args().length == 2) {
-            TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
-            ShortcutTarget target = targetResolution.target();
-            if (target.isError()) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
-                return;
-            }
-
-            int remainingArgs = ctx.argumentCount() - targetResolution.consumedArgs();
+            var target = TargetInput.read(ctx.args());
+            int remainingArgs = ctx.argumentCount() - target.consumedArgs();
             List<Long> uids = new LinkedList<>();
             if (remainingArgs == 1) {
-                String[] uidTokens = ctx.argument(targetResolution.consumedArgs()).split(",");
+                String[] uidTokens = ctx.argument(target.consumedArgs()).split(",");
                 if (uidTokens.length == 0) {
                     ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "玩家ID列表不能为空。"));
                     return;
@@ -338,25 +321,18 @@ public final class SocialCommandHandler {
             }
 
             try (var _ = taskCoordinator.beginRequest(ctx, "Map Leaderboard")) {
-                long beatmapId;
-                if (target.isLocalScore()) {
-                    beatmapId = APIHelper.getScoreBeatmapId(target.localScoreId());
-                } else if (!target.isMacro() || "m".equals(target.macroType())) {
-                    beatmapId = target.explicitId();
-                } else {
-                    switch (target.macroType()) {
-                        case "s" -> beatmapId = APIHelper.getScoreBeatmapId(target.explicitId().toString());
-                        case "ms" -> beatmapId = APIHelper.lookupBeatmapInSet(target.explicitId(), target.macroIndex(),
-                                accessTokenProvider.apply(ctx.senderUserId()));
-                        case "rs", "rp", "bp" -> {
-                            long uid = APIHelper.resolveUid(target.userRef());
-                            beatmapId = APIHelper.lookupPlayerScoreBeatmap(uid, target.macroType(), target.macroIndex(), accessTokenProvider.apply(ctx.senderUserId()));
-
-                        }
-                        case "mp" -> beatmapId = APIHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
-                        default -> throw new ResolutionException("未知的快捷查询");
+                long beatmapId = switch (target.kind()) {
+                    case ID, MAP -> Long.parseLong(target.id());
+                    case SCORE -> APIHelper.getScoreBeatmapId(target.id());
+                    case SET -> APIHelper.lookupBeatmapInSet(Long.parseLong(target.id()), target.index(),
+                            accessTokenProvider.apply(ctx.senderUserId()));
+                    case RS, RP, BP -> {
+                        long uid = APIHelper.resolveUid(resolver.player(target.player(), ctx.senderUserId()));
+                        yield APIHelper.lookupPlayerScoreBeatmap(uid, target.scoreList(), target.index(), accessTokenProvider.apply(ctx.senderUserId()));
                     }
-                }
+                    case MP -> APIHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                    case MEMORY -> throw new ResolutionException("请指定指令目标谱面喵");
+                };
                 var response = APIHelper.getGroupLeaderboardResponse(beatmapId, uids);
                 ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
             }
@@ -366,28 +342,13 @@ public final class SocialCommandHandler {
     }
 
     public void handleSup(Context ctx) {
-        final UserRef target;
-
-        if (ctx.argumentCount() == 0) {
-            Long targetId = resolver.resolveBoundUid(ctx.senderUserId());
-            if (targetId == null) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.NO_BIND));
-                return;
-            }
-            target = new UserRef.ByUid(targetId);
-        } else if (ctx.argumentCount() == 1) {
-            final UserRefResolution res = resolver.resolveUserRefArgument(ctx.argument(0));
-            if (res.errorMessage() != null) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + res.errorMessage()));
-                return;
-            }
-            target = res.userRef();
-        } else {
+        if (ctx.argumentCount() > 1) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.SUP));
             return;
         }
-
-        final UserExtended user = APIHelper.getUserRaw(target);
+        String player = resolver.player(ctx.argumentCount() == 0 ? null : ctx.argument(0), ctx.senderUserId());
+        long uid = APIHelper.resolveUid(player);
+        final UserExtended user = APIHelper.getUserRaw(uid);
         final String openId = UserDataStore.findGroupOpenIdByUid(ctx.groupId(), user.getId()).orElse(null);
 
         ctx.sendReply(replyFactory.supMessage(ctx, user.getUsername(), openId, user.isSupporter(), user.getHasSupported(), user.getSupportLevel()));
