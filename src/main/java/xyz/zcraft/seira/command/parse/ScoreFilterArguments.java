@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 public final class ScoreFilterArguments {
     private static final Pattern FILTER_PATTERN = Pattern.compile(
             "(?i)^(acc(?:uracy)?|combo|pp|time|length|len|star|stars|sr|bpm|miss|misses|score|mod|mods|rank|replay"
-                    + "|any|title|artist|mapper|genre|language|video|storyboard|fullcombo|ar|od|cs|hp)"
+                    + "|any|title|artist|mapper|genre|language|tag|source|video|storyboard|fullcombo|ar|od|cs|hp)"
                     + "(>=|<=|!=|!~|>|<|=|~)(.+)$"
     );
     private static final Pattern MISS_SHORTHAND_PATTERN = Pattern.compile("(?i)^(!?)(\\d+)miss(?:es)?$");
@@ -71,7 +71,7 @@ public final class ScoreFilterArguments {
             if (!RANKS.contains(value)) {
                 throw new IllegalArgumentException("rank 必须是 SSH/SS/XH/X/SH/S/A/B/C/D/F");
             }
-        } else if (Set.of("any", "title", "artist", "mapper", "genre", "language").contains(field)) {
+        } else if (Set.of("any", "title", "artist", "mapper", "genre", "language", "tag", "source").contains(field)) {
             if (!Set.of("~", "!~", "=", "!=").contains(operator)) {
                 throw new IllegalArgumentException(field + " 仅支持 ~、!~、=、!=");
             }
@@ -122,7 +122,7 @@ public final class ScoreFilterArguments {
     private static String normalizeField(String value) {
         return switch (value.toLowerCase(Locale.ROOT)) {
             case "acc", "accuracy" -> "acc";
-            case "combo" -> "combo";
+            case "combo", "cmb", "cb" -> "combo";
             case "pp" -> "pp";
             case "time", "length", "len" -> "time";
             case "star", "stars", "sr" -> "star";
@@ -136,15 +136,17 @@ public final class ScoreFilterArguments {
             case "mod", "mods" -> "mod";
             case "rank" -> "rank";
             case "any" -> "any";
-            case "title" -> "title";
-            case "artist" -> "artist";
-            case "mapper" -> "mapper";
+            case "title", "t" -> "title";
+            case "artist", "a" -> "artist";
+            case "mapper", "m" -> "mapper";
             case "genre" -> "genre";
             case "language" -> "language";
-            case "video" -> "video";
-            case "storyboard" -> "storyboard";
-            case "fullcombo" -> "fullcombo";
-            case "replay" -> "replay";
+            case "tag", "tags" -> "tag";
+            case "source" -> "source";
+            case "video", "vid" -> "video";
+            case "storyboard", "sb" -> "storyboard";
+            case "fullcombo", "fc" -> "fullcombo";
+            case "replay", "rep", "rp" -> "replay";
             default -> throw new IllegalArgumentException("未知字段 " + value);
         };
     }
