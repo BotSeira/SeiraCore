@@ -90,7 +90,7 @@ public final class TaskCoordinator {
 
         final var schedule = TIMEOUT_SCHEDULER.schedule(
                 () -> {
-                    ctx.sendReply(at(ctx) + "请求处理时间超过预期，这可能是由于相关数据缺少缓存，请耐心等待喵。");
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "请求处理时间超过预期，这可能是由于相关数据缺少缓存，请耐心等待喵。"));
                 },
                 60,
                 TimeUnit.SECONDS

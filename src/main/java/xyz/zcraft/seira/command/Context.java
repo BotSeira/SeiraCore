@@ -70,7 +70,7 @@ public record Context(
     }
 
     public SendResult sendReply(String message) {
-        return requireReplies().sendReply(PendingMessage.ofString(message));
+        return requireReplies().sendReply(PendingMessage.ofMarkdownRaw(message));
     }
 
     /**
