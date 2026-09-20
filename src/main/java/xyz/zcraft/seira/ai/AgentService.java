@@ -16,9 +16,11 @@ import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 public class AgentService {
     private final Api api;
@@ -122,6 +124,13 @@ public class AgentService {
         public static StateOwner of(Context ctx) {
             return new StateOwner(ctx.groupId(), ctx.senderUserId());
         }
+    }
+
+    public Set<String> activeGroupIds() {
+        return states.entrySet().stream()
+                .filter(entry -> entry.getValue().running().get())
+                .map(entry -> entry.getKey().groupId())
+                .collect(Collectors.toSet());
     }
 }
 

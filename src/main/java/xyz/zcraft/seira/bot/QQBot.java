@@ -312,7 +312,8 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         RealtimeServiceInterruptionNotifier.NotificationResult result = interruptionNotifier.notifyGroups(
                 watchService.activeTransientGroupIds(),
                 rankGuessGameService.activeGroupIds(),
-                multiplayerRoomWatchService.activeGroupIds()
+                multiplayerRoomWatchService.activeGroupIds(),
+                agentService.activeGroupIds()
         );
         if (result.failedGroups() == 0) {
             LOG.info("Sent restart interruption notices to {} affected groups", result.sentGroups());
