@@ -13,6 +13,8 @@ import xyz.zcraft.seira.config.LLMConfig;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -72,6 +74,34 @@ public class AgentService {
 
     public void clearState(String groupId, String openId) {
         states.remove(StateOwner.of(groupId, openId));
+    }
+
+    public void clearStateOfGroup(String groupId) {
+        List<StateOwner> toRemove = new ArrayList<>(100);
+
+        states.keySet().forEach((owner) -> {
+            if (owner.groupId().equals(groupId)) {
+                toRemove.add(owner);
+            }
+        });
+
+        for (StateOwner stateOwner : toRemove) {
+            states.remove(stateOwner);
+        }
+    }
+
+    public void clearStateOfUser(String openId) {
+        List<StateOwner> toRemove = new ArrayList<>(100);
+
+        states.keySet().forEach((owner) -> {
+            if (owner.openId().equals(openId)) {
+                toRemove.add(owner);
+            }
+        });
+
+        for (StateOwner stateOwner : toRemove) {
+            states.remove(stateOwner);
+        }
     }
 
     record State(
