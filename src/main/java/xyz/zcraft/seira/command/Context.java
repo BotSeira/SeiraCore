@@ -27,7 +27,6 @@ public record Context(
     }
 
     public Context {
-        command = Objects.requireNonNull(command, "command");
         args = args == null ? new String[0] : args.clone();
         query = query == null ? "" : query;
     }

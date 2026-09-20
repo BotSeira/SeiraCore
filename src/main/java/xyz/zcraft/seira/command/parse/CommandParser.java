@@ -1,6 +1,7 @@
 package xyz.zcraft.seira.command.parse;
 
 import xyz.zcraft.seira.command.Context;
+import xyz.zcraft.seira.services.AiPermission;
 
 import java.util.*;
 import java.util.function.UnaryOperator;
@@ -52,7 +53,7 @@ public final class CommandParser {
 
         String normalized = rawContent.trim();
         if (!normalized.startsWith(PREFIX)) {
-            return ParseResult.ignored();
+            return ParseResult.text(new Context(senderUserId, groupId, messageId, null, null, rawContent, null));
         }
 
         String body = normalized.substring(PREFIX.length()).trim();
@@ -75,8 +76,8 @@ public final class CommandParser {
 
     public record ParseResult(Status status, Context context) {
         public ParseResult {
-            if ((status == Status.PARSED) == (context == null)) {
-                throw new IllegalArgumentException("Only parsed results may contain a context");
+            if ((status == Status.PARSED || status == Status.TEXT) == (context == null)) {
+                throw new IllegalArgumentException("Only parsed results or text may contain a context");
             }
         }
 
@@ -92,10 +93,15 @@ public final class CommandParser {
             return new ParseResult(Status.PARSED, Objects.requireNonNull(context));
         }
 
+        static ParseResult text(Context context) {
+            return new ParseResult(Status.TEXT, Objects.requireNonNull(context));
+        }
+
         public enum Status {
             IGNORED,
             EMPTY_COMMAND,
-            PARSED
+            PARSED,
+            TEXT
         }
     }
 }

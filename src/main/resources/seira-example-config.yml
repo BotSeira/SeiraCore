@@ -71,3 +71,8 @@ bridge:
   # 可用占位符：{name}、{id}、{message}
   qqToDiscordFormat: "[{name}] {message}"
   discordToQqFormat: "[{name}] {message}"
+
+llm:
+  # LLM API 的地址
+  baseUrl: "http://localhost:8723"
+  apiKey: ""

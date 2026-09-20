@@ -7,21 +7,13 @@ public record AppConfig(
         QqConfig qq,
         CosConfig cos,
         DiscordConfig discord,
-        BridgeConfig bridge
+        BridgeConfig bridge,
+        LLMConfig llm
 ) {
     public AppConfig {
         discord = discord == null ? DiscordConfig.disabled() : discord;
         bridge = bridge == null ? BridgeConfig.defaults() : bridge;
-    }
-
-    public AppConfig(
-            SeiraConfig seira,
-            OstellaConfig ostella,
-            BindingConfig binding,
-            QqConfig qq,
-            CosConfig cos
-    ) {
-        this(seira, ostella, binding, qq, cos, null, null);
+        llm = llm == null ? new LLMConfig(null, null) : llm;
     }
 }
 

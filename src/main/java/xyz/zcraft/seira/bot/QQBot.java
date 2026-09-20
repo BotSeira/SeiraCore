@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.seira.ai.AgentService;
 import xyz.zcraft.seira.bot.data.*;
 import xyz.zcraft.seira.command.AttachmentHandler;
 import xyz.zcraft.seira.command.route.Router;
@@ -44,6 +45,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
     private final ScoreWatchService watchService;
     private final MultiplayerRoomWatchService multiplayerRoomWatchService;
     private final RankGuessGameService rankGuessGameService;
+    private final AgentService agentService;
     private final RealtimeServiceInterruptionNotifier interruptionNotifier;
     private final DiscordBridgeService discordBridgeService;
     private final AppConfig startupConfig;
@@ -99,6 +101,10 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
 
         LOG.info("Initializing rank guess service");
         this.rankGuessGameService = new RankGuessGameService();
+
+        LOG.info("Initializing agents service");
+        this.agentService = new AgentService(config.llm());
+
         this.attachmentHandler = new AttachmentHandler(executors.attachmentDownloads());
         this.router = new Router(
                 sender,
@@ -119,7 +125,10 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                         return null;
                     }
                 },
-                self::get
+                self::get,
+                agentService,
+                s -> QQApi.getGroupBotState(tokenManager.getToken(), s)
+
         );
     }
 

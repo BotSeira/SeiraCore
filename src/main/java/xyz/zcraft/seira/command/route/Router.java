@@ -3,10 +3,13 @@ package xyz.zcraft.seira.command.route;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.seira.ai.AgentService;
+import xyz.zcraft.seira.ai.AiChatHandler;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.QQApi;
+import xyz.zcraft.seira.bot.data.GroupBotState;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.bot.data.QQUser;
 import xyz.zcraft.seira.command.*;
@@ -19,6 +22,7 @@ import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.discord.DiscordBridgeService;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
+import xyz.zcraft.seira.services.AiPermission;
 import xyz.zcraft.seira.services.BindingService;
 import xyz.zcraft.seira.util.AdminRegistry;
 import xyz.zcraft.seira.util.NoticesHelper;
@@ -49,12 +53,14 @@ public class Router {
     private final CommandHandler unknownCommand;
     private final Executor commandExecutor;
     private final Supplier<QQUser> selfSupplier;
+    private final AiChatHandler aiChatHandler;
 
     public Router(
             MessageSender messageSender, Supplier<AppConfig> configSupplier, AdminRegistry admins,
             BindingService bindingService, ScoreWatchService watchService, MultiplayerRoomWatchService multiplayerRoomWatchService,
             DiscordBridgeService discordBridgeService, RankGuessGameService rankGuessGameService, Executor commandExecutor,
-            Runnable commandMetric, Function<byte[], UploadedImage> imageUploader, Supplier<QQUser> selfSupplier
+            Runnable commandMetric, Function<byte[], UploadedImage> imageUploader, Supplier<QQUser> selfSupplier,
+            AgentService agentService, Function<String, GroupBotState> botStateGetter
     ) {
         this.configSupplier = java.util.Objects.requireNonNull(configSupplier);
         this.commandExecutor = commandExecutor;
@@ -84,6 +90,9 @@ public class Router {
         GeneralCommandHandler generalCommands = new GeneralCommandHandler(
                 messageSender, taskCoordinator, replyFactory, resolver, admins::isAdmin
         );
+        this.aiChatHandler = new AiChatHandler(
+                resolver, agentService, admins::isAdmin, botStateGetter
+        );
         WatchCommandHandler watchCommands = new WatchCommandHandler(resolver, taskCoordinator, watchService, admins::isAdmin);
         SpecificScoreWatchCommandHandler specificScoreWatchCommands =
                 new SpecificScoreWatchCommandHandler(taskCoordinator, watchService);
@@ -98,16 +107,12 @@ public class Router {
         this.commandRegistry = createCommandRegistry(
                 bindingCommands, scoreCommands, beatmapCommands, socialCommands,
                 replayCommands, generalCommands, watchCommands, specificScoreWatchCommands,
-                multiplayerRoomWatchCommands, dcsCommands, rankGuessCommands
+                multiplayerRoomWatchCommands, dcsCommands, rankGuessCommands, aiChatHandler
         );
         this.debugRoutes = new DebugRoutes(
                 configSupplier, messageSender, replyFactory, taskCoordinator,
                 authHelper, admins::isAdmin, unknownCommand
         );
-    }
-
-    private String getAvatar(String openId) {
-        return QQApi.getAvatarUrl(configSupplier.get().qq().appId(), openId);
     }
 
     private static CommandRegistry createCommandRegistry(
@@ -116,7 +121,7 @@ public class Router {
             ReplayCommandHandler replayCommands, GeneralCommandHandler generalCommands,
             WatchCommandHandler watchCommands, SpecificScoreWatchCommandHandler specificScoreWatchCommands,
             MultiplayerRoomWatchCommandHandler multiplayerRoomWatchCommands, DcsCommandHandler dcsCommands,
-            RankGuessCommandHandler rankGuessCommands
+            RankGuessCommandHandler rankGuessCommands, AiChatHandler aiChatHandler
     ) {
         return CommandRegistry.builder()
                 .register(bindingCommands::handleBind, "bind")
@@ -162,7 +167,12 @@ public class Router {
                 .register(dcsCommands::handleDcs, "dcs")
                 .register(rankGuessCommands::handleRankGuess, "rg")
                 .register(generalCommands::handleNotice, "notice")
+                .register(aiChatHandler::handleAi, "ai")
                 .build();
+    }
+
+    private String getAvatar(String openId) {
+        return QQApi.getAvatarUrl(configSupplier.get().qq().appId(), openId);
     }
 
     public void onPrivateMessageReceived(String userId, String messageId, String rawContent) {
@@ -183,8 +193,15 @@ public class Router {
 
             rawContent = rawContent == null ? "" : rawContent.trim();
 
+            boolean beingAt = false;
+
             AppConfig config = configSupplier.get();
             final String selfAt = "<@" + config.qq().selfId() + ">";
+
+            if (rawContent.contains(selfAt)) {
+                beingAt = true;
+            }
+
             if (rawContent.startsWith(selfAt)) {
                 rawContent = rawContent.substring(selfAt.length()).trim();
             }
@@ -192,6 +209,11 @@ public class Router {
             final QQUser qqUser = selfSupplier.get();
             if (qqUser != null) {
                 final String selfLiteralAt = "@" + qqUser.username();
+
+                if (rawContent.contains(selfLiteralAt)) {
+                    beingAt = true;
+                }
+
                 if (rawContent.startsWith(selfLiteralAt)) {
                     rawContent = rawContent.substring(selfLiteralAt.length()).trim();
                 }
@@ -200,15 +222,24 @@ public class Router {
             CommandParser.ParseResult parseResult = commandParser.parse(
                     rawContent, userId, groupId, messageId
             );
+
             if (parseResult.status() == CommandParser.ParseResult.Status.IGNORED) {
                 return;
             }
 
+            if (parseResult.status() == CommandParser.ParseResult.Status.TEXT) {
+                CommandReplyChannel replies = taskCoordinator.openReplyChannel(
+                        targetId, messageId, groupMessage, false
+                );
+
+                if (beingAt && AiPermission.doPermit(groupId)) {
+                    aiChatHandler.handleChat(parseResult.context().withReplies(replies));
+                }
+                return;
+            }
+
             CommandReplyChannel replies = taskCoordinator.openReplyChannel(
-                    targetId,
-                    messageId,
-                    groupMessage,
-                    config.seira().queueMessageInGroup()
+                    targetId, messageId, groupMessage, config.seira().queueMessageInGroup()
             );
             if (parseResult.status() == CommandParser.ParseResult.Status.EMPTY_COMMAND
                     && !group) {

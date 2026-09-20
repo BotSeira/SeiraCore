@@ -54,7 +54,8 @@ public final class RuntimeConfig {
                 previous.qq(),
                 previous.cos(),
                 previous.discord(),
-                previous.bridge()
+                previous.bridge(),
+                previous.llm()
         );
     }
 

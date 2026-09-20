@@ -4,6 +4,7 @@ import xyz.zcraft.seira.api.data.SearchQuery;
 import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.db.UserDataStore;
 
+import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
@@ -129,6 +130,18 @@ public final class Resolver {
         return null;
     }
 
+    public List<String> extractAllMentionedIds(String token) {
+        if (token == null) {
+            return List.of();
+        }
+
+        List<String> result = new LinkedList<>();
+
+        Patterns.QQ_AT_PATTERN.matcher(token).results().forEach(m -> result.add(m.group(1)));
+
+        return result;
+    }
+
     public Long parsePositiveLong(String value) {
         try {
             long parsed = Long.parseLong(value);
@@ -149,8 +162,8 @@ public final class Resolver {
         private static final Pattern SPACE_MISSING_COMMAND_PATTERN = Pattern.compile(
                 "^([a-zA-Z]+)(\\d+(?:#\\d+)?)"
         );
-        private static final Pattern QQ_AT_PATTERN = Pattern.compile("^<@([A-Z|0-9]{32})>$");
-        private static final Pattern QQ_INLINE_AT_PATTERN = Pattern.compile("(<@[A-Z|0-9]{32}>)");
+        private static final Pattern QQ_AT_PATTERN = Pattern.compile("^<@([A-Z0-9]{32})>$");
+        private static final Pattern QQ_INLINE_AT_PATTERN = Pattern.compile("(<@[A-Z0-9]{32}>)");
         private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
         private static final Pattern SEARCH_PATTERN = Pattern.compile("^(?:#(\\d+) )?(.+)$");
     }
