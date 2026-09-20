@@ -137,7 +137,7 @@ public final class Resolver {
 
         List<String> result = new LinkedList<>();
 
-        Patterns.QQ_AT_PATTERN.matcher(token).results().forEach(m -> result.add(m.group(1)));
+        Patterns.QQ_AT_IDS_PATTERN.matcher(token).results().forEach(m -> result.add(m.group(1)));
 
         return result;
     }
@@ -163,6 +163,7 @@ public final class Resolver {
                 "^([a-zA-Z]+)(\\d+(?:#\\d+)?)"
         );
         private static final Pattern QQ_AT_PATTERN = Pattern.compile("^<@([A-Z0-9]{32})>$");
+        private static final Pattern QQ_AT_IDS_PATTERN = Pattern.compile("<@([A-Z0-9]{32})>");
         private static final Pattern QQ_INLINE_AT_PATTERN = Pattern.compile("(<@[A-Z0-9]{32}>)");
         private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
         private static final Pattern SEARCH_PATTERN = Pattern.compile("^(?:#(\\d+) )?(.+)$");
