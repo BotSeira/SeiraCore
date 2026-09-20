@@ -72,11 +72,11 @@ public class AgentService {
         return state != null && state.running().get();
     }
 
-    public void clearState(String groupId, String openId) {
-        states.remove(StateOwner.of(groupId, openId));
+    public boolean clearState(String groupId, String openId) {
+        return states.remove(StateOwner.of(groupId, openId)) != null;
     }
 
-    public void clearStateOfGroup(String groupId) {
+    public int clearStateOfGroup(String groupId) {
         List<StateOwner> toRemove = new ArrayList<>(100);
 
         states.keySet().forEach((owner) -> {
@@ -88,9 +88,11 @@ public class AgentService {
         for (StateOwner stateOwner : toRemove) {
             states.remove(stateOwner);
         }
+
+        return toRemove.size();
     }
 
-    public void clearStateOfUser(String openId) {
+    public int clearStateOfUser(String openId) {
         List<StateOwner> toRemove = new ArrayList<>(100);
 
         states.keySet().forEach((owner) -> {
@@ -102,6 +104,8 @@ public class AgentService {
         for (StateOwner stateOwner : toRemove) {
             states.remove(stateOwner);
         }
+
+        return toRemove.size();
     }
 
     record State(

@@ -69,8 +69,8 @@ public class AiChatHandler {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "已禁用本群AI对话喵。"));
                 return;
             } else if ("reset".equalsIgnoreCase(ctx.argument(0))) {
-                agentService.clearStateOfGroup(ctx.groupId());
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "已重置本群AI对话状态喵。"));
+                final int i = agentService.clearStateOfGroup(ctx.groupId());
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "已重置本群" + i + "个用户的AI对话状态喵。"));
                 return;
             }
         }
