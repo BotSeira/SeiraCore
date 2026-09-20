@@ -1,6 +1,5 @@
 package xyz.zcraft.seira.command;
 
-import com.google.gson.Gson;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
@@ -19,7 +18,6 @@ import xyz.zcraft.seira.services.ApiRequestStats;
 import xyz.zcraft.seira.services.BotStat;
 
 import java.nio.channels.ClosedChannelException;
-import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -27,11 +25,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
-import static xyz.zcraft.seira.command.reply.ReplyFactory.cmd;
 
 public final class TaskCoordinator {
     private static final Logger LOG = LogManager.getLogger(TaskCoordinator.class);
-
+    private static final ScheduledExecutorService TIMEOUT_SCHEDULER = Executors.newSingleThreadScheduledExecutor();
     private final MessageSender messageSender;
     private final DiscordBridgeService discordBridgeService;
     private final ApiRequestStats apiRequestStats = new ApiRequestStats();
@@ -80,23 +77,25 @@ public final class TaskCoordinator {
         return new OutboundReplyChannel(targetId, messageId, groupMessage, queueMessageInGroup);
     }
 
-    private static final ScheduledExecutorService TIMEOUT_SCHEDULER = Executors.newSingleThreadScheduledExecutor();
-
     /**
      * Tracks queue estimates and elapsed time; the caller executes the request directly.
      */
-    public RequestTiming beginRequest(Context ctx, String requestType) {
+    public RequestTiming beginRequest(Context ctx, String requestType, boolean timeoutNotify) {
         long estimatedSeconds = apiRequestStats.estimateAndEnqueue(requestType);
+        ScheduledFuture<?> schedule = null;
 
-        final var schedule = TIMEOUT_SCHEDULER.schedule(
-                () -> {
-                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "请求处理时间超过预期，这可能是由于相关数据缺少缓存，请耐心等待喵。"));
-                },
-                60,
-                TimeUnit.SECONDS
-        );
+        if (timeoutNotify) {
+            schedule = TIMEOUT_SCHEDULER.schedule(
+                    () -> {
+                        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "请求处理时间超过预期，这可能是由于相关数据缺少缓存，请耐心等待喵。"));
+                    },
+                    60,
+                    TimeUnit.SECONDS
+            );
+        }
 
         RequestTiming timing = new RequestTiming(requestType, schedule);
+
         try {
             ctx.sendQueueNotice(PendingMessage.ofMarkdownRaw(
                     at(ctx) + "请求已加入队列，预计等待时间" + estimatedSeconds + "秒。"));
@@ -105,6 +104,10 @@ public final class TaskCoordinator {
             timing.close();
             throw e;
         }
+    }
+
+    public RequestTiming beginRequest(Context ctx, String requestType) {
+        return beginRequest(ctx, requestType, true);
     }
 
     public PendingMessage imageMessage(Response<Base64Bytes> response, PendingMessage completion) {
@@ -241,8 +244,8 @@ public final class TaskCoordinator {
     public final class RequestTiming implements AutoCloseable {
         private final String requestType;
         private final long startedAt = System.nanoTime();
-        private boolean closed;
         private final ScheduledFuture<?> scheduledFuture;
+        private boolean closed;
 
         private RequestTiming(String requestType, ScheduledFuture<?> schedule) {
             this.requestType = requestType;
@@ -251,7 +254,10 @@ public final class TaskCoordinator {
 
         @Override
         public void close() {
-            scheduledFuture.cancel(true);
+            if (scheduledFuture != null) {
+                scheduledFuture.cancel(true);
+            }
+
             if (closed) return;
             closed = true;
             apiRequestStats.complete(requestType,

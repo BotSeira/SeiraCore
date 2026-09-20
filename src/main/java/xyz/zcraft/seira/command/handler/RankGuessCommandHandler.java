@@ -436,7 +436,7 @@ public final class RankGuessCommandHandler {
         }
 
         boolean activated = false;
-        try (var _ = taskCoordinator.beginRequest(ctx, "Rank Guess Render")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "Rank Guess Render", false)) {
             final PendingMessage message = PendingMessage.ofMarkdownRaw(at(ctx) + RandomReply.loading());
             final boolean activeMessageEnabled = ctx.sendMessage(message).success();
             if (!activeMessageEnabled) {
