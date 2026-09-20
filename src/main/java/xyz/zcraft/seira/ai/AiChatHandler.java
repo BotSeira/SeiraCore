@@ -48,7 +48,8 @@ public class AiChatHandler {
         } else if (ctx.argumentCount() == 1
                 && List.of("on", "off", "reset").contains(ctx.argument(0).toLowerCase(Locale.ROOT))) {
             if (!adminAuthorizer.test(ctx.senderUserId())) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "你无权使用该命令喵。"));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "你无权使用该命令喵。\n" +
+                        "> 由于此功能开销较大、处于测试阶段且较为不可控，暂未开放。若想要在此群中使用此功能，请联系 Bot 管理员喵。"));
                 return;
             }
 
