@@ -96,7 +96,7 @@ public class AiChatHandler {
         ids.add(ctx.senderUserId());
 
         for (String openId : ids) {
-            final Long uid = resolver.resolveBoundUid(ctx.senderUserId());
+            final Long uid = resolver.resolveBoundUid(openId);
             if (uid != null) {
                 bindings.put(openId, uid);
                 UserDataStore.findUsername(uid).ifPresent(s -> usernames.put(uid, s));
