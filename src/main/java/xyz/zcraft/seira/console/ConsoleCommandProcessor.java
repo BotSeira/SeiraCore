@@ -322,7 +322,7 @@ public final class ConsoleCommandProcessor {
                     watch clear <group-id> confirm
                     Polling runs in the watch worker. Clearing a group requires explicit confirmation.""";
             case "cache" -> """
-                    cache <query|delete|get|fetch> <score|beatmap|beatmapset|replay> <id>
+                    cache <query|delete|get|fetch> <score|beatmap|beatmapset|replay|beatmap-json|beatmapset-json> <id>
                     query reports presence at oStella and every osuRenderer worker.
                     get includes metadata; fetch populates oStella and downstream workers; delete removes every reachable copy.""";
             case "gateway" -> """
@@ -671,7 +671,7 @@ public final class ConsoleCommandProcessor {
     private ConsoleResult cache(ConsoleInputParser.ParsedInput input) {
         if (input.size() != 4) {
             return ConsoleResult.failure(
-                    "Usage: cache <query|delete|get|fetch> <score|beatmap|beatmapset|replay> <id>"
+                    "Usage: cache <query|delete|get|fetch> <score|beatmap|beatmapset|replay|beatmap-json|beatmapset-json> <id>"
             );
         }
         String operation = input.value(1).toLowerCase(Locale.ROOT);
@@ -679,8 +679,8 @@ public final class ConsoleCommandProcessor {
             return ConsoleResult.failure("Cache operation must be query, delete, get, or fetch.");
         }
         String type = input.value(2).toUpperCase(Locale.ROOT);
-        if (!List.of("SCORE", "BEATMAP", "BEATMAPSET", "REPLAY").contains(type)) {
-            return ConsoleResult.failure("Cache type must be score, beatmap, beatmapset, or replay.");
+        if (!List.of("SCORE", "BEATMAP", "BEATMAPSET", "REPLAY", "BEATMAP-JSON", "BEATMAPSET-JSON").contains(type)) {
+            return ConsoleResult.failure("Cache type must be score, beatmap, beatmapset, replay, beatmap-json, or beatmapset-json.");
         }
         long id = positiveLong(input.value(3), "id");
         return ConsoleResult.success(formatCacheControl(runtimeControl.controlCache(operation, type, id)));

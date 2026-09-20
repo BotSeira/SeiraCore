@@ -497,5 +497,4 @@ public final class ScoreCommandHandler {
 
     record ScoreListRange(int start, int end) {
     }
-
 }
