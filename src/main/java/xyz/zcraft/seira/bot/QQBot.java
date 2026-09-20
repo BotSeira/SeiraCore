@@ -66,7 +66,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         AppConfig config = runtimeConfig.current();
         this.startupConfig = config;
         this.executors = executors;
-        this.cacheControlClient = new OstellaCacheControlClient(config.ostella().endpoint());
+        this.cacheControlClient = new OstellaCacheControlClient(config.ostella().endpoint(), config.ostella().token());
 
         LOG.info("Authorizing QQ API");
         this.tokenManager = new TokenManager(config.qq().appId(), config.qq().appSecret());
@@ -82,7 +82,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
 
         LOG.info("Initializing score watch service");
         this.watchService = new ScoreWatchService(
-                new OstellaWatchApi(config.ostella().endpoint()),
+                new OstellaWatchApi(config.ostella().endpoint(), config.ostella().token()),
                 new WatchScoreNotifier(sender),
                 new SpecificScoreNotifier(sender),
                 new SqliteSpecificScoreWatchStore(),
@@ -91,7 +91,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
 
         LOG.info("Initializing multiplayer room watch service");
         this.multiplayerRoomWatchService = new MultiplayerRoomWatchService(
-                new OstellaMultiplayerRoomWatchApi(config.ostella().endpoint()),
+                new OstellaMultiplayerRoomWatchApi(config.ostella().endpoint(), config.ostella().token()),
                 new QqMultiplayerRoomNotifier(sender),
                 Duration.ofSeconds(config.seira().effectiveMultiplayerWatchIntervalSeconds())
         );

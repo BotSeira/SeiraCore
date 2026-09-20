@@ -14,15 +14,25 @@ import java.time.Duration;
 
 public final class OstellaMultiplayerRoomWatchApi implements MultiplayerRoomWatchApi {
     private final String endpoint;
+    private final String serviceToken;
     private final HttpClient client;
     private final Gson gson;
 
     public OstellaMultiplayerRoomWatchApi(String endpoint) {
-        this(endpoint, HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(30)).build(), new Gson());
+        this(endpoint, null);
+    }
+
+    public OstellaMultiplayerRoomWatchApi(String endpoint, String serviceToken) {
+        this(endpoint, serviceToken, HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(30)).build(), new Gson());
     }
 
     OstellaMultiplayerRoomWatchApi(String endpoint, HttpClient client, Gson gson) {
+        this(endpoint, null, client, gson);
+    }
+
+    OstellaMultiplayerRoomWatchApi(String endpoint, String serviceToken, HttpClient client, Gson gson) {
         this.endpoint = endpoint.endsWith("/") ? endpoint.substring(0, endpoint.length() - 1) : endpoint;
+        this.serviceToken = serviceToken;
         this.client = client;
         this.gson = gson;
     }
@@ -104,12 +114,14 @@ public final class OstellaMultiplayerRoomWatchApi implements MultiplayerRoomWatc
     }
 
     private <T> HttpResponse<T> get(String path, HttpResponse.BodyHandler<T> handler) {
-        HttpRequest request = HttpRequest.newBuilder()
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(endpoint + path))
                 .timeout(Duration.ofMinutes(2))
-                .header("Accept", "application/json, image/*")
-                .GET()
-                .build();
+                .header("Accept", "application/json, image/*");
+        if (serviceToken != null && !serviceToken.isBlank()) {
+            builder.header("Authorization", "Bearer " + serviceToken);
+        }
+        HttpRequest request = builder.GET().build();
         try {
             return client.send(request, handler);
         } catch (InterruptedException e) {

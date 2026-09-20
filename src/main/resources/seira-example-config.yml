@@ -29,6 +29,7 @@ binding:
 ostella:
   # oStella API 的地址，由 Seira 访问，默认为本地运行的 oStella 实例
   endpoint: "http://localhost:8721"
+  token:
 
 # === QQ机器人 配置 ===
 qq:

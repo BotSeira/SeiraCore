@@ -13,19 +13,27 @@ public final class OstellaCacheControlClient {
     private static final Gson GSON = new Gson();
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     private final URI endpoint;
+    private final String serviceToken;
 
     public OstellaCacheControlClient(String endpoint) {
+        this(endpoint, null);
+    }
+
+    public OstellaCacheControlClient(String endpoint, String serviceToken) {
         String normalized = endpoint.replaceAll("/+$", "");
         this.endpoint = URI.create(normalized + "/cache/control");
+        this.serviceToken = serviceToken;
     }
 
     public ConsoleRuntimeControl.CacheControlResult control(String operation, String type, long id) {
         String body = GSON.toJson(new Request(operation, type, id));
-        HttpRequest request = HttpRequest.newBuilder(endpoint)
+        HttpRequest.Builder builder = HttpRequest.newBuilder(endpoint)
                 .timeout(Duration.ofSeconds(40))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
-                .build();
+                .header("Content-Type", "application/json");
+        if (serviceToken != null && !serviceToken.isBlank()) {
+            builder.header("Authorization", "Bearer " + serviceToken);
+        }
+        HttpRequest request = builder.POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build();
         try {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (response.statusCode() < 200 || response.statusCode() >= 300) {

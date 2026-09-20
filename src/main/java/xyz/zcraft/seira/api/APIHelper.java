@@ -26,7 +26,9 @@ import java.util.List;
 import java.util.Map;
 
 public class APIHelper {
+    private static final String OSU_AUTHORIZATION_HEADER = "X-Osu-Authorization";
     private static final String ENDPOINT;
+    private static final String TOKEN;
     private static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(Duration.ofMinutes(5)).build();
     private static final Gson GSON = new Gson();
     private static final int REPLAY_POLL_INTERVAL_MS = 5000;
@@ -34,13 +36,25 @@ public class APIHelper {
 
     static {
         ENDPOINT = Seira.getConfig().ostella().endpoint();
+        TOKEN = Seira.getConfig().ostella().token();
+    }
+
+    private static HttpRequest.Builder requestBuilder() {
+        HttpRequest.Builder builder = HttpRequest.newBuilder();
+        if (TOKEN != null && !TOKEN.isBlank()) {
+            builder.header("Authorization", "Bearer " + TOKEN);
+        }
+        return builder;
+    }
+
+    private static HttpRequest.Builder withOsuAuthorization(HttpRequest.Builder builder, String accessToken) {
+        return builder.header(OSU_AUTHORIZATION_HEADER, "Bearer " + accessToken);
     }
 
     public static Response<List<FriendEntry>> getFollowed(String accessToken) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = withOsuAuthorization(requestBuilder(), accessToken)
                     .uri(URI.create(ENDPOINT + "/users/me/friends"))
-                    .header("Authorization", "Bearer " + accessToken)
                     .GET()
                     .build();
 
@@ -70,9 +84,8 @@ public class APIHelper {
 
     public static Response<UserExtended> getSelf(String accessToken) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = withOsuAuthorization(requestBuilder(), accessToken)
                     .uri(URI.create(ENDPOINT + "/users/me"))
-                    .header("Authorization", "Bearer " + accessToken)
                     .GET()
                     .build();
 
@@ -121,7 +134,7 @@ public class APIHelper {
 
     public static UserExtended getUserRaw(long uid) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/users/" + uid))
                     .header("Accept", "application/json")
                     .GET()
@@ -174,7 +187,7 @@ public class APIHelper {
 
     public static String getDaily() {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/daily"))
                     .GET()
                     .build();
@@ -214,9 +227,8 @@ public class APIHelper {
 
     public static Response<MultiplayerRoom> getMultiplayerRoom(String accessToken) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = withOsuAuthorization(requestBuilder(), accessToken)
                     .uri(URI.create(ENDPOINT + "/multiplayer/rooms/current"))
-                    .header("Authorization", "Bearer " + accessToken)
                     .GET()
                     .build();
 
@@ -300,7 +312,7 @@ public class APIHelper {
 
     public static Beatmapset getBeatmapsetRaw(long id) {
         try {
-            var builder = HttpRequest.newBuilder()
+            var builder = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/beatmapsets/" + id))
                     .header("Accept", "application/json");
 
@@ -334,7 +346,7 @@ public class APIHelper {
 
     private static Response<Base64Bytes> getBase64BytesResponse(String query, String failMessage, @Nullable String postBody) {
         try {
-            var builder = HttpRequest.newBuilder()
+            var builder = requestBuilder()
                     .uri(URI.create(ENDPOINT + query));
 
             if (postBody != null) {
@@ -363,9 +375,8 @@ public class APIHelper {
         try {
             final String query = "/beatmapsets/lookup?ms=" + beatmapsetId;
 
-            HttpRequest localRequest = HttpRequest.newBuilder()
+            HttpRequest localRequest = withOsuAuthorization(requestBuilder(), auth)
                     .uri(URI.create(ENDPOINT + query))
-                    .header("Authorization", "Bearer " + auth)
                     .GET()
                     .build();
 
@@ -389,7 +400,7 @@ public class APIHelper {
 
     public static Response<List<SearchResultItem>> searchBeatmapSetResponse(SearchQuery query) {
         try {
-            HttpRequest localRequest = HttpRequest.newBuilder()
+            HttpRequest localRequest = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/beatmapsets/search?" + "q=" + URLEncoder.encode(query.query(), StandardCharsets.UTF_8)))
                     .GET()
                     .build();
@@ -427,7 +438,7 @@ public class APIHelper {
         }
 
         TimeDurationParser.TimeRange timeRange = getScoreHighlight(scoreId, 10);
-        HttpRequest request = HttpRequest.newBuilder()
+        HttpRequest request = requestBuilder()
                 .uri(URI.create(ENDPOINT + "/replays/renders/score/" + scoreId
                         + "?obscured=true" + timeRange.toQueryString()))
                 .header("Content-Type", "application/json")
@@ -439,7 +450,7 @@ public class APIHelper {
 
     public static RandomScore getRandomScore() {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/scores/random?min_rank=500000"))
                     .GET()
                     .build();
@@ -477,7 +488,7 @@ public class APIHelper {
 
             body.add("weight_factor", weights);
 
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/scores/random/users/" + userId + "/weights?all=" + all))
                     .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                     .build();
@@ -510,7 +521,7 @@ public class APIHelper {
             body.add("uids", uidsArray);
             body.add("weight_factor", weights);
 
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/scores/random/users"))
                     .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                     .build();
@@ -558,7 +569,7 @@ public class APIHelper {
             rangeQuery += range.toQueryString();
         }
 
-        HttpRequest request = HttpRequest.newBuilder()
+        HttpRequest request = requestBuilder()
                 .uri(URI.create(ENDPOINT + "/replays/renders/preview/" + beatmapId + rangeQuery))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
@@ -578,7 +589,7 @@ public class APIHelper {
         if (qqUpload != null) {
             body.add("qqUpload", GSON.toJsonTree(qqUpload));
         }
-        HttpRequest request = HttpRequest.newBuilder()
+        HttpRequest request = requestBuilder()
                 .uri(URI.create(ENDPOINT + "/replays/renders/showcase/" + beatmapId))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
@@ -600,7 +611,7 @@ public class APIHelper {
             timeRange = getScoreHighlight(scoreId, 5);
         }
 
-        HttpRequest request = HttpRequest.newBuilder()
+        HttpRequest request = requestBuilder()
                 .uri(URI.create(ENDPOINT + "/replays/renders/score/" + scoreId + "?" + timeRange.toQueryString()))
                 .header("Content-Type", "application/json")
                 .POST(renderRequestBody(qqUpload))
@@ -616,7 +627,7 @@ public class APIHelper {
 
     private static TimeDurationParser.TimeRange getScoreHighlight(String scoreId, int extend) {
         try {
-            HttpRequest localRequest = HttpRequest.newBuilder()
+            HttpRequest localRequest = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/scores/" + scoreId + "/highlight"))
                     .GET()
                     .build();
@@ -686,8 +697,8 @@ public class APIHelper {
 
     private static JsonObject lookupTargetData(String query, String auth, String error) {
         try {
-            var request = HttpRequest.newBuilder().uri(URI.create(ENDPOINT + query)).GET();
-            if (auth != null) request.header("Authorization", "Bearer " + auth);
+            var request = requestBuilder().uri(URI.create(ENDPOINT + query)).GET();
+            if (auth != null) withOsuAuthorization(request, auth);
             var response = CLIENT.send(request.build(), HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) throw parseHttpError(response.body(), response.statusCode(), error);
             RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
@@ -704,7 +715,7 @@ public class APIHelper {
 
     private static JsonObject lookupScoreData(String scoreId) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/scores/lookup?s=" + scoreId))
                     .GET()
                     .build();
@@ -798,7 +809,7 @@ public class APIHelper {
 
     private static JsonObject getReplayStatus(String taskId) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/replays/" + taskId + "/status"))
                     .GET()
                     .build();
@@ -902,7 +913,7 @@ public class APIHelper {
 
     public static RenderStat getRenderStat(String jobId) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/replays/" + jobId + "/status"))
                     .GET()
                     .build();
@@ -925,7 +936,7 @@ public class APIHelper {
 
     public static RenderStat cancelReplayRender(String jobId) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/replays/" + jobId + "/cancel"))
                     .POST(HttpRequest.BodyPublishers.noBody())
                     .build();
@@ -950,7 +961,7 @@ public class APIHelper {
         boolean osu = false;
         String oStellaVersion = null;
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/health"))
                     .GET()
                     .build();
@@ -981,7 +992,7 @@ public class APIHelper {
 
     public static Response<List<MissData>> getScoreMissesResponse(String scoreId) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/scores/" + scoreId + "/misses"))
                     .GET()
                     .build();
@@ -1026,7 +1037,7 @@ public class APIHelper {
 
     public static long getUserRank(long uid) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/users/" + uid + "/rank"))
                     .header("Content-Type", "application/json")
                     .GET()
@@ -1052,7 +1063,7 @@ public class APIHelper {
 
     public static Response<User> lookupUser(String username) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/users/lookup"))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(
@@ -1083,7 +1094,7 @@ public class APIHelper {
 
     public static List<User> getUsers(List<Long> u) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/users"))
                     .POST(HttpRequest.BodyPublishers.ofString(GSON.toJsonTree(Map.of("ids", u)).toString()))
                     .build();
@@ -1111,7 +1122,7 @@ public class APIHelper {
 
     public static ReplayUploadInfo uploadReplay(byte[] replayBytes) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/replays/upload"))
                     .POST(HttpRequest.BodyPublishers.ofByteArray(replayBytes))
                     .build();
