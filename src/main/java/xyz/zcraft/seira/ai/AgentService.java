@@ -22,122 +22,255 @@ import java.util.stream.Collectors;
 
 public class AgentService {
     public static final int CONTEXT_SIZE = 20;
+
     private final Api api;
+
     private final Map<StateOwner, State> states = new ConcurrentHashMap<>();
+
+    private final Map<String, Deque<String>> chatLog = new ConcurrentHashMap<>();
+
+    private final Map<StateOwner, Object> stateCreationLocks = new ConcurrentHashMap<>();
 
     public AgentService(LLMConfig config) {
         this.api = new Api(config);
     }
 
-    public void recordHistory(String groupId, String sender, String message) {
-        if (groupId == null || groupId.isEmpty() || sender == null || sender.isEmpty()) {
+    /**
+     * API 请求失败时，把已经取出的 incomingMessages 恢复。
+     */
+    private static void restoreIncomingMessages(
+            State state,
+            Collection<String> pendingMessages
+    ) {
+        if (pendingMessages.isEmpty()) {
             return;
         }
 
-        states.forEach((s, state) -> {
-            synchronized (state) {
-                if (s.groupId().equals(groupId)) {
-                    state.getIncomingMessages().add(sender + ": " + message);
+        synchronized (state) {
+            /*
+             * 当前 state.incomingMessages 中可能已经有
+             * API 请求运行期间新收到的消息。
+             *
+             * 所以不能直接 addAll(pendingMessages)，
+             * 否则时间顺序会变成：
+             *
+             * 新消息
+             * old pending
+             *
+             * 正确顺序应该是：
+             *
+             * old pending
+             * 新消息
+             */
+            final Deque<String> merged = new ArrayDeque<>(
+                    pendingMessages.size()
+                            + state.incomingMessages.size()
+            );
 
-                    while (state.getIncomingMessages().size() > CONTEXT_SIZE) {
-                        state.getIncomingMessages().removeFirst();
-                    }
+            merged.addAll(pendingMessages);
+            merged.addAll(state.incomingMessages);
+
+            state.incomingMessages.clear();
+            state.incomingMessages.addAll(merged);
+
+            trimToContextSize(state.incomingMessages);
+        }
+    }
+
+    /**
+     * 保证历史消息数量不超过 CONTEXT_SIZE。
+     */
+    private static void trimToContextSize(Deque<String> messages) {
+        while (messages.size() > CONTEXT_SIZE) {
+            messages.removeFirst();
+        }
+    }
+
+    public void recordHistory(String groupId, String sender, String message) {
+        if (groupId == null || groupId.isEmpty()
+                || sender == null || sender.isEmpty()
+                || message == null || message.isEmpty()) {
+            return;
+        }
+
+        final String historyMessage = sender + ": " + message;
+
+        final Deque<String> log = chatLog.computeIfAbsent(groupId, _ -> new ArrayDeque<>());
+
+        synchronized (log) {
+            log.addLast(historyMessage);
+            trimToContextSize(log);
+
+            states.forEach((owner, state) -> {
+                if (!owner.groupId().equals(groupId)) {
+                    return;
                 }
-            }
-        });
+
+                synchronized (state) {
+                    state.incomingMessages.addLast(historyMessage);
+                    trimToContextSize(state.incomingMessages);
+                }
+            });
+        }
     }
 
     public String input(String groupId, String openId, String input, Consumer<Map<String, String>> var) {
         final StateOwner owner = StateOwner.of(groupId, openId);
+        final State state = getOrCreateState(owner);
 
-        final State state = states.computeIfAbsent(owner, _ -> State.create(api, groupId));
-
-        if (!state.getRunning().compareAndSet(false, true)) {
+        if (!state.running.compareAndSet(false, true)) {
             throw new IllegalStateException("已有请求正在运行");
         }
 
-        state.resetIfNeeded(api, groupId);
-
         try {
+            state.resetIfNeeded(api, groupId);
+
             if (var != null) {
-                final int oldHash = state.getVars().hashCode();
+                final Map<String, String> oldVars = new HashMap<>(state.vars);
 
-                var.accept(state.getVars());
+                var.accept(state.vars);
 
-                if (state.getVars().hashCode() != oldHash) {
+                if (!state.vars.equals(oldVars)) {
                     api.updateConversation(
-                            groupId, state.getConv().appConversationID(), state.getVars()
+                            groupId,
+                            state.conv.appConversationID(),
+                            state.vars
                     );
                 }
             }
 
-            final String query = String.join("\n", state.getIncomingMessages()) + "\n\n" + input;
+            final Deque<String> pendingMessages;
 
-            state.getIncomingMessages().clear();
+            synchronized (state) {
+                pendingMessages = new ArrayDeque<>(state.incomingMessages);
+                state.incomingMessages.clear();
+            }
 
-            final ChatQueryResponse response = api.chatQuery(
-                    groupId, state.getConv().appConversationID(), query
-            );
+            final String query;
 
-            state.getIncomingMessages().add("你: " + response.answer());
+            if (pendingMessages.isEmpty()) {
+                query = input;
+            } else {
+                query = String.join("\n", pendingMessages)
+                        + "\n"
+                        + "\n"
+                        + input;
+            }
+
+            final ChatQueryResponse response;
+
+            try {
+                response = api.chatQuery(groupId, state.conv.appConversationID(), query);
+            } catch (RuntimeException | Error e) {
+                restoreIncomingMessages(state, pendingMessages);
+
+                throw e;
+            }
+
+            synchronized (state) {
+                state.incomingMessages.addLast("你: " + response.answer());
+
+                trimToContextSize(state.incomingMessages);
+            }
 
             return response.answer();
+
         } finally {
-            state.getRunning().set(false);
+            state.running.set(false);
         }
     }
 
     public boolean isRunning(String groupId, String openId) {
-        final State state = states.get(StateOwner.of(groupId, openId));
-        return state != null && state.getRunning().get();
+        final State state = states.get(
+                StateOwner.of(groupId, openId)
+        );
+
+        return state != null && state.running.get();
     }
 
     public boolean clearState(String groupId, String openId) {
-        final State state = states.get(StateOwner.of(groupId, openId));
-        if (state != null) {
-            state.getResetting().set(true);
-            return true;
+        final State state = states.get(
+                StateOwner.of(groupId, openId)
+        );
+
+        if (state == null) {
+            return false;
         }
-        return false;
+
+        state.resetting.set(true);
+        return true;
     }
 
     public int clearStateOfGroup(String groupId) {
-        List<StateOwner> toRemove = new ArrayList<>(100);
+        int count = 0;
 
-        states.keySet().forEach((owner) -> {
-            if (owner.groupId().equals(groupId)) {
-                toRemove.add(owner);
+        for (Map.Entry<StateOwner, State> entry : states.entrySet()) {
+            if (!entry.getKey().groupId().equals(groupId)) {
+                continue;
             }
-        });
 
-        for (StateOwner stateOwner : toRemove) {
-            states.get(stateOwner).getResetting().set(true);
+            entry.getValue().resetting.set(true);
+            count++;
         }
 
-        return toRemove.size();
+        return count;
     }
 
     public int clearStateOfUser(String openId) {
-        List<StateOwner> toRemove = new ArrayList<>(100);
+        int count = 0;
 
-        states.keySet().forEach((owner) -> {
-            if (owner.openId().equals(openId)) {
-                toRemove.add(owner);
+        for (Map.Entry<StateOwner, State> entry : states.entrySet()) {
+            if (!entry.getKey().openId().equals(openId)) {
+                continue;
             }
-        });
 
-        for (StateOwner stateOwner : toRemove) {
-            states.get(stateOwner).getResetting().set(true);
+            entry.getValue().resetting.set(true);
+            count++;
         }
 
-        return toRemove.size();
+        return count;
     }
 
     public Set<String> activeGroupIds() {
-        return states.entrySet().stream()
-                .filter(entry -> entry.getValue().getRunning().get())
+        return states.entrySet()
+                .stream()
+                .filter(entry -> entry.getValue().running.get())
                 .map(entry -> entry.getKey().groupId())
                 .collect(Collectors.toSet());
+    }
+
+    private State getOrCreateState(StateOwner owner) {
+        State state = states.get(owner);
+
+        if (state != null) {
+            return state;
+        }
+
+        final Object creationLock = stateCreationLocks.computeIfAbsent(owner, _ -> new Object());
+
+        try {
+            synchronized (creationLock) {
+                state = states.get(owner);
+
+                if (state != null) {
+                    return state;
+                }
+
+                final String groupId = owner.groupId();
+                final Deque<String> log = chatLog.computeIfAbsent(groupId, _ -> new ArrayDeque<>());
+                final AppConversationBrief conv = api.createConversation(groupId);
+
+                synchronized (log) {
+                    final State created = State.create(conv, new ArrayList<>(log));
+
+                    states.put(owner, created);
+
+                    return created;
+                }
+            }
+        } finally {
+            stateCreationLocks.remove(owner, creationLock);
+        }
     }
 
     @Getter
@@ -145,15 +278,15 @@ public class AgentService {
         private final ConcurrentHashMap<String, String> vars;
         private final AtomicBoolean running;
         private final AtomicBoolean resetting;
-        private final List<String> incomingMessages;
+        private final Deque<String> incomingMessages;
         private AppConversationBrief conv;
 
-        State(
+        private State(
                 AppConversationBrief conv,
                 ConcurrentHashMap<String, String> vars,
                 AtomicBoolean running,
                 AtomicBoolean resetting,
-                List<String> incomingMessages
+                Deque<String> incomingMessages
         ) {
             this.conv = conv;
             this.vars = vars;
@@ -162,33 +295,49 @@ public class AgentService {
             this.incomingMessages = incomingMessages;
         }
 
-        public static State create(Api api, String groupId) {
+
+        public static State create(
+                AppConversationBrief conv,
+                Collection<String> incomingMessages
+        ) {
             return new State(
-                    api.createConversation(groupId),
+                    conv,
                     new ConcurrentHashMap<>(),
                     new AtomicBoolean(false),
                     new AtomicBoolean(false),
-                    new LinkedList<>()
+                    new ArrayDeque<>(incomingMessages)
             );
         }
 
-
         public void resetIfNeeded(Api api, String groupId) {
-            if (resetting.compareAndSet(true, false)) {
+            if (!resetting.compareAndSet(true, false)) {
+                return;
+            }
+
+            try {
                 conv = api.createConversation(groupId);
                 vars.clear();
-                incomingMessages.clear();
+            } catch (RuntimeException | Error e) {
+                resetting.set(true);
+                throw e;
             }
         }
     }
 
+
     record StateOwner(String groupId, String openId) {
-        public static StateOwner of(String groupId, String openId) {
+        public static StateOwner of(
+                String groupId,
+                String openId
+        ) {
             return new StateOwner(groupId, openId);
         }
 
         public static StateOwner of(Context ctx) {
-            return new StateOwner(ctx.groupId(), ctx.senderUserId());
+            return new StateOwner(
+                    ctx.groupId(),
+                    ctx.senderUserId()
+            );
         }
     }
 }
