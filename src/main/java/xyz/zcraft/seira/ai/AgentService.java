@@ -3,6 +3,7 @@ package xyz.zcraft.seira.ai;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.ai.data.AppConversationBrief;
@@ -13,16 +14,14 @@ import xyz.zcraft.seira.config.LLMConfig;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public class AgentService {
+    public static final int CONTEXT_SIZE = 20;
     private final Api api;
     private final Map<StateOwner, State> states = new ConcurrentHashMap<>();
 
@@ -30,52 +29,76 @@ public class AgentService {
         this.api = new Api(config);
     }
 
+    public void recordHistory(String groupId, String sender, String message) {
+        if (groupId == null || groupId.isEmpty() || sender == null || sender.isEmpty()) {
+            return;
+        }
+
+        states.forEach((s, state) -> {
+            synchronized (state) {
+                if (s.groupId().equals(groupId)) {
+                    state.getIncomingMessages().add(sender + ": " + message);
+
+                    while (state.getIncomingMessages().size() > CONTEXT_SIZE) {
+                        state.getIncomingMessages().removeFirst();
+                    }
+                }
+            }
+        });
+    }
+
     public String input(String groupId, String openId, String input, Consumer<Map<String, String>> var) {
         final StateOwner owner = StateOwner.of(groupId, openId);
 
-        final State state = states.computeIfAbsent(
-                owner,
-                _ -> new State(
-                        api.createConversation(groupId),
-                        new ConcurrentHashMap<>(),
-                        new AtomicBoolean(false)
-                )
-        );
+        final State state = states.computeIfAbsent(owner, _ -> State.create(api, groupId));
 
-        if (!state.running().compareAndSet(false, true)) {
+        if (!state.getRunning().compareAndSet(false, true)) {
             throw new IllegalStateException("已有请求正在运行");
         }
 
+        state.resetIfNeeded(api, groupId);
+
         try {
             if (var != null) {
-                final int oldHash = state.vars().hashCode();
+                final int oldHash = state.getVars().hashCode();
 
-                var.accept(state.vars());
+                var.accept(state.getVars());
 
-                if (state.vars().hashCode() != oldHash) {
+                if (state.getVars().hashCode() != oldHash) {
                     api.updateConversation(
-                            groupId, state.conv().appConversationID(), state.vars()
+                            groupId, state.getConv().appConversationID(), state.getVars()
                     );
                 }
             }
 
+            final String query = String.join("\n", state.getIncomingMessages()) + "\n\n" + input;
+
+            state.getIncomingMessages().clear();
+
             final ChatQueryResponse response = api.chatQuery(
-                    groupId, state.conv().appConversationID(), input
+                    groupId, state.getConv().appConversationID(), query
             );
+
+            state.getIncomingMessages().add("你: " + response.answer());
 
             return response.answer();
         } finally {
-            state.running().set(false);
+            state.getRunning().set(false);
         }
     }
 
     public boolean isRunning(String groupId, String openId) {
         final State state = states.get(StateOwner.of(groupId, openId));
-        return state != null && state.running().get();
+        return state != null && state.getRunning().get();
     }
 
     public boolean clearState(String groupId, String openId) {
-        return states.remove(StateOwner.of(groupId, openId)) != null;
+        final State state = states.get(StateOwner.of(groupId, openId));
+        if (state != null) {
+            state.getResetting().set(true);
+            return true;
+        }
+        return false;
     }
 
     public int clearStateOfGroup(String groupId) {
@@ -88,7 +111,7 @@ public class AgentService {
         });
 
         for (StateOwner stateOwner : toRemove) {
-            states.remove(stateOwner);
+            states.get(stateOwner).getResetting().set(true);
         }
 
         return toRemove.size();
@@ -104,16 +127,59 @@ public class AgentService {
         });
 
         for (StateOwner stateOwner : toRemove) {
-            states.remove(stateOwner);
+            states.get(stateOwner).getResetting().set(true);
         }
 
         return toRemove.size();
     }
 
-    record State(
-            AppConversationBrief conv, ConcurrentHashMap<String, String> vars,
-            AtomicBoolean running
-    ) {
+    public Set<String> activeGroupIds() {
+        return states.entrySet().stream()
+                .filter(entry -> entry.getValue().getRunning().get())
+                .map(entry -> entry.getKey().groupId())
+                .collect(Collectors.toSet());
+    }
+
+    @Getter
+    static final class State {
+        private final ConcurrentHashMap<String, String> vars;
+        private final AtomicBoolean running;
+        private final AtomicBoolean resetting;
+        private final List<String> incomingMessages;
+        private AppConversationBrief conv;
+
+        State(
+                AppConversationBrief conv,
+                ConcurrentHashMap<String, String> vars,
+                AtomicBoolean running,
+                AtomicBoolean resetting,
+                List<String> incomingMessages
+        ) {
+            this.conv = conv;
+            this.vars = vars;
+            this.running = running;
+            this.resetting = resetting;
+            this.incomingMessages = incomingMessages;
+        }
+
+        public static State create(Api api, String groupId) {
+            return new State(
+                    api.createConversation(groupId),
+                    new ConcurrentHashMap<>(),
+                    new AtomicBoolean(false),
+                    new AtomicBoolean(false),
+                    new LinkedList<>()
+            );
+        }
+
+
+        public void resetIfNeeded(Api api, String groupId) {
+            if (resetting.compareAndSet(true, false)) {
+                conv = api.createConversation(groupId);
+                vars.clear();
+                incomingMessages.clear();
+            }
+        }
     }
 
     record StateOwner(String groupId, String openId) {
@@ -124,13 +190,6 @@ public class AgentService {
         public static StateOwner of(Context ctx) {
             return new StateOwner(ctx.groupId(), ctx.senderUserId());
         }
-    }
-
-    public Set<String> activeGroupIds() {
-        return states.entrySet().stream()
-                .filter(entry -> entry.getValue().running().get())
-                .map(entry -> entry.getKey().groupId())
-                .collect(Collectors.toSet());
     }
 }
 

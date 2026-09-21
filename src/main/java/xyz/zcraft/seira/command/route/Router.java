@@ -224,6 +224,9 @@ public class Router {
             );
 
             if (parseResult.status() == CommandParser.ParseResult.Status.IGNORED) {
+                if (AiPermission.doPermit(groupId)) {
+                    aiChatHandler.recordHistory(groupId, userId, rawContent);
+                }
                 return;
             }
 

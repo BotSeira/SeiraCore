@@ -120,4 +120,8 @@ public class AiChatHandler {
             }
         }
     }
+
+    public void recordHistory(String groupId, String userId, String rawContent) {
+        agentService.recordHistory(groupId, userId, rawContent);
+    }
 }
