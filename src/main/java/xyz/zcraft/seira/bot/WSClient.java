@@ -9,7 +9,6 @@ import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import xyz.zcraft.seira.bot.data.AccessToken;
 import xyz.zcraft.seira.bot.data.Attachment;
-import xyz.zcraft.seira.bot.data.QQUser;
 import xyz.zcraft.seira.command.AttachmentHandler;
 import xyz.zcraft.seira.command.route.Router;
 import xyz.zcraft.seira.config.AppConfig;
@@ -243,7 +242,7 @@ public class WSClient extends WebSocketClient {
     private void sendIdentify() {
         JsonObject data = new JsonObject();
         data.addProperty("token", "QQBot " + tokenSupplier.get().token());
-        data.addProperty("intents", 1 << 25);
+        data.addProperty("intents", 1 << 25 | 1 << 26);
 
         JsonObject payload = new JsonObject();
         payload.addProperty("op", 2);

@@ -52,7 +52,7 @@ public final class TaskCoordinator {
                     return ApiRequestException.getDefaultMessage(e.getErrorCode());
                 }
                 case ClosedChannelException _ -> {
-                    return "oStella API 无法连接，请稍后再试。";
+                    return "oStella API 无法连接，请稍后再试喵";
                 }
                 case ResolutionException e -> {
                     return e.getMessage();
@@ -65,40 +65,34 @@ public final class TaskCoordinator {
             }
             cursor = cursor.getCause();
         }
-        return "请求处理失败，请稍后再试。";
+        return "请求处理失败，请稍后再试喵";
     }
 
     public CommandReplyChannel openReplyChannel(
-            String targetId,
-            String messageId,
-            boolean groupMessage,
-            boolean queueMessageInGroup
+            String targetId, String messageId, boolean groupMessage, boolean queueMessageInGroup
     ) {
         return new OutboundReplyChannel(targetId, messageId, groupMessage, queueMessageInGroup);
     }
 
-    /**
-     * Tracks queue estimates and elapsed time; the caller executes the request directly.
-     */
     public RequestTiming beginRequest(Context ctx, String requestType, boolean timeoutNotify) {
+        return beginRequest(ctx, requestType, 60, timeoutNotify ? "请求处理时间超过预期，这可能是由于相关数据缺少缓存，请耐心等待喵。" : null);
+    }
+
+    public RequestTiming beginRequest(Context ctx, String requestType, int timeout, String timeoutNotify) {
         long estimatedSeconds = apiRequestStats.estimateAndEnqueue(requestType);
         ScheduledFuture<?> schedule = null;
 
-        if (timeoutNotify) {
+        if (timeoutNotify != null && !timeoutNotify.isBlank()) {
             schedule = TIMEOUT_SCHEDULER.schedule(
-                    () -> {
-                        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "请求处理时间超过预期，这可能是由于相关数据缺少缓存，请耐心等待喵。"));
-                    },
-                    60,
-                    TimeUnit.SECONDS
+                    () -> ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + timeoutNotify)),
+                    timeout, TimeUnit.SECONDS
             );
         }
 
         RequestTiming timing = new RequestTiming(requestType, schedule);
 
         try {
-            ctx.sendQueueNotice(PendingMessage.ofMarkdownRaw(
-                    at(ctx) + "请求已加入队列，预计等待时间" + estimatedSeconds + "秒。"));
+            ctx.sendQueueNotice(PendingMessage.ofMarkdownRaw(at(ctx) + "请求已加入队列，预计等待时间" + estimatedSeconds + "秒。"));
             return timing;
         } catch (RuntimeException e) {
             timing.close();

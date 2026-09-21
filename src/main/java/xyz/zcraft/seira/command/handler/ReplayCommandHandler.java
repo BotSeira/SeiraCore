@@ -74,7 +74,7 @@ public final class ReplayCommandHandler {
             }
         }
 
-        try (var _ = taskCoordinator.beginRequest(ctx, "Score Render")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "Score Render", false)) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "正在获取谱面以及回放文件，请稍作等待喵..."));
             var previous = target.kind() == TargetInput.Kind.MEMORY ? remembered : null;
             Long beatmapId = previous == null ? null : previous.beatmapId();
@@ -193,7 +193,7 @@ public final class ReplayCommandHandler {
             }
         }
 
-        try (var _ = taskCoordinator.beginRequest(ctx, "Showcase Render")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "Showcase Render", false)) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "正在获取谱面以及回放文件，请稍作等待喵..."));
             var previous = target.kind() == TargetInput.Kind.MEMORY ? remembered : null;
             Long beatmapId = previous == null ? null : previous.beatmapId();
