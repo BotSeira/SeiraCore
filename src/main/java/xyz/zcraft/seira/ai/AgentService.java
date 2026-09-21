@@ -18,6 +18,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class AgentService {
@@ -35,9 +36,6 @@ public class AgentService {
         this.api = new Api(config);
     }
 
-    /**
-     * API 请求失败时，把已经取出的 incomingMessages 恢复。
-     */
     private static void restoreIncomingMessages(
             State state,
             Collection<String> pendingMessages
@@ -47,21 +45,6 @@ public class AgentService {
         }
 
         synchronized (state) {
-            /*
-             * 当前 state.incomingMessages 中可能已经有
-             * API 请求运行期间新收到的消息。
-             *
-             * 所以不能直接 addAll(pendingMessages)，
-             * 否则时间顺序会变成：
-             *
-             * 新消息
-             * old pending
-             *
-             * 正确顺序应该是：
-             *
-             * old pending
-             * 新消息
-             */
             final Deque<String> merged = new ArrayDeque<>(
                     pendingMessages.size()
                             + state.incomingMessages.size()
@@ -77,9 +60,6 @@ public class AgentService {
         }
     }
 
-    /**
-     * 保证历史消息数量不超过 CONTEXT_SIZE。
-     */
     private static void trimToContextSize(Deque<String> messages) {
         while (messages.size() > CONTEXT_SIZE) {
             messages.removeFirst();
@@ -114,7 +94,7 @@ public class AgentService {
         }
     }
 
-    public String input(String groupId, String openId, String input, Consumer<Map<String, String>> var) {
+    public String input(String groupId, String openId, String input, Function<String, String> contextFunc) {
         final StateOwner owner = StateOwner.of(groupId, openId);
         final State state = getOrCreateState(owner);
 
@@ -123,22 +103,6 @@ public class AgentService {
         }
 
         try {
-            state.resetIfNeeded(api, groupId);
-
-            if (var != null) {
-                final Map<String, String> oldVars = new HashMap<>(state.vars);
-
-                var.accept(state.vars);
-
-                if (!state.vars.equals(oldVars)) {
-                    api.updateConversation(
-                            groupId,
-                            state.conv.appConversationID(),
-                            state.vars
-                    );
-                }
-            }
-
             final Deque<String> pendingMessages;
 
             synchronized (state) {
@@ -157,6 +121,15 @@ public class AgentService {
                         + input;
             }
 
+            state.resetIfNeeded(api, groupId);
+
+            if (contextFunc != null) {
+                state.getVars().put("CONTEXT", contextFunc.apply(query));
+            }
+
+            api.updateConversation(groupId, state.conv.appConversationID(), state.vars);
+
+
             final ChatQueryResponse response;
 
             try {
@@ -167,14 +140,9 @@ public class AgentService {
                 throw e;
             }
 
-            synchronized (state) {
-                state.incomingMessages.addLast("你: " + response.answer());
-
-                trimToContextSize(state.incomingMessages);
-            }
+            recordHistory(groupId, "Seira(你)", response.answer());
 
             return response.answer();
-
         } finally {
             state.running.set(false);
         }

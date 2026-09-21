@@ -85,33 +85,35 @@ public class AiChatHandler {
             return;
         }
 
-        JsonObject qqContext = new JsonObject();
-        qqContext.addProperty("in_group", ctx.inGroup());
-        qqContext.addProperty("sender_open_id", ctx.senderUserId());
-        qqContext.addProperty("group_id", ctx.groupId());
-
-        Map<String, Long> bindings = new HashMap<>();
-        Map<Long, String> usernames = new HashMap<>();
-
-        final List<String> ids = resolver.extractAllMentionedIds(ctx.rawContent());
-        ids.add(ctx.senderUserId());
-
-        for (String openId : ids) {
-            final Long uid = resolver.resolveBoundUid(openId);
-            if (uid != null) {
-                bindings.put(openId, uid);
-                UserDataStore.findUsername(uid).ifPresent(s -> usernames.put(uid, s));
-            }
-        }
-
-        qqContext.add("bindings", GSON.toJsonTree(bindings));
-        qqContext.add("usernames", GSON.toJsonTree(usernames));
-
         final String answer = at(ctx) + agentService.input(
                 ctx.groupId(),
                 ctx.senderUserId(),
                 ctx.senderUserId() + ": " + ctx.rawContent(),
-                var -> var.put("CONTEXT", qqContext.toString())
+                input -> {
+                    JsonObject qqContext = new JsonObject();
+                    qqContext.addProperty("in_group", ctx.inGroup());
+                    qqContext.addProperty("sender_open_id", ctx.senderUserId());
+                    qqContext.addProperty("group_id", ctx.groupId());
+
+                    Map<String, Long> bindings = new HashMap<>();
+                    Map<Long, String> usernames = new HashMap<>();
+
+                    final List<String> ids = resolver.extractAllMentionedIds(input);
+                    ids.add(ctx.senderUserId());
+
+                    for (String openId : ids) {
+                        final Long uid = resolver.resolveBoundUid(openId);
+                        if (uid != null) {
+                            bindings.put(openId, uid);
+                            UserDataStore.findUsername(uid).ifPresent(s -> usernames.put(uid, s));
+                        }
+                    }
+
+                    qqContext.add("bindings", GSON.toJsonTree(bindings));
+                    qqContext.add("usernames", GSON.toJsonTree(usernames));
+
+                    return qqContext.toString();
+                }
         );
 
         if (!ctx.sendReply(PendingMessage.ofMarkdownRaw(answer)).success()) {
