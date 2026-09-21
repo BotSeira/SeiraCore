@@ -140,7 +140,7 @@ public class AgentService {
                 throw e;
             }
 
-            recordHistory(groupId, "Seira(你)", response.answer());
+            recordHistory(groupId, "Seira(你,回复" + openId + "的消息)", response.answer());
 
             return response.answer();
         } finally {
