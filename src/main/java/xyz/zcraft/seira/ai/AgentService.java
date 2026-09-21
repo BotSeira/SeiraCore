@@ -17,7 +17,6 @@ import java.net.http.HttpResponse;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -94,7 +93,7 @@ public class AgentService {
         }
     }
 
-    public String input(String groupId, String openId, String input, Function<String, String> contextFunc) {
+    public String input(String groupId, String openId, String rawContent, Function<String, String> contextFunc) {
         final StateOwner owner = StateOwner.of(groupId, openId);
         final State state = getOrCreateState(owner);
 
@@ -103,6 +102,8 @@ public class AgentService {
         }
 
         try {
+            recordHistory(groupId, openId, rawContent);
+
             final Deque<String> pendingMessages;
 
             synchronized (state) {
@@ -113,12 +114,12 @@ public class AgentService {
             final String query;
 
             if (pendingMessages.isEmpty()) {
-                query = input;
+                query = openId + ": " + rawContent;
             } else {
                 query = String.join("\n", pendingMessages)
                         + "\n"
                         + "\n"
-                        + input;
+                        + openId + ": " + rawContent;
             }
 
             state.resetIfNeeded(api, groupId);

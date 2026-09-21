@@ -88,7 +88,7 @@ public class AiChatHandler {
         final String answer = at(ctx) + agentService.input(
                 ctx.groupId(),
                 ctx.senderUserId(),
-                ctx.senderUserId() + ": " + ctx.rawContent(),
+                ctx.rawContent(),
                 input -> {
                     JsonObject qqContext = new JsonObject();
                     qqContext.addProperty("in_group", ctx.inGroup());
