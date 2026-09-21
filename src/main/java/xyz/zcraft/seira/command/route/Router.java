@@ -224,9 +224,6 @@ public class Router {
             );
 
             if (parseResult.status() == CommandParser.ParseResult.Status.IGNORED) {
-                if (AiPermission.doPermit(groupId)) {
-                    aiChatHandler.recordHistory(groupId, userId, rawContent);
-                }
                 return;
             }
 
@@ -235,8 +232,11 @@ public class Router {
                         targetId, messageId, groupMessage, false
                 );
 
-                if (beingAt && AiPermission.doPermit(groupId)) {
+                final boolean permit = AiPermission.doPermit(groupId);
+                if (beingAt && permit) {
                     aiChatHandler.handleChat(parseResult.context().withReplies(replies));
+                } else if (permit) {
+                    aiChatHandler.recordHistory(groupId, userId, rawContent);
                 }
                 return;
             }

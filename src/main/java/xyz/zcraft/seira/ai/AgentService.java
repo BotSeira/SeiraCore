@@ -130,7 +130,6 @@ public class AgentService {
 
             api.updateConversation(groupId, state.conv.appConversationID(), state.vars);
 
-
             final ChatQueryResponse response;
 
             try {
