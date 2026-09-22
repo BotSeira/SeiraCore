@@ -152,6 +152,10 @@ public class AiChatHandler {
     }
 
     public void recordHistory(String groupId, String userId, String rawContent) {
+        if (rawContent == null || rawContent.isBlank()) {
+            return;
+        }
+
         recordHistory(groupId, userId, rawContent.trim(), List.of());
     }
 
