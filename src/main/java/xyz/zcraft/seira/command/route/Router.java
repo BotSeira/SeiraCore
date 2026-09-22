@@ -9,6 +9,7 @@ import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.QQApi;
+import xyz.zcraft.seira.bot.data.Attachment;
 import xyz.zcraft.seira.bot.data.GroupBotState;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.bot.data.QQUser;
@@ -30,6 +31,7 @@ import xyz.zcraft.seira.util.OsuAuthHelper;
 import xyz.zcraft.seira.watch.MultiplayerRoomWatchService;
 import xyz.zcraft.seira.watch.ScoreWatchService;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
@@ -176,16 +178,21 @@ public class Router {
         return QQApi.getAvatarUrl(configSupplier.get().qq().appId(), openId);
     }
 
-    public void onPrivateMessageReceived(String userId, String messageId, String rawContent, String msgIdx) {
-        handleMessageReceived(userId, null, userId, messageId, rawContent, false, msgIdx);
+    public void onPrivateMessageReceived(
+            String userId, String messageId, String rawContent, String msgIdx ,List<Attachment> attachments
+    ) {
+        handleMessageReceived(userId, null, userId, messageId, rawContent, false, msgIdx, attachments);
     }
 
-    public void onGroupMessageReceived(String groupId, String senderUserId, String messageId, String rawContent, String msgIdx) {
-        handleMessageReceived(groupId, groupId, senderUserId, messageId, rawContent, true, msgIdx);
+    public void onGroupMessageReceived(
+            String groupId, String senderUserId, String messageId, String rawContent, String msgIdx, List<Attachment> attachments
+    ) {
+        handleMessageReceived(groupId, groupId, senderUserId, messageId, rawContent, true, msgIdx, attachments);
     }
 
     private void handleMessageReceived(
-            String targetId, String groupId, String userId, String messageId, String rawContent, boolean groupMessage, String msgIdx
+            String targetId, String groupId, String userId, String messageId, String rawContent,
+            boolean groupMessage, String msgIdx, List<Attachment> attachments
     ) {
         AtomicInteger messageSeqCounter = new AtomicInteger(1);
         try {
@@ -240,7 +247,7 @@ public class Router {
                 if (beingAt && permitAi) {
                     aiChatHandler.handleChat(parseResult.context().withReplies(replies));
                 } else if (permitAi) {
-                    aiChatHandler.recordHistory(groupId, userId, rawContent);
+                    aiChatHandler.recordHistory(groupId, userId, rawContent, attachments);
                 }
                 return;
             }

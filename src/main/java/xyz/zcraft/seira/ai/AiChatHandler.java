@@ -2,6 +2,7 @@ package xyz.zcraft.seira.ai;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import xyz.zcraft.seira.bot.data.Attachment;
 import xyz.zcraft.seira.bot.data.GroupBotState;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
@@ -151,6 +152,16 @@ public class AiChatHandler {
     }
 
     public void recordHistory(String groupId, String userId, String rawContent) {
-        agentService.recordHistory(groupId, userId, rawContent);
+        recordHistory(groupId, userId, rawContent.trim(), List.of());
+    }
+
+    public void recordHistory(String groupId, String userId, String rawContent, List<Attachment> attachments) {
+        StringBuilder sb = new StringBuilder(rawContent.trim());
+        if (attachments != null && !attachments.isEmpty()) {
+            for (Attachment attachment : attachments) {
+                sb.append("\n").append("![%s](%s)".formatted(attachment.filename(), attachment.url()));
+            }
+        }
+        agentService.recordHistory(groupId, userId, sb.toString());
     }
 }

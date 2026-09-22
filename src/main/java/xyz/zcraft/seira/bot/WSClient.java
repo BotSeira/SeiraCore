@@ -148,6 +148,17 @@ public class WSClient extends WebSocketClient {
         String msgId = data.get("id").getAsString();
         String openId = data.get("author").getAsJsonObject().get("user_openid").getAsString();
 
+        final JsonArray attachments = data.getAsJsonArray("attachments");
+        List<Attachment> attachmentList = new ArrayList<>();
+
+        if  (attachments != null && !attachments.isJsonNull()) {
+            for (JsonElement attachmentElem : attachments) {
+                JsonObject attachmentObj = attachmentElem.getAsJsonObject();
+                Attachment attachment = gson.fromJson(attachmentObj, Attachment.class);
+                attachmentList.add(attachment);
+            }
+        }
+
         String msgIdx = null;
 
         final JsonArray extArr = data.get("message_scene").getAsJsonObject().get("ext").getAsJsonArray();
@@ -160,7 +171,7 @@ public class WSClient extends WebSocketClient {
             }
         }
 
-        router.onPrivateMessageReceived(openId, msgId, content, msgIdx);
+        router.onPrivateMessageReceived(openId, msgId, content, msgIdx, attachmentList);
     }
 
     private void onC2CFile(JsonObject payload) {
@@ -217,7 +228,8 @@ public class WSClient extends WebSocketClient {
                     mentions
             ));
         }
-        router.onGroupMessageReceived(groupId, openId, msgId, content, msgIdx);
+
+        router.onGroupMessageReceived(groupId, openId, msgId, content, msgIdx, attachments);
     }
 
     private Map<String, String> parseMentions(JsonObject data) {
