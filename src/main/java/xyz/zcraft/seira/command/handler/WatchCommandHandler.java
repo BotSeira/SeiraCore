@@ -23,7 +23,7 @@ import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 public final class WatchCommandHandler {
     private static final int DEFAULT_DURATION_MINUTES = 10;
     private static final int MAX_DURATION_MINUTES = 120;
-    private static final String USAGE = "用法：/watch add <玩家ID/用户名/@用户> [分钟]；/watch del [玩家ID/用户名/@用户]；/watch list";
+    private static final String USAGE = "用法：/watch add <玩家ID/用户名/@用户> [分钟,1-120]；/watch del [玩家ID/用户名/@用户]；/watch list";
 
     private final Resolver resolver;
     private final TaskCoordinator taskCoordinator;
@@ -124,7 +124,7 @@ public final class WatchCommandHandler {
         }
 
         String targetArgument = ctx.argument(1);
-        try (var timing = taskCoordinator.beginRequest(ctx, "Add Score Watch")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "Add Score Watch")) {
             String mentionedUser = resolver.extractMentionedUserId(targetArgument);
             WatchTarget target;
             if (mentionedUser != null) {

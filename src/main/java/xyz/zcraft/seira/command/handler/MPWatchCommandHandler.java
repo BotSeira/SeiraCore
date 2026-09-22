@@ -147,7 +147,7 @@ public final class MPWatchCommandHandler {
             return;
         }
 
-        String teamString = "";
+        String teamString;
 
         if (match.teams() != null) {
             teamString = """
@@ -155,8 +155,11 @@ public final class MPWatchCommandHandler {
                     > Team B: %s
                     """.formatted(
                     String.join(", ", match.teams().teamA()),
-                    String.join(", ", match.teams().teamB())
+                    String.join(", ", match.teams().teamB()
+                    ).trim()
             );
+        } else {
+            teamString = "> `%s` vs `%s`".formatted(match.players().getFirst(), match.players().getLast());
         }
 
         final PendingMessage msg = PendingMessage.ofMarkdownRaw(
