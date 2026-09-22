@@ -1,5 +1,6 @@
 package xyz.zcraft.seira.command;
 
+import lombok.Setter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
@@ -23,6 +24,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
@@ -232,7 +235,9 @@ public final class TaskCoordinator {
             discordBridgeService.acceptQqCommandReply(targetId, portableResult);
         }
 
-        return new SendResult(uploadResult && sentMessage != null, sentMessage);
+        final boolean success = uploadResult && sentMessage != null;
+
+        return new SendResult(success, sentMessage);
     }
 
     public final class RequestTiming implements AutoCloseable {

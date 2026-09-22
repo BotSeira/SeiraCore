@@ -67,11 +67,14 @@ public record Context(
     }
 
     public SendResult sendReply(PendingMessage message, boolean ref) {
+        record(message);
         return requireReplies().sendReply(Objects.requireNonNull(message, "message"), ref);
     }
 
     public SendResult sendReply(String message) {
-        return requireReplies().sendReply(PendingMessage.ofMarkdownRaw(message));
+        final PendingMessage msg = PendingMessage.ofMarkdownRaw(message);
+        record(msg);
+        return requireReplies().sendReply(msg);
     }
 
     public SendResult send(boolean replyFirst, PendingMessage message) {
@@ -98,14 +101,17 @@ public record Context(
      * Sends an active message to the same user or group, without an inbound message reference.
      */
     public SendResult sendMessage(PendingMessage message, boolean ref) {
+        record(message);
         return requireReplies().sendProactive(Objects.requireNonNull(message, "message"), ref);
     }
 
     public SendResult sendMessage(PendingMessage message) {
+        record(message);
         return requireReplies().sendProactive(Objects.requireNonNull(message, "message"));
     }
 
     public SendResult sendQueueNotice(PendingMessage message) {
+        record(message);
         return requireReplies().sendQueueNotice(Objects.requireNonNull(message, "message"));
     }
 
@@ -114,5 +120,10 @@ public record Context(
             throw new IllegalStateException("This command context is not bound to a reply channel");
         }
         return replies;
+    }
+
+    private void record(PendingMessage message) {
+        if (message == null || recorder == null) return;
+        recorder.accept(message.getRealContent());
     }
 }

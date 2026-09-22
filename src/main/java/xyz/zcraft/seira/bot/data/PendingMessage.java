@@ -95,4 +95,12 @@ public class PendingMessage {
         this.messageReference = reference;
         return this;
     }
+
+    public String getRealContent() {
+        if (this instanceof MDMessage md) {
+            return md.getMarkdown();
+        } else {
+            return getContent();
+        }
+    }
 }
