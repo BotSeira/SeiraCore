@@ -21,8 +21,8 @@ public final class MPNotifier {
                 groupId,
                 """
                 %s
-                > 多人房间监视 - %s
-                > %s - %s
+                > __%s__
+                > %s mp - %s
                 """.formatted(uploadedImage.toMarkdown(), watch.roomName(), watch.version().value(), watch.roomId()).trim()
         ) != null;
     }

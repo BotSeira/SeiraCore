@@ -82,7 +82,7 @@ public final class MPWatchCommandHandler {
     }
 
     private static String formatRoom(RoomWatchView view) {
-        return view.version().value() + " 多人房间“" + view.roomName() + "” (#" + view.roomId() + ")";
+        return view.version().value() + " - " + view.roomId() + " `" + view.roomName() + "`";
     }
 
     private static void usage(Context ctx) {
@@ -146,7 +146,7 @@ public final class MPWatchCommandHandler {
                         ctx.groupId(), ctx.senderUserId(), target.version(), target.roomId()
                 );
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(
-                        at(ctx) + "已开始监视 `" + formatRoom(view) + "` 喵。"
+                        at(ctx) + "已开始监视" + formatRoom(view) + "喵。"
                 ));
             } catch (IllegalArgumentException | IllegalStateException e) {
                 throw new ResolutionException(e.getMessage());
