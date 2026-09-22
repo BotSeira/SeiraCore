@@ -24,7 +24,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
-import static xyz.zcraft.seira.command.reply.ReplyFactory.ms;
 
 public final class MPWatchCommandHandler {
     private static final String USAGE =
@@ -152,24 +151,25 @@ public final class MPWatchCommandHandler {
 
         if (match.teams() != null) {
             teamString = """
-                > Team A: %s
-                > Team B: %s
-                """.formatted(
+                    > Team A: %s
+                    > Team B: %s
+                    """.formatted(
                     String.join(", ", match.teams().teamA()),
                     String.join(", ", match.teams().teamB())
-                );
+            );
         }
 
         final PendingMessage msg = PendingMessage.ofMarkdownRaw(
                 at(ctx) + """
-                正在启动 RomAI 监视喵。
-                > %s - %s
-                %s
-                """.formatted(
-                match.lobbyId(),
-                match.mode(),
-                teamString
-        ));
+                        正在启动 RomAI 监视喵。
+                        > %s - %s
+                        %s
+                        """.formatted(
+                        match.lobbyId(),
+                        match.mode(),
+                        teamString
+                ).trim()
+        );
 
         try (var _ = taskCoordinator.beginRequest(ctx, "Start RomAI Watch")) {
             if (!ctx.sendMessage(msg).success()) {
