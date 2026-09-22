@@ -93,7 +93,7 @@ public class AiChatHandler {
                 new StreamHandler() {
                     @Override
                     public void onText(String message) {
-                        ctx.send(true, PendingMessage.ofMarkdownRaw(at(ctx) + message));
+                        ctx.send(true, PendingMessage.ofMarkdownRaw(at(ctx) + message), true);
                     }
 
                     @Override
@@ -105,7 +105,8 @@ public class AiChatHandler {
                     public void onError(String errorCode, String errorMsg) {
                         ctx.send(
                                 true,
-                                PendingMessage.ofMarkdownRaw(at(ctx) + "回复生成失败了喵。\n>" + errorCode + ": " + errorMsg)
+                                PendingMessage.ofMarkdownRaw(at(ctx) + "回复生成失败了喵。\n>" + errorCode + ": " + errorMsg),
+                                true
                         );
                     }
                 }

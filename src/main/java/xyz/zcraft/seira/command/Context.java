@@ -13,7 +13,7 @@ public record Context(
         String[] args,
         String query,
         String rawContent,
-        CommandReplyChannel replies) {
+        ReplyChannel replies) {
     public Context(
             String senderUserId,
             String groupId,
@@ -48,7 +48,7 @@ public record Context(
         return groupId != null && !groupId.isBlank();
     }
 
-    public Context withReplies(CommandReplyChannel replyChannel) {
+    public Context withReplies(ReplyChannel replyChannel) {
         return new Context(
                 senderUserId, groupId, messageId, command, args, query, rawContent,
                 Objects.requireNonNull(replyChannel, "replyChannel")
@@ -65,7 +65,11 @@ public record Context(
      * Sends a passive reply associated with the message that invoked this command.
      */
     public SendResult sendReply(PendingMessage message) {
-        return requireReplies().sendReply(Objects.requireNonNull(message, "message"));
+        return sendReply(message, false);
+    }
+
+    public SendResult sendReply(PendingMessage message, boolean ref) {
+        return requireReplies().sendReply(Objects.requireNonNull(message, "message"), ref);
     }
 
     public SendResult sendReply(String message) {
@@ -73,16 +77,20 @@ public record Context(
     }
 
     public SendResult send(boolean replyFirst, PendingMessage message) {
+        return send(replyFirst, message, false);
+    }
+
+    public SendResult send(boolean replyFirst, PendingMessage message, boolean ref) {
         SendResult sendResult;
         if (replyFirst) {
-            sendResult = sendReply(message);
+            sendResult = sendReply(message, ref);
             if (!sendResult.success()) {
-                sendResult = sendMessage(message);
+                sendResult = sendMessage(message, ref);
             }
         } else {
-            sendResult = sendMessage(message);
+            sendResult = sendMessage(message, ref);
             if (!sendResult.success()) {
-                sendResult = sendReply(message);
+                sendResult = sendReply(message, ref);
             }
         }
         return sendResult;
@@ -91,6 +99,10 @@ public record Context(
     /**
      * Sends an active message to the same user or group, without an inbound message reference.
      */
+    public SendResult sendMessage(PendingMessage message, boolean ref) {
+        return requireReplies().sendProactive(Objects.requireNonNull(message, "message"), ref);
+    }
+
     public SendResult sendMessage(PendingMessage message) {
         return requireReplies().sendProactive(Objects.requireNonNull(message, "message"));
     }
@@ -99,7 +111,7 @@ public record Context(
         return requireReplies().sendQueueNotice(Objects.requireNonNull(message, "message"));
     }
 
-    private CommandReplyChannel requireReplies() {
+    private ReplyChannel requireReplies() {
         if (replies == null) {
             throw new IllegalStateException("This command context is not bound to a reply channel");
         }

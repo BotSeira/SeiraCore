@@ -175,15 +175,17 @@ public class Router {
         return QQApi.getAvatarUrl(configSupplier.get().qq().appId(), openId);
     }
 
-    public void onPrivateMessageReceived(String userId, String messageId, String rawContent) {
-        handleMessageReceived(userId, null, userId, messageId, rawContent, false);
+    public void onPrivateMessageReceived(String userId, String messageId, String rawContent, String msgIdx) {
+        handleMessageReceived(userId, null, userId, messageId, rawContent, false, msgIdx);
     }
 
-    public void onGroupMessageReceived(String groupId, String senderUserId, String messageId, String rawContent) {
-        handleMessageReceived(groupId, groupId, senderUserId, messageId, rawContent, true);
+    public void onGroupMessageReceived(String groupId, String senderUserId, String messageId, String rawContent, String msgIdx) {
+        handleMessageReceived(groupId, groupId, senderUserId, messageId, rawContent, true, msgIdx);
     }
 
-    private void handleMessageReceived(String targetId, String groupId, String userId, String messageId, String rawContent, boolean groupMessage) {
+    private void handleMessageReceived(
+            String targetId, String groupId, String userId, String messageId, String rawContent, boolean groupMessage, String msgIdx
+    ) {
         AtomicInteger messageSeqCounter = new AtomicInteger(1);
         try {
             final boolean group = groupMessage && groupId != null && !groupId.isBlank();
@@ -228,8 +230,8 @@ public class Router {
             }
 
             if (parseResult.status() == CommandParser.ParseResult.Status.TEXT) {
-                CommandReplyChannel replies = taskCoordinator.openReplyChannel(
-                        targetId, messageId, groupMessage, false
+                ReplyChannel replies = taskCoordinator.openReplyChannel(
+                        targetId, messageId, groupMessage, false, msgIdx
                 );
 
                 final boolean permit = AiPermission.doPermit(groupId);
@@ -241,9 +243,10 @@ public class Router {
                 return;
             }
 
-            CommandReplyChannel replies = taskCoordinator.openReplyChannel(
-                    targetId, messageId, groupMessage, config.seira().queueMessageInGroup()
+            ReplyChannel replies = taskCoordinator.openReplyChannel(
+                    targetId, messageId, groupMessage, config.seira().queueMessageInGroup(), msgIdx
             );
+
             if (parseResult.status() == CommandParser.ParseResult.Status.EMPTY_COMMAND
                     && !group) {
                 replies.sendReply(PendingMessage.ofString("请输入指令。使用/help获取帮助。"));

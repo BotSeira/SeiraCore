@@ -147,7 +147,20 @@ public class WSClient extends WebSocketClient {
         String content = data.get("content").getAsString();
         String msgId = data.get("id").getAsString();
         String openId = data.get("author").getAsJsonObject().get("user_openid").getAsString();
-        router.onPrivateMessageReceived(openId, msgId, content);
+
+        String msgIdx = null;
+
+        final JsonArray extArr = data.get("message_scene").getAsJsonObject().get("ext").getAsJsonArray();
+
+        for (JsonElement elem : extArr) {
+            final String str = elem.getAsString();
+
+            if (str.startsWith("msg_idx=")) {
+                msgIdx = str.substring("msg_idx=".length());
+            }
+        }
+
+        router.onPrivateMessageReceived(openId, msgId, content, msgIdx);
     }
 
     private void onC2CFile(JsonObject payload) {
@@ -177,6 +190,19 @@ public class WSClient extends WebSocketClient {
         JsonObject author = data.get("author").getAsJsonObject();
         String openId = author.get("member_openid").getAsString();
         String groupId = data.get("group_openid").getAsString();
+
+        String msgIdx = null;
+
+        final JsonArray extArr = data.get("message_scene").getAsJsonObject().get("ext").getAsJsonArray();
+
+        for (JsonElement elem : extArr) {
+            final String str = elem.getAsString();
+
+            if (str.startsWith("msg_idx=")) {
+                msgIdx = str.substring("msg_idx=".length());
+            }
+        }
+
         List<Attachment> attachments = parseAttachments(data);
         Map<String, String> mentions = parseMentions(data);
 
@@ -191,7 +217,7 @@ public class WSClient extends WebSocketClient {
                     mentions
             ));
         }
-        router.onGroupMessageReceived(groupId, openId, msgId, content);
+        router.onGroupMessageReceived(groupId, openId, msgId, content, msgIdx);
     }
 
     private Map<String, String> parseMentions(JsonObject data) {

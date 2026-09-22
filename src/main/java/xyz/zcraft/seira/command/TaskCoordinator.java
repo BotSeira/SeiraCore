@@ -68,10 +68,10 @@ public final class TaskCoordinator {
         return "请求处理失败，请稍后再试喵";
     }
 
-    public CommandReplyChannel openReplyChannel(
-            String targetId, String messageId, boolean groupMessage, boolean queueMessageInGroup
+    public ReplyChannel openReplyChannel(
+            String targetId, String messageId, boolean groupMessage, boolean queueMessageInGroup, String refMsgIdx
     ) {
-        return new OutboundReplyChannel(targetId, messageId, groupMessage, queueMessageInGroup);
+        return new ReplyChannel(this, targetId, messageId, groupMessage, queueMessageInGroup, refMsgIdx);
     }
 
     public RequestTiming beginRequest(Context ctx, String requestType, boolean timeoutNotify) {
@@ -257,44 +257,5 @@ public final class TaskCoordinator {
             apiRequestStats.complete(requestType,
                     Math.max(1L, (System.nanoTime() - startedAt) / 1_000_000L));
         }
-    }
-
-    private final class OutboundReplyChannel implements CommandReplyChannel {
-        private final String targetId;
-        private final String messageId;
-        private final boolean groupMessage;
-        private final boolean queueMessageInGroup;
-        private final AtomicInteger passiveSequence = new AtomicInteger(1);
-
-        private OutboundReplyChannel(
-                String targetId,
-                String messageId,
-                boolean groupMessage,
-                boolean queueMessageInGroup
-        ) {
-            this.targetId = targetId;
-            this.messageId = messageId;
-            this.groupMessage = groupMessage;
-            this.queueMessageInGroup = queueMessageInGroup;
-        }
-
-        @Override
-        public synchronized SendResult sendReply(PendingMessage message) {
-            return sendOutboundMessage(targetId, messageId, groupMessage, message, passiveSequence);
-        }
-
-        @Override
-        public synchronized SendResult sendProactive(PendingMessage message) {
-            return sendOutboundMessage(targetId, null, groupMessage, message, null);
-        }
-
-        @Override
-        public synchronized SendResult sendQueueNotice(PendingMessage message) {
-            if (groupMessage && !queueMessageInGroup) {
-                return new SendResult(true, null);
-            }
-            return sendReply(message);
-        }
-
     }
 }
