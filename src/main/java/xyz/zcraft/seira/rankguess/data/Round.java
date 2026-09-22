@@ -276,8 +276,8 @@ public record Round(long userId, long scoreId, int bestIndex, long actualRank, D
             try {
                 final BufferedImage original = ImageUtil.readImage(qqAvatarUrl);
 
-                final byte[] mosaicBytes = ImageUtil.toPngBytes(ImageUtil.mosaic(original, 15));
-                final byte[] blurBytes = ImageUtil.toPngBytes(ImageUtil.gaussianBlur(original, 50));
+                final byte[] mosaicBytes = ImageUtil.toPngBytes(ImageUtil.mosaic(original, 18));
+                final byte[] blurBytes = ImageUtil.toPngBytes(ImageUtil.gaussianBlur(original, 60));
 
                 final var mosaicImage = imageUploader.apply(mosaicBytes);
                 final var blurImage = imageUploader.apply(blurBytes);
@@ -303,8 +303,8 @@ public record Round(long userId, long scoreId, int bestIndex, long actualRank, D
         try {
             final BufferedImage original = ImageUtil.readImage(randomScore.user().getAvatarUrl());
 
-            final byte[] mosaicBytes = ImageUtil.toPngBytes(ImageUtil.mosaic(original, 15));
-            final byte[] blurBytes = ImageUtil.toPngBytes(ImageUtil.gaussianBlur(original, 50));
+            final byte[] mosaicBytes = ImageUtil.toPngBytes(ImageUtil.mosaic(original, 18));
+            final byte[] blurBytes = ImageUtil.toPngBytes(ImageUtil.gaussianBlur(original, 60));
 
             final var mosaicImage = imageUploader.apply(mosaicBytes);
             final var blurImage = imageUploader.apply(blurBytes);
