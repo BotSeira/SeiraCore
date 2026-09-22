@@ -2,17 +2,17 @@ package xyz.zcraft.seira.watch;
 
 import java.util.Locale;
 
-public enum MultiplayerRoomVersion {
+public enum MPVersion {
     LAZER("lazer"),
     STABLE("stable");
 
     private final String value;
 
-    MultiplayerRoomVersion(String value) {
+    MPVersion(String value) {
         this.value = value;
     }
 
-    public static MultiplayerRoomVersion parse(String value) {
+    public static MPVersion parse(String value) {
         if (value == null) {
             return null;
         }

@@ -12,25 +12,25 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 
-public final class OstellaMultiplayerRoomWatchApi implements MultiplayerRoomWatchApi {
+public final class MPWatchApi {
     private final String endpoint;
     private final String serviceToken;
     private final HttpClient client;
     private final Gson gson;
 
-    public OstellaMultiplayerRoomWatchApi(String endpoint) {
+    public MPWatchApi(String endpoint) {
         this(endpoint, null);
     }
 
-    public OstellaMultiplayerRoomWatchApi(String endpoint, String serviceToken) {
+    public MPWatchApi(String endpoint, String serviceToken) {
         this(endpoint, serviceToken, HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(30)).build(), new Gson());
     }
 
-    OstellaMultiplayerRoomWatchApi(String endpoint, HttpClient client, Gson gson) {
+    MPWatchApi(String endpoint, HttpClient client, Gson gson) {
         this(endpoint, null, client, gson);
     }
 
-    OstellaMultiplayerRoomWatchApi(String endpoint, String serviceToken, HttpClient client, Gson gson) {
+    MPWatchApi(String endpoint, String serviceToken, HttpClient client, Gson gson) {
         this.endpoint = endpoint.endsWith("/") ? endpoint.substring(0, endpoint.length() - 1) : endpoint;
         this.serviceToken = serviceToken;
         this.client = client;
@@ -71,15 +71,14 @@ public final class OstellaMultiplayerRoomWatchApi implements MultiplayerRoomWatc
         return value;
     }
 
-    private static MultiplayerRoomVersion requireVersion(MultiplayerRoomVersion version) {
+    private static MPVersion requireVersion(MPVersion version) {
         if (version == null) {
             throw new IllegalArgumentException("version is required");
         }
         return version;
     }
 
-    @Override
-    public RoomWatchSnapshot getSnapshot(MultiplayerRoomVersion version, long roomId) {
+    public RoomWatchSnapshot getSnapshot(MPVersion version, long roomId) {
         HttpResponse<String> response = get(
                 "/multiplayer/rooms/" + requirePositive(roomId, "roomId") + "/watch?version="
                         + requireVersion(version).value(),
@@ -98,8 +97,7 @@ public final class OstellaMultiplayerRoomWatchApi implements MultiplayerRoomWatc
         return snapshot;
     }
 
-    @Override
-    public byte[] renderResult(MultiplayerRoomVersion version, long roomId, long playlistItemId) {
+    public byte[] renderResult(MPVersion version, long roomId, long playlistItemId) {
         HttpResponse<byte[]> response = get(
                 "/multiplayer/rooms/" + requirePositive(roomId, "roomId")
                         + "/playlist/" + requirePositive(playlistItemId, "playlistItemId") + "/result?version="

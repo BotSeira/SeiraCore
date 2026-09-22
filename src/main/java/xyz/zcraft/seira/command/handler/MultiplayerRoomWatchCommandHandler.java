@@ -9,8 +9,8 @@ import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.db.UserDataStore;
-import xyz.zcraft.seira.watch.MultiplayerRoomVersion;
-import xyz.zcraft.seira.watch.MultiplayerRoomWatchService;
+import xyz.zcraft.seira.watch.MPVersion;
+import xyz.zcraft.seira.watch.MPWatchService;
 import xyz.zcraft.seira.watch.RoomWatchView;
 
 import java.util.Locale;
@@ -32,11 +32,11 @@ public final class MultiplayerRoomWatchCommandHandler {
     );
 
     private final TaskCoordinator taskCoordinator;
-    private final MultiplayerRoomWatchService watchService;
+    private final MPWatchService watchService;
 
     public MultiplayerRoomWatchCommandHandler(
             TaskCoordinator taskCoordinator,
-            MultiplayerRoomWatchService watchService
+            MPWatchService watchService
     ) {
         this.taskCoordinator = Objects.requireNonNull(taskCoordinator);
         this.watchService = Objects.requireNonNull(watchService);
@@ -48,31 +48,31 @@ public final class MultiplayerRoomWatchCommandHandler {
         }
         String normalized = value.trim();
         String numeric = normalized;
-        MultiplayerRoomVersion inferredVersion = null;
+        MPVersion inferredVersion = null;
         Matcher lazerMatcher = LAZER_ROOM_URL.matcher(normalized);
         Matcher stableMatcher = STABLE_ROOM_URL.matcher(normalized);
         if (lazerMatcher.matches()) {
             numeric = lazerMatcher.group(1);
-            inferredVersion = MultiplayerRoomVersion.LAZER;
+            inferredVersion = MPVersion.LAZER;
         } else if (stableMatcher.matches()) {
             numeric = stableMatcher.group(1);
-            inferredVersion = MultiplayerRoomVersion.STABLE;
+            inferredVersion = MPVersion.STABLE;
         } else if (!normalized.matches("\\d+")) {
             return null;
         }
 
-        MultiplayerRoomVersion requestedVersion = explicitVersion == null
+        MPVersion requestedVersion = explicitVersion == null
                 ? null
-                : MultiplayerRoomVersion.parse(explicitVersion);
+                : MPVersion.parse(explicitVersion);
         if (explicitVersion != null && requestedVersion == null) {
             return null;
         }
         if (inferredVersion != null && requestedVersion != null && inferredVersion != requestedVersion) {
             return null;
         }
-        MultiplayerRoomVersion version = inferredVersion != null
+        MPVersion version = inferredVersion != null
                 ? inferredVersion
-                : requestedVersion == null ? MultiplayerRoomVersion.LAZER : requestedVersion;
+                : requestedVersion == null ? MPVersion.LAZER : requestedVersion;
         try {
             long roomId = Long.parseLong(numeric);
             return roomId > 0 ? new RoomTarget(roomId, version) : null;
@@ -123,7 +123,7 @@ public final class MultiplayerRoomWatchCommandHandler {
                 return;
             }
             final Response<MultiplayerRoom> multiplayerRoom = APIHelper.getMultiplayerRoom(osuToken.accessToken());
-            target = new RoomTarget(multiplayerRoom.getContent().getId(), MultiplayerRoomVersion.LAZER);
+            target = new RoomTarget(multiplayerRoom.getContent().getId(), MPVersion.LAZER);
         } else {
             String version = startArgumentCount == 2 ? ctx.argument(argumentOffset + 1) : null;
             target = parseRoomTarget(ctx.argument(argumentOffset), version);
@@ -146,8 +146,7 @@ public final class MultiplayerRoomWatchCommandHandler {
                         ctx.groupId(), ctx.senderUserId(), target.version(), target.roomId()
                 );
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(
-                        at(ctx) + "已开始监视 `" + formatRoom(view) + "` 。"
-                                + "之后完成的每张图都会自动推送结果。"
+                        at(ctx) + "已开始监视 `" + formatRoom(view) + "` 喵。"
                 ));
             } catch (IllegalArgumentException | IllegalStateException e) {
                 throw new ResolutionException(e.getMessage());
@@ -184,6 +183,6 @@ public final class MultiplayerRoomWatchCommandHandler {
                 : "你当前正在监视" + formatRoom(view) + "。")));
     }
 
-    record RoomTarget(long roomId, MultiplayerRoomVersion version) {
+    record RoomTarget(long roomId, MPVersion version) {
     }
 }

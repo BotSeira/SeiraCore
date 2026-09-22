@@ -43,7 +43,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
     @Getter
     private final MessageSender sender;
     private final ScoreWatchService watchService;
-    private final MultiplayerRoomWatchService multiplayerRoomWatchService;
+    private final MPWatchService mpWatchService;
     private final RankGuessGameService rankGuessGameService;
     private final AgentService agentService;
     private final RealtimeServiceInterruptionNotifier interruptionNotifier;
@@ -92,9 +92,9 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         );
 
         LOG.info("Initializing multiplayer room watch service");
-        this.multiplayerRoomWatchService = new MultiplayerRoomWatchService(
-                new OstellaMultiplayerRoomWatchApi(config.ostella().endpoint(), config.ostella().token()),
-                new QqMultiplayerRoomNotifier(sender),
+        this.mpWatchService = new MPWatchService(
+                new MPWatchApi(config.ostella().endpoint(), config.ostella().token()),
+                new MPNotifier(sender),
                 Duration.ofSeconds(config.seira().effectiveMultiplayerWatchIntervalSeconds())
         );
 
@@ -112,7 +112,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                 admins,
                 bindingService,
                 watchService,
-                multiplayerRoomWatchService,
+                mpWatchService,
                 discordBridgeService,
                 rankGuessGameService,
                 executors.commandTasks(),
@@ -142,7 +142,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         runnerThread = Thread.currentThread();
         tokenManager.start();
         watchService.start();
-        multiplayerRoomWatchService.start();
+        mpWatchService.start();
         discordBridgeService.start();
         LOG.info("Starting bot connection loop...");
 
@@ -239,7 +239,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
             thread.interrupt();
         }
         watchService.close();
-        multiplayerRoomWatchService.close();
+        mpWatchService.close();
         discordBridgeService.close();
         tokenManager.close();
     }
@@ -312,7 +312,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         RealtimeServiceInterruptionNotifier.NotificationResult result = interruptionNotifier.notifyGroups(
                 watchService.activeTransientGroupIds(),
                 rankGuessGameService.activeGroupIds(),
-                multiplayerRoomWatchService.activeGroupIds(),
+                mpWatchService.activeGroupIds(),
                 agentService.activeGroupIds()
         );
         if (result.failedGroups() == 0) {

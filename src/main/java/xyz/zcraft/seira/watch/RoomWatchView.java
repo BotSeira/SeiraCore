@@ -1,4 +1,4 @@
 package xyz.zcraft.seira.watch;
 
-public record RoomWatchView(MultiplayerRoomVersion version, long roomId, String roomName) {
+public record RoomWatchView(MPVersion version, long roomId, String roomName) {
 }
