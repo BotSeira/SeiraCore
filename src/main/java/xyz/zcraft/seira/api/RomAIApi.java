@@ -6,8 +6,12 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.api.data.RomAIMatch;
+import xyz.zcraft.seira.config.DiscordProxyConfig;
 
+import java.net.InetSocketAddress;
+import java.net.ProxySelector;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -20,9 +24,17 @@ public class RomAIApi {
     private static final Gson GSON = new Gson();
     private static final Logger LOG = LogManager.getLogger(RomAIApi.class);
 
-    private static final HttpClient CLIENT = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(20))
-            .build();
+    private static final HttpClient CLIENT;
+
+    static {
+        var proxy = Seira.getConfig().discord().proxy();
+        CLIENT = HttpClient.newBuilder()
+                .proxy(ProxySelector.of(
+                        new InetSocketAddress(proxy.host(), proxy.port())
+                ))
+                .connectTimeout(Duration.ofSeconds(20))
+                .build();
+    }
 
     public static List<RomAIMatch> getActiveMatches() {
         try {
