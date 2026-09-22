@@ -5,7 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.osu.model.*;
-import xyz.zcraft.seira.api.APIHelper;
+import xyz.zcraft.seira.api.ApiHelper;
 import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.bot.data.Button;
 import xyz.zcraft.seira.bot.data.PendingMessage;
@@ -317,7 +317,7 @@ public final class ReplyFactory {
         );
     }
 
-    public PendingMessage replayMessage(Context ctx, APIHelper.ReplayTaskInfo taskInfo) {
+    public PendingMessage replayMessage(Context ctx, ApiHelper.ReplayTaskInfo taskInfo) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.replayTaskContent(ctx, taskInfo),
                 buttons().replayProgressButtons(taskInfo.taskId(), ctx.senderUserId())
@@ -424,7 +424,7 @@ public final class ReplyFactory {
         );
     }
 
-    public PendingMessage statusMessage(Context ctx, APIHelper.ServerStatus status) {
+    public PendingMessage statusMessage(Context ctx, ApiHelper.ServerStatus status) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.statContent(ctx, status), null
         );
@@ -464,7 +464,7 @@ public final class ReplyFactory {
     }
 
     private static final class Contents {
-        static String replayTaskContent(Context ctx, APIHelper.ReplayTaskInfo taskInfo) {
+        static String replayTaskContent(Context ctx, ApiHelper.ReplayTaskInfo taskInfo) {
             StringBuilder sb = new StringBuilder();
             sb.append(at(ctx)).append("回放生成请求已提交").append("\n");
 
@@ -720,7 +720,7 @@ public final class ReplyFactory {
             return sb.toString().trim();
         }
 
-        public static String statContent(Context ctx, APIHelper.ServerStatus status) {
+        public static String statContent(Context ctx, ApiHelper.ServerStatus status) {
             String stat = at(ctx) + "\n" +
                     "## 服务器状态\n" +
                     "> 消息网关: ✅ 正常\n" +

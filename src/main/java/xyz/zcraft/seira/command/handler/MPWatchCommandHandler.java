@@ -1,13 +1,18 @@
 package xyz.zcraft.seira.command.handler;
 
 import xyz.zcraft.osu.model.MultiplayerRoom;
-import xyz.zcraft.seira.api.APIHelper;
+import xyz.zcraft.osu.model.User;
+import xyz.zcraft.osu.model.UserExtended;
+import xyz.zcraft.seira.api.ApiHelper;
+import xyz.zcraft.seira.api.RomAIApi;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.Response;
+import xyz.zcraft.seira.api.data.RomAIMatch;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.command.TaskCoordinator;
+import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.watch.MPVersion;
 import xyz.zcraft.seira.watch.MPWatchService;
@@ -19,6 +24,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
+import static xyz.zcraft.seira.command.reply.ReplyFactory.ms;
 
 public final class MPWatchCommandHandler {
     private static final String USAGE =
@@ -33,12 +39,15 @@ public final class MPWatchCommandHandler {
 
     private final TaskCoordinator taskCoordinator;
     private final MPWatchService watchService;
+    private final Resolver resolver;
 
     public MPWatchCommandHandler(
             TaskCoordinator taskCoordinator,
+            Resolver resolver,
             MPWatchService watchService
     ) {
         this.taskCoordinator = Objects.requireNonNull(taskCoordinator);
+        this.resolver = Objects.requireNonNull(resolver);
         this.watchService = Objects.requireNonNull(watchService);
     }
 
@@ -106,6 +115,72 @@ public final class MPWatchCommandHandler {
         }
     }
 
+    public void handleRomAI(Context ctx) {
+        if (!ctx.inGroup()) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "/romai 仅支持群聊使用。"));
+            return;
+        }
+
+        String username;
+        if (ctx.argumentCount() == 0) {
+            final Long boundUid = resolver.resolveBoundUid(ctx.senderUserId());
+            if (boundUid == null) {
+                ctx.sendReply(at(ctx) + "由于未绑定，无法查找正在进行的 RomAI 比赛喵。");
+                return;
+            }
+
+            final UserExtended userRaw = ApiHelper.getUserRaw(boundUid);
+
+            username = userRaw.getUsername();
+        } else if (ctx.argumentCount() == 1) {
+            final String player = resolver.player(ctx.argument(0), null);
+            final User content = ApiHelper.lookupUser(player).getContent();
+            username = content.getUsername();
+        } else {
+            ctx.sendReply(at(ctx) + "用法：/romai [@user]");
+            return;
+        }
+
+        final RomAIMatch match = RomAIApi.getMatchFor(username);
+
+        if (match == null) {
+            ctx.sendReply(at(ctx) + "对方不在打 RomAI 喵。");
+            return;
+        }
+
+        final PendingMessage msg = PendingMessage.ofMarkdownRaw(
+                at(ctx) + """
+                正在启动 RomAI 监视喵。
+                > %s - %s
+                > Team A: %s
+                > Team B: %s
+                """.formatted(
+                match.lobbyId(),
+                match.mode(),
+                String.join(", ", match.teams().teamA()),
+                String.join(", ", match.teams().teamB())
+        ));
+
+        try (var _ = taskCoordinator.beginRequest(ctx, "Start RomAI Watch")) {
+            if (!ctx.sendMessage(msg).success()) {
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) +
+                        "由于缺少主动消息权限，无法启动监视！权限配置请见：<https://docs.seira.top/overview/use.html#extra-permission>"
+                ));
+                return;
+            }
+            try {
+                RoomWatchView view = watchService.watch(
+                        ctx.groupId(), ctx.senderUserId(), MPVersion.STABLE, Long.parseLong(match.lobbyId())
+                );
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(
+                        at(ctx) + "已开始监视" + formatRoom(view) + "喵。"
+                ));
+            } catch (IllegalArgumentException | IllegalStateException e) {
+                throw new ResolutionException(e.getMessage());
+            }
+        }
+    }
+
     private void handleStart(Context ctx, int argumentOffset) {
         int startArgumentCount = ctx.argumentCount() - argumentOffset;
         if (startArgumentCount < 0 || startArgumentCount > 2) {
@@ -120,7 +195,7 @@ public final class MPWatchCommandHandler {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "由于未绑定账户，无法获取当前房间，请手动提供ID~"));
                 return;
             }
-            final Response<MultiplayerRoom> multiplayerRoom = APIHelper.getMultiplayerRoom(osuToken.accessToken());
+            final Response<MultiplayerRoom> multiplayerRoom = ApiHelper.getMultiplayerRoom(osuToken.accessToken());
             target = new RoomTarget(multiplayerRoom.getContent().getId(), MPVersion.LAZER);
         } else {
             String version = startArgumentCount == 2 ? ctx.argument(argumentOffset + 1) : null;

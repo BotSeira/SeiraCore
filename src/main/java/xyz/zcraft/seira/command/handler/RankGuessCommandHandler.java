@@ -2,7 +2,7 @@ package xyz.zcraft.seira.command.handler;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.seira.api.APIHelper;
+import xyz.zcraft.seira.api.ApiHelper;
 import xyz.zcraft.seira.api.data.RandomScore;
 import xyz.zcraft.seira.bot.data.MessageReference;
 import xyz.zcraft.seira.bot.data.PendingMessage;
@@ -26,7 +26,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -268,8 +267,8 @@ public final class RankGuessCommandHandler {
 
         if (resolver.looksLikeMention(argument)) {
             String player = resolver.player(argument, ctx.senderUserId());
-            long uid = APIHelper.resolveUid(player);
-            rank = APIHelper.getUserRank(uid);
+            long uid = ApiHelper.resolveUid(player);
+            rank = ApiHelper.getUserRank(uid);
         } else {
             rank = parseRank(argument);
             if (rank == null) {
@@ -330,7 +329,7 @@ public final class RankGuessCommandHandler {
         reply.append(at(ctx)).append("目前%s在本群权重为 `%.2f` (%s)\n".formatted(ref, probability.weight(), factors.isBlank() ? "基础权重" : factors));
         reply.append("在本群 `%d` 名玩家中，%s被选中的概率为 `%.3f%%`\n".formatted(totalPlayer, ref, probability.chance() * 100));
 
-        final String randomScoreWeight = APIHelper.getRandomScoreWeight(boundUid, games.generateWeights(ctx.groupId()), all);
+        final String randomScoreWeight = ApiHelper.getRandomScoreWeight(boundUid, games.generateWeights(ctx.groupId()), all);
 
         reply.append("%s的成绩当前抽选概率：\n>".formatted(ref)).append(randomScoreWeight).append("\n");
 
@@ -407,7 +406,7 @@ public final class RankGuessCommandHandler {
 
         try {
             scoreId = Long.parseLong(
-                    APIHelper.lookupPlayerScore(boundUid, "bp", index, List.of(), null)
+                    ApiHelper.lookupPlayerScore(boundUid, "bp", index, List.of(), null)
             );
         } catch (Exception e) {
             LOG.error("Failed to lookup score id", e);
@@ -451,9 +450,9 @@ public final class RankGuessCommandHandler {
                     ctx.sendReply(PendingMessage.ofMarkdownRaw("本群没有绑定的用户，无法开始游戏喵"));
                     return;
                 }
-                randomScore = APIHelper.getRandomScoreFromUsers(uids, games.generateWeights(ctx.groupId()));
+                randomScore = ApiHelper.getRandomScoreFromUsers(uids, games.generateWeights(ctx.groupId()));
             } else {
-                randomScore = APIHelper.getRandomScore();
+                randomScore = ApiHelper.getRandomScore();
             }
 
             Round round = Round.from(randomScore, activeMessageEnabled);
@@ -474,7 +473,7 @@ public final class RankGuessCommandHandler {
 
             ctx.sendReply(PendingMessage.ofMarkdownRaw(content));
 
-            var renderTask = APIHelper.createObscuredReplayRenderTask(
+            var renderTask = ApiHelper.createObscuredReplayRenderTask(
                     round.scoreId(), taskCoordinator.createVideoUploadRequest(ctx)
             );
 
@@ -488,7 +487,7 @@ public final class RankGuessCommandHandler {
                     TimeUnit.SECONDS
             );
 
-            APIHelper.ReplayRenderResult replay = null;
+            ApiHelper.ReplayRenderResult replay = null;
             try {
                 replay = taskCoordinator.waitForReplay(renderTask);
             } catch (Exception e) {

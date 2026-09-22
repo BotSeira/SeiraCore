@@ -25,7 +25,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-public class APIHelper {
+public class ApiHelper {
     private static final String OSU_AUTHORIZATION_HEADER = "X-Osu-Authorization";
     private static final String ENDPOINT;
     private static final String TOKEN;

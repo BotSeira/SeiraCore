@@ -2,7 +2,7 @@ package xyz.zcraft.seira.command;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.seira.api.APIHelper;
+import xyz.zcraft.seira.api.ApiHelper;
 import xyz.zcraft.seira.api.data.ReplayUploadInfo;
 import xyz.zcraft.seira.bot.data.Attachment;
 import xyz.zcraft.seira.bot.data.PendingMessage;
@@ -74,7 +74,7 @@ public class AttachmentHandler {
                     throw new IllegalArgumentException("Replay file exceeds the 512 KiB limit");
                 }
 
-                final ReplayUploadInfo replayUploadInfo = APIHelper.uploadReplay(bytes);
+                final ReplayUploadInfo replayUploadInfo = ApiHelper.uploadReplay(bytes);
 
                 msgSender.accept(ReplyFactory.replayUploadMessage(replayUploadInfo));
             } catch (InterruptedException e) {

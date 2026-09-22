@@ -1,7 +1,7 @@
 package xyz.zcraft.seira.command.handler;
 
 import org.jline.utils.Log;
-import xyz.zcraft.seira.api.APIHelper;
+import xyz.zcraft.seira.api.ApiHelper;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
@@ -86,30 +86,30 @@ public final class ReplayCommandHandler {
                 case SET -> {
                     beatmapsetId = Long.parseLong(target.id());
                     String player = resolver.player(target.player(), ctx.senderUserId());
-                    long uid = APIHelper.resolveUid(player);
-                    scoreId = APIHelper.lookupBeatmapsetScore(beatmapsetId, target.index(), uid, List.of(), null);
+                    long uid = ApiHelper.resolveUid(player);
+                    scoreId = ApiHelper.lookupBeatmapsetScore(beatmapsetId, target.index(), uid, List.of(), null);
                 }
                 case RS, RP, BP -> {
                     String player = resolver.player(target.player(), ctx.senderUserId());
-                    long uid = APIHelper.resolveUid(player);
-                    scoreId = APIHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
+                    long uid = ApiHelper.resolveUid(player);
+                    scoreId = ApiHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
                 }
-                case MP -> beatmapId = APIHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                case MP -> beatmapId = ApiHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
                 case MEMORY -> {}
             }
             if (scoreId == null) {
                 if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
                 String player = resolver.player(target.player(), ctx.senderUserId());
-                long uid = APIHelper.resolveUid(player);
-                scoreId = APIHelper.lookupBeatmapScore(beatmapId, uid, List.of(), null);
+                long uid = ApiHelper.resolveUid(player);
+                scoreId = ApiHelper.lookupBeatmapScore(beatmapId, uid, List.of(), null);
             }
             var upload = taskCoordinator.createVideoUploadRequest(ctx);
-            var task = APIHelper.createReplayRenderTask(scoreId, range, upload);
+            var task = ApiHelper.createReplayRenderTask(scoreId, range, upload);
             history.remember(ctx, beatmapsetId, beatmapId, scoreId);
             videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
             ctx.sendReply(replyFactory.replayMessage(ctx, task));
 
-            APIHelper.ReplayRenderResult result;
+            ApiHelper.ReplayRenderResult result;
 
             try {
                 result = taskCoordinator.waitForReplay(task);
@@ -183,7 +183,7 @@ public final class ReplayCommandHandler {
                         participants.add(token.trim());
                     } else if (resolver.looksLikeMention(token)) {
                         String player = resolver.player(token, ctx.senderUserId());
-                        long uid = APIHelper.resolveUid(player);
+                        long uid = ApiHelper.resolveUid(player);
                         participants.add("u" + uid);
                     } else {
                         ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "追加ID列表包含非法值。"));
@@ -204,17 +204,17 @@ public final class ReplayCommandHandler {
                 case SCORE -> scoreId = target.id();
                 case SET -> {
                     beatmapsetId = Long.parseLong(target.id());
-                    beatmapId = APIHelper.lookupBeatmapInSet(beatmapsetId, target.index(), accessTokenProvider.apply(ctx.senderUserId()));
+                    beatmapId = ApiHelper.lookupBeatmapInSet(beatmapsetId, target.index(), accessTokenProvider.apply(ctx.senderUserId()));
                 }
                 case RS, RP, BP -> {
                     String player = resolver.player(target.player(), ctx.senderUserId());
-                    long uid = APIHelper.resolveUid(player);
-                    scoreId = APIHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
+                    long uid = ApiHelper.resolveUid(player);
+                    scoreId = ApiHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
                 }
-                case MP -> beatmapId = APIHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                case MP -> beatmapId = ApiHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
                 case MEMORY -> {}
             }
-            if (beatmapId == null && scoreId != null) beatmapId = APIHelper.getScoreBeatmapId(scoreId);
+            if (beatmapId == null && scoreId != null) beatmapId = ApiHelper.getScoreBeatmapId(scoreId);
             if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
             var upload = taskCoordinator.createVideoUploadRequest(ctx);
             String[] scoreTargets = participants.toArray(String[]::new);
@@ -225,12 +225,12 @@ public final class ReplayCommandHandler {
                 scoreTargets = ids.toArray(String[]::new);
 
             }
-            var task = APIHelper.createReplayShowcaseTask(beatmapId, scoreTargets, upload);
+            var task = ApiHelper.createReplayShowcaseTask(beatmapId, scoreTargets, upload);
             history.remember(ctx, beatmapsetId, beatmapId, scoreId);
             videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
             ctx.sendReply(replyFactory.replayMessage(ctx, task));
 
-            APIHelper.ReplayRenderResult result;
+            ApiHelper.ReplayRenderResult result;
 
             try {
                 result = taskCoordinator.waitForReplay(task);
@@ -270,7 +270,7 @@ public final class ReplayCommandHandler {
             jobId = ctx.args()[0];
         }
 
-        APIHelper.ReplayRenderResult replayResult = replayResults.get(jobId);
+        ApiHelper.ReplayRenderResult replayResult = replayResults.get(jobId);
         if (replayResult != null) {
             PendingMessage video = replayResult.qqFile() != null
                     ? PendingMessage.ofUploadedVideo(replayResult.qqFile(), replayResult.videoUrl())
@@ -281,7 +281,7 @@ public final class ReplayCommandHandler {
             return;
         }
 
-        ctx.sendReply(replyFactory.replayStatMessage(ctx, jobId, APIHelper.getRenderStat(jobId)));
+        ctx.sendReply(replyFactory.replayStatMessage(ctx, jobId, ApiHelper.getRenderStat(jobId)));
     }
 
     public void handleRcancel(Context ctx) {
@@ -309,7 +309,7 @@ public final class ReplayCommandHandler {
             }
         }
 
-        var result = APIHelper.cancelReplayRender(jobId);
+        var result = ApiHelper.cancelReplayRender(jobId);
         String status = Objects.toString(result.getStatus(), "unknown").toLowerCase();
         String message = switch (status) {
             case "canceled" -> "回放渲染已取消。";

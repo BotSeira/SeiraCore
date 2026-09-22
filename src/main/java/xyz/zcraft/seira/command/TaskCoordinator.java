@@ -1,10 +1,9 @@
 package xyz.zcraft.seira.command;
 
-import lombok.Setter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
-import xyz.zcraft.seira.api.APIHelper;
+import xyz.zcraft.seira.api.ApiHelper;
 import xyz.zcraft.seira.api.ApiRequestException;
 import xyz.zcraft.seira.api.ReplayRenderException;
 import xyz.zcraft.seira.api.data.Base64Bytes;
@@ -24,8 +23,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
@@ -117,22 +114,22 @@ public final class TaskCoordinator {
         return messageSender.createVideoUploadRequest(targetId, ctx.inGroup());
     }
 
-    public APIHelper.ReplayRenderResult waitForReplay(APIHelper.ReplayTaskInfo taskInfo) {
+    public ApiHelper.ReplayRenderResult waitForReplay(ApiHelper.ReplayTaskInfo taskInfo) {
         return waitForReplay(taskInfo, -1);
     }
 
-    public APIHelper.ReplayRenderResult waitForReplay(APIHelper.ReplayTaskInfo taskInfo, long timeout) {
+    public ApiHelper.ReplayRenderResult waitForReplay(ApiHelper.ReplayTaskInfo taskInfo, long timeout) {
         if (taskInfo == null || taskInfo.taskId() == null || taskInfo.taskId().isBlank()) {
             throw new IllegalArgumentException("回放任务未返回有效请求ID，无法获取视频结果。");
         }
 
-        APIHelper.ReplayRenderResult result = APIHelper.waitReplayVideo(taskInfo.taskId(), timeout);
+        ApiHelper.ReplayRenderResult result = ApiHelper.waitReplayVideo(taskInfo.taskId(), timeout);
         replayResults.put(taskInfo.taskId(), result);
         BotStat.incrementReplays();
         return result;
     }
 
-    public PendingMessage replayVideoMessage(APIHelper.ReplayRenderResult result) {
+    public PendingMessage replayVideoMessage(ApiHelper.ReplayRenderResult result) {
         if (result == null) {
             return PendingMessage.ofString("回放视频生成失败，请稍后重试。");
         }

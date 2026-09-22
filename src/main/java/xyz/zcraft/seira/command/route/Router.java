@@ -99,7 +99,7 @@ public class Router {
         SpecificScoreWatchCommandHandler specificScoreWatchCommands =
                 new SpecificScoreWatchCommandHandler(taskCoordinator, watchService);
         MPWatchCommandHandler multiplayerRoomWatchCommands =
-                new MPWatchCommandHandler(taskCoordinator, mpWatchService);
+                new MPWatchCommandHandler(taskCoordinator, resolver, mpWatchService);
         DcsCommandHandler dcsCommands = new DcsCommandHandler(discordBridgeService);
         RankGuessCommandHandler rankGuessCommands = new RankGuessCommandHandler(
                 taskCoordinator, replyFactory, rankGuessGameService, resolver, admins::isAdmin, this::getAvatar, imageUploader
@@ -166,6 +166,7 @@ public class Router {
                 .register(watchCommands::handleWatch, "watch")
                 .register(specificScoreWatchCommands::handleWx, "wx")
                 .register(multiplayerRoomWatchCommands::handleMpWatch, "mpwatch", "mpw")
+                .register(multiplayerRoomWatchCommands::handleRomAI, "romai")
                 .register(dcsCommands::handleDcs, "dcs")
                 .register(rankGuessCommands::handleRankGuess, "rg")
                 .register(generalCommands::handleNotice, "notice")

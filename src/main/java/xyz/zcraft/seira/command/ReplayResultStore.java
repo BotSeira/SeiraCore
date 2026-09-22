@@ -1,13 +1,13 @@
 package xyz.zcraft.seira.command;
 
-import xyz.zcraft.seira.api.APIHelper;
+import xyz.zcraft.seira.api.ApiHelper;
 
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 public final class ReplayResultStore {
-    private final ConcurrentMap<String, APIHelper.ReplayRenderResult> results = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, ApiHelper.ReplayRenderResult> results = new ConcurrentHashMap<>();
 
     private static String requireTaskId(String taskId) {
         if (taskId == null || taskId.isBlank()) {
@@ -16,11 +16,11 @@ public final class ReplayResultStore {
         return taskId;
     }
 
-    void put(String taskId, APIHelper.ReplayRenderResult result) {
+    void put(String taskId, ApiHelper.ReplayRenderResult result) {
         results.put(requireTaskId(taskId), Objects.requireNonNull(result));
     }
 
-    public APIHelper.ReplayRenderResult get(String taskId) {
+    public ApiHelper.ReplayRenderResult get(String taskId) {
         return results.get(requireTaskId(taskId));
     }
 

@@ -1,7 +1,7 @@
 package xyz.zcraft.seira.command.handler;
 
 import org.jline.utils.Log;
-import xyz.zcraft.seira.api.APIHelper;
+import xyz.zcraft.seira.api.ApiHelper;
 import xyz.zcraft.seira.api.data.Response;
 import xyz.zcraft.seira.api.data.SearchQuery;
 import xyz.zcraft.seira.api.data.SearchResultItem;
@@ -49,7 +49,7 @@ public final class BeatmapCommandHandler {
 
     public void handleDaily(Context ctx) {
         try (var timing = taskCoordinator.beginRequest(ctx, "Daily Challenge")) {
-            var daily = APIHelper.getDaily();
+            var daily = ApiHelper.getDaily();
             ctx.sendReply(PendingMessage.ofMarkdownRaw(daily));
         }
     }
@@ -73,19 +73,19 @@ public final class BeatmapCommandHandler {
                 case SCORE -> scoreId = target.id();
                 case SET -> {
                     beatmapsetId = Long.parseLong(target.id());
-                    beatmapId = APIHelper.lookupBeatmapInSet(beatmapsetId, target.index(), accessTokenProvider.apply(ctx.senderUserId()));
+                    beatmapId = ApiHelper.lookupBeatmapInSet(beatmapsetId, target.index(), accessTokenProvider.apply(ctx.senderUserId()));
                 }
                 case RS, RP, BP -> {
                     String player = resolver.player(target.player(), ctx.senderUserId());
-                    long uid = APIHelper.resolveUid(player);
-                    scoreId = APIHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
+                    long uid = ApiHelper.resolveUid(player);
+                    scoreId = ApiHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
                 }
-                case MP -> beatmapId = APIHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                case MP -> beatmapId = ApiHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
                 case MEMORY -> {}
             }
-            if (beatmapId == null && scoreId != null) beatmapId = APIHelper.getScoreBeatmapId(scoreId);
+            if (beatmapId == null && scoreId != null) beatmapId = ApiHelper.getScoreBeatmapId(scoreId);
             if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
-            var response = APIHelper.getBeatmapResponse(beatmapId, (ctx.argumentCount() > target.consumedArgs() ? ctx.argument(target.consumedArgs()) : null));
+            var response = ApiHelper.getBeatmapResponse(beatmapId, (ctx.argumentCount() > target.consumedArgs() ? ctx.argument(target.consumedArgs()) : null));
             history.remember(ctx, beatmapsetId, beatmapId, scoreId);
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.beatmapMessage(ctx, response)));
         }
@@ -110,19 +110,19 @@ public final class BeatmapCommandHandler {
                 case SCORE -> scoreId = target.id();
                 case SET -> {
                     beatmapsetId = Long.parseLong(target.id());
-                    beatmapId = APIHelper.lookupBeatmapInSet(beatmapsetId, target.index(), accessTokenProvider.apply(ctx.senderUserId()));
+                    beatmapId = ApiHelper.lookupBeatmapInSet(beatmapsetId, target.index(), accessTokenProvider.apply(ctx.senderUserId()));
                 }
                 case RS, RP, BP -> {
                     String player = resolver.player(target.player(), ctx.senderUserId());
-                    long uid = APIHelper.resolveUid(player);
-                    scoreId = APIHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
+                    long uid = ApiHelper.resolveUid(player);
+                    scoreId = ApiHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
                 }
-                case MP -> beatmapId = APIHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                case MP -> beatmapId = ApiHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
                 case MEMORY -> {}
             }
-            if (beatmapId == null && scoreId != null) beatmapId = APIHelper.getScoreBeatmapId(scoreId);
+            if (beatmapId == null && scoreId != null) beatmapId = ApiHelper.getScoreBeatmapId(scoreId);
             if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
-            var response = APIHelper.getBeatmapAnalysisResponse(beatmapId, (ctx.argumentCount() > target.consumedArgs() ? ctx.argument(target.consumedArgs()) : null));
+            var response = ApiHelper.getBeatmapAnalysisResponse(beatmapId, (ctx.argumentCount() > target.consumedArgs() ? ctx.argument(target.consumedArgs()) : null));
             history.remember(ctx, beatmapsetId, beatmapId, scoreId);
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.beatmapMessage(ctx, response)));
         }
@@ -148,16 +148,16 @@ public final class BeatmapCommandHandler {
                 case SET -> beatmapsetId = Long.parseLong(target.id());
                 case RS, RP, BP -> {
                     String player = resolver.player(target.player(), ctx.senderUserId());
-                    long uid = APIHelper.resolveUid(player);
-                    scoreId = APIHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
+                    long uid = ApiHelper.resolveUid(player);
+                    scoreId = ApiHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
                 }
-                case MP -> beatmapsetId = APIHelper.lookupMultiplayerBeatmapset(accessTokenProvider.apply(ctx.senderUserId()));
+                case MP -> beatmapsetId = ApiHelper.lookupMultiplayerBeatmapset(accessTokenProvider.apply(ctx.senderUserId()));
                 case MEMORY -> {}
             }
             if (beatmapsetId == null) {
-                if (beatmapId == null && scoreId != null) beatmapId = APIHelper.getScoreBeatmapId(scoreId);
+                if (beatmapId == null && scoreId != null) beatmapId = ApiHelper.getScoreBeatmapId(scoreId);
                 if (beatmapId == null) throw new ResolutionException("请指定指令目标喵");
-                beatmapsetId = APIHelper.lookupBeatmapsetForBeatmap(beatmapId, accessTokenProvider.apply(ctx.senderUserId()));
+                beatmapsetId = ApiHelper.lookupBeatmapsetForBeatmap(beatmapId, accessTokenProvider.apply(ctx.senderUserId()));
             }
             history.remember(ctx, beatmapsetId, beatmapId, scoreId);
             ctx.sendReply(PendingMessage.ofVoiceUrl("https://b.ppy.sh/preview/" + beatmapsetId + ".mp3").doUpload(false));
@@ -205,24 +205,24 @@ public final class BeatmapCommandHandler {
                 case SCORE -> scoreId = target.id();
                 case SET -> {
                     beatmapsetId = Long.parseLong(target.id());
-                    beatmapId = APIHelper.lookupBeatmapInSet(beatmapsetId, target.index(), accessTokenProvider.apply(ctx.senderUserId()));
+                    beatmapId = ApiHelper.lookupBeatmapInSet(beatmapsetId, target.index(), accessTokenProvider.apply(ctx.senderUserId()));
                 }
                 case RS, RP, BP -> {
                     String player = resolver.player(target.player(), ctx.senderUserId());
-                    long uid = APIHelper.resolveUid(player);
-                    scoreId = APIHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
+                    long uid = ApiHelper.resolveUid(player);
+                    scoreId = ApiHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
                 }
-                case MP -> beatmapId = APIHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                case MP -> beatmapId = ApiHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
                 case MEMORY -> {}
             }
-            if (beatmapId == null && scoreId != null) beatmapId = APIHelper.getScoreBeatmapId(scoreId);
+            if (beatmapId == null && scoreId != null) beatmapId = ApiHelper.getScoreBeatmapId(scoreId);
             if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
-            var task = APIHelper.createBeatmapPreviewTask(beatmapId, mods, range, qqUpload);
+            var task = ApiHelper.createBeatmapPreviewTask(beatmapId, mods, range, qqUpload);
             history.remember(ctx, beatmapsetId, beatmapId, scoreId);
             videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
             ctx.sendReply(replyFactory.replayMessage(ctx, task));
 
-            APIHelper.ReplayRenderResult result;
+            ApiHelper.ReplayRenderResult result;
 
             try {
                 result = taskCoordinator.waitForReplay(task);
@@ -262,19 +262,19 @@ public final class BeatmapCommandHandler {
                 case SCORE -> scoreId = target.id();
                 case SET -> {
                     beatmapsetId = Long.parseLong(target.id());
-                    beatmapId = APIHelper.lookupBeatmapInSet(beatmapsetId, target.index(), accessTokenProvider.apply(ctx.senderUserId()));
+                    beatmapId = ApiHelper.lookupBeatmapInSet(beatmapsetId, target.index(), accessTokenProvider.apply(ctx.senderUserId()));
                 }
                 case RS, RP, BP -> {
                     String player = resolver.player(target.player(), ctx.senderUserId());
-                    long uid = APIHelper.resolveUid(player);
-                    scoreId = APIHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
+                    long uid = ApiHelper.resolveUid(player);
+                    scoreId = ApiHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
                 }
-                case MP -> beatmapId = APIHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                case MP -> beatmapId = ApiHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
                 case MEMORY -> {}
             }
-            if (beatmapId == null && scoreId != null) beatmapId = APIHelper.getScoreBeatmapId(scoreId);
+            if (beatmapId == null && scoreId != null) beatmapId = ApiHelper.getScoreBeatmapId(scoreId);
             if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
-            var response = APIHelper.getBeatmapBgResponse(beatmapId);
+            var response = ApiHelper.getBeatmapBgResponse(beatmapId);
             history.remember(ctx, beatmapsetId, beatmapId, scoreId);
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.bgpMessage(ctx, response)));
         }
@@ -301,18 +301,18 @@ public final class BeatmapCommandHandler {
                 case SET -> beatmapsetId = Long.parseLong(target.id());
                 case RS, RP, BP -> {
                     String player = resolver.player(target.player(), ctx.senderUserId());
-                    long uid = APIHelper.resolveUid(player);
-                    scoreId = APIHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
+                    long uid = ApiHelper.resolveUid(player);
+                    scoreId = ApiHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
                 }
-                case MP -> beatmapsetId = APIHelper.lookupMultiplayerBeatmapset(accessTokenProvider.apply(ctx.senderUserId()));
+                case MP -> beatmapsetId = ApiHelper.lookupMultiplayerBeatmapset(accessTokenProvider.apply(ctx.senderUserId()));
                 case MEMORY -> {}
             }
             if (beatmapsetId == null) {
-                if (beatmapId == null && scoreId != null) beatmapId = APIHelper.getScoreBeatmapId(scoreId);
+                if (beatmapId == null && scoreId != null) beatmapId = ApiHelper.getScoreBeatmapId(scoreId);
                 if (beatmapId == null) throw new ResolutionException("请指定指令目标喵");
-                beatmapsetId = APIHelper.lookupBeatmapsetForBeatmap(beatmapId, accessTokenProvider.apply(ctx.senderUserId()));
+                beatmapsetId = ApiHelper.lookupBeatmapsetForBeatmap(beatmapId, accessTokenProvider.apply(ctx.senderUserId()));
             }
-            var response = APIHelper.getLookupBeatmapsetResponse(beatmapsetId, accessTokenProvider.apply(ctx.senderUserId()));
+            var response = ApiHelper.getLookupBeatmapsetResponse(beatmapsetId, accessTokenProvider.apply(ctx.senderUserId()));
             history.remember(ctx, beatmapsetId, beatmapId, scoreId);
             ctx.sendReply(replyFactory.dlMessage(ctx, response));
         }
@@ -339,18 +339,18 @@ public final class BeatmapCommandHandler {
                 case SET -> beatmapsetId = Long.parseLong(target.id());
                 case RS, RP, BP -> {
                     String player = resolver.player(target.player(), ctx.senderUserId());
-                    long uid = APIHelper.resolveUid(player);
-                    scoreId = APIHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
+                    long uid = ApiHelper.resolveUid(player);
+                    scoreId = ApiHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
                 }
-                case MP -> beatmapsetId = APIHelper.lookupMultiplayerBeatmapset(accessTokenProvider.apply(ctx.senderUserId()));
+                case MP -> beatmapsetId = ApiHelper.lookupMultiplayerBeatmapset(accessTokenProvider.apply(ctx.senderUserId()));
                 case MEMORY -> {}
             }
             if (beatmapsetId == null) {
-                if (beatmapId == null && scoreId != null) beatmapId = APIHelper.getScoreBeatmapId(scoreId);
+                if (beatmapId == null && scoreId != null) beatmapId = ApiHelper.getScoreBeatmapId(scoreId);
                 if (beatmapId == null) throw new ResolutionException("请指定指令目标喵");
-                beatmapsetId = APIHelper.lookupBeatmapsetForBeatmap(beatmapId, accessTokenProvider.apply(ctx.senderUserId()));
+                beatmapsetId = ApiHelper.lookupBeatmapsetForBeatmap(beatmapId, accessTokenProvider.apply(ctx.senderUserId()));
             }
-            var response = APIHelper.getBeatmapsetResponse(beatmapsetId);
+            var response = ApiHelper.getBeatmapsetResponse(beatmapsetId);
             history.remember(ctx, beatmapsetId, beatmapId, scoreId);
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.beatmapsetMessage(ctx, response)));
         }
@@ -363,7 +363,7 @@ public final class BeatmapCommandHandler {
             return;
         }
         try (var timing = taskCoordinator.beginRequest(ctx, "Search Beatmapset")) {
-            Response<List<SearchResultItem>> searchResponse = APIHelper.searchBeatmapSetResponse(searchQuery);
+            Response<List<SearchResultItem>> searchResponse = ApiHelper.searchBeatmapSetResponse(searchQuery);
             ctx.sendReply(replyFactory.searchMessage(ctx, searchResponse, searchQuery));
         }
     }

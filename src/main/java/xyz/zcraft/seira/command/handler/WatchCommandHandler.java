@@ -1,7 +1,7 @@
 package xyz.zcraft.seira.command.handler;
 
 import xyz.zcraft.osu.model.User;
-import xyz.zcraft.seira.api.APIHelper;
+import xyz.zcraft.seira.api.ApiHelper;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.ResolutionException;
@@ -133,7 +133,7 @@ public final class WatchCommandHandler {
                 }
                 Long userId = UserDataStore.findBoundUid(mentionedUser);
                 if (userId == null) throw new ResolutionException("被@的用户还没有绑定玩家ID，请先让对方使用 /bind。");
-                User user = APIHelper.getUsers(List.of(userId)).stream()
+                User user = ApiHelper.getUsers(List.of(userId)).stream()
                         .filter(candidate -> candidate.getId() == userId)
                         .findFirst().orElseThrow(() -> new ResolutionException("未找到指定的玩家。"));
                 UserDataStore.storeUserInfo(user.getId(), user.getUsername());
@@ -191,8 +191,8 @@ public final class WatchCommandHandler {
 
     private WatchTarget lookupGroupPlayer(String groupId, String argument) {
         Long uid = resolver.parsePositiveLong(argument);
-        User user = uid == null ? APIHelper.lookupUser(argument).getContent()
-                : APIHelper.getUsers(List.of(uid)).stream()
+        User user = uid == null ? ApiHelper.lookupUser(argument).getContent()
+                : ApiHelper.getUsers(List.of(uid)).stream()
                         .filter(candidate -> candidate.getId() == uid)
                         .findFirst().orElseThrow(() -> new ResolutionException("未找到指定的玩家。"));
         String openId = UserDataStore.findGroupOpenIdByUid(groupId, user.getId())

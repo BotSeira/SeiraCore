@@ -2,7 +2,7 @@ package xyz.zcraft.seira.command.handler;
 
 import xyz.zcraft.osu.model.User;
 import xyz.zcraft.osu.model.UserExtended;
-import xyz.zcraft.seira.api.APIHelper;
+import xyz.zcraft.seira.api.ApiHelper;
 import xyz.zcraft.seira.api.data.FriendEntry;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.Response;
@@ -62,7 +62,7 @@ public final class SocialCommandHandler {
         }
 
         try (var _ = taskCoordinator.beginRequest(ctx, "Multiplayer Room")) {
-            var response = APIHelper.getMultiplayerRoom(token.accessToken());
+            var response = ApiHelper.getMultiplayerRoom(token.accessToken());
             ctx.sendReply(replyFactory.mpMessage(ctx, response));
         }
     }
@@ -95,19 +95,19 @@ public final class SocialCommandHandler {
         }
 
         String player = resolver.player(ctx.argument(0), ctx.senderUserId());
-        long uid = APIHelper.resolveUid(player);
+        long uid = ApiHelper.resolveUid(player);
         final String mention = UserDataStore.findGroupOpenIdByUid(ctx.groupId(), uid)
                 .map(ReplyFactory::at)
                 .orElse("");
         ctx.sendReply(PendingMessage.ofMarkdownRaw(mention) + ": [%d](%s)".formatted(uid, "https://osu.ppy.sh/users/" + uid));
-        final UserExtended targetUser = APIHelper.getUserRaw(uid);
+        final UserExtended targetUser = ApiHelper.getUserRaw(uid);
         final String targetOsuAvatar = targetUser.getAvatarUrl();
 
         boolean selfFollowed;
         final AtomicReference<Boolean> targetFollowed = new AtomicReference<>();
 
         final OsuToken selfToken = authHelper.updateTokenAndGet(ctx.senderUserId());
-        final var selfUser = APIHelper.getSelf(selfToken.accessToken()).getContent();
+        final var selfUser = ApiHelper.getSelf(selfToken.accessToken()).getContent();
         final String selfOsuAvatar = selfUser.getAvatarUrl();
 
         if (targetUser.getId() == selfUser.getId()) {
@@ -115,7 +115,7 @@ public final class SocialCommandHandler {
             return;
         }
 
-        final List<FriendEntry> selfFollowedList = APIHelper.getFollowed(selfToken.accessToken()).getContent();
+        final List<FriendEntry> selfFollowedList = ApiHelper.getFollowed(selfToken.accessToken()).getContent();
         updateFriends(selfId, selfFollowedList);
         final Set<User> users = new HashSet<>(selfFollowedList.stream().map(FriendEntry::user).toList());
 
@@ -136,7 +136,7 @@ public final class SocialCommandHandler {
             final List<FriendEntry> targetFollowedList;
             final OsuToken target = authHelper.updateTokenAndGet(targetOpenId);
             if (target != null) {
-                targetFollowedList = APIHelper.getFollowed(target.accessToken()).getContent();
+                targetFollowedList = ApiHelper.getFollowed(target.accessToken()).getContent();
                 targetFollowed.set(targetFollowedList.stream().anyMatch(e -> e.user().getId() == selfId));
                 users.addAll(targetFollowedList.stream().map(FriendEntry::user).toList());
             }
@@ -168,8 +168,8 @@ public final class SocialCommandHandler {
         }
 
         try (var _ = taskCoordinator.beginRequest(ctx, "Friend List")) {
-            final Response<UserExtended> self = APIHelper.getSelf(token.accessToken());
-            final Response<List<FriendEntry>> response = APIHelper.getFollowed(token.accessToken());
+            final Response<UserExtended> self = ApiHelper.getSelf(token.accessToken());
+            final Response<List<FriendEntry>> response = ApiHelper.getFollowed(token.accessToken());
             final List<FriendEntry> friendEntries = response.getContent();
 
             final Predicate<Long> filter;
@@ -269,7 +269,7 @@ public final class SocialCommandHandler {
                 }
 
                 try (var _ = taskCoordinator.beginRequest(ctx, "Leaderboard")) {
-                    var response = APIHelper.getLeaderboardResponse(groupBoundUids);
+                    var response = ApiHelper.getLeaderboardResponse(groupBoundUids);
                     ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
                 }
                 return;
@@ -281,7 +281,7 @@ public final class SocialCommandHandler {
             }
 
             try (var _ = taskCoordinator.beginRequest(ctx, "Leaderboard")) {
-                var response = APIHelper.getLeaderboardResponse(List.of(uid));
+                var response = ApiHelper.getLeaderboardResponse(List.of(uid));
                 ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
             }
         } else if (ctx.args().length == 1 || ctx.args().length == 2) {
@@ -323,17 +323,17 @@ public final class SocialCommandHandler {
             try (var _ = taskCoordinator.beginRequest(ctx, "Map Leaderboard")) {
                 long beatmapId = switch (target.kind()) {
                     case ID, MAP -> Long.parseLong(target.id());
-                    case SCORE -> APIHelper.getScoreBeatmapId(target.id());
-                    case SET -> APIHelper.lookupBeatmapInSet(Long.parseLong(target.id()), target.index(),
+                    case SCORE -> ApiHelper.getScoreBeatmapId(target.id());
+                    case SET -> ApiHelper.lookupBeatmapInSet(Long.parseLong(target.id()), target.index(),
                             accessTokenProvider.apply(ctx.senderUserId()));
                     case RS, RP, BP -> {
-                        long uid = APIHelper.resolveUid(resolver.player(target.player(), ctx.senderUserId()));
-                        yield APIHelper.lookupPlayerScoreBeatmap(uid, target.scoreList(), target.index(), accessTokenProvider.apply(ctx.senderUserId()));
+                        long uid = ApiHelper.resolveUid(resolver.player(target.player(), ctx.senderUserId()));
+                        yield ApiHelper.lookupPlayerScoreBeatmap(uid, target.scoreList(), target.index(), accessTokenProvider.apply(ctx.senderUserId()));
                     }
-                    case MP -> APIHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                    case MP -> ApiHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
                     case MEMORY -> throw new ResolutionException("请指定指令目标谱面喵");
                 };
-                var response = APIHelper.getGroupLeaderboardResponse(beatmapId, uids);
+                var response = ApiHelper.getGroupLeaderboardResponse(beatmapId, uids);
                 ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
             }
         } else {
@@ -347,8 +347,8 @@ public final class SocialCommandHandler {
             return;
         }
         String player = resolver.player(ctx.argumentCount() == 0 ? null : ctx.argument(0), ctx.senderUserId());
-        long uid = APIHelper.resolveUid(player);
-        final UserExtended user = APIHelper.getUserRaw(uid);
+        long uid = ApiHelper.resolveUid(player);
+        final UserExtended user = ApiHelper.getUserRaw(uid);
         final String openId = UserDataStore.findGroupOpenIdByUid(ctx.groupId(), user.getId()).orElse(null);
 
         ctx.sendReply(replyFactory.supMessage(ctx, user.getUsername(), openId, user.isSupporter(), user.getHasSupported(), user.getSupportLevel()));

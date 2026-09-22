@@ -4,7 +4,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bouncycastle.util.encoders.Base64Encoder;
 import xyz.zcraft.osu.model.UserExtended;
-import xyz.zcraft.seira.api.APIHelper;
+import xyz.zcraft.seira.api.ApiHelper;
 import xyz.zcraft.seira.api.data.FriendEntry;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.Response;
@@ -149,7 +149,7 @@ public class DebugRoutes {
             return;
         }
         try (var timing = taskCoordinator.beginRequest(ctx, "Update All User Info")) {
-            var users = APIHelper.getUsers(allUsers);
+            var users = ApiHelper.getUsers(allUsers);
             for (var user : users) {
                 UserDataStore.storeUserInfo(user.getId(), user.getUsername());
             }
@@ -167,8 +167,8 @@ public class DebugRoutes {
                         .map(authHelper::updateTokenAndGet)
                         .map(OsuToken::accessToken)
                         .forEach(accessToken -> {
-                            final Response<UserExtended> self = APIHelper.getSelf(accessToken);
-                            final Response<List<FriendEntry>> response = APIHelper.getFollowed(accessToken);
+                            final Response<UserExtended> self = ApiHelper.getSelf(accessToken);
+                            final Response<List<FriendEntry>> response = ApiHelper.getFollowed(accessToken);
                             final List<FriendEntry> content = response.getContent();
                             final List<Long> ids = content.stream().map(e -> e.user().getId()).toList();
 
