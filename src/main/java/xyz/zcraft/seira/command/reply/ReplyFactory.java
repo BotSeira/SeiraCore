@@ -106,7 +106,7 @@ public final class ReplyFactory {
 
     public static PendingMessage replayUploadMessage(ReplayUploadInfo info) {
         return PendingMessage.ofMarkdownRaw(
-                ("\n" + "## Replay上传成功~" + "\n" +
+                ("\n" + "__Replay上传成功~__" + "\n" +
                         "> 成绩: " + s(info.scoreId()) + "\n" +
                         "> 谱面: " + m(info.beatmapId()) + "\n" +
                         "> 用户: " + u(info.userId(), info.username()) + "\n").trim(),
@@ -643,16 +643,16 @@ public final class ReplyFactory {
 
             boolean collapsed = false;
 
-            sb.append("> 好友←→ (").append(mutual.size()).append(")\n>");
+            sb.append("> __好友←→ (").append(mutual.size()).append(")__ \n>");
             collapsed |= appendFriends(ctx, mutual, sb);
 
-            sb.append("\n> 仅关注→ (").append(onlyFollowed.size()).append(")\n>");
+            sb.append("\n> __仅关注→ (").append(onlyFollowed.size()).append(")__ \n>");
             collapsed |= appendFriends(ctx, onlyFollowed, sb);
 
-            sb.append("\n> 仅粉丝← (");
+            sb.append("\n> __仅粉丝← (");
             sb.append(onlyFollower.size()).append(" 已知");
             if (all) sb.append(" 共 ").append(Math.max(self.getFollowerCount() - allMutualCount, 0));
-            sb.append(")\n>");
+            sb.append(")__ \n>");
             collapsed |= appendFriends(ctx, onlyFollower, sb);
 
             if (ctx.inGroup() && collapsed) {
