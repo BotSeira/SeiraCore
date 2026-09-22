@@ -148,17 +148,27 @@ public final class MPWatchCommandHandler {
             return;
         }
 
+        String teamString = "";
+
+        if (match.teams() != null) {
+            teamString = """
+                > Team A: %s
+                > Team B: %s
+                """.formatted(
+                    String.join(", ", match.teams().teamA()),
+                    String.join(", ", match.teams().teamB())
+                );
+        }
+
         final PendingMessage msg = PendingMessage.ofMarkdownRaw(
                 at(ctx) + """
                 正在启动 RomAI 监视喵。
                 > %s - %s
-                > Team A: %s
-                > Team B: %s
+                %s
                 """.formatted(
                 match.lobbyId(),
                 match.mode(),
-                String.join(", ", match.teams().teamA()),
-                String.join(", ", match.teams().teamB())
+                teamString
         ));
 
         try (var _ = taskCoordinator.beginRequest(ctx, "Start RomAI Watch")) {
