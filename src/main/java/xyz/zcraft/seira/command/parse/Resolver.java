@@ -130,12 +130,12 @@ public final class Resolver {
         return null;
     }
 
-    public List<String> extractAllMentionedIds(String token) {
+    public Set<String> extractAllMentionedIds(String token) {
         if (token == null) {
-            return List.of();
+            return Set.of();
         }
 
-        List<String> result = new LinkedList<>();
+        Set<String> result = new HashSet<>();
 
         Patterns.QQ_AT_IDS_PATTERN.matcher(token).results().forEach(m -> result.add(m.group(1)));
 

@@ -9,10 +9,8 @@ import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.services.AiPermission;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -24,6 +22,7 @@ public class AiChatHandler {
     private final Predicate<String> adminAuthorizer;
     private final AgentService agentService;
     private final Function<String, GroupBotState> botStateGetter;
+    private final Map<String, Deque<String>> groupMentionedHistory = new ConcurrentHashMap<>();
 
     public AiChatHandler(
             Resolver resolver, AgentService agentService, Predicate<String> isAdmin,
@@ -119,22 +118,34 @@ public class AiChatHandler {
         qqContext.addProperty("sender_open_id", ctx.senderUserId());
         qqContext.addProperty("group_id", ctx.groupId());
 
-        Map<String, Long> bindings = new HashMap<>();
-        Map<Long, String> usernames = new HashMap<>();
+        Map<String, Map<String, String>> bindings = new HashMap<>();
 
-        final List<String> ids = resolver.extractAllMentionedIds(input);
+        final Deque<String> mentionedHistory = groupMentionedHistory.computeIfAbsent(ctx.groupId(), _ -> new ArrayDeque<>(100));
+
+        final Set<String> ids = resolver.extractAllMentionedIds(input);
+
+        for (String id : ids) {
+            if (!mentionedHistory.contains(id)) {
+                mentionedHistory.push(id);
+            }
+        }
+
+        while (mentionedHistory.size() > 64) {
+            mentionedHistory.removeFirst();
+        }
+
         ids.add(ctx.senderUserId());
+        ids.addAll(mentionedHistory);
 
         for (String openId : ids) {
             final Long uid = resolver.resolveBoundUid(openId);
             if (uid != null) {
-                bindings.put(openId, uid);
-                UserDataStore.findUsername(uid).ifPresent(s -> usernames.put(uid, s));
+                final String username = UserDataStore.findUsername(uid).orElse("");
+                bindings.put(openId, Map.of("uid", uid.toString(), "username", username));
             }
         }
 
         qqContext.add("bindings", GSON.toJsonTree(bindings));
-        qqContext.add("usernames", GSON.toJsonTree(usernames));
 
         return qqContext.toString();
     }
