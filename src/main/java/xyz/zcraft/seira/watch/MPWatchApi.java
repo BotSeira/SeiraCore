@@ -115,7 +115,7 @@ public final class MPWatchApi {
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(endpoint + path))
                 .timeout(Duration.ofMinutes(2))
-                .header("Accept", "application/json, image/*");
+                .header("Accept",  "image/png");
         if (serviceToken != null && !serviceToken.isBlank()) {
             builder.header("Authorization", "Bearer " + serviceToken);
         }

@@ -98,8 +98,8 @@ public class Router {
         WatchCommandHandler watchCommands = new WatchCommandHandler(resolver, taskCoordinator, watchService, admins::isAdmin);
         SpecificScoreWatchCommandHandler specificScoreWatchCommands =
                 new SpecificScoreWatchCommandHandler(taskCoordinator, watchService);
-        MultiplayerRoomWatchCommandHandler multiplayerRoomWatchCommands =
-                new MultiplayerRoomWatchCommandHandler(taskCoordinator, mpWatchService);
+        MPWatchCommandHandler multiplayerRoomWatchCommands =
+                new MPWatchCommandHandler(taskCoordinator, mpWatchService);
         DcsCommandHandler dcsCommands = new DcsCommandHandler(discordBridgeService);
         RankGuessCommandHandler rankGuessCommands = new RankGuessCommandHandler(
                 taskCoordinator, replyFactory, rankGuessGameService, resolver, admins::isAdmin, this::getAvatar, imageUploader
@@ -122,7 +122,7 @@ public class Router {
             BeatmapCommandHandler beatmapCommands, SocialCommandHandler socialCommands,
             ReplayCommandHandler replayCommands, GeneralCommandHandler generalCommands,
             WatchCommandHandler watchCommands, SpecificScoreWatchCommandHandler specificScoreWatchCommands,
-            MultiplayerRoomWatchCommandHandler multiplayerRoomWatchCommands, DcsCommandHandler dcsCommands,
+            MPWatchCommandHandler multiplayerRoomWatchCommands, DcsCommandHandler dcsCommands,
             RankGuessCommandHandler rankGuessCommands, AiChatHandler aiChatHandler
     ) {
         return CommandRegistry.builder()

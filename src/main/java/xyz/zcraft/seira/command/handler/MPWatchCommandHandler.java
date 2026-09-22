@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
-public final class MultiplayerRoomWatchCommandHandler {
+public final class MPWatchCommandHandler {
     private static final String USAGE =
             "用法：/mpwatch [start] <房间ID> [stable|lazer]；"
                     + "/mpwatch [start] <房间链接>；/mpwatch stop [all]；/mpwatch status";
@@ -34,7 +34,7 @@ public final class MultiplayerRoomWatchCommandHandler {
     private final TaskCoordinator taskCoordinator;
     private final MPWatchService watchService;
 
-    public MultiplayerRoomWatchCommandHandler(
+    public MPWatchCommandHandler(
             TaskCoordinator taskCoordinator,
             MPWatchService watchService
     ) {
