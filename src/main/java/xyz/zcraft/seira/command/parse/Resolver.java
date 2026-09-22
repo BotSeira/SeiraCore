@@ -25,6 +25,8 @@ public final class Resolver {
         // Add surrounding space to <@> before expanding compact commands so /bp5<@...> is recognized.
         rawContent = Patterns.QQ_INLINE_AT_PATTERN.matcher(rawContent).replaceAll(r -> " " + r.group() + " ");
 
+        rawContent = Pattern.compile("(\\d+)(\\+)").matcher(rawContent).replaceAll(r -> r.group(1) + " " + r.group(2));
+
         Matcher matcher = Patterns.COMPACT_SCORE_COMMAND_PATTERN.matcher(rawContent);
         if (matcher.find()) {
             String type = matcher.group(1).toLowerCase(Locale.ROOT);
