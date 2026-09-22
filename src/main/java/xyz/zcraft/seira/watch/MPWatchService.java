@@ -67,23 +67,33 @@ public final class MPWatchService implements AutoCloseable {
         );
     }
 
-    public RoomWatchView watch(
-            String groupId,
-            String userId,
-            MPVersion version,
-            long roomId
-    ) {
+    public RoomWatchView watch(String groupId, String userId, MPVersion version, long roomId) {
         requireIdentifier(groupId, "groupId");
         requireIdentifier(userId, "userId");
-        Objects.requireNonNull(version);
+
         if (roomId <= 0) {
             throw new IllegalArgumentException("房间 ID 必须为正整数。");
         }
-        RoomKey room = new RoomKey(version, roomId);
+        RoomKey room;
+        RoomWatchSnapshot snapshot;
+
+        if (version == null) {
+            try {
+                version = MPVersion.STABLE;
+                snapshot = api.getSnapshot(MPVersion.STABLE, roomId);
+            } catch (IllegalStateException e) {
+                version = MPVersion.LAZER;
+                snapshot = api.getSnapshot(MPVersion.LAZER, roomId);
+            }
+        } else {
+            snapshot = api.getSnapshot(version, roomId);
+        }
+
+        room = new RoomKey(version, roomId);
         synchronized (lock) {
             ensureRoomAvailable(groupId, userId, room);
         }
-        RoomWatchSnapshot snapshot = api.getSnapshot(version, roomId);
+
         if (!snapshot.active()) {
             throw new IllegalStateException("该多人房间已经结束，无法开始监视。");
         }

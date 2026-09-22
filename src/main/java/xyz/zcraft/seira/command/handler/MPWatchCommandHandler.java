@@ -70,9 +70,7 @@ public final class MPWatchCommandHandler {
         if (inferredVersion != null && requestedVersion != null && inferredVersion != requestedVersion) {
             return null;
         }
-        MPVersion version = inferredVersion != null
-                ? inferredVersion
-                : requestedVersion == null ? MPVersion.LAZER : requestedVersion;
+        MPVersion version = (inferredVersion != null ? inferredVersion : requestedVersion);
         try {
             long roomId = Long.parseLong(numeric);
             return roomId > 0 ? new RoomTarget(roomId, version) : null;
@@ -134,7 +132,7 @@ public final class MPWatchCommandHandler {
             return;
         }
 
-        try (var timing = taskCoordinator.beginRequest(ctx, "Start Multiplayer Room Watch")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "Start Multiplayer Room Watch")) {
             if (!ctx.sendMessage(PendingMessage.ofString("正在尝试启动多人房间监视……")).success()) {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) +
                         "由于缺少主动消息权限，无法启动监视！权限配置请见：https://docs.seira.top/overview/use.html#extra-permission"
