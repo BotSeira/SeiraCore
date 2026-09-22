@@ -6,19 +6,24 @@ import com.google.gson.JsonParser;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.seira.ai.data.AppConversationBrief;
 import xyz.zcraft.seira.ai.data.ChatQueryResponse;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.config.LLMConfig;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class AgentService {
     public static final int CONTEXT_SIZE = 20;
@@ -94,6 +99,12 @@ public class AgentService {
     }
 
     public String input(String groupId, String openId, String rawContent, Function<String, String> contextFunc) {
+        return input(groupId, openId, rawContent, contextFunc, null);
+    }
+
+    public String input(
+            String groupId, String openId, String rawContent, Function<String, String> contextFunc, StreamHandler handler
+    ) {
         final StateOwner owner = StateOwner.of(groupId, openId);
         final State state = getOrCreateState(owner);
 
@@ -102,8 +113,6 @@ public class AgentService {
         }
 
         try {
-            recordHistory(groupId, openId, rawContent);
-
             final Deque<String> pendingMessages;
 
             synchronized (state) {
@@ -111,16 +120,23 @@ public class AgentService {
                 state.incomingMessages.clear();
             }
 
-            final String query;
+            String query = "";
 
             if (pendingMessages.isEmpty()) {
                 query = openId + ": " + rawContent;
             } else {
-                query = String.join("\n", pendingMessages)
+                if (pendingMessages.size() == CONTEXT_SIZE) {
+                    query += "====== ...历史消息较多已省略 ======";
+                }
+                query += String.join("\n", pendingMessages)
                         + "\n"
+                        + "====== 以上是最近的所有消息 ======\n"
+                        + "====== 以下是本次询问的内容 ======\n"
                         + "\n"
                         + openId + ": " + rawContent;
             }
+
+            recordHistory(groupId, openId, rawContent);
 
             state.resetIfNeeded(api, groupId);
 
@@ -130,19 +146,22 @@ public class AgentService {
 
             api.updateConversation(groupId, state.conv.appConversationID(), state.vars);
 
-            final ChatQueryResponse response;
-
+            final String answer;
             try {
-                response = api.chatQuery(groupId, state.conv.appConversationID(), query);
+                if (handler != null) {
+                    answer = api.chatQueryStreaming(groupId, state.conv.appConversationID(), query, handler);
+                } else {
+                    var response = api.chatQuery(groupId, state.conv.appConversationID(), query);
+                    answer = response.answer();
+                }
             } catch (RuntimeException | Error e) {
                 restoreIncomingMessages(state, pendingMessages);
 
                 throw e;
             }
 
-            recordHistory(groupId, "Seira(你,回复" + openId + "的消息)", response.answer());
-
-            return response.answer();
+            recordHistory(groupId, "Seira(你,回复" + openId + "的消息)", answer);
+            return answer;
         } finally {
             state.running.set(false);
         }
@@ -399,7 +418,7 @@ class Api {
             final ChatQueryResponse chatQueryResponse = GSON.fromJson(send.body(), ChatQueryResponse.class);
 
             LOG.info(
-                    "Chat query success for group {}, Token input:{}, output:{}",
+                    "Chat query success for user {}, Token input:{}, output:{}",
                     openId,
                     chatQueryResponse.inputTokens(),
                     chatQueryResponse.outputTokens()
@@ -411,6 +430,101 @@ class Api {
         }
     }
 
+    public String chatQueryStreaming(String openId, String appConvId, String query, StreamHandler handler) {
+        LOG.info("Running chat query for user {}", openId);
+
+        JsonObject body = new JsonObject();
+        body.addProperty("UserID", openId);
+        body.addProperty("AppConversationID", appConvId);
+        body.addProperty("Query", query);
+        body.addProperty("ResponseMode", "streaming");
+
+        try {
+            var request = newRequest("/api/proxy/api/v1/chat_query_v2")
+                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                    .build();
+
+            final var response = CLIENT.send(request, HttpResponse.BodyHandlers.ofInputStream());
+
+            if (response.statusCode() != 200) {
+                throw new RuntimeException("Failed to query conversation: " + response.statusCode());
+            }
+
+            StringBuilder fullAnswer = new StringBuilder();
+            StringBuilder currentMessage = new StringBuilder();
+            boolean ended = false;
+
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(response.body(), StandardCharsets.UTF_8)
+            )) {
+                String line;
+
+                while ((line = reader.readLine()) != null) {
+                    if (!line.startsWith("data:")) {
+                        continue;
+                    }
+
+                    String data = line.substring(5).trim();
+
+                    if (data.isEmpty()) {
+                        continue;
+                    }
+
+                    JsonObject event = JsonParser.parseString(data).getAsJsonObject();
+                    String eventType = event.get("event").getAsString();
+
+                    switch (eventType) {
+                        case "message" -> {
+                            String delta = event.get("answer").getAsString();
+
+                            currentMessage.append(delta);
+                            fullAnswer.append(delta);
+                        }
+
+                        case "agent_thought", "message_output_end" -> flushMessage(currentMessage, handler);
+
+                        case "agent_error" -> {
+                            final String errorMsg = event.get("error_msg").getAsString();
+                            final String errorCode = event.get("error_code").getAsString();
+                            handler.onError(errorCode, errorMsg);
+                            throw new RuntimeException("Error when querying stream conversation: " + errorCode + ": " + errorMsg);
+                        }
+
+                        case "message_cost" -> {
+                            // token statistics
+                        }
+
+                        case "message_end" -> ended = true;
+                    }
+
+                    if (ended) {
+                        break;
+                    }
+                }
+            }
+
+            final String result = fullAnswer.toString();
+
+            handler.onComplete(result);
+
+            LOG.info("Chat query success for user {}", openId);
+
+            return result;
+        } catch (Exception e) {
+            throw new RuntimeException("Error querying conversation", e);
+        }
+    }
+
+    private void flushMessage(@NotNull StringBuilder currentMessage, @NotNull StreamHandler handler) {
+        final String message = currentMessage.toString().trim();
+
+        if (message.isBlank()) return;
+
+        currentMessage.setLength(0);
+
+        handler.onText(message);
+    }
+
     private HttpRequest.Builder newRequest(String path) {
         return HttpRequest.newBuilder()
                 .uri(java.net.URI.create(this.endpoint + path))
@@ -418,3 +532,5 @@ class Api {
                 .header("Content-Type", "application/json");
     }
 }
+
+

@@ -85,42 +85,57 @@ public class AiChatHandler {
             return;
         }
 
-        final String answer = at(ctx) + agentService.input(
+        agentService.input(
                 ctx.groupId(),
                 ctx.senderUserId(),
                 ctx.rawContent(),
-                input -> {
-                    JsonObject qqContext = new JsonObject();
-                    qqContext.addProperty("in_group", ctx.inGroup());
-                    qqContext.addProperty("sender_open_id", ctx.senderUserId());
-                    qqContext.addProperty("group_id", ctx.groupId());
-
-                    Map<String, Long> bindings = new HashMap<>();
-                    Map<Long, String> usernames = new HashMap<>();
-
-                    final List<String> ids = resolver.extractAllMentionedIds(input);
-                    ids.add(ctx.senderUserId());
-
-                    for (String openId : ids) {
-                        final Long uid = resolver.resolveBoundUid(openId);
-                        if (uid != null) {
-                            bindings.put(openId, uid);
-                            UserDataStore.findUsername(uid).ifPresent(s -> usernames.put(uid, s));
-                        }
+                input -> generateVar(ctx, input),
+                new StreamHandler() {
+                    @Override
+                    public void onText(String message) {
+                        ctx.send(true, PendingMessage.ofMarkdownRaw(at(ctx) + message));
                     }
 
-                    qqContext.add("bindings", GSON.toJsonTree(bindings));
-                    qqContext.add("usernames", GSON.toJsonTree(usernames));
+                    @Override
+                    public void onComplete(String fullText) {
+                        // Do nothing
+                    }
 
-                    return qqContext.toString();
+                    @Override
+                    public void onError(String errorCode, String errorMsg) {
+                        ctx.send(
+                                true,
+                                PendingMessage.ofMarkdownRaw(at(ctx) + "回复生成失败了喵。\n>" + errorCode + ": " + errorMsg)
+                        );
+                    }
                 }
         );
+    }
 
-        if (!ctx.sendReply(PendingMessage.ofMarkdownRaw(answer)).success()) {
-            if (!ctx.sendMessage(PendingMessage.ofMarkdownRaw(answer)).success()) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "消息发送失败了喵。"));
+    private String generateVar(Context ctx, String input) {
+        JsonObject qqContext = new JsonObject();
+        qqContext.addProperty("in_group", ctx.inGroup());
+        qqContext.addProperty("sender_open_id", ctx.senderUserId());
+        qqContext.addProperty("group_id", ctx.groupId());
+
+        Map<String, Long> bindings = new HashMap<>();
+        Map<Long, String> usernames = new HashMap<>();
+
+        final List<String> ids = resolver.extractAllMentionedIds(input);
+        ids.add(ctx.senderUserId());
+
+        for (String openId : ids) {
+            final Long uid = resolver.resolveBoundUid(openId);
+            if (uid != null) {
+                bindings.put(openId, uid);
+                UserDataStore.findUsername(uid).ifPresent(s -> usernames.put(uid, s));
             }
         }
+
+        qqContext.add("bindings", GSON.toJsonTree(bindings));
+        qqContext.add("usernames", GSON.toJsonTree(usernames));
+
+        return qqContext.toString();
     }
 
     public void recordHistory(String groupId, String userId, String rawContent) {

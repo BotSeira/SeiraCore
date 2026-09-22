@@ -72,6 +72,22 @@ public record Context(
         return requireReplies().sendReply(PendingMessage.ofMarkdownRaw(message));
     }
 
+    public SendResult send(boolean replyFirst, PendingMessage message) {
+        SendResult sendResult;
+        if (replyFirst) {
+            sendResult = sendReply(message);
+            if (!sendResult.success()) {
+                sendResult = sendMessage(message);
+            }
+        } else {
+            sendResult = sendMessage(message);
+            if (!sendResult.success()) {
+                sendResult = sendReply(message);
+            }
+        }
+        return sendResult;
+    }
+
     /**
      * Sends an active message to the same user or group, without an inbound message reference.
      */
