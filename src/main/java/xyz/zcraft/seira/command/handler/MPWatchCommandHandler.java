@@ -134,7 +134,7 @@ public final class MPWatchCommandHandler {
             username = userRaw.getUsername();
         } else if (ctx.argumentCount() == 1) {
             final String player = resolver.player(ctx.argument(0), null);
-            final User content = ApiHelper.lookupUser(player).getContent();
+            final User content = ApiHelper.getUserRaw(ApiHelper.resolveUid(player));
             username = content.getUsername();
         } else {
             ctx.sendReply(at(ctx) + "用法：/romai [@user]");
