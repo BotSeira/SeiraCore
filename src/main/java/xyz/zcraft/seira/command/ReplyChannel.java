@@ -40,7 +40,7 @@ public class ReplyChannel {
     }
 
     public synchronized SendResult sendProactive(PendingMessage message) {
-        return sendReply(message, false);
+        return sendProactive(message, false);
     }
 
     public synchronized SendResult sendProactive(PendingMessage message, boolean ref) {
