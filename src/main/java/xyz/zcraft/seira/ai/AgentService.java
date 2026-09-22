@@ -25,7 +25,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class AgentService {
-    public static final int CONTEXT_SIZE = 20;
+    public static final int CONTEXT_SIZE = 30;
 
     private final Api api;
 
@@ -76,7 +76,7 @@ public class AgentService {
             return;
         }
 
-        final String historyMessage = sender + ": " + message;
+        final String historyMessage = "<@" + sender + ">" + ": " + message;
 
         final Deque<String> log = chatLog.computeIfAbsent(groupId, _ -> new ArrayDeque<>());
 
@@ -122,7 +122,7 @@ public class AgentService {
             String query = "";
 
             if (pendingMessages.isEmpty()) {
-                query = openId + ": " + rawContent;
+                query = "<@" + openId + ">" + ": " + rawContent;
             } else {
                 if (pendingMessages.size() == CONTEXT_SIZE) {
                     query += "====== ...历史消息较多已省略 ======";
@@ -132,7 +132,7 @@ public class AgentService {
                         + "====== 以上是最近的所有消息 ======\n"
                         + "====== 以下是本次询问的内容 ======\n"
                         + "\n"
-                        + openId + ": " + rawContent;
+                        + "<@" + openId + ">" + ": " + rawContent;
             }
 
             recordHistory(groupId, openId, rawContent);

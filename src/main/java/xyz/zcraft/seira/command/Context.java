@@ -4,26 +4,17 @@ import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.data.SendResult;
 
 import java.util.Objects;
+import java.util.function.Consumer;
 
 public record Context(
-        String senderUserId,
-        String groupId,
-        String messageId,
-        String command,
-        String[] args,
-        String query,
-        String rawContent,
-        ReplyChannel replies) {
+        String senderUserId, String groupId, String messageId, String command,
+        String[] args, String query, String rawContent, ReplyChannel replies, Consumer<String> recorder
+) {
     public Context(
-            String senderUserId,
-            String groupId,
-            String messageId,
-            String command,
-            String[] args,
-            String rawContent,
-            String query
+            String senderUserId, String groupId, String messageId, String command,
+            String[] args, String rawContent, String query
     ) {
-        this(senderUserId, groupId, messageId, command, args, query, rawContent, null);
+        this(senderUserId, groupId, messageId, command, args, query, rawContent, null, null);
     }
 
     public Context {
@@ -51,13 +42,20 @@ public record Context(
     public Context withReplies(ReplyChannel replyChannel) {
         return new Context(
                 senderUserId, groupId, messageId, command, args, query, rawContent,
-                Objects.requireNonNull(replyChannel, "replyChannel")
+                Objects.requireNonNull(replyChannel, "replyChannel"), recorder
         );
     }
 
     public Context asCommand(String nextCommand, String[] nextArgs, String nextQuery) {
         return new Context(
-                senderUserId, groupId, messageId, nextCommand, nextArgs, nextQuery, rawContent, replies
+                senderUserId, groupId, messageId, nextCommand, nextArgs, nextQuery, rawContent, replies, recorder
+        );
+    }
+
+    public Context withRecorder(Consumer<String> recorder) {
+        return new Context(
+                senderUserId, groupId, messageId, command, args, query, rawContent,
+                replies, Objects.requireNonNull(recorder, "recorder")
         );
     }
 

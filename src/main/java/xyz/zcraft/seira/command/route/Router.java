@@ -229,15 +229,16 @@ public class Router {
                 return;
             }
 
+            final boolean permitAi = AiPermission.doPermit(groupId);
+
             if (parseResult.status() == CommandParser.ParseResult.Status.TEXT) {
                 ReplyChannel replies = taskCoordinator.openReplyChannel(
                         targetId, messageId, groupMessage, false, msgIdx
                 );
 
-                final boolean permit = AiPermission.doPermit(groupId);
-                if (beingAt && permit) {
+                if (beingAt && permitAi) {
                     aiChatHandler.handleChat(parseResult.context().withReplies(replies));
-                } else if (permit) {
+                } else if (permitAi) {
                     aiChatHandler.recordHistory(groupId, userId, rawContent);
                 }
                 return;
@@ -253,9 +254,19 @@ public class Router {
                 return;
             }
 
-            Context context = parseResult.context().withReplies(replies);
+            Context context = parseResult.context()
+                    .withReplies(replies)
+                    .withRecorder(s -> {
+                        if (permitAi) {
+                            aiChatHandler.recordHistory(groupId, "Seira(你,回复" + userId + "的消息)", s);
+                        }
+                    });
+
             commandExecutor.execute(() -> {
                 try {
+                    if (permitAi) {
+                        aiChatHandler.recordHistory(groupId, userId, context.rawContent());
+                    }
                     LOG.info("Routing {} message : {}", groupMessage ? "group" : "private", context.rawContent());
                     dispatch(context);
                     NoticesHelper.checkNotices(context);
