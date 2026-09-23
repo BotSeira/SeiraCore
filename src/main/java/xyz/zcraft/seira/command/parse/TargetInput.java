@@ -3,10 +3,12 @@ package xyz.zcraft.seira.command.parse;
 import xyz.zcraft.seira.command.ResolutionException;
 
 import java.util.Locale;
+import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 
 public record TargetInput(Kind kind, String id, long index, String player, int consumedArgs) {
-    private static final Pattern PLAYER_SCORE = Pattern.compile("(?i)^(rs|rp|bp|bo)(\\d+)?$");
+    private static final Pattern PLAYER_SCORE = Pattern.compile("(?i)^(rs|rp|bp)(\\d+)?$");
     private static final Pattern SET = Pattern.compile("^(\\d+)#(\\d+)$");
 
     public enum Kind { MEMORY, ID, MAP, SET, SCORE, RS, RP, BP, MP }
@@ -20,11 +22,13 @@ public record TargetInput(Kind kind, String id, long index, String player, int c
         int consumed = args.length >= 2 && PLAYER_SCORE.matcher(args[1]).matches() ? 2 : 1;
         String player = consumed == 2 ? args[0] : null;
         String value = args[consumed - 1].trim().toLowerCase(Locale.ROOT);
+        if (value.equals("rbp")) {
+            value = "bp" + (ThreadLocalRandom.current().nextInt(200) + 1);
+        }
         var score = PLAYER_SCORE.matcher(value);
         if (score.matches()) {
-            if (score.group(1).equals("bo")) throw new ResolutionException("未知的快捷查询");
-            long index = score.group(2) == null ? 1 : positive(score.group(2), "快捷指令索引无效，请输入 1-200 之间的数字。例如: rs5");
-            if (index > 200) throw new ResolutionException("快捷指令索引无效，请输入 1-200 之间的数字。例如: rs5");
+            long index = score.group(2) == null ? 1 : positive(score.group(2), "快捷指令索引无效，请输入 1-200 之间的数字。例如: rp5");
+            if (index > 200) throw new ResolutionException("快捷指令索引无效，请输入 1-200 之间的数字。例如: rp5");
             return new TargetInput(Kind.valueOf(score.group(1).toUpperCase(Locale.ROOT)), null, index, player, consumed);
         }
         var set = SET.matcher(value);
@@ -39,7 +43,7 @@ public record TargetInput(Kind kind, String id, long index, String player, int c
             long id = positive(value.substring(1), "谱面ID无效");
             return new TargetInput(Kind.MAP, Long.toString(id), 1, null, consumed);
         }
-        long id = positive(value, "参数无效。请输入数字ID、本地成绩ID或快捷指令 (例如 loc123456789, rs1, 12345#2)。");
+        long id = positive(value, "参数无效。请输入数字ID、本地成绩ID或快捷指令 (例如 loc123456789, rp1, 12345#2)。");
         return new TargetInput(Kind.ID, Long.toString(id), 1, null, consumed);
     }
 
