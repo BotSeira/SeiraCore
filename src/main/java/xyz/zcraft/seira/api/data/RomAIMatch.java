@@ -78,7 +78,9 @@ public record RomAIMatch(
         List<Integer> score,
         Long currentMapId,
         String mode,
-        List<PlayerData> playerData
+        List<PlayerData> playerData,
+        Integer customBO,
+        Integer customELO
 ) {
 
     public record Teams(List<String> teamA, List<String> teamB){}

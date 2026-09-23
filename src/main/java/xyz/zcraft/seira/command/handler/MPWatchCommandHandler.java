@@ -50,7 +50,7 @@ public final class MPWatchCommandHandler {
         this.watchService = Objects.requireNonNull(watchService);
     }
 
-    static RoomTarget parseRoomTarget(String value, String explicitVersion) {
+    static RoomTarget parseRoomTarget(String value, MPVersion requestedVersion, Integer bo) {
         if (value == null || value.isBlank()) {
             return null;
         }
@@ -69,19 +69,15 @@ public final class MPWatchCommandHandler {
             return null;
         }
 
-        MPVersion requestedVersion = explicitVersion == null
-                ? null
-                : MPVersion.parse(explicitVersion);
-        if (explicitVersion != null && requestedVersion == null) {
-            return null;
-        }
         if (inferredVersion != null && requestedVersion != null && inferredVersion != requestedVersion) {
             return null;
         }
+
         MPVersion version = (inferredVersion != null ? inferredVersion : requestedVersion);
+
         try {
             long roomId = Long.parseLong(numeric);
-            return roomId > 0 ? new RoomTarget(roomId, version) : null;
+            return roomId > 0 ? new RoomTarget(roomId, version, bo) : null;
         } catch (NumberFormatException ignored) {
             return null;
         }
@@ -166,10 +162,11 @@ public final class MPWatchCommandHandler {
                 at(ctx) + """
                         正在启动 RomAI 监视喵。
                         > %s - %s
+                        > ELO %d · BO%d
                         %s
                         """.formatted(
-                        match.lobbyId(),
-                        match.mode(),
+                        match.lobbyId(), match.mode(),
+                        match.customELO(), match.customBO(),
                         teamString
                 ).trim()
         );
@@ -183,7 +180,7 @@ public final class MPWatchCommandHandler {
             }
             try {
                 RoomWatchView view = watchService.watch(
-                        ctx.groupId(), ctx.senderUserId(), MPVersion.STABLE, Long.parseLong(match.lobbyId())
+                        ctx.groupId(), ctx.senderUserId(), MPVersion.STABLE, Long.parseLong(match.lobbyId()), match.customBO()
                 );
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(
                         at(ctx) + "已开始监视" + formatRoom(view) + "喵。"
@@ -196,7 +193,7 @@ public final class MPWatchCommandHandler {
 
     private void handleStart(Context ctx, int argumentOffset) {
         int startArgumentCount = ctx.argumentCount() - argumentOffset;
-        if (startArgumentCount < 0 || startArgumentCount > 2) {
+        if (startArgumentCount < 0 || startArgumentCount > 3) {
             usage(ctx);
             return;
         }
@@ -209,10 +206,25 @@ public final class MPWatchCommandHandler {
                 return;
             }
             final Response<MultiplayerRoom> multiplayerRoom = ApiHelper.getMultiplayerRoom(osuToken.accessToken());
-            target = new RoomTarget(multiplayerRoom.getContent().getId(), MPVersion.LAZER);
+            target = new RoomTarget(multiplayerRoom.getContent().getId(), MPVersion.LAZER, null);
         } else {
-            String version = startArgumentCount == 2 ? ctx.argument(argumentOffset + 1) : null;
-            target = parseRoomTarget(ctx.argument(argumentOffset), version);
+            MPVersion version = null;
+            Integer customBo = null;
+            for (int i = argumentOffset + 1; i < ctx.argumentCount(); i++) {
+                final String arg = ctx.argument(i);
+                final Matcher boMatcher = BO.matcher(arg);
+                if (boMatcher.matches()) {
+                    customBo = Integer.valueOf(boMatcher.group(1));
+                } else if ("stable".equalsIgnoreCase(arg) || "stb".equalsIgnoreCase(arg)) {
+                    version = MPVersion.STABLE;
+                } else if ("lazer".equalsIgnoreCase(arg) || "lzr".equalsIgnoreCase(arg)) {
+                    version = MPVersion.LAZER;
+                } else {
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "未知的参数: " + arg));
+                    return;
+                }
+            }
+            target = parseRoomTarget(ctx.argument(argumentOffset), version, customBo);
         }
 
         if (target == null) {
@@ -229,7 +241,7 @@ public final class MPWatchCommandHandler {
             }
             try {
                 RoomWatchView view = watchService.watch(
-                        ctx.groupId(), ctx.senderUserId(), target.version(), target.roomId()
+                        ctx.groupId(), ctx.senderUserId(), target.version(), target.roomId(), null
                 );
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(
                         at(ctx) + "已开始监视" + formatRoom(view) + "喵。"
@@ -240,6 +252,9 @@ public final class MPWatchCommandHandler {
         }
     }
 
+    private static final Pattern BO = Pattern.compile(
+            "^bo(\\d+)$"
+    );
     private void handleStop(Context ctx) {
         if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
             int stoppedCount = watchService.stopAll(ctx.groupId()).size();
@@ -269,6 +284,6 @@ public final class MPWatchCommandHandler {
                 : "你当前正在监视" + formatRoom(view) + "。")));
     }
 
-    record RoomTarget(long roomId, MPVersion version) {
+    record RoomTarget(long roomId, MPVersion version, Integer customBo) {
     }
 }

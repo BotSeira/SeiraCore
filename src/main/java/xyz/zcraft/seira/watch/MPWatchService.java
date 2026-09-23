@@ -67,7 +67,7 @@ public final class MPWatchService implements AutoCloseable {
         );
     }
 
-    public RoomWatchView watch(String groupId, String userId, MPVersion version, long roomId) {
+    public RoomWatchView watch(String groupId, String userId, MPVersion version, long roomId, Integer customBo) {
         requireIdentifier(groupId, "groupId");
         requireIdentifier(userId, "userId");
 
@@ -100,7 +100,7 @@ public final class MPWatchService implements AutoCloseable {
 
         Set<Long> baseline = new LinkedHashSet<>();
         snapshot.completedPlays().forEach(play -> baseline.add(play.playlistItemId()));
-        WatchEntry entry = new WatchEntry(version, snapshot.roomId(), snapshot.roomName(), baseline);
+        WatchEntry entry = new WatchEntry(version, snapshot.roomId(), snapshot.roomName(), baseline, customBo);
         synchronized (lock) {
             ensureRoomAvailable(groupId, userId, room);
             watchesByGroup.computeIfAbsent(groupId, ignored -> new LinkedHashMap<>())
@@ -297,15 +297,16 @@ public final class MPWatchService implements AutoCloseable {
     }
 
     public record WatchEntry(
-            MPVersion version, long roomId, String roomName, Set<Long> sentPlaylistItemIds
+            MPVersion version, long roomId, String roomName, Set<Long> sentPlaylistItemIds, Integer customBo
     ) {
         public WatchEntry(
-                MPVersion version, long roomId, String roomName, Set<Long> sentPlaylistItemIds
+                MPVersion version, long roomId, String roomName, Set<Long> sentPlaylistItemIds, Integer customBo
         ) {
             this.version = version;
             this.roomId = roomId;
             this.roomName = roomName;
             this.sentPlaylistItemIds = new LinkedHashSet<>(sentPlaylistItemIds);
+            this.customBo = customBo;
         }
     }
 
