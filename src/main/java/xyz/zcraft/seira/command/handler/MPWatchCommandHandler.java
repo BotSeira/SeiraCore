@@ -162,11 +162,12 @@ public final class MPWatchCommandHandler {
                 at(ctx) + """
                         正在启动 RomAI 监视喵。
                         > %s - %s
-                        > ELO %d · BO%d
+                        > ELO %s · BO%s
                         %s
                         """.formatted(
                         match.lobbyId(), match.mode(),
-                        match.customELO(), match.customBO(),
+                        (match.customELO() == null ? "?" : match.customELO().toString()),
+                        (match.customBO() == null ? "?" : match.customBO().toString()),
                         teamString
                 ).trim()
         );
