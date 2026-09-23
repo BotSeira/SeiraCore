@@ -139,7 +139,7 @@ public final class MPWatchCommandHandler {
         final RomAIMatch match = RomAIApi.getMatchFor(username);
 
         if (match == null) {
-            ctx.sendReply(at(ctx) + "对方不在打 RomAI 喵。");
+            ctx.sendReply(at(ctx) + username + "不在打 RomAI 喵。");
             return;
         }
 
