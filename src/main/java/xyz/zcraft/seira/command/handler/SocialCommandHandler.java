@@ -99,7 +99,7 @@ public final class SocialCommandHandler {
         final String mention = UserDataStore.findGroupOpenIdByUid(ctx.groupId(), uid)
                 .map(ReplyFactory::at)
                 .orElse("");
-        ctx.sendReply(PendingMessage.ofMarkdownRaw(mention) + ": [%d](%s)".formatted(uid, "https://osu.ppy.sh/users/" + uid));
+        ctx.sendReply(PendingMessage.ofMarkdownRaw(mention + ": [%d](%s)".formatted(uid, "https://osu.ppy.sh/users/" + uid)));
         final UserExtended targetUser = ApiHelper.getUserRaw(uid);
         final String targetOsuAvatar = targetUser.getAvatarUrl();
 
