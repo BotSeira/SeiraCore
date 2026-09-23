@@ -12,7 +12,11 @@ import xyz.zcraft.seira.data.Notice;
 import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.services.DailyLuck;
 import xyz.zcraft.seira.services.NoticeStore;
+import xyz.zcraft.seira.util.dice.Dice;
+import xyz.zcraft.seira.util.dice.expr.DiceExpr;
+import xyz.zcraft.seira.util.dice.result.DiceResult;
 
+import java.util.Objects;
 import java.util.function.Predicate;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
@@ -47,6 +51,30 @@ public final class GeneralCommandHandler {
             var completion = replyFactory.userInfoMessage(context, response);
             context.sendReply(taskCoordinator.imageMessage(response, completion));
         }
+    }
+
+    public void handleRoll(Context ctx) {
+        DiceExpr diceExpr;
+
+        if (ctx.argumentCount() == 0) {
+            diceExpr = DiceExpr.HUNDRED;
+        } else {
+            try {
+                diceExpr = DiceExpr.parse(ctx.query());
+            } catch (Exception e) {
+                ctx.sendReply(at(ctx) + "无法解析骰子表达式喵。");
+                return;
+            }
+        }
+
+        final Dice dice = new Dice();
+        final DiceResult rollResult = dice.roll(diceExpr);
+
+        final String rollResultStr = rollResult.toString();
+        final String totalStr = String.valueOf(rollResult.total());
+
+        final String message = at(ctx) + diceExpr + (Objects.equals(rollResultStr, totalStr) ? "" : " = " + rollResultStr) + " = __" + totalStr + "__";
+        ctx.sendReply(message.replace("*", "\\*"));
     }
 
     public void handleLuck(Context context) {

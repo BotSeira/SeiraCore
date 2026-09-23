@@ -159,6 +159,7 @@ public class Router {
                 .register(generalCommands::handleStat, "stat")
                 .register(generalCommands::handleU, "u")
                 .register(generalCommands::handleLuck, "luck")
+                .register(generalCommands::handleRoll, "roll")
                 .register(replayCommands::handleRstat, "rstat")
                 .register(replayCommands::handleRcancel, "rcancel")
                 .register(generalCommands::handleInspect, "inspect")

@@ -680,7 +680,7 @@ public final class RankGuessCommandHandler {
             case FINISHED -> replyFactory.rankGuessResultMessage(ctx, result.round(), result.rankType());
         };
 
-        ctx.send(true, message, true);
+        ctx.send(true, message, false);
     }
 
     enum LeaderboardType {
