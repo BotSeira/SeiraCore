@@ -171,7 +171,7 @@ public final class Resolver {
 
     private static final class Patterns {
         private static final Pattern COMPACT_SCORE_COMMAND_PATTERN = Pattern.compile(
-                "(?i)^(rs|rp|bp)(\\d+)(?:-(\\d+))?(?=\\s|$)"
+                "(?i)^(rs|rp|bp|rbp)(\\d+)(?:-(\\d+))?(?=\\s|$)"
         );
         private static final Pattern SPACE_MISSING_COMMAND_PATTERN = Pattern.compile(
                 "^([a-zA-Z]+)(\\d+(?:#\\d+)?)"
