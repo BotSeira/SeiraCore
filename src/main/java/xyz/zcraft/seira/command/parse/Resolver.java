@@ -21,7 +21,19 @@ public final class Resolver {
         this.boundUid = Objects.requireNonNull(boundUid);
     }
 
+    private static final Map<List<String>, String> ALIASES = Map.of(
+            List.of("+", "＋"), "+",
+            List.of("~", "～"), "~",
+            List.of("=", "＝"), "="
+    );
+
     public String sanitize(String rawContent) {
+        for (Map.Entry<List<String>, String> entry : ALIASES.entrySet()) {
+            for (String s : entry.getKey()) {
+                rawContent = rawContent.replace(s, entry.getValue());
+            }
+        }
+
         // Add surrounding space to <@> before expanding compact commands so /bp5<@...> is recognized.
         rawContent = Patterns.QQ_INLINE_AT_PATTERN.matcher(rawContent).replaceAll(r -> " " + r.group() + " ");
 
