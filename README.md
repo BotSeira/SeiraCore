@@ -95,6 +95,7 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 | `/lb`           | `/lb [id] [<uid1>,<uid2>...]`                           | 列出指定谱面排行或表现分排行                                                    |
 | `/daily`        | `/daily`                                                | 每日挑战信息                                                                    |
 | `/luck`         | `/luck`                                                 | 今日人品                                                                        |
+| `/rbp`          | `/rbp [uid/username/@user]`                             | 获取随机BP                                                                      |
 | `/mp`           | `/mp`                                                   | 多人房间列表                                                                    |
 | `/watch`        | `/watch add/del/list [目标]`                            | 添加/删除/列出监视任务                                                          |
 | `/mpwatch`      | `/mpwatch start/stop/status [目标]`                     | 按群成员添加、停止或查看多人房间监视；`stop all` 可停止本群全部监视             |

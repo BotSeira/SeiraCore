@@ -14,6 +14,7 @@ import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -111,6 +112,23 @@ public final class ScoreCommandHandler {
                     filters.filters()
             );
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.bpMessage(ctx, response)));
+        }
+    }
+
+    public void handleRbp(Context ctx) {
+        if (ctx.argumentCount() > 1) {
+            ctx.sendReply(at(ctx) + "用法：/rbp [目标]");
+            return;
+        }
+
+        String player = resolver.player(ctx.argumentCount() == 1 ? ctx.argument(0) : null, ctx.senderUserId());
+
+        try (var _ = taskCoordinator.beginRequest(ctx, "Score")) {
+            long uid = ApiHelper.resolveUid(player);
+            String scoreId = ApiHelper.lookupPlayerScore(uid, "bp", ThreadLocalRandom.current().nextInt(200) + 1, List.of(), null);
+            var response = ApiHelper.getScoreResponse(scoreId);
+            history.remember(ctx, null, null, scoreId);
+            ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.scoreMessage(ctx, response)));
         }
     }
 

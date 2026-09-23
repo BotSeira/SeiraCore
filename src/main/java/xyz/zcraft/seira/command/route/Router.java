@@ -129,6 +129,7 @@ public class Router {
                 .register(bindingCommands::handleBind, "bind")
                 .register(bindingCommands::handleUnbind, "unbind")
                 .register(bindingCommands::handleClearHistory, "clearhistory")
+                .register(scoreCommands::handleRbp, "rbp")
                 .register(scoreCommands::handleBp, "bp")
                 .register(beatmapCommands::handleDaily, "daily")
                 .register(socialCommands::handleMp, "mp")
