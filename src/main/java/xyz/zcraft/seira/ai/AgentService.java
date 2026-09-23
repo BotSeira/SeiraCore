@@ -69,6 +69,18 @@ public class AgentService {
         }
     }
 
+    private static String shorten(String input) {
+        if (input == null || input.isEmpty()) {
+            return input;
+        }
+
+        if (input.length() <= 300) {
+            return input;
+        }
+
+        return input.substring(0, 150) + "... 已省略 ..." + input.substring(input.length() - 150);
+    }
+
     public void recordHistory(String groupId, String sender, String message) {
         if (groupId == null || groupId.isEmpty()
                 || sender == null || sender.isEmpty()
@@ -159,7 +171,7 @@ public class AgentService {
                 throw e;
             }
 
-            recordHistory(groupId, "Seira(你,回复" + openId + "的消息)", answer);
+            recordHistory(groupId, "Seira(你,回复" + openId + "的消息)", shorten(answer));
             return answer;
         } finally {
             state.running.set(false);
@@ -531,5 +543,3 @@ class Api {
                 .header("Content-Type", "application/json");
     }
 }
-
-
