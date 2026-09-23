@@ -97,11 +97,12 @@ public final class MPWatchApi {
         return snapshot;
     }
 
-    public byte[] renderResult(MPVersion version, long roomId, long playlistItemId) {
+    public byte[] renderResult(MPVersion version, long roomId, long playlistItemId, Integer customBo) {
         HttpResponse<byte[]> response = get(
                 "/multiplayer/rooms/" + requirePositive(roomId, "roomId")
                         + "/playlist/" + requirePositive(playlistItemId, "playlistItemId") + "/result?version="
-                        + requireVersion(version).value(),
+                        + requireVersion(version).value()
+                        + (customBo == null ? "" : "&bo" + customBo),
                 HttpResponse.BodyHandlers.ofByteArray()
         );
         ensureSuccessfulStatus(response.statusCode(), response.body(), "生成多人房间结果图片");
@@ -115,7 +116,7 @@ public final class MPWatchApi {
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(endpoint + path))
                 .timeout(Duration.ofMinutes(2))
-                .header("Accept",  "image/png");
+                .header("Accept", "image/png");
         if (serviceToken != null && !serviceToken.isBlank()) {
             builder.header("Authorization", "Bearer " + serviceToken);
         }

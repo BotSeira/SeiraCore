@@ -198,7 +198,7 @@ public final class MPWatchService implements AutoCloseable {
             try {
                 byte[] image = rendered.computeIfAbsent(
                         play.playlistItemId(),
-                        itemId -> api.renderResult(watch.entry().version, watch.entry().roomId, itemId)
+                        itemId -> api.renderResult(watch.entry().version, watch.entry().roomId, itemId, watch.entry().customBo())
                 );
                 if (!notifier.sendResult(watch.entry(), watch.groupId(), image)) {
                     LOG.warn(
