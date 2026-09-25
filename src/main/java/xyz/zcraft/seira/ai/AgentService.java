@@ -313,8 +313,10 @@ public class AgentService {
             }
 
             try {
+                api.clearConversation(groupId, conv.appConversationID());
                 conv = api.createConversation(groupId);
                 vars.clear();
+                incomingMessages.clear();
             } catch (RuntimeException | Error e) {
                 resetting.set(true);
                 throw e;
@@ -352,10 +354,10 @@ class Api {
         this.apiKey = config.apiKey();
     }
 
-    public AppConversationBrief createConversation(String openId) {
-        LOG.info("Creating conversation for user {}", openId);
+    public AppConversationBrief createConversation(String groupId) {
+        LOG.info("Creating conversation for id {}", groupId);
         JsonObject body = new JsonObject();
-        body.addProperty("UserID", openId);
+        body.addProperty("UserID", groupId);
         try {
             var request = newRequest("/api/proxy/api/v1/create_conversation")
                     .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
@@ -374,18 +376,18 @@ class Api {
                     AppConversationBrief.class
             );
 
-            LOG.info("Conversation for user {} created, id {}", openId, conversation.appConversationID());
+            LOG.info("Conversation for id {} created, conv id {}", groupId, conversation.appConversationID());
             return conversation;
         } catch (Exception e) {
             throw new RuntimeException("Error creating conversation", e);
         }
     }
 
-    public void updateConversation(String openId, String appConvId, Map<String, String> variables) {
-        LOG.info("Updating conversation for user {}", openId);
+    public void updateConversation(String groupId, String appConvId, Map<String, String> variables) {
+        LOG.info("Updating conversation for id {}", groupId);
 
         JsonObject body = new JsonObject();
-        body.addProperty("UserID", openId);
+        body.addProperty("UserID", groupId);
         body.addProperty("AppConversationID", appConvId);
         body.add("Inputs", GSON.toJsonTree(variables));
 
@@ -400,17 +402,41 @@ class Api {
                 throw new RuntimeException("Failed to update conversation: " + send.statusCode());
             }
 
-            LOG.info("Updated conversation for user {}", openId);
+            LOG.info("Updated conversation for id {}", groupId);
         } catch (Exception e) {
             throw new RuntimeException("Error updating conversation", e);
         }
     }
 
-    public ChatQueryResponse chatQuery(String openId, String appConvId, String query) {
-        LOG.info("Running chat query for user {}", openId);
+    public void clearConversation(String groupId, String appConvId) {
+        LOG.info("Clearing conversation for id {}", groupId);
 
         JsonObject body = new JsonObject();
-        body.addProperty("UserID", openId);
+        body.addProperty("UserID", groupId);
+        body.addProperty("AppConversationID", appConvId);
+
+        try {
+            var request = newRequest("/api/proxy/api/v1/clear_message")
+                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw new RuntimeException("Failed to clear conversation: " + send.statusCode());
+            }
+
+            LOG.info("Cleared conversation for id {}", groupId);
+        } catch (Exception e) {
+            throw new RuntimeException("Error clearing conversation", e);
+        }
+    }
+
+    public ChatQueryResponse chatQuery(String groupId, String appConvId, String query) {
+        LOG.info("Running chat query for id {}", groupId);
+
+        JsonObject body = new JsonObject();
+        body.addProperty("UserID", groupId);
         body.addProperty("AppConversationID", appConvId);
         body.addProperty("Query", query);
         body.addProperty("ResponseMode", "blocking");
@@ -429,8 +455,8 @@ class Api {
             final ChatQueryResponse chatQueryResponse = GSON.fromJson(send.body(), ChatQueryResponse.class);
 
             LOG.info(
-                    "Chat query success for user {}, Token input:{}, output:{}",
-                    openId,
+                    "Chat query success for id {}, Token input:{}, output:{}",
+                    groupId,
                     chatQueryResponse.inputTokens(),
                     chatQueryResponse.outputTokens()
             );
@@ -441,11 +467,11 @@ class Api {
         }
     }
 
-    public String chatQueryStreaming(String openId, String appConvId, String query, StreamHandler handler) {
-        LOG.info("Running chat query for user {}", openId);
+    public String chatQueryStreaming(String groupId, String appConvId, String query, StreamHandler handler) {
+        LOG.info("Running chat query for id {}", groupId);
 
         JsonObject body = new JsonObject();
-        body.addProperty("UserID", openId);
+        body.addProperty("UserID", groupId);
         body.addProperty("AppConversationID", appConvId);
         body.addProperty("Query", query);
         body.addProperty("ResponseMode", "streaming");
@@ -518,7 +544,7 @@ class Api {
 
             handler.onComplete(result);
 
-            LOG.info("Chat query success for user {}", openId);
+            LOG.info("Chat query success for id {}", groupId);
 
             return result;
         } catch (Exception e) {

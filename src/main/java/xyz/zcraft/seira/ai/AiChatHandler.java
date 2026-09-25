@@ -79,7 +79,7 @@ public class AiChatHandler {
         ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/ai [on|off]"));
     }
 
-    public void handleChat(Context ctx) {
+    public void handleChat(Context ctx, String message) {
         if (agentService.isRunning(ctx.groupId(), ctx.senderUserId())) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "已有一轮对话正在进行中了喵，请稍作等待~"));
             return;
@@ -88,7 +88,7 @@ public class AiChatHandler {
         agentService.input(
                 ctx.groupId(),
                 ctx.senderUserId(),
-                ctx.rawContent(),
+                message,
                 input -> generateVar(ctx, input),
                 new StreamHandler() {
                     @Override

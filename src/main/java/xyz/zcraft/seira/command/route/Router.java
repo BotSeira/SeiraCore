@@ -205,6 +205,8 @@ public class Router {
 
             rawContent = rawContent == null ? "" : rawContent.trim();
 
+            String msgToRecord = rawContent;
+
             boolean beingAt = false;
 
             AppConfig config = configSupplier.get();
@@ -212,6 +214,7 @@ public class Router {
 
             if (rawContent.contains(selfAt)) {
                 beingAt = true;
+                msgToRecord = msgToRecord.replace(selfAt, "@Seira");
             }
 
             if (rawContent.startsWith(selfAt)) {
@@ -247,9 +250,9 @@ public class Router {
                 );
 
                 if (beingAt && permitAi) {
-                    aiChatHandler.handleChat(parseResult.context().withReplies(replies));
+                    aiChatHandler.handleChat(parseResult.context().withReplies(replies), msgToRecord);
                 } else if (permitAi) {
-                    aiChatHandler.recordHistory(groupId, userId, rawContent, attachments);
+                    aiChatHandler.recordHistory(groupId, userId, msgToRecord, attachments);
                 }
                 return;
             }
