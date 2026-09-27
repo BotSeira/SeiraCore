@@ -173,6 +173,7 @@ public class Router {
                 .register(rankGuessCommands::handleRankGuess, "rg")
                 .register(generalCommands::handleNotice, "notice")
                 .register(aiChatHandler::handleAi, "ai")
+                .register(generalCommands::handleMc, "mc")
                 .build();
     }
 

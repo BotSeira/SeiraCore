@@ -1,7 +1,9 @@
 package xyz.zcraft.seira.command.handler;
 
 import xyz.zcraft.osu.model.Beatmapset;
+import xyz.zcraft.seira.api.AsteroidApi;
 import xyz.zcraft.seira.api.OstellaApi;
+import xyz.zcraft.seira.api.data.MinecraftServerStatus;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
@@ -141,5 +143,48 @@ public final class GeneralCommandHandler {
                 }, () -> sb.append(at(context)).append("未找到公告#").append(noticeId));
 
         context.sendReply(PendingMessage.ofMarkdownRaw(sb.toString()));
+    }
+
+    public void handleMc(Context ctx) {
+        if (ctx.argumentCount() != 1) {
+            ctx.sendReply(at(ctx) + "用法：/mc <服务器地址>");
+            return;
+        }
+
+        try {
+            final String address = ctx.argument(0);
+
+            final var probe = AsteroidApi.getMinecraftServerStatus(address);
+
+            final var status = probe.status();
+            final var players = status.players();
+            final var samples = players.samples();
+
+            String playersSample = "";
+
+            if (samples != null) {
+                playersSample = String.join(", ", samples.stream().map(MinecraftServerStatus.Players.Sample::name).toList());
+            }
+
+            ctx.sendReply(at(ctx) + """
+                             `%s` 的服务器状态：
+                             - 版本: `%s`
+                             - 描述: `%s`
+                             - 延迟: `%d` ms
+                             - 在线人数: `%d` / `%d`
+                             - 在线玩家: [%s]
+                            """.formatted(
+                            address,
+                            status.version().name(),
+                            status.description(),
+                            probe.latency(),
+                            players.online(),
+                            players.max(),
+                            playersSample
+                    )
+            );
+        } catch (Exception e) {
+            ctx.sendReply(at(ctx) + "状态获取失败了喵，请稍后再试。");
+        }
     }
 }

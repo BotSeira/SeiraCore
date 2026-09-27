@@ -3,6 +3,7 @@ package xyz.zcraft.seira.api;
 import com.google.gson.Gson;
 import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.api.data.MinecraftServerStatus;
+import xyz.zcraft.seira.api.data.RawResponse;
 
 import java.net.URI;
 import java.net.URLEncoder;
@@ -44,7 +45,10 @@ public class AsteroidApi {
                 throw ApiUtil.parseHttpError(response.body(), response.statusCode(), "获取 MC 服务器状态失败");
             }
 
-            return GSON.fromJson(response.body(), MinecraftServerStatus.class);
+            final RawResponse r = GSON.fromJson(response.body(), RawResponse.class);
+            ApiUtil.ensureApiSuccess(r, "获取 MC 服务器状态失败");
+
+            return GSON.fromJson(r.getData(), MinecraftServerStatus.class);
         } catch (Exception e) {
             throw new RuntimeException("获取 MC 服务器状态失败", e);
         }
