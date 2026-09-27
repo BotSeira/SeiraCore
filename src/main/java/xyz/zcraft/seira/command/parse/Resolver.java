@@ -34,6 +34,13 @@ public final class Resolver {
             }
         }
 
+        if (rawContent.trim().equalsIgnoreCase("@")
+                || rawContent.trim().equalsIgnoreCase("//")) {
+            return "ux";
+        } else if (looksLikeMention(rawContent.trim())) {
+            return "ux " + rawContent;
+        }
+
         // Add surrounding space to <@> before expanding compact commands so /bp5<@...> is recognized.
         rawContent = Patterns.QQ_INLINE_AT_PATTERN.matcher(rawContent).replaceAll(r -> " " + r.group() + " ");
 
@@ -87,18 +94,18 @@ public final class Resolver {
     public String player(String argument, String senderUserId) {
         if (argument == null) {
             Long uid = resolveBoundUid(senderUserId);
-            if (uid == null) throw new ResolutionException("你还没有绑定玩家ID，请先使用 /bind");
+            if (uid == null) throw new ResolutionException("你还没有绑定玩家ID，请先使用 /bind 喵");
             return uid.toString();
         }
         String mentioned = extractMentionedUserId(argument);
         if (mentioned != null) {
             Long uid = resolveBoundUid(mentioned);
-            if (uid == null) throw new ResolutionException("被@的用户还没有绑定玩家ID，请先让对方使用 /bind");
+            if (uid == null) throw new ResolutionException("被@的用户还没有绑定玩家ID，请先让对方使用 /bind 喵");
             return uid.toString();
         }
         String player = argument.trim();
         if (player.startsWith("@")) player = player.substring(1);
-        if (player.isBlank()) throw new ResolutionException("无法识别指定的玩家");
+        if (player.isBlank()) throw new ResolutionException("无法识别指定的玩家喵");
         return player;
     }
 

@@ -158,6 +158,7 @@ public class Router {
                 .register(socialCommands::handleLb, "lb")
                 .register(generalCommands::handleStat, "stat")
                 .register(generalCommands::handleU, "u")
+                .register(generalCommands::handleUx, "ux")
                 .register(generalCommands::handleLuck, "luck")
                 .register(generalCommands::handleRoll, "roll")
                 .register(replayCommands::handleRstat, "rstat")

@@ -22,6 +22,7 @@ import java.util.Objects;
 import java.util.function.Predicate;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
+import static xyz.zcraft.seira.command.reply.ReplyFactory.u;
 
 public final class GeneralCommandHandler {
     private final MessageSender messageSender;
@@ -185,6 +186,16 @@ public final class GeneralCommandHandler {
             );
         } catch (Exception e) {
             ctx.sendReply(at(ctx) + "状态获取失败了喵，请稍后再试。");
+        }
+    }
+
+    public void handleUx(Context ctx) {
+        String player = resolver.player(ctx.argumentCount() == 0 ? null : ctx.argument(0), ctx.senderUserId());
+
+        try (var _ = taskCoordinator.beginRequest(ctx, "User Info Short")) {
+            long uid = OstellaApi.resolveUid(player);
+            var user = OstellaApi.getUserRaw(uid);
+            ctx.sendReply(replyFactory.userInfoShortMessage(ctx, user));
         }
     }
 }

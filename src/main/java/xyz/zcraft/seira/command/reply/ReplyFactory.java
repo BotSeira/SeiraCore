@@ -463,6 +463,10 @@ public final class ReplyFactory {
         return PendingMessage.ofMarkdownRaw(Contents.supContent(ctx, username, openId, isSupporter, hasSupported, supportLevel));
     }
 
+    public PendingMessage userInfoShortMessage(Context ctx, UserExtended user) {
+        return PendingMessage.ofMarkdownRaw(Contents.userInfoShortContent(ctx, user));
+    }
+
     private static final class Contents {
         static String replayTaskContent(Context ctx, OstellaApi.ReplayTaskInfo taskInfo) {
             StringBuilder sb = new StringBuilder();
@@ -873,6 +877,27 @@ public final class ReplyFactory {
             }
 
             return sb.toString().trim();
+        }
+
+        public static String userInfoShortContent(Context ctx, UserExtended user) {
+            final Duration playTime = Duration.ofSeconds(user.getStatistics().getPlayTime());
+            return """
+                    %s `%s` 的用户信息
+                    > - PP: %.2f
+                    > - Rank: #%,d (%s #%,d)
+                    > - 准确率: %.2f%%
+                    > - 游玩次数: %,d
+                    > - 获得总分: %,d
+                    > - 游玩时间: %dd %dh %dm
+                    """.formatted(
+                    at(ctx), user.getUsername(),
+                    user.getStatistics().getPp(),
+                    user.getStatistics().getGlobalRank(), user.getCountry().getCode(), user.getStatistics().getRank().getCountry(),
+                    user.getStatistics().getAccuracy() * 100,
+                    user.getStatistics().getPlayCount(),
+                    user.getStatistics().getRankedScore(),
+                    playTime.toDaysPart(), playTime.toHoursPart(), playTime.toMinutesPart()
+            );
         }
     }
 
