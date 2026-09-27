@@ -3,7 +3,7 @@ package xyz.zcraft.seira.command;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
-import xyz.zcraft.seira.api.ApiHelper;
+import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.ApiRequestException;
 import xyz.zcraft.seira.api.ReplayRenderException;
 import xyz.zcraft.seira.api.data.Base64Bytes;
@@ -114,22 +114,22 @@ public final class TaskCoordinator {
         return messageSender.createVideoUploadRequest(targetId, ctx.inGroup());
     }
 
-    public ApiHelper.ReplayRenderResult waitForReplay(ApiHelper.ReplayTaskInfo taskInfo) {
+    public OstellaApi.ReplayRenderResult waitForReplay(OstellaApi.ReplayTaskInfo taskInfo) {
         return waitForReplay(taskInfo, -1);
     }
 
-    public ApiHelper.ReplayRenderResult waitForReplay(ApiHelper.ReplayTaskInfo taskInfo, long timeout) {
+    public OstellaApi.ReplayRenderResult waitForReplay(OstellaApi.ReplayTaskInfo taskInfo, long timeout) {
         if (taskInfo == null || taskInfo.taskId() == null || taskInfo.taskId().isBlank()) {
             throw new IllegalArgumentException("回放任务未返回有效请求ID，无法获取视频结果。");
         }
 
-        ApiHelper.ReplayRenderResult result = ApiHelper.waitReplayVideo(taskInfo.taskId(), timeout);
+        OstellaApi.ReplayRenderResult result = OstellaApi.waitReplayVideo(taskInfo.taskId(), timeout);
         replayResults.put(taskInfo.taskId(), result);
         BotStat.incrementReplays();
         return result;
     }
 
-    public PendingMessage replayVideoMessage(ApiHelper.ReplayRenderResult result) {
+    public PendingMessage replayVideoMessage(OstellaApi.ReplayRenderResult result) {
         if (result == null) {
             return PendingMessage.ofString("回放视频生成失败，请稍后重试。");
         }

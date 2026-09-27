@@ -1,7 +1,7 @@
 package xyz.zcraft.seira.command.handler;
 
 import xyz.zcraft.osu.model.Beatmapset;
-import xyz.zcraft.seira.api.ApiHelper;
+import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
@@ -46,8 +46,8 @@ public final class GeneralCommandHandler {
         String player = resolver.player(context.argumentCount() == 0 ? null : context.argument(0), context.senderUserId());
 
         try (var _ = taskCoordinator.beginRequest(context, "User Info")) {
-            long uid = ApiHelper.resolveUid(player);
-            var response = ApiHelper.getUserInfoResponse(uid);
+            long uid = OstellaApi.resolveUid(player);
+            var response = OstellaApi.getUserInfoResponse(uid);
             var completion = replyFactory.userInfoMessage(context, response);
             context.sendReply(taskCoordinator.imageMessage(response, completion));
         }
@@ -85,7 +85,7 @@ public final class GeneralCommandHandler {
 
         try (var _ = taskCoordinator.beginRequest(context, "Luck")) {
             DailyLuck.Luck luck = DailyLuck.getLuck(context.senderUserId());
-            Beatmapset mapset = ApiHelper.getBeatmapsetRaw(luck.dailyMapset());
+            Beatmapset mapset = OstellaApi.getBeatmapsetRaw(luck.dailyMapset());
             UploadedImage cover = messageSender.uploadImageToCos(mapset.getCovers().getCover());
             context.sendReply(replyFactory.luckMessage(context, luck, mapset, cover));
         }
@@ -107,7 +107,7 @@ public final class GeneralCommandHandler {
     }
 
     public void handleStat(Context context) {
-        context.sendReply(replyFactory.statusMessage(context, ApiHelper.getServerStatus()));
+        context.sendReply(replyFactory.statusMessage(context, OstellaApi.getServerStatus()));
     }
 
     public void handleUnknown(Context context) {

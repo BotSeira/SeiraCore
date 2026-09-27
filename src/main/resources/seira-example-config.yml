@@ -76,3 +76,8 @@ llm:
   # LLM API 的地址
   baseUrl: "http://localhost:8723"
   apiKey: ""
+
+asteroid:
+  # asteroid API 的地址
+  endpoint: "http://localhost:8728"
+  token:

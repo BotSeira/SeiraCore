@@ -1,7 +1,7 @@
 package xyz.zcraft.seira.command.handler;
 
 import org.jline.utils.Log;
-import xyz.zcraft.seira.api.ApiHelper;
+import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
@@ -86,30 +86,30 @@ public final class ReplayCommandHandler {
                 case SET -> {
                     beatmapsetId = Long.parseLong(target.id());
                     String player = resolver.player(target.player(), ctx.senderUserId());
-                    long uid = ApiHelper.resolveUid(player);
-                    scoreId = ApiHelper.lookupBeatmapsetScore(beatmapsetId, target.index(), uid, List.of(), null);
+                    long uid = OstellaApi.resolveUid(player);
+                    scoreId = OstellaApi.lookupBeatmapsetScore(beatmapsetId, target.index(), uid, List.of(), null);
                 }
                 case RS, RP, BP -> {
                     String player = resolver.player(target.player(), ctx.senderUserId());
-                    long uid = ApiHelper.resolveUid(player);
-                    scoreId = ApiHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
+                    long uid = OstellaApi.resolveUid(player);
+                    scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
                 }
-                case MP -> beatmapId = ApiHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                case MP -> beatmapId = OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
                 case MEMORY -> {}
             }
             if (scoreId == null) {
                 if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
                 String player = resolver.player(target.player(), ctx.senderUserId());
-                long uid = ApiHelper.resolveUid(player);
-                scoreId = ApiHelper.lookupBeatmapScore(beatmapId, uid, List.of(), null);
+                long uid = OstellaApi.resolveUid(player);
+                scoreId = OstellaApi.lookupBeatmapScore(beatmapId, uid, List.of(), null);
             }
             var upload = taskCoordinator.createVideoUploadRequest(ctx);
-            var task = ApiHelper.createReplayRenderTask(scoreId, range, upload);
+            var task = OstellaApi.createReplayRenderTask(scoreId, range, upload);
             history.remember(ctx, beatmapsetId, beatmapId, scoreId);
             videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
             ctx.sendReply(replyFactory.replayMessage(ctx, task));
 
-            ApiHelper.ReplayRenderResult result;
+            OstellaApi.ReplayRenderResult result;
 
             try {
                 result = taskCoordinator.waitForReplay(task);
@@ -160,7 +160,7 @@ public final class ReplayCommandHandler {
 
         String localScoreId = target.kind() != TargetInput.Kind.MEMORY
                 ? target.kind() == TargetInput.Kind.SCORE ? target.id() : null
-                : remembered == null ? null : remembered.scoreId();
+                : remembered.scoreId();
         boolean localScore = localScoreId != null && localScoreId.startsWith("loc");
         var participants = new java.util.LinkedHashSet<String>();
         if (!(localScore && extraUidArg == null)) {
@@ -183,7 +183,7 @@ public final class ReplayCommandHandler {
                         participants.add(token.trim());
                     } else if (resolver.looksLikeMention(token)) {
                         String player = resolver.player(token, ctx.senderUserId());
-                        long uid = ApiHelper.resolveUid(player);
+                        long uid = OstellaApi.resolveUid(player);
                         participants.add("u" + uid);
                     } else {
                         ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "追加ID列表包含非法值。"));
@@ -204,17 +204,17 @@ public final class ReplayCommandHandler {
                 case SCORE -> scoreId = target.id();
                 case SET -> {
                     beatmapsetId = Long.parseLong(target.id());
-                    beatmapId = ApiHelper.lookupBeatmapInSet(beatmapsetId, target.index(), accessTokenProvider.apply(ctx.senderUserId()));
+                    beatmapId = OstellaApi.lookupBeatmapInSet(beatmapsetId, target.index(), accessTokenProvider.apply(ctx.senderUserId()));
                 }
                 case RS, RP, BP -> {
                     String player = resolver.player(target.player(), ctx.senderUserId());
-                    long uid = ApiHelper.resolveUid(player);
-                    scoreId = ApiHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
+                    long uid = OstellaApi.resolveUid(player);
+                    scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
                 }
-                case MP -> beatmapId = ApiHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                case MP -> beatmapId = OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
                 case MEMORY -> {}
             }
-            if (beatmapId == null && scoreId != null) beatmapId = ApiHelper.getScoreBeatmapId(scoreId);
+            if (beatmapId == null && scoreId != null) beatmapId = OstellaApi.getScoreBeatmapId(scoreId);
             if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
             var upload = taskCoordinator.createVideoUploadRequest(ctx);
             String[] scoreTargets = participants.toArray(String[]::new);
@@ -225,12 +225,12 @@ public final class ReplayCommandHandler {
                 scoreTargets = ids.toArray(String[]::new);
 
             }
-            var task = ApiHelper.createReplayShowcaseTask(beatmapId, scoreTargets, upload);
+            var task = OstellaApi.createReplayShowcaseTask(beatmapId, scoreTargets, upload);
             history.remember(ctx, beatmapsetId, beatmapId, scoreId);
             videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
             ctx.sendReply(replyFactory.replayMessage(ctx, task));
 
-            ApiHelper.ReplayRenderResult result;
+            OstellaApi.ReplayRenderResult result;
 
             try {
                 result = taskCoordinator.waitForReplay(task);
@@ -270,7 +270,7 @@ public final class ReplayCommandHandler {
             jobId = ctx.args()[0];
         }
 
-        ApiHelper.ReplayRenderResult replayResult = replayResults.get(jobId);
+        OstellaApi.ReplayRenderResult replayResult = replayResults.get(jobId);
         if (replayResult != null) {
             PendingMessage video = replayResult.qqFile() != null
                     ? PendingMessage.ofUploadedVideo(replayResult.qqFile(), replayResult.videoUrl())
@@ -281,7 +281,7 @@ public final class ReplayCommandHandler {
             return;
         }
 
-        ctx.sendReply(replyFactory.replayStatMessage(ctx, jobId, ApiHelper.getRenderStat(jobId)));
+        ctx.sendReply(replyFactory.replayStatMessage(ctx, jobId, OstellaApi.getRenderStat(jobId)));
     }
 
     public void handleRcancel(Context ctx) {
@@ -309,7 +309,7 @@ public final class ReplayCommandHandler {
             }
         }
 
-        var result = ApiHelper.cancelReplayRender(jobId);
+        var result = OstellaApi.cancelReplayRender(jobId);
         String status = Objects.toString(result.getStatus(), "unknown").toLowerCase();
         String message = switch (status) {
             case "canceled" -> "回放渲染已取消。";

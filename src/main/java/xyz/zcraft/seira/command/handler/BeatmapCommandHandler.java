@@ -1,7 +1,7 @@
 package xyz.zcraft.seira.command.handler;
 
 import org.jline.utils.Log;
-import xyz.zcraft.seira.api.ApiHelper;
+import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.Response;
 import xyz.zcraft.seira.api.data.SearchQuery;
 import xyz.zcraft.seira.api.data.SearchResultItem;
@@ -48,8 +48,8 @@ public final class BeatmapCommandHandler {
     }
 
     public void handleDaily(Context ctx) {
-        try (var timing = taskCoordinator.beginRequest(ctx, "Daily Challenge")) {
-            var daily = ApiHelper.getDaily();
+        try (var _ = taskCoordinator.beginRequest(ctx, "Daily Challenge")) {
+            var daily = OstellaApi.getDaily();
             ctx.sendReply(PendingMessage.ofMarkdownRaw(daily));
         }
     }
@@ -73,19 +73,19 @@ public final class BeatmapCommandHandler {
                 case SCORE -> scoreId = target.id();
                 case SET -> {
                     beatmapsetId = Long.parseLong(target.id());
-                    beatmapId = ApiHelper.lookupBeatmapInSet(beatmapsetId, target.index(), accessTokenProvider.apply(ctx.senderUserId()));
+                    beatmapId = OstellaApi.lookupBeatmapInSet(beatmapsetId, target.index(), accessTokenProvider.apply(ctx.senderUserId()));
                 }
                 case RS, RP, BP -> {
                     String player = resolver.player(target.player(), ctx.senderUserId());
-                    long uid = ApiHelper.resolveUid(player);
-                    scoreId = ApiHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
+                    long uid = OstellaApi.resolveUid(player);
+                    scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
                 }
-                case MP -> beatmapId = ApiHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                case MP -> beatmapId = OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
                 case MEMORY -> {}
             }
-            if (beatmapId == null && scoreId != null) beatmapId = ApiHelper.getScoreBeatmapId(scoreId);
+            if (beatmapId == null && scoreId != null) beatmapId = OstellaApi.getScoreBeatmapId(scoreId);
             if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
-            var response = ApiHelper.getBeatmapResponse(beatmapId, (ctx.argumentCount() > target.consumedArgs() ? ctx.argument(target.consumedArgs()) : null));
+            var response = OstellaApi.getBeatmapResponse(beatmapId, (ctx.argumentCount() > target.consumedArgs() ? ctx.argument(target.consumedArgs()) : null));
             history.remember(ctx, beatmapsetId, beatmapId, scoreId);
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.beatmapMessage(ctx, response)));
         }
@@ -100,7 +100,7 @@ public final class BeatmapCommandHandler {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.BMA));
             return;
         }
-        try (var timing = taskCoordinator.beginRequest(ctx, "Beatmap Analysis")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "Beatmap Analysis")) {
             var previous = target.kind() == TargetInput.Kind.MEMORY ? remembered : null;
             Long beatmapId = previous == null ? null : previous.beatmapId();
             Long beatmapsetId = previous == null ? null : previous.beatmapsetId();
@@ -110,19 +110,19 @@ public final class BeatmapCommandHandler {
                 case SCORE -> scoreId = target.id();
                 case SET -> {
                     beatmapsetId = Long.parseLong(target.id());
-                    beatmapId = ApiHelper.lookupBeatmapInSet(beatmapsetId, target.index(), accessTokenProvider.apply(ctx.senderUserId()));
+                    beatmapId = OstellaApi.lookupBeatmapInSet(beatmapsetId, target.index(), accessTokenProvider.apply(ctx.senderUserId()));
                 }
                 case RS, RP, BP -> {
                     String player = resolver.player(target.player(), ctx.senderUserId());
-                    long uid = ApiHelper.resolveUid(player);
-                    scoreId = ApiHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
+                    long uid = OstellaApi.resolveUid(player);
+                    scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
                 }
-                case MP -> beatmapId = ApiHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                case MP -> beatmapId = OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
                 case MEMORY -> {}
             }
-            if (beatmapId == null && scoreId != null) beatmapId = ApiHelper.getScoreBeatmapId(scoreId);
+            if (beatmapId == null && scoreId != null) beatmapId = OstellaApi.getScoreBeatmapId(scoreId);
             if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
-            var response = ApiHelper.getBeatmapAnalysisResponse(beatmapId, (ctx.argumentCount() > target.consumedArgs() ? ctx.argument(target.consumedArgs()) : null));
+            var response = OstellaApi.getBeatmapAnalysisResponse(beatmapId, (ctx.argumentCount() > target.consumedArgs() ? ctx.argument(target.consumedArgs()) : null));
             history.remember(ctx, beatmapsetId, beatmapId, scoreId);
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.beatmapMessage(ctx, response)));
         }
@@ -136,7 +136,7 @@ public final class BeatmapCommandHandler {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.AP));
             return;
         }
-        try (var timing = taskCoordinator.beginRequest(ctx, "Audio Preview")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "Audio Preview")) {
             var previous = target.kind() == TargetInput.Kind.MEMORY ? remembered : null;
             Long beatmapId = previous == null ? null : previous.beatmapId();
             Long beatmapsetId = previous == null ? null : previous.beatmapsetId();
@@ -148,16 +148,16 @@ public final class BeatmapCommandHandler {
                 case SET -> beatmapsetId = Long.parseLong(target.id());
                 case RS, RP, BP -> {
                     String player = resolver.player(target.player(), ctx.senderUserId());
-                    long uid = ApiHelper.resolveUid(player);
-                    scoreId = ApiHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
+                    long uid = OstellaApi.resolveUid(player);
+                    scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
                 }
-                case MP -> beatmapsetId = ApiHelper.lookupMultiplayerBeatmapset(accessTokenProvider.apply(ctx.senderUserId()));
+                case MP -> beatmapsetId = OstellaApi.lookupMultiplayerBeatmapset(accessTokenProvider.apply(ctx.senderUserId()));
                 case MEMORY -> {}
             }
             if (beatmapsetId == null) {
-                if (beatmapId == null && scoreId != null) beatmapId = ApiHelper.getScoreBeatmapId(scoreId);
+                if (beatmapId == null && scoreId != null) beatmapId = OstellaApi.getScoreBeatmapId(scoreId);
                 if (beatmapId == null) throw new ResolutionException("请指定指令目标喵");
-                beatmapsetId = ApiHelper.lookupBeatmapsetForBeatmap(beatmapId, accessTokenProvider.apply(ctx.senderUserId()));
+                beatmapsetId = OstellaApi.lookupBeatmapsetForBeatmap(beatmapId, accessTokenProvider.apply(ctx.senderUserId()));
             }
             history.remember(ctx, beatmapsetId, beatmapId, scoreId);
             ctx.sendReply(PendingMessage.ofVoiceUrl("https://b.ppy.sh/preview/" + beatmapsetId + ".mp3").doUpload(false));
@@ -205,24 +205,24 @@ public final class BeatmapCommandHandler {
                 case SCORE -> scoreId = target.id();
                 case SET -> {
                     beatmapsetId = Long.parseLong(target.id());
-                    beatmapId = ApiHelper.lookupBeatmapInSet(beatmapsetId, target.index(), accessTokenProvider.apply(ctx.senderUserId()));
+                    beatmapId = OstellaApi.lookupBeatmapInSet(beatmapsetId, target.index(), accessTokenProvider.apply(ctx.senderUserId()));
                 }
                 case RS, RP, BP -> {
                     String player = resolver.player(target.player(), ctx.senderUserId());
-                    long uid = ApiHelper.resolveUid(player);
-                    scoreId = ApiHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
+                    long uid = OstellaApi.resolveUid(player);
+                    scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
                 }
-                case MP -> beatmapId = ApiHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                case MP -> beatmapId = OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
                 case MEMORY -> {}
             }
-            if (beatmapId == null && scoreId != null) beatmapId = ApiHelper.getScoreBeatmapId(scoreId);
+            if (beatmapId == null && scoreId != null) beatmapId = OstellaApi.getScoreBeatmapId(scoreId);
             if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
-            var task = ApiHelper.createBeatmapPreviewTask(beatmapId, mods, range, qqUpload);
+            var task = OstellaApi.createBeatmapPreviewTask(beatmapId, mods, range, qqUpload);
             history.remember(ctx, beatmapsetId, beatmapId, scoreId);
             videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
             ctx.sendReply(replyFactory.replayMessage(ctx, task));
 
-            ApiHelper.ReplayRenderResult result;
+            OstellaApi.ReplayRenderResult result;
 
             try {
                 result = taskCoordinator.waitForReplay(task);
@@ -252,7 +252,7 @@ public final class BeatmapCommandHandler {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.BGP));
             return;
         }
-        try (var timing = taskCoordinator.beginRequest(ctx, "Background Preview")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "Background Preview")) {
             var previous = target.kind() == TargetInput.Kind.MEMORY ? remembered : null;
             Long beatmapId = previous == null ? null : previous.beatmapId();
             Long beatmapsetId = previous == null ? null : previous.beatmapsetId();
@@ -262,19 +262,19 @@ public final class BeatmapCommandHandler {
                 case SCORE -> scoreId = target.id();
                 case SET -> {
                     beatmapsetId = Long.parseLong(target.id());
-                    beatmapId = ApiHelper.lookupBeatmapInSet(beatmapsetId, target.index(), accessTokenProvider.apply(ctx.senderUserId()));
+                    beatmapId = OstellaApi.lookupBeatmapInSet(beatmapsetId, target.index(), accessTokenProvider.apply(ctx.senderUserId()));
                 }
                 case RS, RP, BP -> {
                     String player = resolver.player(target.player(), ctx.senderUserId());
-                    long uid = ApiHelper.resolveUid(player);
-                    scoreId = ApiHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
+                    long uid = OstellaApi.resolveUid(player);
+                    scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
                 }
-                case MP -> beatmapId = ApiHelper.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                case MP -> beatmapId = OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
                 case MEMORY -> {}
             }
-            if (beatmapId == null && scoreId != null) beatmapId = ApiHelper.getScoreBeatmapId(scoreId);
+            if (beatmapId == null && scoreId != null) beatmapId = OstellaApi.getScoreBeatmapId(scoreId);
             if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
-            var response = ApiHelper.getBeatmapBgResponse(beatmapId);
+            var response = OstellaApi.getBeatmapBgResponse(beatmapId);
             history.remember(ctx, beatmapsetId, beatmapId, scoreId);
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.bgpMessage(ctx, response)));
         }
@@ -289,7 +289,7 @@ public final class BeatmapCommandHandler {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.DL));
             return;
         }
-        try (var timing = taskCoordinator.beginRequest(ctx, "Download Beatmap")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "Download Beatmap")) {
             var previous = target.kind() == TargetInput.Kind.MEMORY ? remembered : null;
             Long beatmapId = previous == null ? null : previous.beatmapId();
             Long beatmapsetId = previous == null ? null : previous.beatmapsetId();
@@ -301,18 +301,18 @@ public final class BeatmapCommandHandler {
                 case SET -> beatmapsetId = Long.parseLong(target.id());
                 case RS, RP, BP -> {
                     String player = resolver.player(target.player(), ctx.senderUserId());
-                    long uid = ApiHelper.resolveUid(player);
-                    scoreId = ApiHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
+                    long uid = OstellaApi.resolveUid(player);
+                    scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
                 }
-                case MP -> beatmapsetId = ApiHelper.lookupMultiplayerBeatmapset(accessTokenProvider.apply(ctx.senderUserId()));
+                case MP -> beatmapsetId = OstellaApi.lookupMultiplayerBeatmapset(accessTokenProvider.apply(ctx.senderUserId()));
                 case MEMORY -> {}
             }
             if (beatmapsetId == null) {
-                if (beatmapId == null && scoreId != null) beatmapId = ApiHelper.getScoreBeatmapId(scoreId);
+                if (beatmapId == null && scoreId != null) beatmapId = OstellaApi.getScoreBeatmapId(scoreId);
                 if (beatmapId == null) throw new ResolutionException("请指定指令目标喵");
-                beatmapsetId = ApiHelper.lookupBeatmapsetForBeatmap(beatmapId, accessTokenProvider.apply(ctx.senderUserId()));
+                beatmapsetId = OstellaApi.lookupBeatmapsetForBeatmap(beatmapId, accessTokenProvider.apply(ctx.senderUserId()));
             }
-            var response = ApiHelper.getLookupBeatmapsetResponse(beatmapsetId, accessTokenProvider.apply(ctx.senderUserId()));
+            var response = OstellaApi.getLookupBeatmapsetResponse(beatmapsetId, accessTokenProvider.apply(ctx.senderUserId()));
             history.remember(ctx, beatmapsetId, beatmapId, scoreId);
             ctx.sendReply(replyFactory.dlMessage(ctx, response));
         }
@@ -327,7 +327,7 @@ public final class BeatmapCommandHandler {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/ms <谱面集ID 或 快捷查询>"));
             return;
         }
-        try (var timing = taskCoordinator.beginRequest(ctx, "Beatmapset")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "Beatmapset")) {
             var previous = target.kind() == TargetInput.Kind.MEMORY ? remembered : null;
             Long beatmapId = previous == null ? null : previous.beatmapId();
             Long beatmapsetId = previous == null ? null : previous.beatmapsetId();
@@ -339,18 +339,18 @@ public final class BeatmapCommandHandler {
                 case SET -> beatmapsetId = Long.parseLong(target.id());
                 case RS, RP, BP -> {
                     String player = resolver.player(target.player(), ctx.senderUserId());
-                    long uid = ApiHelper.resolveUid(player);
-                    scoreId = ApiHelper.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
+                    long uid = OstellaApi.resolveUid(player);
+                    scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
                 }
-                case MP -> beatmapsetId = ApiHelper.lookupMultiplayerBeatmapset(accessTokenProvider.apply(ctx.senderUserId()));
+                case MP -> beatmapsetId = OstellaApi.lookupMultiplayerBeatmapset(accessTokenProvider.apply(ctx.senderUserId()));
                 case MEMORY -> {}
             }
             if (beatmapsetId == null) {
-                if (beatmapId == null && scoreId != null) beatmapId = ApiHelper.getScoreBeatmapId(scoreId);
+                if (beatmapId == null && scoreId != null) beatmapId = OstellaApi.getScoreBeatmapId(scoreId);
                 if (beatmapId == null) throw new ResolutionException("请指定指令目标喵");
-                beatmapsetId = ApiHelper.lookupBeatmapsetForBeatmap(beatmapId, accessTokenProvider.apply(ctx.senderUserId()));
+                beatmapsetId = OstellaApi.lookupBeatmapsetForBeatmap(beatmapId, accessTokenProvider.apply(ctx.senderUserId()));
             }
-            var response = ApiHelper.getBeatmapsetResponse(beatmapsetId);
+            var response = OstellaApi.getBeatmapsetResponse(beatmapsetId);
             history.remember(ctx, beatmapsetId, beatmapId, scoreId);
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.beatmapsetMessage(ctx, response)));
         }
@@ -362,8 +362,8 @@ public final class BeatmapCommandHandler {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/sms [#页数] <搜索关键字>"));
             return;
         }
-        try (var timing = taskCoordinator.beginRequest(ctx, "Search Beatmapset")) {
-            Response<List<SearchResultItem>> searchResponse = ApiHelper.searchBeatmapSetResponse(searchQuery);
+        try (var _ = taskCoordinator.beginRequest(ctx, "Search Beatmapset")) {
+            Response<List<SearchResultItem>> searchResponse = OstellaApi.searchBeatmapSetResponse(searchQuery);
             ctx.sendReply(replyFactory.searchMessage(ctx, searchResponse, searchQuery));
         }
     }

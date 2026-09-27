@@ -4,7 +4,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bouncycastle.util.encoders.Base64Encoder;
 import xyz.zcraft.osu.model.UserExtended;
-import xyz.zcraft.seira.api.ApiHelper;
+import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.FriendEntry;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.Response;
@@ -148,8 +148,8 @@ public class DebugRoutes {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用户信息更新失败"));
             return;
         }
-        try (var timing = taskCoordinator.beginRequest(ctx, "Update All User Info")) {
-            var users = ApiHelper.getUsers(allUsers);
+        try (var _ = taskCoordinator.beginRequest(ctx, "Update All User Info")) {
+            var users = OstellaApi.getUsers(allUsers);
             for (var user : users) {
                 UserDataStore.storeUserInfo(user.getId(), user.getUsername());
             }
@@ -158,7 +158,7 @@ public class DebugRoutes {
     }
 
     public void handleGetAllFriends(Context ctx) {
-        try (var timing = taskCoordinator.beginRequest(ctx, "Get All Friends")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "Get All Friends")) {
             try {
                 final List<OsuAuthHelper.TokenStore> allOsuTokens = UserDataStore.getAllOsuTokens();
                 allOsuTokens
@@ -167,8 +167,8 @@ public class DebugRoutes {
                         .map(authHelper::updateTokenAndGet)
                         .map(OsuToken::accessToken)
                         .forEach(accessToken -> {
-                            final Response<UserExtended> self = ApiHelper.getSelf(accessToken);
-                            final Response<List<FriendEntry>> response = ApiHelper.getFollowed(accessToken);
+                            final Response<UserExtended> self = OstellaApi.getSelf(accessToken);
+                            final Response<List<FriendEntry>> response = OstellaApi.getFollowed(accessToken);
                             final List<FriendEntry> content = response.getContent();
                             final List<Long> ids = content.stream().map(e -> e.user().getId()).toList();
 
@@ -207,7 +207,7 @@ public class DebugRoutes {
     }
 
     public void handleValidateToken(Context ctx) {
-        try (var timing = taskCoordinator.beginRequest(ctx, "Validate Token")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "Validate Token")) {
             int updated = 0, removed = 0;
             try {
                 final List<OsuAuthHelper.TokenStore> allOsuTokens = UserDataStore.getAllOsuTokens();

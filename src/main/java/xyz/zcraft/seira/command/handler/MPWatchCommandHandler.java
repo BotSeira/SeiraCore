@@ -3,7 +3,7 @@ package xyz.zcraft.seira.command.handler;
 import xyz.zcraft.osu.model.MultiplayerRoom;
 import xyz.zcraft.osu.model.User;
 import xyz.zcraft.osu.model.UserExtended;
-import xyz.zcraft.seira.api.ApiHelper;
+import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.RomAIApi;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.Response;
@@ -124,12 +124,12 @@ public final class MPWatchCommandHandler {
                 return;
             }
 
-            final UserExtended userRaw = ApiHelper.getUserRaw(boundUid);
+            final UserExtended userRaw = OstellaApi.getUserRaw(boundUid);
 
             username = userRaw.getUsername();
         } else if (ctx.argumentCount() == 1) {
             final String player = resolver.player(ctx.argument(0), null);
-            final User content = ApiHelper.getUserRaw(ApiHelper.resolveUid(player));
+            final User content = OstellaApi.getUserRaw(OstellaApi.resolveUid(player));
             username = content.getUsername();
         } else {
             ctx.sendReply(at(ctx) + "用法：/romai [@user]");
@@ -206,7 +206,7 @@ public final class MPWatchCommandHandler {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "由于未绑定账户，无法获取当前房间，请手动提供ID~"));
                 return;
             }
-            final Response<MultiplayerRoom> multiplayerRoom = ApiHelper.getMultiplayerRoom(osuToken.accessToken());
+            final Response<MultiplayerRoom> multiplayerRoom = OstellaApi.getMultiplayerRoom(osuToken.accessToken());
             target = new RoomTarget(multiplayerRoom.getContent().getId(), MPVersion.LAZER, null);
         } else {
             MPVersion version = null;

@@ -7,6 +7,7 @@ import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
+import xyz.zcraft.seira.ai.data.AgentFile;
 import xyz.zcraft.seira.ai.data.AppConversationBrief;
 import xyz.zcraft.seira.ai.data.ChatQueryResponse;
 import xyz.zcraft.seira.command.Context;
@@ -22,17 +23,28 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class AgentService {
     public static final int CONTEXT_SIZE = 30;
-
+    // <faceType=1,faceId="86",ext="eyJ0ZXh0Ijoi5oCE54GrIn0=">
+    // <faceType=1,faceId="497",ext="eyJ0ZXh0Ijoi5LyR5YGH5LqGIn0=">
+    private static final Pattern QQ_FACE = Pattern.compile(
+            "<faceType=[1|3],faceId=\"(\\d+)\",ext=\"([^\"]+)\">", Pattern.CASE_INSENSITIVE
+    );
+    // <faceType=6,faceId="0",ext="eyJ0ZXh0IjoiIn0="> ![ECA4B87395655D69E285314BAB3A2105.jpg](https://multimedia.nt.qq.com.cn/download?appid=14....9_U&spec=0)
+    private static final Pattern QQ_MEME = Pattern.compile(
+            "<faceType=6,faceId=\"0\",ext=\"([^\"]+)\">(?: !\\[.*]\\(.*\\))?", Pattern.CASE_INSENSITIVE
+    );
+    // <faceType=4,faceId="",ext="eyJ0ZXh0IjoiW+eCueeCueeCuV0ifQ==">
+    private static final Pattern QQ_MEME_ALT = Pattern.compile(
+            "<faceType=4,faceId=\"\",ext=\"([^\"]+)\">", Pattern.CASE_INSENSITIVE
+    );
     private final Api api;
-
     private final Map<StateOwner, State> states = new ConcurrentHashMap<>();
-
     private final Map<String, Deque<String>> chatLog = new ConcurrentHashMap<>();
-
     private final Map<StateOwner, Object> stateCreationLocks = new ConcurrentHashMap<>();
 
     public AgentService(LLMConfig config) {
@@ -81,6 +93,46 @@ public class AgentService {
         return input.substring(0, 150) + "... 已省略 ..." + input.substring(input.length() - 150);
     }
 
+    private static String parseQqMeme(String original) {
+        final Matcher qqFaceMatcher = QQ_FACE.matcher(original);
+
+        if (qqFaceMatcher.matches()) {
+            original = qqFaceMatcher.replaceAll(r -> {
+                final String extBase64 = r.group(2);
+                final String ext = new String(Base64.getDecoder().decode(extBase64));
+                final String text = JsonParser.parseString(ext).getAsJsonObject().get("text").getAsString();
+                return "[表情:" + text + "]";
+            });
+        }
+
+        final Matcher qqMemeMatcher = QQ_MEME.matcher(original);
+
+        if (qqMemeMatcher.matches()) {
+            original = qqMemeMatcher.replaceAll("[表情]");
+        }
+
+        final Matcher qqMemeAltMatcher = QQ_MEME_ALT.matcher(original);
+
+        if (qqMemeAltMatcher.matches()) {
+            original = qqMemeAltMatcher.replaceAll(r -> {
+                final String extBase64 = r.group(1);
+                final String ext = new String(Base64.getDecoder().decode(extBase64));
+                final String text = JsonParser.parseString(ext).getAsJsonObject().get("text").getAsString();
+                return "[表情:" + text + "]";
+            });
+        }
+
+        return original;
+    }
+
+    private static String processMessage(String original) {
+        try {
+            return parseQqMeme(original);
+        } catch (Exception e) {
+            return original;
+        }
+    }
+
     public void recordHistory(String groupId, String sender, String message) {
         if (groupId == null || groupId.isEmpty()
                 || sender == null || sender.isEmpty()
@@ -88,7 +140,7 @@ public class AgentService {
             return;
         }
 
-        final String historyMessage = "<@" + sender + ">" + ": " + message;
+        final String historyMessage = "**<@" + sender + ">**" + ": " + processMessage(message);
 
         final Deque<String> log = chatLog.computeIfAbsent(groupId, _ -> new ArrayDeque<>());
 
@@ -110,11 +162,20 @@ public class AgentService {
     }
 
     public String input(String groupId, String openId, String rawContent, Function<String, String> contextFunc) {
-        return input(groupId, openId, rawContent, contextFunc, null);
+        return input(groupId, openId, rawContent, contextFunc, null, null);
     }
 
     public String input(
-            String groupId, String openId, String rawContent, Function<String, String> contextFunc, StreamHandler handler
+            String groupId, String openId, String rawContent,
+            Function<String, String> contextFunc, StreamHandler handler
+    ) {
+        return input(groupId, openId, rawContent, contextFunc, handler, null);
+    }
+
+    public String input(
+            String groupId, String openId, String rawContent,
+            Function<String, String> contextFunc, StreamHandler handler,
+            List<AgentFile> attachments
     ) {
         final StateOwner owner = StateOwner.of(groupId, openId);
         final State state = getOrCreateState(owner);
@@ -133,8 +194,10 @@ public class AgentService {
 
             String query = "";
 
+            final String message = processMessage(rawContent);
+
             if (pendingMessages.isEmpty()) {
-                query = "<@" + openId + ">" + ": " + rawContent;
+                query = "**<@" + openId + ">**" + ": " + message;
             } else {
                 if (pendingMessages.size() == CONTEXT_SIZE) {
                     query += "====== ...历史消息较多已省略 ======";
@@ -144,10 +207,10 @@ public class AgentService {
                         + "====== 以上是最近的所有消息 ======\n"
                         + "====== 以下是本次询问的内容 ======\n"
                         + "\n"
-                        + "<@" + openId + ">" + ": " + rawContent;
+                        + "**<@" + openId + ">**" + ": " + message;
             }
 
-            recordHistory(groupId, openId, rawContent);
+            recordHistory(groupId, openId, message);
 
             state.resetIfNeeded(api, groupId);
 
@@ -160,9 +223,9 @@ public class AgentService {
             final String answer;
             try {
                 if (handler != null) {
-                    answer = api.chatQueryStreaming(groupId, state.conv.appConversationID(), query, handler);
+                    answer = api.chatQueryStreaming(groupId, state.conv.appConversationID(), query, handler, attachments);
                 } else {
-                    var response = api.chatQuery(groupId, state.conv.appConversationID(), query);
+                    var response = api.chatQuery(groupId, state.conv.appConversationID(), query, attachments);
                     answer = response.answer();
                 }
             } catch (RuntimeException | Error e) {
@@ -324,7 +387,6 @@ public class AgentService {
         }
     }
 
-
     record StateOwner(String groupId, String openId) {
         public static StateOwner of(
                 String groupId,
@@ -432,7 +494,7 @@ class Api {
         }
     }
 
-    public ChatQueryResponse chatQuery(String groupId, String appConvId, String query) {
+    public ChatQueryResponse chatQuery(String groupId, String appConvId, String query, List<AgentFile> attachments) {
         LOG.info("Running chat query for id {}", groupId);
 
         JsonObject body = new JsonObject();
@@ -440,6 +502,10 @@ class Api {
         body.addProperty("AppConversationID", appConvId);
         body.addProperty("Query", query);
         body.addProperty("ResponseMode", "blocking");
+
+        if (attachments != null) {
+            body.add("QueryExtends", GSON.toJsonTree(Map.of("Files", attachments)));
+        }
 
         try {
             var request = newRequest("/api/proxy/api/v1/chat_query_v2")
@@ -467,7 +533,7 @@ class Api {
         }
     }
 
-    public String chatQueryStreaming(String groupId, String appConvId, String query, StreamHandler handler) {
+    public String chatQueryStreaming(String groupId, String appConvId, String query, StreamHandler handler, List<AgentFile> attachments) {
         LOG.info("Running chat query for id {}", groupId);
 
         JsonObject body = new JsonObject();
@@ -475,6 +541,10 @@ class Api {
         body.addProperty("AppConversationID", appConvId);
         body.addProperty("Query", query);
         body.addProperty("ResponseMode", "streaming");
+
+        if (attachments != null) {
+            body.add("QueryExtends", GSON.toJsonTree(Map.of("Files", attachments)));
+        }
 
         try {
             var request = newRequest("/api/proxy/api/v1/chat_query_v2")

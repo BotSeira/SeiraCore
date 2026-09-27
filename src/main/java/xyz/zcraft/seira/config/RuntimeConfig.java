@@ -55,7 +55,8 @@ public final class RuntimeConfig {
                 previous.cos(),
                 previous.discord(),
                 previous.bridge(),
-                previous.llm()
+                previous.llm(),
+                previous.asteroid()
         );
     }
 
