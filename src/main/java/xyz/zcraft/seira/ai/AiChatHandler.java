@@ -2,8 +2,10 @@ package xyz.zcraft.seira.ai;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import xyz.zcraft.seira.ai.data.AgentFile;
 import xyz.zcraft.seira.bot.data.Attachment;
 import xyz.zcraft.seira.bot.data.GroupBotState;
+import xyz.zcraft.seira.bot.data.MsgElem;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.parse.Resolver;
@@ -79,11 +81,23 @@ public class AiChatHandler {
         ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/ai [on|off]"));
     }
 
-    public void handleChat(Context ctx, String message) {
+    public void handleChat(Context ctx, String message, List<MsgElem> elems) {
         if (agentService.isRunning(ctx.groupId(), ctx.senderUserId())) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "已有一轮对话正在进行中了喵，请稍作等待~"));
             return;
         }
+
+        final List<AgentFile> attachments = elems.stream()
+                .filter(e -> e.attachments() != null)
+                .flatMap(e -> e.attachments().stream())
+                .map(e -> new AgentFile(e.filename(), null, e.size(), e.url()))
+                .toList();
+
+        final var refContent = elems.stream()
+                .filter(e -> e.content() != null && !e.content().isBlank())
+                .findFirst()
+                .map(MsgElem::content)
+                .orElse(null);
 
         agentService.input(
                 ctx.groupId(),
@@ -109,7 +123,9 @@ public class AiChatHandler {
                                 true
                         );
                     }
-                }
+                },
+                attachments,
+                refContent
         );
     }
 

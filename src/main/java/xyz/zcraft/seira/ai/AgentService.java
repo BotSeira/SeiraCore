@@ -161,21 +161,10 @@ public class AgentService {
         }
     }
 
-    public String input(String groupId, String openId, String rawContent, Function<String, String> contextFunc) {
-        return input(groupId, openId, rawContent, contextFunc, null, null);
-    }
-
-    public String input(
-            String groupId, String openId, String rawContent,
-            Function<String, String> contextFunc, StreamHandler handler
-    ) {
-        return input(groupId, openId, rawContent, contextFunc, handler, null);
-    }
-
     public String input(
             String groupId, String openId, String rawContent,
             Function<String, String> contextFunc, StreamHandler handler,
-            List<AgentFile> attachments
+            List<AgentFile> attachments, String refContent
     ) {
         final StateOwner owner = StateOwner.of(groupId, openId);
         final State state = getOrCreateState(owner);
@@ -192,22 +181,29 @@ public class AgentService {
                 state.incomingMessages.clear();
             }
 
-            String query = "";
+            var query = new StringBuilder();
 
             final String message = processMessage(rawContent);
 
             if (pendingMessages.isEmpty()) {
-                query = "**<@" + openId + ">**" + ": " + message;
+                query.append("**<@").append(openId).append(">**").append(": ").append(message);
             } else {
                 if (pendingMessages.size() == CONTEXT_SIZE) {
-                    query += "====== ...历史消息较多已省略 ======";
+                    query.append("====== ...历史消息较多已省略 ======");
                 }
-                query += String.join("\n", pendingMessages)
-                        + "\n"
-                        + "====== 以上是最近的所有消息 ======\n"
-                        + "====== 以下是本次询问的内容 ======\n"
-                        + "\n"
-                        + "**<@" + openId + ">**" + ": " + message;
+                query.append(String.join("\n", pendingMessages))
+                        .append("\n")
+                        .append("====== 以上是最近的所有消息 ======\n");
+
+                if (refContent != null && !refContent.isBlank()) {
+                    query.append("====== 以下本次询问引用的消息 ======\n")
+                            .append(refContent)
+                            .append("\n");
+                }
+
+                query.append("====== 以下是本次询问的内容 ======\n")
+                        .append("\n")
+                        .append("**<@").append(openId).append(">**").append(": ").append(message);
             }
 
             recordHistory(groupId, openId, message);
@@ -215,7 +211,7 @@ public class AgentService {
             state.resetIfNeeded(api, groupId);
 
             if (contextFunc != null) {
-                state.getVars().put("CONTEXT", contextFunc.apply(query));
+                state.getVars().put("CONTEXT", contextFunc.apply(query.toString()));
             }
 
             api.updateConversation(groupId, state.conv.appConversationID(), state.vars);
@@ -223,9 +219,9 @@ public class AgentService {
             final String answer;
             try {
                 if (handler != null) {
-                    answer = api.chatQueryStreaming(groupId, state.conv.appConversationID(), query, handler, attachments);
+                    answer = api.chatQueryStreaming(groupId, state.conv.appConversationID(), query.toString(), handler, attachments);
                 } else {
-                    var response = api.chatQuery(groupId, state.conv.appConversationID(), query, attachments);
+                    var response = api.chatQuery(groupId, state.conv.appConversationID(), query.toString(), attachments);
                     answer = response.answer();
                 }
             } catch (RuntimeException | Error e) {
@@ -494,7 +490,9 @@ class Api {
         }
     }
 
-    public ChatQueryResponse chatQuery(String groupId, String appConvId, String query, List<AgentFile> attachments) {
+    public ChatQueryResponse chatQuery(
+            String groupId, String appConvId, String query, List<AgentFile> attachments
+    ) {
         LOG.info("Running chat query for id {}", groupId);
 
         JsonObject body = new JsonObject();
@@ -503,7 +501,7 @@ class Api {
         body.addProperty("Query", query);
         body.addProperty("ResponseMode", "blocking");
 
-        if (attachments != null) {
+        if (attachments != null && !attachments.isEmpty()) {
             body.add("QueryExtends", GSON.toJsonTree(Map.of("Files", attachments)));
         }
 
@@ -533,7 +531,9 @@ class Api {
         }
     }
 
-    public String chatQueryStreaming(String groupId, String appConvId, String query, StreamHandler handler, List<AgentFile> attachments) {
+    public String chatQueryStreaming(
+            String groupId, String appConvId, String query, StreamHandler handler, List<AgentFile> attachments
+    ) {
         LOG.info("Running chat query for id {}", groupId);
 
         JsonObject body = new JsonObject();
@@ -542,7 +542,7 @@ class Api {
         body.addProperty("Query", query);
         body.addProperty("ResponseMode", "streaming");
 
-        if (attachments != null) {
+        if (attachments != null && !attachments.isEmpty()) {
             body.add("QueryExtends", GSON.toJsonTree(Map.of("Files", attachments)));
         }
 

@@ -9,6 +9,7 @@ import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import xyz.zcraft.seira.bot.data.AccessToken;
 import xyz.zcraft.seira.bot.data.Attachment;
+import xyz.zcraft.seira.bot.data.MsgElem;
 import xyz.zcraft.seira.command.AttachmentHandler;
 import xyz.zcraft.seira.command.route.Router;
 import xyz.zcraft.seira.config.AppConfig;
@@ -171,7 +172,14 @@ public class WSClient extends WebSocketClient {
             }
         }
 
-        router.onPrivateMessageReceived(openId, msgId, content, msgIdx, attachmentList);
+        List<MsgElem> msgElemList = new ArrayList<>();
+
+        if (data.has("msg_elements")) {
+            data.get("msg_elements").getAsJsonArray()
+                    .forEach(elem -> msgElemList.add(gson.fromJson(elem, MsgElem.class)));
+        }
+
+        router.onPrivateMessageReceived(openId, msgId, content, msgIdx, attachmentList, msgElemList);
     }
 
     private void onC2CFile(JsonObject payload) {
@@ -214,6 +222,13 @@ public class WSClient extends WebSocketClient {
             }
         }
 
+        List<MsgElem> msgElemList = new ArrayList<>();
+
+        if (data.has("msg_elements")) {
+            data.get("msg_elements").getAsJsonArray()
+                    .forEach(elem -> msgElemList.add(gson.fromJson(elem, MsgElem.class)));
+        }
+
         List<Attachment> attachments = parseAttachments(data);
         Map<String, String> mentions = parseMentions(data);
 
@@ -229,7 +244,7 @@ public class WSClient extends WebSocketClient {
             ));
         }
 
-        router.onGroupMessageReceived(groupId, openId, msgId, content, msgIdx, attachments);
+        router.onGroupMessageReceived(groupId, openId, msgId, content, msgIdx, attachments, msgElemList);
     }
 
     private Map<String, String> parseMentions(JsonObject data) {
