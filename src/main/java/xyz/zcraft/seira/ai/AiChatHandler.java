@@ -91,6 +91,7 @@ public class AiChatHandler {
                 .filter(e -> e.attachments() != null)
                 .flatMap(e -> e.attachments().stream())
                 .map(e -> new AgentFile(e.filename(), null, e.size(), e.url()))
+                .filter(AgentFile::isValid)
                 .toList();
 
         final var refContent = elems.stream()

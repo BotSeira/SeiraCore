@@ -8,4 +8,7 @@ public record AgentFile(
         @SerializedName("Size") Long size,
         @SerializedName("Url") String url
 ) {
+    public boolean isValid() {
+        return name != null && url != null;
+    }
 }

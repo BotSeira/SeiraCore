@@ -66,7 +66,7 @@ public class OstellaApi {
 
             final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
             ApiUtil.ensureApiSuccess(r, "获取多人房间失败");
-            final JsonArray data = r.getData().getAsJsonArray();
+            final JsonArray data = ApiUtil.requireResultArray(r, "获取好友响应缺少结果数组");
 
             LinkedList<FriendEntry> followed = new LinkedList<>();
 
@@ -413,7 +413,7 @@ public class OstellaApi {
 
             final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
             ApiUtil.ensureApiSuccess(rawResponse, "搜索谱面集失败");
-            final JsonArray data = rawResponse.getData().getAsJsonArray();
+            final JsonArray data = ApiUtil.requireResultArray(rawResponse, "搜索谱面集响应缺少结果数组");
 
             final LinkedList<SearchResultItem> items = new LinkedList<>();
 
@@ -935,7 +935,7 @@ public class OstellaApi {
 
             final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
             ApiUtil.ensureApiSuccess(r, "获取 Miss 数据失败");
-            final JsonArray data = r.getData().getAsJsonArray();
+            final JsonArray data = ApiUtil.requireResultArray(r, "获取 Miss 数据响应缺少结果数组");
 
             List<MissData> misses = new LinkedList<>();
             for (JsonElement datum : data) {
@@ -1037,7 +1037,7 @@ public class OstellaApi {
 
             final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
             ApiUtil.ensureApiSuccess(r, "获取用户信息失败");
-            final JsonArray data = r.getData().getAsJsonArray();
+            final JsonArray data = ApiUtil.requireResultArray(r, "获取用户信息响应缺少结果数组");
 
             List<User> users = new LinkedList<>();
             for (JsonElement datum : data) {

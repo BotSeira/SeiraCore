@@ -1,6 +1,8 @@
 package xyz.zcraft.seira.api;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import xyz.zcraft.seira.api.data.RawResponse;
 
@@ -77,5 +79,21 @@ public class ApiUtil {
             throw new RuntimeException(message);
         }
         return payload.getData().getAsJsonObject();
+    }
+
+    static JsonArray requireResultArray(RawResponse payload, String message) {
+        JsonElement data = payload.getData();
+        if (data != null && data.isJsonArray()) {
+            return data.getAsJsonArray();
+        }
+        if (data == null || !data.isJsonObject()) {
+            throw new RuntimeException(message);
+        }
+
+        JsonElement result = data.getAsJsonObject().get("result");
+        if (result == null || !result.isJsonArray()) {
+            throw new RuntimeException(message);
+        }
+        return result.getAsJsonArray();
     }
 }
