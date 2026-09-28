@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.ai;
+package xyz.zcraft.seira.ai.provider;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -8,6 +8,7 @@ import lombok.Setter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
+import xyz.zcraft.seira.ai.StreamHandler;
 import xyz.zcraft.seira.ai.data.AgentFile;
 import xyz.zcraft.seira.ai.data.AppConversationBrief;
 import xyz.zcraft.seira.ai.data.ChatQueryResponse;
@@ -29,8 +30,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-public class AgentService {
-    public static final int CONTEXT_SIZE = 30;
+class HiAgentProvider implements ChatProvider {
     // <faceType=1,faceId="86",ext="eyJ0ZXh0Ijoi5oCE54GrIn0=">
     // <faceType=1,faceId="497",ext="eyJ0ZXh0Ijoi5LyR5YGH5LqGIn0=">
     private static final Pattern QQ_FACE = Pattern.compile(
@@ -49,7 +49,7 @@ public class AgentService {
     private final Map<String, Deque<String>> chatLog = new ConcurrentHashMap<>();
     private final Map<StateOwner, Object> stateCreationLocks = new ConcurrentHashMap<>();
 
-    public AgentService(LLMConfig config) {
+    protected HiAgentProvider(LLMConfig config) {
         this.api = new Api(config);
     }
 
@@ -135,6 +135,7 @@ public class AgentService {
         }
     }
 
+    @Override
     public void recordHistory(String groupId, String sender, String message) {
         if (groupId == null || groupId.isEmpty()
                 || sender == null || sender.isEmpty()
@@ -163,6 +164,7 @@ public class AgentService {
         }
     }
 
+    @Override
     public String input(
             String groupId, String openId, String rawContent,
             Function<String, String> contextFunc, StreamHandler handler,
@@ -246,6 +248,7 @@ public class AgentService {
         }
     }
 
+    @Override
     public StopStatus requireStop(String groupId, String openId) {
         final StateOwner owner = StateOwner.of(groupId, openId);
         final State state = states.get(owner);
@@ -266,6 +269,7 @@ public class AgentService {
         }
     }
 
+    @Override
     public boolean isRunning(String groupId, String openId) {
         final State state = states.get(
                 StateOwner.of(groupId, openId)
@@ -274,6 +278,7 @@ public class AgentService {
         return state != null && state.running.get();
     }
 
+    @Override
     public boolean clearState(String groupId, String openId) {
         final State state = states.get(
                 StateOwner.of(groupId, openId)
@@ -287,6 +292,7 @@ public class AgentService {
         return true;
     }
 
+    @Override
     public int clearStateOfGroup(String groupId) {
         int count = 0;
 
@@ -302,6 +308,7 @@ public class AgentService {
         return count;
     }
 
+    @Override
     public int clearStateOfUser(String openId) {
         int count = 0;
 
@@ -317,6 +324,7 @@ public class AgentService {
         return count;
     }
 
+    @Override
     public Set<String> activeGroupIds() {
         return states.entrySet()
                 .stream()
@@ -357,13 +365,6 @@ public class AgentService {
         } finally {
             stateCreationLocks.remove(owner, creationLock);
         }
-    }
-
-    public enum StopStatus {
-        SUCCESS,
-        NO_CONVERSATION,
-        NOT_SUPPORTED,
-        FAILED
     }
 
     @Getter

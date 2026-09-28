@@ -3,7 +3,7 @@ package xyz.zcraft.seira.command.route;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.seira.ai.AgentService;
+import xyz.zcraft.seira.ai.provider.ChatProvider;
 import xyz.zcraft.seira.ai.AiChatHandler;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
@@ -59,7 +59,7 @@ public class Router {
             BindingService bindingService, ScoreWatchService watchService, MPWatchService mpWatchService,
             DiscordBridgeService discordBridgeService, RankGuessGameService rankGuessGameService, Executor commandExecutor,
             Runnable commandMetric, Function<byte[], UploadedImage> imageUploader, Supplier<QQUser> selfSupplier,
-            AgentService agentService, Function<String, GroupBotState> botStateGetter
+            ChatProvider chatProvider, Function<String, GroupBotState> botStateGetter
     ) {
         this.configSupplier = java.util.Objects.requireNonNull(configSupplier);
         this.commandExecutor = commandExecutor;
@@ -90,7 +90,7 @@ public class Router {
                 messageSender, taskCoordinator, replyFactory, resolver, admins::isAdmin
         );
         this.aiChatHandler = new AiChatHandler(
-                resolver, agentService, admins::isAdmin, botStateGetter
+                resolver, chatProvider, admins::isAdmin, botStateGetter
         );
         WatchCommandHandler watchCommands = new WatchCommandHandler(resolver, taskCoordinator, watchService, admins::isAdmin);
         SpecificScoreWatchCommandHandler specificScoreWatchCommands =

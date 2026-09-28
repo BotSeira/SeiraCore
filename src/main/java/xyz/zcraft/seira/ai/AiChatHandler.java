@@ -3,6 +3,7 @@ package xyz.zcraft.seira.ai;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import xyz.zcraft.seira.ai.data.AgentFile;
+import xyz.zcraft.seira.ai.provider.ChatProvider;
 import xyz.zcraft.seira.bot.data.Attachment;
 import xyz.zcraft.seira.bot.data.GroupBotState;
 import xyz.zcraft.seira.bot.data.MsgElem;
@@ -24,17 +25,17 @@ public class AiChatHandler {
     private static final Gson GSON = new Gson();
     private final Resolver resolver;
     private final Predicate<String> adminAuthorizer;
-    private final AgentService agentService;
+    private final ChatProvider chatProvider;
     private final Function<String, GroupBotState> botStateGetter;
     private final Map<String, Deque<String>> groupMentionedHistory = new ConcurrentHashMap<>();
 
     public AiChatHandler(
-            Resolver resolver, AgentService agentService, Predicate<String> isAdmin,
+            Resolver resolver, ChatProvider chatProvider, Predicate<String> isAdmin,
             Function<String, GroupBotState> botStateGetter
     ) {
         this.resolver = resolver;
         this.adminAuthorizer = isAdmin;
-        this.agentService = agentService;
+        this.chatProvider = chatProvider;
         this.botStateGetter = botStateGetter;
     }
 
@@ -78,11 +79,11 @@ public class AiChatHandler {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "已禁用本群AI对话喵。"));
                 return;
             } else if ("reset".equalsIgnoreCase(ctx.argument(0))) {
-                agentService.clearState(ctx.groupId(), ctx.senderUserId());
+                chatProvider.clearState(ctx.groupId(), ctx.senderUserId());
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "已重置你在本群的AI对话状态喵。"));
                 return;
             } else if ("resetme".equalsIgnoreCase(ctx.argument(0))) {
-                final int i = agentService.clearStateOfUser(ctx.senderUserId());
+                final int i = chatProvider.clearStateOfUser(ctx.senderUserId());
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "已重置你在" + i + "个群中的AI对话状态喵。"));
                 return;
             } else if ("resetgroup".equalsIgnoreCase(ctx.argument(0))) {
@@ -90,11 +91,11 @@ public class AiChatHandler {
                     ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "你无权使用该命令喵。"));
                     return;
                 }
-                final int i = agentService.clearStateOfGroup(ctx.groupId());
+                final int i = chatProvider.clearStateOfGroup(ctx.groupId());
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "已重置本群" + i + "个用户的AI对话状态喵。"));
                 return;
             } else if ("stop".equalsIgnoreCase(ctx.argument(0))) {
-                final AgentService.StopStatus stopStatus = agentService.requireStop(ctx.groupId(), ctx.senderUserId());
+                final ChatProvider.StopStatus stopStatus = chatProvider.requireStop(ctx.groupId(), ctx.senderUserId());
                 ctx.sendReply(at(ctx) + switch (stopStatus) {
                     case SUCCESS -> "已停止你在本群的AI对话喵。";
                     case FAILED -> "停止AI对话失败了喵。";
@@ -111,7 +112,7 @@ public class AiChatHandler {
 
     public void handleChat(Context ctx, String message, List<MsgElem> elems) {
         final String at = at(ctx);
-        if (agentService.isRunning(ctx.groupId(), ctx.senderUserId())) {
+        if (chatProvider.isRunning(ctx.groupId(), ctx.senderUserId())) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(
                     at +
                     "已有一轮对话正在进行中了喵，请稍作等待或" + cmd("/ai stop", "取消对话") + "~")
@@ -132,7 +133,7 @@ public class AiChatHandler {
                 .map(MsgElem::content)
                 .orElse(null);
 
-        agentService.input(
+        chatProvider.input(
                 ctx.groupId(),
                 ctx.senderUserId(),
                 message,
@@ -222,6 +223,6 @@ public class AiChatHandler {
                 sb.append("\n").append("![%s](%s)".formatted(attachment.filename(), attachment.url()));
             }
         }
-        agentService.recordHistory(groupId, userId, sb.toString());
+        chatProvider.recordHistory(groupId, userId, sb.toString());
     }
 }

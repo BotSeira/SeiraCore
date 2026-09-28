@@ -4,7 +4,8 @@ import com.google.gson.Gson;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.seira.ai.AgentService;
+import xyz.zcraft.seira.ai.provider.ChatProvider;
+import xyz.zcraft.seira.ai.provider.ChatProviders;
 import xyz.zcraft.seira.bot.data.*;
 import xyz.zcraft.seira.command.AttachmentHandler;
 import xyz.zcraft.seira.command.route.Router;
@@ -45,7 +46,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
     private final ScoreWatchService watchService;
     private final MPWatchService mpWatchService;
     private final RankGuessGameService rankGuessGameService;
-    private final AgentService agentService;
+    private final ChatProvider chatProvider;
     private final RealtimeServiceInterruptionNotifier interruptionNotifier;
     private final DiscordBridgeService discordBridgeService;
     private final AppConfig startupConfig;
@@ -103,7 +104,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         this.rankGuessGameService = new RankGuessGameService();
 
         LOG.info("Initializing agents service");
-        this.agentService = new AgentService(config.llm());
+        this.chatProvider = ChatProviders.newHiAgentChatProvider(config.llm());
 
         this.attachmentHandler = new AttachmentHandler(executors.attachmentDownloads());
         this.router = new Router(
@@ -126,7 +127,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                     }
                 },
                 self::get,
-                agentService,
+                chatProvider,
                 s -> QQApi.getGroupBotState(tokenManager.getToken(), s)
 
         );
@@ -313,7 +314,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                 watchService.activeTransientGroupIds(),
                 rankGuessGameService.activeGroupIds(),
                 mpWatchService.activeGroupIds(),
-                agentService.activeGroupIds()
+                chatProvider.activeGroupIds()
         );
         if (result.failedGroups() == 0) {
             LOG.info("Sent restart interruption notices to {} affected groups", result.sentGroups());
