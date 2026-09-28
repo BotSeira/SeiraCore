@@ -3,7 +3,6 @@ package xyz.zcraft.seira.command.parse;
 import xyz.zcraft.seira.command.ResolutionException;
 
 import java.util.Locale;
-import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 

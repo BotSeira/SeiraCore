@@ -3,11 +3,8 @@ package xyz.zcraft.seira.util;
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.awt.image.ConvolveOp;
-import java.awt.image.Kernel;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
-import java.util.Arrays;
 
 import static java.lang.Math.clamp;
 

@@ -22,7 +22,6 @@ import java.util.Objects;
 import java.util.function.Predicate;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
-import static xyz.zcraft.seira.command.reply.ReplyFactory.u;
 
 public final class GeneralCommandHandler {
     private final MessageSender messageSender;
@@ -110,7 +109,7 @@ public final class GeneralCommandHandler {
     }
 
     public void handleStat(Context context) {
-        context.sendReply(replyFactory.statusMessage(context, OstellaApi.getServerStatus()));
+        context.sendReply(replyFactory.statusMessage(context, OstellaApi.getServerStatus(), AsteroidApi.getServerStatus()));
     }
 
     public void handleUnknown(Context context) {

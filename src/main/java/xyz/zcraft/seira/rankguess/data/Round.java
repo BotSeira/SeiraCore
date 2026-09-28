@@ -9,14 +9,12 @@ import xyz.zcraft.seira.rankguess.RankGuessGameService;
 import xyz.zcraft.seira.util.ImageUtil;
 import xyz.zcraft.seira.util.WeightedRandom;
 
-import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 public record Round(long userId, long scoreId, int bestIndex, long actualRank, Double pp,
                     RandomScore randomScore, boolean standard) {

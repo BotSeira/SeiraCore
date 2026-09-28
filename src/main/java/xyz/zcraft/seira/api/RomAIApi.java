@@ -8,7 +8,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.api.data.RomAIMatch;
-import xyz.zcraft.seira.config.DiscordProxyConfig;
 
 import java.net.InetSocketAddress;
 import java.net.ProxySelector;

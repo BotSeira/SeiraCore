@@ -1,6 +1,5 @@
 package xyz.zcraft.seira.bot;
 
-import com.google.gson.Gson;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.api.data.QqUploadRequest;
@@ -12,7 +11,6 @@ import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.services.CosService;
 import xyz.zcraft.seira.util.TokenManager;
 
-import java.util.Map;
 import java.util.function.Supplier;
 
 public class MessageSender {

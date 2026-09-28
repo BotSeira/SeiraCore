@@ -1,6 +1,5 @@
 package xyz.zcraft.seira.console;
 
-import xyz.zcraft.seira.bot.data.GroupInfo;
 import xyz.zcraft.seira.watch.WatchView;
 
 import java.time.Duration;

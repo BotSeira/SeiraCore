@@ -10,7 +10,6 @@ import xyz.zcraft.seira.watch.SpecificScoreWatchState;
 
 import java.sql.*;
 import java.util.*;
-import java.util.stream.Collectors;
 
 public final class UserDataStore {
     private static final Logger LOG = LogManager.getLogger(UserDataStore.class);

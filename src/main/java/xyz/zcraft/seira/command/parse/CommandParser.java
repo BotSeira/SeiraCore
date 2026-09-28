@@ -1,7 +1,6 @@
 package xyz.zcraft.seira.command.parse;
 
 import xyz.zcraft.seira.command.Context;
-import xyz.zcraft.seira.services.AiPermission;
 
 import java.util.*;
 import java.util.function.UnaryOperator;

@@ -4,7 +4,6 @@ import xyz.zcraft.seira.api.data.SearchQuery;
 import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.db.UserDataStore;
 
-import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
