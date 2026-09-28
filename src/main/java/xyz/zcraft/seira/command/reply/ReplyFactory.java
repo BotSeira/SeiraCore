@@ -476,7 +476,7 @@ public final class ReplyFactory {
     public static class ExternalUrls {
         public static final String COMMANDS = "https://docs.seira.top/overview/commands.html";
         public static final String PERMISSION = "https://docs.seira.top/overview/use.html#extra-permission";
-        public static final String CHANNEL = "https://docs.seira.top/overview/use.html#extra-permission";
+        public static final String CHANNEL = "https://pd.qq.com/s/f9icas5gj?b=5";
         public static final String CHANGELOG = "https://docs.seira.top/overview/changelog.html";
         public static final String FAQ = "https://docs.seira.top/overview/faq.html";
         public static final String GITHUB = "https://github.com/BotSeira";
