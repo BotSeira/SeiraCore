@@ -64,7 +64,7 @@ public class AsteroidApi {
 
             final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
 
-            if (response.statusCode() != 200) {
+            if (response.statusCode() == 200) {
                 return true;
             }
         } catch (Exception e) {
