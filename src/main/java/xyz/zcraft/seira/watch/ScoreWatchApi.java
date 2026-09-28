@@ -18,7 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-public class OstellaWatchApi implements WatchApi {
+public class ScoreWatchApi {
     private static final Type SCORE_MAP_TYPE = new TypeToken<Map<String, List<RecentScore>>>() {
     }.getType();
 
@@ -27,19 +27,19 @@ public class OstellaWatchApi implements WatchApi {
     private final HttpClient client;
     private final Gson gson;
 
-    public OstellaWatchApi(String endpoint) {
+    public ScoreWatchApi(String endpoint) {
         this(endpoint, null);
     }
 
-    public OstellaWatchApi(String endpoint, String serviceToken) {
+    public ScoreWatchApi(String endpoint, String serviceToken) {
         this(endpoint, serviceToken, HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(30)).build(), new Gson());
     }
 
-    OstellaWatchApi(String endpoint, HttpClient client, Gson gson) {
+    ScoreWatchApi(String endpoint, HttpClient client, Gson gson) {
         this(endpoint, null, client, gson);
     }
 
-    OstellaWatchApi(String endpoint, String serviceToken, HttpClient client, Gson gson) {
+    ScoreWatchApi(String endpoint, String serviceToken, HttpClient client, Gson gson) {
         this.endpoint = endpoint.endsWith("/") ? endpoint.substring(0, endpoint.length() - 1) : endpoint;
         this.serviceToken = serviceToken;
         this.client = client;
@@ -68,7 +68,6 @@ public class OstellaWatchApi implements WatchApi {
         throw new IllegalStateException(action + "失败: HTTP " + statusCode + " " + detail);
     }
 
-    @Override
     public Map<Long, List<RecentScore>> getRecentScores(Collection<Long> userIds, int limit) {
         JsonObject body = new JsonObject();
         body.add("user_ids", gson.toJsonTree(userIds));
@@ -101,7 +100,6 @@ public class OstellaWatchApi implements WatchApi {
         return Map.copyOf(scores);
     }
 
-    @Override
     public byte[] renderScore(long userId, long scoreId) {
         JsonObject body = new JsonObject();
         body.addProperty("name", Long.toString(userId));
@@ -123,8 +121,7 @@ public class OstellaWatchApi implements WatchApi {
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(endpoint + path))
                 .timeout(Duration.ofMinutes(2))
-                .header("Content-Type", "application/json")
-                .header("Accept", "application/json, image/*");
+                .header("Content-Type", "application/json");
         if (serviceToken != null && !serviceToken.isBlank()) {
             builder.header("Authorization", "Bearer " + serviceToken);
         }

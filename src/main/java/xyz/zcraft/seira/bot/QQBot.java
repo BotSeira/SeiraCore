@@ -84,7 +84,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
 
         LOG.info("Initializing score watch service");
         this.watchService = new ScoreWatchService(
-                new OstellaWatchApi(config.ostella().endpoint(), config.ostella().token()),
+                new ScoreWatchApi(config.ostella().endpoint(), config.ostella().token()),
                 new WatchScoreNotifier(sender),
                 new SpecificScoreNotifier(sender),
                 new SqliteSpecificScoreWatchStore(),
