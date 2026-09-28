@@ -266,13 +266,6 @@ public class AgentService {
         }
     }
 
-    public enum StopStatus {
-        SUCCESS,
-        NO_CONVERSATION,
-        NOT_SUPPORTED,
-        FAILED;
-    }
-
     public boolean isRunning(String groupId, String openId) {
         final State state = states.get(
                 StateOwner.of(groupId, openId)
@@ -364,6 +357,13 @@ public class AgentService {
         } finally {
             stateCreationLocks.remove(owner, creationLock);
         }
+    }
+
+    public enum StopStatus {
+        SUCCESS,
+        NO_CONVERSATION,
+        NOT_SUPPORTED,
+        FAILED
     }
 
     @Getter
@@ -694,7 +694,9 @@ class Api {
     private void flushMessage(@NotNull StringBuilder currentMessage, @NotNull StreamHandler handler) {
         final String message = currentMessage.toString().trim();
 
-        if (message.isBlank()) return;
+        if (message.isBlank() || "大模型接口调用出错，请联系管理员".equals(message)) {
+            return;
+        }
 
         currentMessage.setLength(0);
 

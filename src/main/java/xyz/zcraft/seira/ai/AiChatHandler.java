@@ -110,9 +110,10 @@ public class AiChatHandler {
     }
 
     public void handleChat(Context ctx, String message, List<MsgElem> elems) {
+        final String at = at(ctx);
         if (agentService.isRunning(ctx.groupId(), ctx.senderUserId())) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(
-                    at(ctx) +
+                    at +
                     "已有一轮对话正在进行中了喵，请稍作等待或" + cmd("/ai stop", "取消对话") + "~")
             );
             return;
@@ -139,7 +140,10 @@ public class AiChatHandler {
                 new StreamHandler() {
                     @Override
                     public void onText(String message) {
-                        ctx.send(true, PendingMessage.ofMarkdownRaw(at(ctx) + message), true);
+                        if (!message.trim().startsWith(at.trim())) {
+                            message = at + message;
+                        }
+                        ctx.send(true, PendingMessage.ofMarkdownRaw(message), true);
                     }
 
                     @Override
@@ -152,7 +156,7 @@ public class AiChatHandler {
                         ctx.send(
                                 true,
                                 PendingMessage.ofMarkdownRaw(
-                                        at(ctx) + "回复生成失败了喵。\n" +
+                                        at + "回复生成失败了喵。\n" +
                                         "> " + errorCode + ": " + errorMsg + "\n" +
                                         "> 若重复出现错误，请尝试" + cmd("/ai reset", "重置会话")
                                 ),
