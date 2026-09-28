@@ -23,6 +23,7 @@ import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static xyz.zcraft.seira.command.reply.ReplyFactory.ExternalUrls.PERMISSION;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class MPWatchCommandHandler {
@@ -175,7 +176,7 @@ public final class MPWatchCommandHandler {
         try (var _ = taskCoordinator.beginRequest(ctx, "Start RomAI Watch")) {
             if (!ctx.sendMessage(msg).success()) {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) +
-                        "由于缺少主动消息权限，无法启动监视！权限配置请见：<https://docs.seira.top/overview/use.html#extra-permission>"
+                        "由于缺少主动消息权限，无法启动监视！权限配置请见[这里](" + PERMISSION + ")~"
                 ));
                 return;
             }
@@ -236,7 +237,7 @@ public final class MPWatchCommandHandler {
         try (var _ = taskCoordinator.beginRequest(ctx, "Start Multiplayer Room Watch")) {
             if (!ctx.sendMessage(PendingMessage.ofString("正在尝试启动多人房间监视……")).success()) {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) +
-                        "由于缺少主动消息权限，无法启动监视！权限配置请见：https://docs.seira.top/overview/use.html#extra-permission"
+                        "由于缺少主动消息权限，无法启动监视！权限配置请见[这里](" + PERMISSION + ")~"
                 ));
                 return;
             }

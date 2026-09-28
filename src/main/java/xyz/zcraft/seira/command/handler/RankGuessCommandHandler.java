@@ -29,6 +29,7 @@ import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static xyz.zcraft.seira.command.reply.ReplyFactory.ExternalUrls.PERMISSION;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.cmd;
 
@@ -468,7 +469,7 @@ public final class RankGuessCommandHandler {
             content += "，正在渲染回放片段...";
 
             if (!activeMessageEnabled) {
-                content += "\n\n> 提示: 由于缺少主动消息权限，阶段提示与自动结束已禁用。稍后需要使用 `/rg end` 手动结束。权限配置请见[这里](https://docs.seira.top/overview/use.html#extra-permission)。";
+                content += "\n\n> 提示: 由于缺少主动消息权限，阶段提示与自动结束已禁用。稍后需要使用 `/rg end` 手动结束。权限配置请见[这里](" + PERMISSION + ")。";
             }
 
             ctx.sendReply(PendingMessage.ofMarkdownRaw(content));

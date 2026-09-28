@@ -11,6 +11,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
+import static xyz.zcraft.seira.command.reply.ReplyFactory.ExternalUrls.PERMISSION;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class SpecificScoreWatchCommandHandler {
@@ -74,10 +75,10 @@ public final class SpecificScoreWatchCommandHandler {
             return;
         }
 
-        try (var timing = taskCoordinator.beginRequest(ctx, "Start Specific Score Watch")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "Start Specific Score Watch")) {
             if (!ctx.sendMessage(PendingMessage.ofString("正在尝试启动指定谱面成绩监视……")).success()) {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) +
-                        "由于缺少主动消息权限，无法启动监视！权限配置请见：https://docs.seira.top/overview/use.html#extra-permission"
+                        "由于缺少主动消息权限，无法启动监视！权限配置请见：" + PERMISSION
                 ));
                 return;
             }

@@ -162,6 +162,7 @@ public class Router {
                 .register(replayCommands::handleRcancel, "rcancel")
                 .register(generalCommands::handleInspect, "inspect")
                 .register(generalCommands::handleHelp, "help")
+                .register(generalCommands::handleUsages, "usages")
                 .register(generalCommands::handleFaq, "faq")
                 .register(watchCommands::handleWatch, "watch")
                 .register(specificScoreWatchCommands::handleWx, "wx")

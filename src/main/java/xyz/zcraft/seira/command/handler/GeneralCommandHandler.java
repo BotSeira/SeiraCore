@@ -104,6 +104,10 @@ public final class GeneralCommandHandler {
         context.sendReply(replyFactory.helpMessage(context));
     }
 
+    public void handleUsages(Context context) {
+        context.sendReply(replyFactory.usagesMessage(context));
+    }
+
     public void handleFaq(Context context) {
         context.sendReply(replyFactory.faqMessage(context));
     }

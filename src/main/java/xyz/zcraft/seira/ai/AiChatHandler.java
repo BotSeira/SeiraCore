@@ -18,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
+import static xyz.zcraft.seira.command.reply.ReplyFactory.ExternalUrls.PERMISSION;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.cmd;
 
@@ -65,7 +66,7 @@ public class AiChatHandler {
                 } else {
                     ctx.sendReply(PendingMessage.ofMarkdownRaw(
                             at(ctx) + "由于本群未配置权限或配置不完整，暂无法启用本群AI对话喵。" +
-                                    "权限配置见[这里](https://docs.seira.top/overview/use.html#extra-permission)~")
+                                    "权限配置见[这里](" + PERMISSION + ")~")
                     );
                 }
                 return;

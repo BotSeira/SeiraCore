@@ -27,6 +27,8 @@ import java.util.*;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
+import static xyz.zcraft.seira.command.reply.ReplyFactory.ExternalUrls.*;
+
 public final class ReplyFactory {
     private final Supplier<AppConfig> configSupplier;
 
@@ -434,6 +436,10 @@ public final class ReplyFactory {
         return PendingMessage.ofMarkdownRaw(Contents.helpContent(ctx));
     }
 
+    public PendingMessage usagesMessage(Context ctx) {
+        return PendingMessage.ofMarkdownRaw(Contents.usagesContent(ctx));
+    }
+
     public PendingMessage faqMessage(Context ctx) {
         return PendingMessage.ofMarkdownRaw(Contents.faqContent(ctx));
     }
@@ -465,6 +471,15 @@ public final class ReplyFactory {
 
     public PendingMessage userInfoShortMessage(Context ctx, UserExtended user) {
         return PendingMessage.ofMarkdownRaw(Contents.userInfoShortContent(ctx, user));
+    }
+
+    public static class ExternalUrls {
+        public static final String COMMANDS = "https://docs.seira.top/overview/commands.html";
+        public static final String PERMISSION = "https://docs.seira.top/overview/use.html#extra-permission";
+        public static final String CHANNEL = "https://docs.seira.top/overview/use.html#extra-permission";
+        public static final String CHANGELOG = "https://docs.seira.top/overview/changelog.html";
+        public static final String FAQ = "https://docs.seira.top/overview/faq.html";
+        public static final String GITHUB = "https://github.com/BotSeira";
     }
 
     private static final class Contents {
@@ -758,32 +773,51 @@ public final class ReplyFactory {
         }
 
         public static String helpContent(Context ctx) {
-            return at(ctx) + "\n" +
-                    """
-                            常用指令：
-                            > /bind - 绑定你的玩家ID
-                            > /rp - 获取最近通过的一个成绩
-                            > /bo [个数] [玩家ID] - 获取一个或多个最佳成绩
-                            > /rp [个数] [玩家ID] - 获取最近通过一个或多个成绩
-                            > /tb [#天数] [玩家ID] - 获取近N天达成的BP
-                            > /s <成绩ID或快捷查询> - 获取指定成绩
-                            > /m <谱面ID或快捷查询> - 获取谱面
-                            > /bma <谱面ID或快捷查询> [Mod] - 分析谱面PP构成和类型
-                            > /ms <谱面集ID或快捷查询> - 获取谱面集
-                            > /r [成绩ID或快捷查询] [[mm:ss]-[mm:ss]] - 生成成绩高光视频或指定片段
-                            > /rcancel <任务ID> - 取消回放渲染任务
-                            > /rg <start/group/#Rank/end/wish/stats [all]> - 猜 Rank 游戏与个人战绩
-                            > /lb <谱面ID> [玩家ID列表] - 获取指定谱面排行榜
-                            > /watch add <玩家ID/用户名/@用户> [分钟] - 监视群友的新成绩
-                            > /wx start <UID列表> <谱面ID列表> - 监视指定玩家在指定谱面的成绩
-                            > /mpwatch [start] <房间ID> [stable|lazer] - 监视多人房间的逐图结果（链接可自动识别版本，stop all 停止本群全部监视）
-                            > /f - 获取好友列表
-                            
-                            详细指令列表请在 [这里](https://docs.seira.top/overview/commands.html) 查看
-                            配置额外权限请在 [这里](https://docs.seira.top/overview/use.html#extra-permission) 查看
-                            """ + "\n"
-                    + "当前版本: " + VersionInfo.getVersion() + " [更新日志](https://docs.seira.top/overview/changelog.html)" + "\n"
-                    + "[常见问题](https://docs.seira.top/overview/faq.html)" + " " + cmd("/stat", "状态信息").trim();
+            return at(ctx) + "常用指令: \n" + """
+                    > /rp - 获取最近通过的一个或多个成绩
+                    > /bp - 获取一个或多个最佳成绩
+                    > /tb - 获取近日BP
+                    > /s - 获取指定成绩
+                    > /m - 获取谱面
+                    > /r - 生成成绩高光视频或指定片段
+                    > /rg - 猜 Rank 游戏
+                    > /watch - 监视群友的新成绩
+                    > /mpwatch <MPLink> - 监视多人房间的逐图结果
+                    > /f - 获取好友列表
+                    
+                    [详细指令列表](%s) | [配置额外权限](%s)
+                    [加入官方频道](%s) | [查看常见问题](%s)
+                    [查看更新日志](%s) | %s
+                    %s | [Github主页](%s)
+                    
+                    当前版本: %s
+                    """.formatted(
+                    COMMANDS, PERMISSION,
+                    CHANNEL, FAQ,
+                    CHANGELOG, cmd("/stat", "查看状态信息"),
+                    cmd("/usages", "查看用法示例"), GITHUB,
+                    VersionInfo.getVersion()
+            ) + "\n";
+        }
+
+        public static String usagesContent(Context ctx) {
+            return at(ctx) + "部分指令示例\n" +
+                    "> 注意：所有指令中的@均需要开启权限才能正常读取。权限配置见 [这里]( " + PERMISSION + " )~\n" + """
+                    > /rp -> 查看最近通过的一个成绩
+                    > /rp1-20 -> 查看最近通过的1到20个成绩
+                    > /bp1-20 -> 查看20个最佳成绩
+                    > /bp1-20 @peppy acc>95 -> 查看指定玩家BP1-20中准确率大于95%的成绩
+                    > /sa bp2 -> 查看BP2的成绩分析
+                    > /tb #7 @peppy -> 查看指定玩家近7天的新BP
+                    > /@peppy -> 查看指定玩家的基本信息
+                    > /rg group -> 开始群组猜 Rank 游戏
+                    > /m @peppy rp2 -> 查看指定玩家最近第2条成绩的谱面
+                    > /dl mp -> 获取所在lazer多人房间当前谱面的镜像下载链接
+                    > /r rp -> 渲染最近通过的成绩的高光片段回放视频
+                    > /r @peppy bp2 90- -> 渲染指定玩家BP2从1:30开始的回放视频
+                    > /mpw <mplink> -> 开始多人房间监视
+                    > /romai @peppy -> 开始监视指定玩家所在的RomAI对局
+                    """;
         }
 
         public static String faqContent(Context ctx) {
