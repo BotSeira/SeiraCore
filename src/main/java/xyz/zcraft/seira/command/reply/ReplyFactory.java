@@ -796,8 +796,7 @@ public final class ReplyFactory {
 
         public static String luckContent(Context ctx, DailyLuck.Luck luck, Beatmapset mapset, UploadedImage cover) {
             final List<Double> list = mapset.getBeatmaps().stream().map(Beatmap::getDifficultyRating).sorted().toList();
-            String sb = at(ctx) + "\n" +
-                    "## 今日运势" + "\n" +
+            String sb = at(ctx) + "你的今日运势" + "\n" +
                     "> 人品值: **" + luck.luck() + "**/100\n" +
                     "> 宜: " + luck.ups() + "\n" +
                     "> 忌: " + luck.downs() + "\n\n" +
