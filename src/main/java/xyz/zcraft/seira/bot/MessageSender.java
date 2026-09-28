@@ -153,6 +153,13 @@ public class MessageSender {
         return sendGroupMessage(groupId, message);
     }
 
+    public SentMessage sendPrivateMarkdown(String userId, String content) {
+        Message message = new Message();
+        message.setMsgType(PendingMessage.MSG_TYPE_MARKDOWN);
+        message.setMarkdown(Message.MessageMarkdown.of(content));
+        return sendPrivateMessage(userId, message);
+    }
+
     private FileInfo retryUpload(Supplier<FileInfo> operation, long baseDelayMillis, String description) {
         for (int attempt = 1; attempt <= MAX_UPLOAD_ATTEMPTS; attempt++) {
             try {

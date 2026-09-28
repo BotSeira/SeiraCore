@@ -614,8 +614,8 @@ public final class ConsoleCommandProcessor {
         }
 
         boolean sent = switch (targetType) {
-            case "group" -> messenger.sendGroupText(targetId, content) != null;
-            case "private" -> messenger.sendPrivateText(targetId, content) != null;
+            case "group" -> messenger.sendGroupMarkdown(targetId, content) != null;
+            case "private" -> messenger.sendPrivateMarkdown(targetId, content) != null;
             default -> throw new IllegalArgumentException("Message type must be 'group' or 'private'.");
         };
         return sent
