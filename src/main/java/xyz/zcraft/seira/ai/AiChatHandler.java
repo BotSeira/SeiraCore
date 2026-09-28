@@ -50,13 +50,13 @@ public class AiChatHandler {
             return;
         } else if (ctx.argumentCount() == 1
                 && List.of("on", "off", "reset", "resetgroup", "resetme", "stop").contains(ctx.argument(0).toLowerCase(Locale.ROOT))) {
-            if (!adminAuthorizer.test(ctx.senderUserId())) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "你无权使用该命令喵。\n" +
-                        "> 由于此功能开销较大、处于测试阶段且较为不可控，暂未开放。若想要在此群中使用此功能，请联系 Bot 管理员喵。"));
-                return;
-            }
-
             if ("on".equalsIgnoreCase(ctx.argument(0))) {
+                if (!adminAuthorizer.test(ctx.senderUserId())) {
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "你无权使用该命令喵。\n" +
+                            "> 由于此功能开销较大、处于测试阶段且较为不可控，暂未开放。若想要在此群中使用此功能，请联系 Bot 管理员喵。"));
+                    return;
+                }
+
                 final GroupBotState apply = botStateGetter.apply(ctx.groupId());
                 if (apply.allowProactiveMsg() && apply.receiveMsgSetting() == GroupBotState.ReceiveMsgSetting.ALL) {
                     AiPermission.permit(ctx.groupId());
@@ -69,6 +69,11 @@ public class AiChatHandler {
                 }
                 return;
             } else if ("off".equalsIgnoreCase(ctx.argument(0))) {
+                if (!adminAuthorizer.test(ctx.senderUserId())) {
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "你无权使用该命令喵。"));
+                    return;
+                }
+
                 AiPermission.revoke(ctx.groupId());
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "已禁用本群AI对话喵。"));
                 return;
@@ -82,7 +87,7 @@ public class AiChatHandler {
                 return;
             } else if ("resetgroup".equalsIgnoreCase(ctx.argument(0))) {
                 if (!adminAuthorizer.test(ctx.senderUserId())) {
-                    ctx.sendReply(at(ctx) + "你无权使用该命令喵。");
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "你无权使用该命令喵。"));
                     return;
                 }
                 final int i = agentService.clearStateOfGroup(ctx.groupId());
