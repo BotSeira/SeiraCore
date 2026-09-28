@@ -1,6 +1,8 @@
 package xyz.zcraft.seira.api;
 
 import com.google.gson.Gson;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.api.data.MinecraftServerStatus;
 import xyz.zcraft.seira.api.data.RawResponse;
@@ -53,4 +55,25 @@ public class AsteroidApi {
             throw new RuntimeException("获取 MC 服务器状态失败", e);
         }
     }
+
+    public static boolean getServerStatus() {
+        try {
+            var request = requestBuilder("/health")
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                return true;
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to get server status", e);
+        }
+
+        LOG.warn("Asteroid server is down.");
+        return false;
+    }
+
+    private static final Logger LOG = LogManager.getLogger(AsteroidApi.class);
 }

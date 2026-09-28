@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.osu.model.*;
+import xyz.zcraft.seira.api.AsteroidApi;
 import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.bot.data.Button;
@@ -731,10 +732,12 @@ public final class ReplyFactory {
                     "> oStella API: " + (status.oStella() ? "✅ 正常" : "❌ 无法访问") + "\n";
 
             if (status.oStella()) {
-                stat += "> osuRenderer: " + (status.onlineWorkers() + " / " + status.allWorkers())
+                stat += "> ↳ osuRenderer: " + (status.onlineWorkers() + " / " + status.allWorkers())
                         + (status.onlineWorkers() > 0 ? " (✅在线)" : " (❌全部离线)") + "\n";
-                stat += "> osu! API: " + (status.osu() ? "✅ 正常" : "❌ 无法访问") + "\n";
+                stat += "> ↳ osu! API: " + (status.osu() ? "✅ 正常" : "❌ 无法访问") + "\n";
             }
+
+            stat += "> Asteroid API: " + (AsteroidApi.getServerStatus() ? "✅ 正常" : "❌ 无法访问") + "\n";
 
             String version = "## 版本信息" + "\n"
                     + "> SeiraCore: " + VersionInfo.getVersion() + "\n";
