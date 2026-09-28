@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import lombok.Getter;
+import lombok.Setter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
@@ -22,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -219,7 +221,14 @@ public class AgentService {
             final String answer;
             try {
                 if (handler != null) {
-                    answer = api.chatQueryStreaming(groupId, state.conv.appConversationID(), query.toString(), handler, attachments);
+                    answer = api.chatQueryStreaming(
+                            groupId,
+                            state.conv.appConversationID(),
+                            query.toString(),
+                            handler,
+                            attachments,
+                            state::setRunningMessageId
+                    );
                 } else {
                     var response = api.chatQuery(groupId, state.conv.appConversationID(), query.toString(), attachments);
                     answer = response.answer();
@@ -235,6 +244,33 @@ public class AgentService {
         } finally {
             state.running.set(false);
         }
+    }
+
+    public StopStatus requireStop(String groupId, String openId) {
+        final StateOwner owner = StateOwner.of(groupId, openId);
+        final State state = states.get(owner);
+
+        if (state == null || !state.running.get()) {
+            return StopStatus.NO_CONVERSATION;
+        }
+
+        if (state.getRunningMessageId() == null) {
+            return StopStatus.NOT_SUPPORTED;
+        }
+
+        try {
+            api.stopConversation(state.getRunningMessageId(), groupId);
+            return StopStatus.SUCCESS;
+        } catch (Exception e) {
+            return StopStatus.FAILED;
+        }
+    }
+
+    public enum StopStatus {
+        SUCCESS,
+        NO_CONVERSATION,
+        NOT_SUPPORTED,
+        FAILED;
     }
 
     public boolean isRunning(String groupId, String openId) {
@@ -337,6 +373,8 @@ public class AgentService {
         private final AtomicBoolean resetting;
         private final Deque<String> incomingMessages;
         private AppConversationBrief conv;
+        @Setter
+        private volatile String runningMessageId;
 
         private State(
                 AppConversationBrief conv,
@@ -490,6 +528,30 @@ class Api {
         }
     }
 
+    public void stopConversation(String messageId, String groupId) {
+        LOG.info("Stopping conversation for id {}", groupId);
+
+        JsonObject body = new JsonObject();
+        body.addProperty("UserID", groupId);
+        body.addProperty("MessageID", messageId);
+
+        try {
+            var request = newRequest("/api/proxy/api/v1/stop_message")
+                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw new RuntimeException("Failed to stop conversation: " + send.statusCode());
+            }
+
+            LOG.info("Stopped conversation for id {}", groupId);
+        } catch (Exception e) {
+            throw new RuntimeException("Error clearing conversation", e);
+        }
+    }
+
     public ChatQueryResponse chatQuery(
             String groupId, String appConvId, String query, List<AgentFile> attachments
     ) {
@@ -532,7 +594,9 @@ class Api {
     }
 
     public String chatQueryStreaming(
-            String groupId, String appConvId, String query, StreamHandler handler, List<AgentFile> attachments
+            String groupId, String appConvId, String query,
+            StreamHandler handler, List<AgentFile> attachments,
+            Consumer<String> taskIdSetter
     ) {
         LOG.info("Running chat query for id {}", groupId);
 
@@ -579,6 +643,11 @@ class Api {
 
                     JsonObject event = JsonParser.parseString(data).getAsJsonObject();
                     String eventType = event.get("event").getAsString();
+                    String taskId = event.get("task_id").getAsString();
+
+                    if (taskIdSetter != null && taskId != null && !taskId.isEmpty()) {
+                        taskIdSetter.accept(taskId);
+                    }
 
                     switch (eventType) {
                         case "message" -> {

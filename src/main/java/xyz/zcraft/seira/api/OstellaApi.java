@@ -651,7 +651,9 @@ public class OstellaApi {
         }
     }
 
-    /** 每个查找方法只请求一个接口；目标类型转换和记忆由指令处理方法决定。 */
+    /**
+     * 每个查找方法只请求一个接口；目标类型转换和记忆由指令处理方法决定。
+     */
     public static long lookupBeatmapInSet(long setId, long index, String auth) {
         return lookupTargetData("/beatmaps/lookup?ms=" + setId + "&i=" + index, auth, "查找谱面失败")
                 .get("beatmap_id").getAsLong();
@@ -691,7 +693,7 @@ public class OstellaApi {
 
     private static String lookupScore(String query, List<String> filters, String mod) {
         return lookupTargetData(query + encodeScoreFilters(filters)
-                + (mod == null ? "" : "&mod=" + URLEncoder.encode(mod, StandardCharsets.UTF_8)),
+                        + (mod == null ? "" : "&mod=" + URLEncoder.encode(mod, StandardCharsets.UTF_8)),
                 null, "获取成绩失败").get("score_id").getAsString();
     }
 
@@ -700,7 +702,8 @@ public class OstellaApi {
             var request = requestBuilder().uri(URI.create(ENDPOINT + query)).GET();
             if (auth != null) withOsuAuthorization(request, auth);
             var response = CLIENT.send(request.build(), HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) throw ApiUtil.parseHttpError(response.body(), response.statusCode(), error);
+            if (response.statusCode() != 200)
+                throw ApiUtil.parseHttpError(response.body(), response.statusCode(), error);
             RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
             ApiUtil.ensureApiSuccess(payload, error);
             return ApiUtil.requireDataObject(payload, error);
@@ -890,6 +893,8 @@ public class OstellaApi {
         boolean oStella = false;
         boolean osu = false;
         String oStellaVersion = null;
+        int allWorkers = 0;
+        int onlineWorkers = 0;
         try {
             HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/health"))
@@ -912,12 +917,18 @@ public class OstellaApi {
                     if (data.has("osu_api") && !data.get("osu_api").isJsonNull()) {
                         osu = data.get("osu_api").getAsBoolean();
                     }
+                    if (data.has("all_render_workers") && !data.get("all_render_workers").isJsonNull()) {
+                        allWorkers = data.get("all_render_workers").getAsInt();
+                    }
+                    if (data.has("online_render_workers") && !data.get("online_render_workers").isJsonNull()) {
+                        onlineWorkers = data.get("online_render_workers").getAsInt();
+                    }
                 }
             }
         } catch (Exception _) {
         }
 
-        return new ServerStatus(true, oStella, oStellaVersion, osu);
+        return new ServerStatus(true, oStella, oStellaVersion, allWorkers, onlineWorkers, osu);
     }
 
     public static Response<List<MissData>> getScoreMissesResponse(String scoreId) {
@@ -1087,7 +1098,8 @@ public class OstellaApi {
         return new RuntimeException(exception);
     }
 
-    public record ServerStatus(boolean gateway, boolean oStella, String oStellaVersion, boolean osu) {
+    public record ServerStatus(boolean gateway, boolean oStella, String oStellaVersion,
+                               int allWorkers, int onlineWorkers, boolean osu) {
     }
 
     public record ReplayRenderResult(String videoUrl, String taskId, FileInfo qqFile) {

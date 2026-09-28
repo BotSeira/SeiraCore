@@ -731,6 +731,7 @@ public final class ReplyFactory {
                     "> oStella API: " + (status.oStella() ? "✅ 正常" : "❌ 无法访问") + "\n";
 
             if (status.oStella()) {
+                stat += "> osuRenderer: " + (status.onlineWorkers() + " / " + status.allWorkers()) + "\n";
                 stat += "> osu! API: " + (status.osu() ? "✅ 正常" : "❌ 无法访问") + "\n";
             }
 

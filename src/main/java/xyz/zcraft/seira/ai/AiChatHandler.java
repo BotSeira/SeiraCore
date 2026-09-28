@@ -18,6 +18,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
+import static xyz.zcraft.seira.command.reply.ReplyFactory.cmd;
 
 public class AiChatHandler {
     private static final Gson GSON = new Gson();
@@ -48,7 +49,7 @@ public class AiChatHandler {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "目前AI对话在本群启用状态为：" + (b ? "√" : "×")));
             return;
         } else if (ctx.argumentCount() == 1
-                && List.of("on", "off", "reset").contains(ctx.argument(0).toLowerCase(Locale.ROOT))) {
+                && List.of("on", "off", "reset", "resetgroup", "resetme", "stop").contains(ctx.argument(0).toLowerCase(Locale.ROOT))) {
             if (!adminAuthorizer.test(ctx.senderUserId())) {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "你无权使用该命令喵。\n" +
                         "> 由于此功能开销较大、处于测试阶段且较为不可控，暂未开放。若想要在此群中使用此功能，请联系 Bot 管理员喵。"));
@@ -72,8 +73,30 @@ public class AiChatHandler {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "已禁用本群AI对话喵。"));
                 return;
             } else if ("reset".equalsIgnoreCase(ctx.argument(0))) {
+                agentService.clearState(ctx.groupId(), ctx.senderUserId());
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "已重置你在本群的AI对话状态喵。"));
+                return;
+            } else if ("resetme".equalsIgnoreCase(ctx.argument(0))) {
+                final int i = agentService.clearStateOfUser(ctx.senderUserId());
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "已重置你在" + i + "个群中的AI对话状态喵。"));
+                return;
+            } else if ("resetgroup".equalsIgnoreCase(ctx.argument(0))) {
+                if (!adminAuthorizer.test(ctx.senderUserId())) {
+                    ctx.sendReply(at(ctx) + "你无权使用该命令喵。");
+                    return;
+                }
                 final int i = agentService.clearStateOfGroup(ctx.groupId());
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "已重置本群" + i + "个用户的AI对话状态喵。"));
+                return;
+            } else if ("stop".equalsIgnoreCase(ctx.argument(0))) {
+                final AgentService.StopStatus stopStatus = agentService.requireStop(ctx.groupId(), ctx.senderUserId());
+                ctx.sendReply(at(ctx) + switch (stopStatus) {
+                    case SUCCESS -> "已停止你在本群的AI对话喵。";
+                    case FAILED -> "停止AI对话失败了喵。";
+                    case NO_CONVERSATION -> "目前没有运行中的对话喵。";
+                    case NOT_SUPPORTED -> "当前不支持停止AI对话。";
+                });
+
                 return;
             }
         }
@@ -83,7 +106,10 @@ public class AiChatHandler {
 
     public void handleChat(Context ctx, String message, List<MsgElem> elems) {
         if (agentService.isRunning(ctx.groupId(), ctx.senderUserId())) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "已有一轮对话正在进行中了喵，请稍作等待~"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(
+                    at(ctx) +
+                    "已有一轮对话正在进行中了喵，请稍作等待或" + cmd("/ai stop", "取消对话") + "~")
+            );
             return;
         }
 
