@@ -151,7 +151,11 @@ public class AiChatHandler {
                     public void onError(String errorCode, String errorMsg) {
                         ctx.send(
                                 true,
-                                PendingMessage.ofMarkdownRaw(at(ctx) + "回复生成失败了喵。\n>" + errorCode + ": " + errorMsg),
+                                PendingMessage.ofMarkdownRaw(
+                                        at(ctx) + "回复生成失败了喵。\n" +
+                                        "> " + errorCode + ": " + errorMsg + "\n" +
+                                        "> 若重复出现错误，请尝试" + cmd("/ai reset", "重置会话")
+                                ),
                                 true
                         );
                     }
