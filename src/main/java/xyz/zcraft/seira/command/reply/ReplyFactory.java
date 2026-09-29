@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.osu.model.*;
+import xyz.zcraft.seira.api.AsteroidApi;
 import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.bot.data.Button;
@@ -426,7 +427,7 @@ public final class ReplyFactory {
         );
     }
 
-    public PendingMessage statusMessage(Context ctx, OstellaApi.ServerStatus status, boolean asteroid) {
+    public PendingMessage statusMessage(Context ctx, OstellaApi.ServerStatus status, AsteroidApi.ServerStatus asteroid) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.statContent(ctx, status, asteroid), null
         );
@@ -739,7 +740,7 @@ public final class ReplyFactory {
             return sb.toString().trim();
         }
 
-        public static String statContent(Context ctx, OstellaApi.ServerStatus status, boolean asteroid) {
+        public static String statContent(Context ctx, OstellaApi.ServerStatus status, AsteroidApi.ServerStatus asteroid) {
             String stat = at(ctx) + "\n" +
                     "## 服务器状态\n" +
                     "> 消息网关: ✅ 正常\n" +
@@ -751,13 +752,17 @@ public final class ReplyFactory {
                 stat += "> ↳ osu! API: " + (status.osu() ? "✅ 正常" : "❌ 无法访问") + "\n";
             }
 
-            stat += "> Asteroid API: " + (asteroid ? "✅ 正常" : "❌ 无法访问") + "\n";
+            stat += "> Asteroid API: " + (asteroid.online() ? "✅ 正常" : "❌ 无法访问") + "\n";
 
             String version = "## 版本信息" + "\n"
                     + "> SeiraCore: " + VersionInfo.getVersion() + "\n";
 
             if (status.oStella() && status.oStellaVersion() != null) {
                 version += "> oStella: " + status.oStellaVersion() + "\n";
+            }
+
+            if (asteroid.online() && asteroid.version() != null) {
+                version += "> Asteroid: " + asteroid.version() + "\n";
             }
 
 

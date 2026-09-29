@@ -1,6 +1,8 @@
 package xyz.zcraft.seira.api;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.Seira;
@@ -56,23 +58,34 @@ public class AsteroidApi {
         }
     }
 
-    public static boolean getServerStatus() {
+    public record ServerStatus(boolean online, String version){}
+
+    public static ServerStatus getServerStatus() {
         try {
             var request = requestBuilder("/health")
                     .GET()
                     .build();
 
             final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            final RawResponse rawResponse = GSON.fromJson(response.body(), RawResponse.class);
 
-            if (response.statusCode() == 200) {
-                return true;
+            if (response.statusCode() == 200
+                    && response.body() != null
+                    && rawResponse != null
+                    && rawResponse.isSuccess()) {
+                final JsonElement rawResponseData = rawResponse.getData();
+                if (rawResponseData != null && rawResponseData.isJsonObject()) {
+                    JsonObject data = rawResponseData.getAsJsonObject();
+                    return new ServerStatus(true, data.get("version").getAsString());
+                }
+                return new ServerStatus(true, "?");
             }
         } catch (Exception e) {
             LOG.error("Failed to get server status", e);
         }
 
         LOG.warn("Asteroid server is down.");
-        return false;
+        return new ServerStatus(false, null);
     }
 
     private static final Logger LOG = LogManager.getLogger(AsteroidApi.class);
