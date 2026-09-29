@@ -782,7 +782,7 @@ public final class ReplyFactory {
                     > /r - 生成成绩高光视频或指定片段
                     > /rg - 猜 Rank 游戏
                     > /watch - 监视群友的新成绩
-                    > /mpwatch <MPLink> - 监视多人房间的逐图结果
+                    > /mpw <MPLink> - 监视多人房间的逐图结果
                     > /f - 获取好友列表
                     
                     [详细指令列表](%s) | [配置额外权限](%s)
