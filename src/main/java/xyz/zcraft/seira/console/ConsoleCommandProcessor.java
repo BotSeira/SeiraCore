@@ -272,8 +272,8 @@ public final class ConsoleCommandProcessor {
     }
 
     private ConsoleResult ai(ConsoleInputParser.ParsedInput input) {
-        if (input.size() == 1) {
-            final String value = input.value(0).toLowerCase(Locale.ROOT);
+        if (input.size() == 2) {
+            final String value = input.value(1).toLowerCase(Locale.ROOT);
             if (value.equalsIgnoreCase("reload")) {
                 AiPermission.loadFromFile();
                 return ConsoleResult.success("AI permission reloaded.");
@@ -282,9 +282,9 @@ public final class ConsoleCommandProcessor {
             } else {
                 return ConsoleResult.failure("Group id " + value + " not a valid id.");
             }
-        } else if (input.size() == 2) {
-            final String target = input.value(0).toLowerCase(Locale.ROOT);
-            final String option = input.value(1).toLowerCase(Locale.ROOT);
+        } else if (input.size() == 3) {
+            final String target = input.value(1).toUpperCase(Locale.ROOT);
+            final String option = input.value(2).toLowerCase(Locale.ROOT);
 
             if (!ID_PATTERN.matcher(target).matches()) {
                 return ConsoleResult.failure("Group id " + target + " not a valid id.");
@@ -307,10 +307,10 @@ public final class ConsoleCommandProcessor {
                 final int parallel = AiPermission.getParallel(target);
                 return ConsoleResult.success("Parallel count of AI chat for group " + target + " is " +  parallel + ".");
             }
-        } else if (input.size() == 3) {
-            final String target = input.value(0).toLowerCase(Locale.ROOT);
-            final String option = input.value(1).toLowerCase(Locale.ROOT);
-            final String value = input.value(2).toLowerCase(Locale.ROOT);
+        } else if (input.size() == 4) {
+            final String target = input.value(1).toUpperCase(Locale.ROOT);;
+            final String option = input.value(2).toLowerCase(Locale.ROOT);
+            final String value = input.value(3).toLowerCase(Locale.ROOT);
 
             if (!ID_PATTERN.matcher(target).matches()) {
                 return ConsoleResult.failure("Group id " + target + " not a valid id.");
