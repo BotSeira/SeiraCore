@@ -283,7 +283,7 @@ public final class ConsoleCommandProcessor {
                 return ConsoleResult.failure("Group id " + value + " not a valid id.");
             }
         } else if (input.size() == 3) {
-            final String target = input.value(1).toLowerCase(Locale.ROOT);
+            final String target = input.value(1).toUpperCase(Locale.ROOT);
             final String option = input.value(2).toLowerCase(Locale.ROOT);
 
             if (!ID_PATTERN.matcher(target).matches()) {
@@ -308,7 +308,7 @@ public final class ConsoleCommandProcessor {
                 return ConsoleResult.success("Parallel count of AI chat for group " + target + " is " +  parallel + ".");
             }
         } else if (input.size() == 4) {
-            final String target = input.value(1).toLowerCase(Locale.ROOT);
+            final String target = input.value(1).toUpperCase(Locale.ROOT);;
             final String option = input.value(2).toLowerCase(Locale.ROOT);
             final String value = input.value(3).toLowerCase(Locale.ROOT);
 
