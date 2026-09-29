@@ -11,10 +11,7 @@ import xyz.zcraft.seira.console.ConsoleCommandProcessor;
 import xyz.zcraft.seira.console.JLineConsole;
 import xyz.zcraft.seira.console.UserDataConsoleAccess;
 import xyz.zcraft.seira.db.SqliteDatabase;
-import xyz.zcraft.seira.services.BindingService;
-import xyz.zcraft.seira.services.BotStat;
-import xyz.zcraft.seira.services.DailyLuck;
-import xyz.zcraft.seira.services.NoticeStore;
+import xyz.zcraft.seira.services.*;
 import xyz.zcraft.seira.util.AdminRegistry;
 import xyz.zcraft.seira.util.ApplicationExecutors;
 
@@ -47,6 +44,7 @@ public final class SeiraApplication implements AutoCloseable {
         DailyLuck.initialize(config.qq().appId());
         BotStat.initialize();
         NoticeStore.initialize();
+        AiPermission.initialize();
 
         ApplicationExecutors createdExecutors = new ApplicationExecutors();
         BindingService createdBindingService = new BindingService(
@@ -97,6 +95,7 @@ public final class SeiraApplication implements AutoCloseable {
         bot.close();
         DailyLuck.saveToFile();
         BotStat.shutdown();
+        AiPermission.saveToFile();
         LOG.info("Shutdown complete");
     }
 }

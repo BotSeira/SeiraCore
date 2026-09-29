@@ -4,30 +4,20 @@ import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.data.SendResult;
 
 import java.util.Objects;
+import java.util.function.Consumer;
 
 public record Context(
-        String senderUserId,
-        String groupId,
-        String messageId,
-        String command,
-        String[] args,
-        String query,
-        String rawContent,
-        CommandReplyChannel replies) {
+        String senderUserId, String groupId, String messageId, String command,
+        String[] args, String query, String rawContent, ReplyChannel replies, Consumer<String> recorder
+) {
     public Context(
-            String senderUserId,
-            String groupId,
-            String messageId,
-            String command,
-            String[] args,
-            String rawContent,
-            String query
+            String senderUserId, String groupId, String messageId, String command,
+            String[] args, String rawContent, String query
     ) {
-        this(senderUserId, groupId, messageId, command, args, query, rawContent, null);
+        this(senderUserId, groupId, messageId, command, args, query, rawContent, null, null);
     }
 
     public Context {
-        command = Objects.requireNonNull(command, "command");
         args = args == null ? new String[0] : args.clone();
         query = query == null ? "" : query;
     }
@@ -49,16 +39,23 @@ public record Context(
         return groupId != null && !groupId.isBlank();
     }
 
-    public Context withReplies(CommandReplyChannel replyChannel) {
+    public Context withReplies(ReplyChannel replyChannel) {
         return new Context(
                 senderUserId, groupId, messageId, command, args, query, rawContent,
-                Objects.requireNonNull(replyChannel, "replyChannel")
+                Objects.requireNonNull(replyChannel, "replyChannel"), recorder
         );
     }
 
     public Context asCommand(String nextCommand, String[] nextArgs, String nextQuery) {
         return new Context(
-                senderUserId, groupId, messageId, nextCommand, nextArgs, nextQuery, rawContent, replies
+                senderUserId, groupId, messageId, nextCommand, nextArgs, nextQuery, rawContent, replies, recorder
+        );
+    }
+
+    public Context withRecorder(Consumer<String> recorder) {
+        return new Context(
+                senderUserId, groupId, messageId, command, args, query, rawContent,
+                replies, Objects.requireNonNull(recorder, "recorder")
         );
     }
 
@@ -66,28 +63,67 @@ public record Context(
      * Sends a passive reply associated with the message that invoked this command.
      */
     public SendResult sendReply(PendingMessage message) {
-        return requireReplies().sendReply(Objects.requireNonNull(message, "message"));
+        return sendReply(message, false);
+    }
+
+    public SendResult sendReply(PendingMessage message, boolean ref) {
+        record(message);
+        return requireReplies().sendReply(Objects.requireNonNull(message, "message"), ref);
     }
 
     public SendResult sendReply(String message) {
-        return requireReplies().sendReply(PendingMessage.ofString(message));
+        final PendingMessage msg = PendingMessage.ofMarkdownRaw(message);
+        record(msg);
+        return requireReplies().sendReply(msg);
+    }
+
+    public SendResult send(boolean replyFirst, PendingMessage message) {
+        return send(replyFirst, message, false);
+    }
+
+    public SendResult send(boolean replyFirst, PendingMessage message, boolean ref) {
+        SendResult sendResult;
+        if (replyFirst) {
+            sendResult = sendReply(message, ref);
+            if (!sendResult.success()) {
+                sendResult = sendMessage(message, ref);
+            }
+        } else {
+            sendResult = sendMessage(message, ref);
+            if (!sendResult.success()) {
+                sendResult = sendReply(message, ref);
+            }
+        }
+        return sendResult;
     }
 
     /**
      * Sends an active message to the same user or group, without an inbound message reference.
      */
+    public SendResult sendMessage(PendingMessage message, boolean ref) {
+        record(message);
+        return requireReplies().sendProactive(Objects.requireNonNull(message, "message"), ref);
+    }
+
     public SendResult sendMessage(PendingMessage message) {
+        record(message);
         return requireReplies().sendProactive(Objects.requireNonNull(message, "message"));
     }
 
     public SendResult sendQueueNotice(PendingMessage message) {
+        record(message);
         return requireReplies().sendQueueNotice(Objects.requireNonNull(message, "message"));
     }
 
-    private CommandReplyChannel requireReplies() {
+    private ReplyChannel requireReplies() {
         if (replies == null) {
             throw new IllegalStateException("This command context is not bound to a reply channel");
         }
         return replies;
+    }
+
+    private void record(PendingMessage message) {
+        if (message == null || recorder == null) return;
+        recorder.accept(message.getRealContent());
     }
 }

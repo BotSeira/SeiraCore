@@ -1,7 +1,7 @@
 package xyz.zcraft.seira.command.handler;
 
 import xyz.zcraft.osu.model.User;
-import xyz.zcraft.seira.api.APIHelper;
+import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.ResolutionException;
@@ -16,35 +16,26 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.function.BiFunction;
 import java.util.function.Predicate;
 
+import static xyz.zcraft.seira.command.reply.ReplyFactory.ExternalUrls.PERMISSION;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class WatchCommandHandler {
     private static final int DEFAULT_DURATION_MINUTES = 10;
     private static final int MAX_DURATION_MINUTES = 120;
-    private static final String USAGE = "用法：/watch add <玩家ID/用户名/@用户> [分钟]；/watch del [玩家ID/用户名/@用户]；/watch list";
+    private static final String USAGE = "用法：/watch add <玩家ID/用户名/@用户> [分钟,1-120]；/watch del [玩家ID/用户名/@用户]；/watch list";
 
     private final Resolver resolver;
     private final TaskCoordinator taskCoordinator;
     private final ScoreWatchService watchService;
     private final Predicate<String> adminAuthorizer;
-    private final BiFunction<String, String, WatchTarget> targetResolver;
 
     public WatchCommandHandler(Resolver resolver, TaskCoordinator taskCoordinator, ScoreWatchService watchService, Predicate<String> adminAuthorizer) {
         this.resolver = Objects.requireNonNull(resolver);
         this.taskCoordinator = Objects.requireNonNull(taskCoordinator);
         this.watchService = watchService;
         this.adminAuthorizer = Objects.requireNonNull(adminAuthorizer);
-        this.targetResolver = this::resolveTarget;
-    }
-
-    private static User findUserById(long userId) {
-        return APIHelper.getUsers(List.of(userId)).stream()
-                .filter(user -> user.getId() == userId)
-                .findFirst()
-                .orElseThrow(() -> new ResolutionException("未找到指定的玩家。"));
     }
 
     private static PendingMessage removedMessage(WatchView removed) {
@@ -134,13 +125,28 @@ public final class WatchCommandHandler {
         }
 
         String targetArgument = ctx.argument(1);
-        try (var timing = taskCoordinator.beginRequest(ctx, "Add Score Watch")) {
-            WatchTarget target = targetResolver.apply(ctx.groupId(), targetArgument);
+        try (var _ = taskCoordinator.beginRequest(ctx, "Add Score Watch")) {
+            String mentionedUser = resolver.extractMentionedUserId(targetArgument);
+            WatchTarget target;
+            if (mentionedUser != null) {
+                if (!UserDataStore.isGroupMember(ctx.groupId(), mentionedUser)) {
+                    throw new ResolutionException("指定的用户不在当前群聊中。");
+                }
+                Long userId = UserDataStore.findBoundUid(mentionedUser);
+                if (userId == null) throw new ResolutionException("被@的用户还没有绑定玩家ID，请先让对方使用 /bind。");
+                User user = OstellaApi.getUsers(List.of(userId)).stream()
+                        .filter(candidate -> candidate.getId() == userId)
+                        .findFirst().orElseThrow(() -> new ResolutionException("未找到指定的玩家。"));
+                UserDataStore.storeUserInfo(user.getId(), user.getUsername());
+                target = new WatchTarget(user.getId(), user.getUsername(), mentionedUser);
+            } else {
+                target = lookupGroupPlayer(ctx.groupId(), targetArgument);
+            }
             final boolean b = ctx.sendMessage(PendingMessage.ofMarkdownRaw(
                     at(ctx) + "正在尝试添加监视..."
             )).success();
             if (!b) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "由于缺少主动消息权限，无法添加监视！权限配置请见[这里](https://docs.seira.top/overview/use.html#extra-permission)~"));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "由于缺少主动消息权限，无法添加监视！权限配置请见[这里](" + PERMISSION + ")~"));
                 return;
             }
 
@@ -178,10 +184,22 @@ public final class WatchCommandHandler {
             return;
         }
 
-        try (var timing = taskCoordinator.beginRequest(ctx, "Delete Score Watch")) {
-            WatchTarget target = resolveTarget(ctx.groupId(), targetArgument);
+        try (var _ = taskCoordinator.beginRequest(ctx, "Delete Score Watch")) {
+            WatchTarget target = lookupGroupPlayer(ctx.groupId(), targetArgument);
             ctx.sendReply(removedMessage(watchService.remove(ctx.groupId(), target.userId())));
         }
+    }
+
+    private WatchTarget lookupGroupPlayer(String groupId, String argument) {
+        Long uid = resolver.parsePositiveLong(argument);
+        User user = uid == null ? OstellaApi.lookupUser(argument).getContent()
+                : OstellaApi.getUsers(List.of(uid)).stream()
+                        .filter(candidate -> candidate.getId() == uid)
+                        .findFirst().orElseThrow(() -> new ResolutionException("未找到指定的玩家。"));
+        String openId = UserDataStore.findGroupOpenIdByUid(groupId, user.getId())
+                .orElseThrow(() -> new ResolutionException("指定的玩家不在当前群聊中，或尚未在本群完成绑定。"));
+        UserDataStore.storeUserInfo(user.getId(), user.getUsername());
+        return new WatchTarget(user.getId(), user.getUsername(), openId);
     }
 
     private void handleList(Context ctx) {
@@ -206,28 +224,4 @@ public final class WatchCommandHandler {
         ctx.sendReply(PendingMessage.ofMarkdownRaw(content.toString().trim()));
     }
 
-    private WatchTarget resolveTarget(String groupId, String argument) {
-        String mentionedOpenId = resolver.extractMentionedUserId(argument);
-        if (mentionedOpenId != null) {
-            if (!UserDataStore.isGroupMember(groupId, mentionedOpenId)) {
-                throw new ResolutionException("指定的用户不在当前群聊中。");
-            }
-            Long userId = UserDataStore.findBoundUid(mentionedOpenId);
-            if (userId == null) {
-                throw new ResolutionException("被@的用户还没有绑定玩家ID，请先让对方使用 /bind。");
-            }
-            User user = findUserById(userId);
-            UserDataStore.storeUserInfo(user.getId(), user.getUsername());
-            return new WatchTarget(user.getId(), user.getUsername(), mentionedOpenId);
-        }
-
-        Long explicitUserId = resolver.parsePositiveLong(argument);
-        User user = explicitUserId == null
-                ? APIHelper.lookupUser(argument).getContent()
-                : findUserById(explicitUserId);
-        String qqOpenId = UserDataStore.findGroupOpenIdByUid(groupId, user.getId())
-                .orElseThrow(() -> new ResolutionException("指定的玩家不在当前群聊中，或尚未在本群完成绑定。"));
-        UserDataStore.storeUserInfo(user.getId(), user.getUsername());
-        return new WatchTarget(user.getId(), user.getUsername(), qqOpenId);
-    }
 }

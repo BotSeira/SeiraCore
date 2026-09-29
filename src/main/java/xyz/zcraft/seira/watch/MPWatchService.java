@@ -10,22 +10,20 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public final class MultiplayerRoomWatchService implements AutoCloseable {
-    private static final Logger LOG = LogManager.getLogger(MultiplayerRoomWatchService.class);
+public final class MPWatchService implements AutoCloseable {
+    private static final Logger LOG = LogManager.getLogger(MPWatchService.class);
 
     private final Object lock = new Object();
     private final Map<String, Map<String, WatchEntry>> watchesByGroup = new LinkedHashMap<>();
-    private final MultiplayerRoomWatchApi api;
-    private final MultiplayerRoomNotifier notifier;
+    private final MPWatchApi api;
+    private final MPNotifier notifier;
     private final Duration pollInterval;
     private final ScheduledExecutorService scheduler;
     private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
 
-    public MultiplayerRoomWatchService(
-            MultiplayerRoomWatchApi api,
-            MultiplayerRoomNotifier notifier,
-            Duration pollInterval
+    public MPWatchService(
+            MPWatchApi api, MPNotifier notifier, Duration pollInterval
     ) {
         this.api = Objects.requireNonNull(api);
         this.notifier = Objects.requireNonNull(notifier);
@@ -69,30 +67,40 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
         );
     }
 
-    public RoomWatchView watch(
-            String groupId,
-            String userId,
-            MultiplayerRoomVersion version,
-            long roomId
-    ) {
+    public RoomWatchView watch(String groupId, String userId, MPVersion version, long roomId, Integer customBo) {
         requireIdentifier(groupId, "groupId");
         requireIdentifier(userId, "userId");
-        Objects.requireNonNull(version);
+
         if (roomId <= 0) {
             throw new IllegalArgumentException("房间 ID 必须为正整数。");
         }
-        RoomKey room = new RoomKey(version, roomId);
+        RoomKey room;
+        RoomWatchSnapshot snapshot;
+
+        if (version == null) {
+            try {
+                version = MPVersion.STABLE;
+                snapshot = api.getSnapshot(MPVersion.STABLE, roomId);
+            } catch (IllegalStateException e) {
+                version = MPVersion.LAZER;
+                snapshot = api.getSnapshot(MPVersion.LAZER, roomId);
+            }
+        } else {
+            snapshot = api.getSnapshot(version, roomId);
+        }
+
+        room = new RoomKey(version, roomId);
         synchronized (lock) {
             ensureRoomAvailable(groupId, userId, room);
         }
-        RoomWatchSnapshot snapshot = api.getSnapshot(version, roomId);
+
         if (!snapshot.active()) {
             throw new IllegalStateException("该多人房间已经结束，无法开始监视。");
         }
 
         Set<Long> baseline = new LinkedHashSet<>();
         snapshot.completedPlays().forEach(play -> baseline.add(play.playlistItemId()));
-        WatchEntry entry = new WatchEntry(version, snapshot.roomId(), snapshot.roomName(), baseline);
+        WatchEntry entry = new WatchEntry(version, snapshot.roomId(), snapshot.roomName(), baseline, customBo);
         synchronized (lock) {
             ensureRoomAvailable(groupId, userId, room);
             watchesByGroup.computeIfAbsent(groupId, ignored -> new LinkedHashMap<>())
@@ -124,7 +132,7 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
             if (removed == null) {
                 return List.of();
             }
-            return removed.values().stream().map(MultiplayerRoomWatchService::view).toList();
+            return removed.values().stream().map(MPWatchService::view).toList();
         }
     }
 
@@ -181,9 +189,7 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
     }
 
     private boolean sendPendingResults(
-            WatchRef watch,
-            List<CompletedRoomPlay> completed,
-            Map<Long, byte[]> rendered
+            WatchRef watch, List<CompletedRoomPlay> completed, Map<Long, byte[]> rendered
     ) {
         for (CompletedRoomPlay play : completed) {
             if (wasSent(watch, play.playlistItemId())) {
@@ -192,9 +198,9 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
             try {
                 byte[] image = rendered.computeIfAbsent(
                         play.playlistItemId(),
-                        itemId -> api.renderResult(watch.entry().version, watch.entry().roomId, itemId)
+                        itemId -> api.renderResult(watch.entry().version, watch.entry().roomId, itemId, watch.entry().customBo())
                 );
-                if (!notifier.sendResult(watch.groupId(), image)) {
+                if (!notifier.sendResult(watch.entry(), watch.groupId(), image)) {
                     LOG.warn(
                             "Failed to send room {} playlist item {} to group {}",
                             watch.entry().roomId, play.playlistItemId(), watch.groupId()
@@ -290,24 +296,23 @@ public final class MultiplayerRoomWatchService implements AutoCloseable {
         }
     }
 
-    private record WatchEntry(MultiplayerRoomVersion version, long roomId, String roomName,
-                              Set<Long> sentPlaylistItemIds) {
-        private WatchEntry(
-                MultiplayerRoomVersion version,
-                long roomId,
-                String roomName,
-                Set<Long> sentPlaylistItemIds
+    public record WatchEntry(
+            MPVersion version, long roomId, String roomName, Set<Long> sentPlaylistItemIds, Integer customBo
+    ) {
+        public WatchEntry(
+                MPVersion version, long roomId, String roomName, Set<Long> sentPlaylistItemIds, Integer customBo
         ) {
             this.version = version;
             this.roomId = roomId;
             this.roomName = roomName;
             this.sentPlaylistItemIds = new LinkedHashSet<>(sentPlaylistItemIds);
+            this.customBo = customBo;
         }
     }
 
-    private record WatchRef(String groupId, String userId, WatchEntry entry) {
+    public record WatchRef(String groupId, String userId, WatchEntry entry) {
     }
 
-    private record RoomKey(MultiplayerRoomVersion version, long roomId) {
+    public record RoomKey(MPVersion version, long roomId) {
     }
 }

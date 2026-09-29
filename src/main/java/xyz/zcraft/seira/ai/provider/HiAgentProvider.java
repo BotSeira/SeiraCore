@@ -1,0 +1,729 @@
+package xyz.zcraft.seira.ai.provider;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import lombok.Getter;
+import lombok.Setter;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.jetbrains.annotations.NotNull;
+import xyz.zcraft.seira.ai.StreamHandler;
+import xyz.zcraft.seira.ai.data.AgentFile;
+import xyz.zcraft.seira.ai.data.AppConversationBrief;
+import xyz.zcraft.seira.ai.data.ChatQueryResponse;
+import xyz.zcraft.seira.command.Context;
+import xyz.zcraft.seira.config.LLMConfig;
+import xyz.zcraft.seira.services.AiPermission;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+class HiAgentProvider implements ChatProvider {
+    // <faceType=1,faceId="86",ext="eyJ0ZXh0Ijoi5oCE54GrIn0=">
+    // <faceType=1,faceId="497",ext="eyJ0ZXh0Ijoi5LyR5YGH5LqGIn0=">
+    private static final Pattern QQ_FACE = Pattern.compile(
+            "<faceType=[1|3],faceId=\"(\\d+)\",ext=\"([^\"]+)\">", Pattern.CASE_INSENSITIVE
+    );
+    // <faceType=6,faceId="0",ext="eyJ0ZXh0IjoiIn0="> ![ECA4B87395655D69E285314BAB3A2105.jpg](https://multimedia.nt.qq.com.cn/download?appid=14....9_U&spec=0)
+    private static final Pattern QQ_MEME = Pattern.compile(
+            "<faceType=6,faceId=\"0\",ext=\"([^\"]+)\">(?: !\\[.*]\\(.*\\))?", Pattern.CASE_INSENSITIVE
+    );
+    // <faceType=4,faceId="",ext="eyJ0ZXh0IjoiW+eCueeCueeCuV0ifQ==">
+    private static final Pattern QQ_MEME_ALT = Pattern.compile(
+            "<faceType=4,faceId=\"\",ext=\"([^\"]+)\">", Pattern.CASE_INSENSITIVE
+    );
+    private final Api api;
+    private final Map<StateOwner, State> states = new ConcurrentHashMap<>();
+    private final Map<String, Deque<String>> chatLog = new ConcurrentHashMap<>();
+    private final Map<StateOwner, Object> stateCreationLocks = new ConcurrentHashMap<>();
+
+    protected HiAgentProvider(LLMConfig config) {
+        this.api = new Api(config);
+    }
+
+    private static void restoreIncomingMessages(
+            State state,
+            Collection<String> pendingMessages
+    ) {
+        if (pendingMessages.isEmpty()) {
+            return;
+        }
+
+        synchronized (state) {
+            final Deque<String> merged = new ArrayDeque<>(
+                    pendingMessages.size()
+                            + state.incomingMessages.size()
+            );
+
+            merged.addAll(pendingMessages);
+            merged.addAll(state.incomingMessages);
+
+            state.incomingMessages.clear();
+            state.incomingMessages.addAll(merged);
+
+            trimToContextSize(state.incomingMessages);
+        }
+    }
+
+    private static void trimToContextSize(Deque<String> messages) {
+        while (messages.size() > CONTEXT_SIZE) {
+            messages.removeFirst();
+        }
+    }
+
+    private static String shorten(String input) {
+        if (input == null || input.isEmpty()) {
+            return input;
+        }
+
+        if (input.length() <= 300) {
+            return input;
+        }
+
+        return input.substring(0, 150) + "... 已省略 ..." + input.substring(input.length() - 150);
+    }
+
+    private static String parseQqMeme(String original) {
+        final Matcher qqFaceMatcher = QQ_FACE.matcher(original);
+
+        if (qqFaceMatcher.matches()) {
+            original = qqFaceMatcher.replaceAll(r -> {
+                final String extBase64 = r.group(2);
+                final String ext = new String(Base64.getDecoder().decode(extBase64));
+                final String text = JsonParser.parseString(ext).getAsJsonObject().get("text").getAsString();
+                return "[表情:" + text + "]";
+            });
+        }
+
+        final Matcher qqMemeMatcher = QQ_MEME.matcher(original);
+
+        if (qqMemeMatcher.matches()) {
+            original = qqMemeMatcher.replaceAll("[表情]");
+        }
+
+        final Matcher qqMemeAltMatcher = QQ_MEME_ALT.matcher(original);
+
+        if (qqMemeAltMatcher.matches()) {
+            original = qqMemeAltMatcher.replaceAll(r -> {
+                final String extBase64 = r.group(1);
+                final String ext = new String(Base64.getDecoder().decode(extBase64));
+                final String text = JsonParser.parseString(ext).getAsJsonObject().get("text").getAsString();
+                return "[表情:" + text + "]";
+            });
+        }
+
+        return original;
+    }
+
+    private static String processMessage(String original) {
+        try {
+            return parseQqMeme(original);
+        } catch (Exception e) {
+            return original;
+        }
+    }
+
+    @Override
+    public void recordHistory(String groupId, String sender, String message) {
+        if (groupId == null || groupId.isEmpty()
+                || sender == null || sender.isEmpty()
+                || message == null || message.isEmpty()) {
+            return;
+        }
+
+        final String historyMessage = "**<@" + sender + ">**" + ": " + processMessage(message);
+
+        final Deque<String> log = chatLog.computeIfAbsent(groupId, _ -> new ArrayDeque<>());
+
+        synchronized (log) {
+            log.addLast(historyMessage);
+            trimToContextSize(log);
+
+            states.forEach((owner, state) -> {
+                if (!owner.groupId().equals(groupId)) {
+                    return;
+                }
+
+                synchronized (state) {
+                    state.incomingMessages.addLast(historyMessage);
+                    trimToContextSize(state.incomingMessages);
+                }
+            });
+        }
+    }
+
+    @Override
+    public String input(
+            String groupId, String openId, String rawContent,
+            Function<String, String> contextFunc, StreamHandler handler,
+            List<AgentFile> attachments, String refContent
+    ) {
+        final StateOwner owner = StateOwner.of(groupId, openId);
+        final State state = getOrCreateState(owner);
+
+        if (!state.running.compareAndSet(false, true)) {
+            throw new IllegalStateException("已有请求正在运行");
+        }
+
+        try {
+            final Deque<String> pendingMessages;
+
+            synchronized (state) {
+                pendingMessages = new ArrayDeque<>(state.incomingMessages);
+                state.incomingMessages.clear();
+            }
+
+            var query = new StringBuilder();
+
+            final String message = processMessage(rawContent);
+
+            if (pendingMessages.isEmpty()) {
+                query.append("**<@").append(openId).append(">**").append(": ").append(message);
+            } else {
+                if (pendingMessages.size() == CONTEXT_SIZE) {
+                    query.append("====== ...历史消息较多已省略 ======");
+                }
+                query.append(String.join("\n", pendingMessages))
+                        .append("\n")
+                        .append("====== 以上是最近的所有消息 ======\n");
+
+                if (refContent != null && !refContent.isBlank()) {
+                    query.append("====== 以下本次询问引用的消息 ======\n")
+                            .append(refContent)
+                            .append("\n");
+                }
+
+                query.append("====== 以下是本次询问的内容 ======\n")
+                        .append("\n")
+                        .append("**<@").append(openId).append(">**").append(": ").append(message);
+            }
+
+            recordHistory(groupId, openId, message);
+
+            state.resetIfNeeded(api, groupId);
+
+            if (contextFunc != null) {
+                state.getVars().put("CONTEXT", contextFunc.apply(query.toString()));
+            }
+
+            api.updateConversation(groupId, state.conv.appConversationID(), state.vars);
+
+            final String answer;
+            try {
+                if (handler != null) {
+                    answer = api.chatQueryStreaming(
+                            groupId,
+                            state.conv.appConversationID(),
+                            query.toString(),
+                            handler,
+                            attachments,
+                            state::setRunningMessageId
+                    );
+                } else {
+                    var response = api.chatQuery(groupId, state.conv.appConversationID(), query.toString(), attachments);
+                    answer = response.answer();
+                }
+            } catch (RuntimeException | Error e) {
+                restoreIncomingMessages(state, pendingMessages);
+
+                throw e;
+            }
+
+            recordHistory(groupId, "Seira(你,回复" + openId + "的消息)", shorten(answer));
+            return answer;
+        } finally {
+            state.running.set(false);
+        }
+    }
+
+    @Override
+    public StopStatus requireStop(String groupId, String openId) {
+        final StateOwner owner = StateOwner.of(groupId, openId);
+        final State state = states.get(owner);
+
+        if (state == null || !state.running.get()) {
+            return StopStatus.NO_CONVERSATION;
+        }
+
+        if (state.getRunningMessageId() == null) {
+            return StopStatus.NOT_SUPPORTED;
+        }
+
+        try {
+            api.stopConversation(state.getRunningMessageId(), groupId);
+            return StopStatus.SUCCESS;
+        } catch (Exception e) {
+            return StopStatus.FAILED;
+        }
+    }
+
+    @Override
+    public boolean isRunning(String groupId, String openId) {
+        final State state = states.get(
+                StateOwner.of(groupId, openId)
+        );
+
+        return state != null && state.running.get();
+    }
+
+    @Override
+    public int runningCount(String groupId) {
+        int count = 0;
+
+        for (Map.Entry<StateOwner, State> entry : states.entrySet()) {
+            if (!entry.getKey().groupId().equals(groupId)) {
+                continue;
+            }
+
+            count++;
+        }
+
+        return count;
+    }
+
+    @Override
+    public boolean clearState(String groupId, String openId) {
+        final State state = states.get(
+                StateOwner.of(groupId, openId)
+        );
+
+        if (state == null) {
+            return false;
+        }
+
+        state.resetting.set(true);
+        return true;
+    }
+
+    @Override
+    public int clearStateOfGroup(String groupId) {
+        int count = 0;
+
+        for (Map.Entry<StateOwner, State> entry : states.entrySet()) {
+            if (!entry.getKey().groupId().equals(groupId)) {
+                continue;
+            }
+
+            entry.getValue().resetting.set(true);
+            count++;
+        }
+
+        return count;
+    }
+
+    @Override
+    public int clearStateOfUser(String openId) {
+        int count = 0;
+
+        for (Map.Entry<StateOwner, State> entry : states.entrySet()) {
+            if (!entry.getKey().openId().equals(openId)) {
+                continue;
+            }
+
+            entry.getValue().resetting.set(true);
+            count++;
+        }
+
+        return count;
+    }
+
+    @Override
+    public Set<String> activeGroupIds() {
+        return states.entrySet()
+                .stream()
+                .filter(entry -> entry.getValue().running.get())
+                .map(entry -> entry.getKey().groupId())
+                .collect(Collectors.toSet());
+    }
+
+    private State getOrCreateState(StateOwner owner) {
+        State state = states.get(owner);
+
+        if (state != null) {
+            return state;
+        }
+
+        final Object creationLock = stateCreationLocks.computeIfAbsent(owner, _ -> new Object());
+
+        try {
+            synchronized (creationLock) {
+                state = states.get(owner);
+
+                if (state != null) {
+                    return state;
+                }
+
+                final String groupId = owner.groupId();
+                final Deque<String> log = chatLog.computeIfAbsent(groupId, _ -> new ArrayDeque<>());
+                final AppConversationBrief conv = api.createConversation(groupId);
+
+                synchronized (log) {
+                    final State created = State.create(conv, new ArrayList<>(log));
+
+                    states.put(owner, created);
+
+                    return created;
+                }
+            }
+        } finally {
+            stateCreationLocks.remove(owner, creationLock);
+        }
+    }
+
+    @Getter
+    static final class State {
+        private final ConcurrentHashMap<String, String> vars;
+        private final AtomicBoolean running;
+        private final AtomicBoolean resetting;
+        private final Deque<String> incomingMessages;
+        private AppConversationBrief conv;
+        @Setter
+        private volatile String runningMessageId;
+
+        private State(
+                AppConversationBrief conv,
+                ConcurrentHashMap<String, String> vars,
+                AtomicBoolean running,
+                AtomicBoolean resetting,
+                Deque<String> incomingMessages
+        ) {
+            this.conv = conv;
+            this.vars = vars;
+            this.running = running;
+            this.resetting = resetting;
+            this.incomingMessages = incomingMessages;
+        }
+
+
+        public static State create(
+                AppConversationBrief conv,
+                Collection<String> incomingMessages
+        ) {
+            return new State(
+                    conv,
+                    new ConcurrentHashMap<>(),
+                    new AtomicBoolean(false),
+                    new AtomicBoolean(false),
+                    new ArrayDeque<>(incomingMessages)
+            );
+        }
+
+        public void resetIfNeeded(Api api, String groupId) {
+            if (!resetting.compareAndSet(true, false)) {
+                return;
+            }
+
+            try {
+                api.clearConversation(groupId, conv.appConversationID());
+                conv = api.createConversation(groupId);
+                vars.clear();
+                incomingMessages.clear();
+            } catch (RuntimeException | Error e) {
+                resetting.set(true);
+                throw e;
+            }
+        }
+    }
+
+    record StateOwner(String groupId, String openId) {
+        public static StateOwner of(
+                String groupId,
+                String openId
+        ) {
+            return new StateOwner(groupId, openId);
+        }
+
+        public static StateOwner of(Context ctx) {
+            return new StateOwner(
+                    ctx.groupId(),
+                    ctx.senderUserId()
+            );
+        }
+    }
+}
+
+class Api {
+    private static final Logger LOG = LogManager.getLogger(Api.class);
+    public final HttpClient CLIENT = HttpClient.newHttpClient();
+    public final Gson GSON = new Gson();
+    public final String apiKey;
+    public final String endpoint;
+
+    public Api(LLMConfig config) {
+        this.endpoint = config.baseUrl();
+        this.apiKey = config.apiKey();
+    }
+
+    public AppConversationBrief createConversation(String groupId) {
+        LOG.info("Creating conversation for id {}", groupId);
+        JsonObject body = new JsonObject();
+        body.addProperty("UserID", groupId);
+        try {
+            var request = newRequest("/api/proxy/api/v1/create_conversation")
+                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw new RuntimeException("Failed to create conversation: " + send.statusCode());
+            }
+
+            final var response = JsonParser.parseString(send.body()).getAsJsonObject();
+
+            final AppConversationBrief conversation = GSON.fromJson(
+                    response.getAsJsonObject("Conversation"),
+                    AppConversationBrief.class
+            );
+
+            LOG.info("Conversation for id {} created, conv id {}", groupId, conversation.appConversationID());
+            return conversation;
+        } catch (Exception e) {
+            throw new RuntimeException("Error creating conversation", e);
+        }
+    }
+
+    public void updateConversation(String groupId, String appConvId, Map<String, String> variables) {
+        LOG.info("Updating conversation for id {}", groupId);
+
+        JsonObject body = new JsonObject();
+        body.addProperty("UserID", groupId);
+        body.addProperty("AppConversationID", appConvId);
+        body.add("Inputs", GSON.toJsonTree(variables));
+
+        try {
+            var request = newRequest("/api/proxy/api/v1/update_conversation")
+                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw new RuntimeException("Failed to update conversation: " + send.statusCode());
+            }
+
+            LOG.info("Updated conversation for id {}", groupId);
+        } catch (Exception e) {
+            throw new RuntimeException("Error updating conversation", e);
+        }
+    }
+
+    public void clearConversation(String groupId, String appConvId) {
+        LOG.info("Clearing conversation for id {}", groupId);
+
+        JsonObject body = new JsonObject();
+        body.addProperty("UserID", groupId);
+        body.addProperty("AppConversationID", appConvId);
+
+        try {
+            var request = newRequest("/api/proxy/api/v1/clear_message")
+                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw new RuntimeException("Failed to clear conversation: " + send.statusCode());
+            }
+
+            LOG.info("Cleared conversation for id {}", groupId);
+        } catch (Exception e) {
+            throw new RuntimeException("Error clearing conversation", e);
+        }
+    }
+
+    public void stopConversation(String messageId, String groupId) {
+        LOG.info("Stopping conversation for id {}", groupId);
+
+        JsonObject body = new JsonObject();
+        body.addProperty("UserID", groupId);
+        body.addProperty("MessageID", messageId);
+
+        try {
+            var request = newRequest("/api/proxy/api/v1/stop_message")
+                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw new RuntimeException("Failed to stop conversation: " + send.statusCode());
+            }
+
+            LOG.info("Stopped conversation for id {}", groupId);
+        } catch (Exception e) {
+            throw new RuntimeException("Error clearing conversation", e);
+        }
+    }
+
+    public ChatQueryResponse chatQuery(
+            String groupId, String appConvId, String query, List<AgentFile> attachments
+    ) {
+        LOG.info("Running chat query for id {}", groupId);
+
+        JsonObject body = new JsonObject();
+        body.addProperty("UserID", groupId);
+        body.addProperty("AppConversationID", appConvId);
+        body.addProperty("Query", query);
+        body.addProperty("ResponseMode", "blocking");
+
+        if (attachments != null && !attachments.isEmpty()) {
+            body.add("QueryExtends", GSON.toJsonTree(Map.of("Files", attachments)));
+        }
+
+        try {
+            var request = newRequest("/api/proxy/api/v1/chat_query_v2")
+                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw new RuntimeException("Failed to query conversation: " + send.statusCode());
+            }
+
+            final ChatQueryResponse chatQueryResponse = GSON.fromJson(send.body(), ChatQueryResponse.class);
+
+            LOG.info(
+                    "Chat query success for id {}, Token input:{}, output:{}",
+                    groupId,
+                    chatQueryResponse.inputTokens(),
+                    chatQueryResponse.outputTokens()
+            );
+
+            return chatQueryResponse;
+        } catch (Exception e) {
+            throw new RuntimeException("Error querying conversation", e);
+        }
+    }
+
+    public String chatQueryStreaming(
+            String groupId, String appConvId, String query,
+            StreamHandler handler, List<AgentFile> attachments,
+            Consumer<String> taskIdSetter
+    ) {
+        LOG.info("Running chat query for id {}", groupId);
+
+        JsonObject body = new JsonObject();
+        body.addProperty("UserID", groupId);
+        body.addProperty("AppConversationID", appConvId);
+        body.addProperty("Query", query);
+        body.addProperty("ResponseMode", "streaming");
+
+        if (attachments != null && !attachments.isEmpty()) {
+            body.add("QueryExtends", GSON.toJsonTree(Map.of("Files", attachments)));
+        }
+
+        try {
+            var request = newRequest("/api/proxy/api/v1/chat_query_v2")
+                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                    .build();
+
+            final var response = CLIENT.send(request, HttpResponse.BodyHandlers.ofInputStream());
+
+            if (response.statusCode() != 200) {
+                throw new RuntimeException("Failed to query conversation: " + response.statusCode());
+            }
+
+            StringBuilder fullAnswer = new StringBuilder();
+            StringBuilder currentMessage = new StringBuilder();
+            boolean ended = false;
+
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(response.body(), StandardCharsets.UTF_8)
+            )) {
+                String line;
+
+                while ((line = reader.readLine()) != null) {
+                    if (!line.startsWith("data:")) {
+                        continue;
+                    }
+
+                    String data = line.substring(5).trim();
+
+                    if (data.isEmpty()) {
+                        continue;
+                    }
+
+                    JsonObject event = JsonParser.parseString(data).getAsJsonObject();
+                    String eventType = event.get("event").getAsString();
+                    String taskId = event.get("task_id").getAsString();
+
+                    if (taskIdSetter != null && taskId != null && !taskId.isEmpty()) {
+                        taskIdSetter.accept(taskId);
+                    }
+
+                    switch (eventType) {
+                        case "message" -> {
+                            String delta = event.get("answer").getAsString();
+
+                            currentMessage.append(delta);
+                            fullAnswer.append(delta);
+                        }
+
+                        case "agent_thought", "message_output_end" -> flushMessage(currentMessage, handler);
+
+                        case "agent_error" -> {
+                            final String errorMsg = event.get("error_msg").getAsString();
+                            final String errorCode = event.get("error_code").getAsString();
+                            handler.onError(errorCode, errorMsg);
+                            throw new RuntimeException("Error when querying stream conversation: " + errorCode + ": " + errorMsg);
+                        }
+
+                        case "message_cost" -> {
+                            // token statistics
+                        }
+
+                        case "message_end" -> ended = true;
+                    }
+
+                    if (ended) {
+                        break;
+                    }
+                }
+            }
+
+            final String result = fullAnswer.toString();
+
+            handler.onComplete(result);
+
+            LOG.info("Chat query success for id {}", groupId);
+
+            return result;
+        } catch (Exception e) {
+            throw new RuntimeException("Error querying conversation", e);
+        }
+    }
+
+    private void flushMessage(@NotNull StringBuilder currentMessage, @NotNull StreamHandler handler) {
+        final String message = currentMessage.toString().trim();
+
+        if (message.isBlank() || "大模型接口调用出错，请联系管理员".equals(message)) {
+            return;
+        }
+
+        currentMessage.setLength(0);
+
+        handler.onText(message);
+    }
+
+    private HttpRequest.Builder newRequest(String path) {
+        return HttpRequest.newBuilder()
+                .uri(java.net.URI.create(this.endpoint + path))
+                .header("Apikey", this.apiKey)
+                .header("Content-Type", "application/json");
+    }
+}

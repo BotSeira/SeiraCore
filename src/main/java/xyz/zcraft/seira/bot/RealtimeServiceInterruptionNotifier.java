@@ -6,6 +6,7 @@ public final class RealtimeServiceInterruptionNotifier {
     private static final String SCORE_WATCH = "成绩监视";
     private static final String RANK_GUESS = "猜 Rank";
     private static final String MULTIPLAYER_WATCH = "MP 监视";
+    private static final String AI_CHAT = "AI 对话";
 
     private final MessageSender sender;
 
@@ -14,9 +15,7 @@ public final class RealtimeServiceInterruptionNotifier {
     }
 
     private static void addService(
-            Map<String, LinkedHashSet<String>> servicesByGroup,
-            Set<String> groupIds,
-            String service
+            Map<String, LinkedHashSet<String>> servicesByGroup, Set<String> groupIds, String service
     ) {
         Objects.requireNonNull(groupIds);
         groupIds.stream().sorted().forEach(groupId -> servicesByGroup
@@ -33,12 +32,14 @@ public final class RealtimeServiceInterruptionNotifier {
     public NotificationResult notifyGroups(
             Set<String> scoreWatchGroups,
             Set<String> rankGuessGroups,
-            Set<String> multiplayerWatchGroups
+            Set<String> multiplayerWatchGroups,
+            Set<String> agentGroups
     ) {
         Map<String, LinkedHashSet<String>> servicesByGroup = new LinkedHashMap<>();
         addService(servicesByGroup, scoreWatchGroups, SCORE_WATCH);
         addService(servicesByGroup, rankGuessGroups, RANK_GUESS);
         addService(servicesByGroup, multiplayerWatchGroups, MULTIPLAYER_WATCH);
+        addService(servicesByGroup, agentGroups, AI_CHAT);
 
         int sent = 0;
         for (Map.Entry<String, LinkedHashSet<String>> entry : servicesByGroup.entrySet()) {

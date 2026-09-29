@@ -1,7 +1,7 @@
 package xyz.zcraft.seira.command.parse;
 
 import xyz.zcraft.seira.api.data.SearchQuery;
-import xyz.zcraft.seira.data.UserRef;
+import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.db.UserDataStore;
 
 import java.util.*;
@@ -10,7 +10,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class Resolver {
-    private static final ArrayList<String> USER_MACRO_TYPES = new ArrayList<>(List.of("rs", "bp", "rp"));
     private final java.util.function.Function<String, Long> boundUid;
 
     public Resolver() {
@@ -21,9 +20,30 @@ public final class Resolver {
         this.boundUid = Objects.requireNonNull(boundUid);
     }
 
+    private static final Map<List<String>, String> ALIASES = Map.of(
+            List.of("+", "＋"), "+",
+            List.of("~", "～"), "~",
+            List.of("=", "＝"), "="
+    );
+
     public String sanitize(String rawContent) {
+        for (Map.Entry<List<String>, String> entry : ALIASES.entrySet()) {
+            for (String s : entry.getKey()) {
+                rawContent = rawContent.replace(s, entry.getValue());
+            }
+        }
+
+        if (rawContent.trim().equalsIgnoreCase("@")
+                || rawContent.trim().equalsIgnoreCase("//")) {
+            return "ux";
+        } else if (looksLikeMention(rawContent.trim())) {
+            return "ux " + rawContent;
+        }
+
         // Add surrounding space to <@> before expanding compact commands so /bp5<@...> is recognized.
         rawContent = Patterns.QQ_INLINE_AT_PATTERN.matcher(rawContent).replaceAll(r -> " " + r.group() + " ");
+
+        rawContent = rawContent.replace("+", " +");
 
         Matcher matcher = Patterns.COMPACT_SCORE_COMMAND_PATTERN.matcher(rawContent);
         if (matcher.find()) {
@@ -39,6 +59,14 @@ public final class Resolver {
             } else {
                 rawContent = type + " " + start + "-" + end + remaining;
             }
+        }
+
+        matcher = Patterns.SPACE_MISSING_COMMAND_PATTERN.matcher(rawContent);
+        if (matcher.find()) {
+            String command = matcher.group(1).toLowerCase(Locale.ROOT);
+            String target = matcher.group(2);
+            String remaining = rawContent.substring(matcher.end());
+            rawContent = command + " " + target + " " + remaining;
         }
 
         return rawContent;
@@ -62,110 +90,22 @@ public final class Resolver {
         return null;
     }
 
-    public TargetResolution resolveTargetWithOptionalMention(String[] args, String senderUserId) {
-        if (args.length >= 2 && isUserMacro(args[1])) {
-            String mentionedUserId = extractMentionedUserId(args[0]);
-            if (mentionedUserId != null) {
-                Long boundUid = resolveBoundUid(mentionedUserId);
-                if (boundUid == null) {
-                    return new TargetResolution(new ShortcutTarget(null, null, null, null,
-                            "被@的用户还没有绑定玩家ID，无法使用快捷查询。"), 2);
-                }
-                return new TargetResolution(parseTarget(args[1], new UserRef.ByUid(boundUid), true, false), 2);
-            }
-
-            Long uid = parsePositiveLong(args[0]);
-            if (uid != null) {
-                return new TargetResolution(parseTarget(args[1], new UserRef.ByUid(uid), false, false), 2);
-            }
-
-            if (!looksLikeMention(args[0]) && !args[0].isBlank()) {
-                return new TargetResolution(parseTarget(args[1], new UserRef.ByUsername(args[0]), false, false), 2);
-            }
-
-//            if (looksLikeMention(args[0])) {
-//                return new TargetResolution(new ShortcutTarget(null, null, null, null, "@用户格式无效，请使用@用户后再输入快捷查询（如 rs2）。"), 2);
-//            }
+    public String player(String argument, String senderUserId) {
+        if (argument == null) {
+            Long uid = resolveBoundUid(senderUserId);
+            if (uid == null) throw new ResolutionException("你还没有绑定玩家ID，请先使用 /bind 喵");
+            return uid.toString();
         }
-        return new TargetResolution(parseTarget(args[0], senderUserId), 1);
-    }
-
-    public ShortcutTarget parseTarget(String arg, String senderUserId) {
-        Long boundUid = resolveBoundUid(senderUserId);
-        UserRef userRef = boundUid == null ? null : new UserRef.ByUid(boundUid);
-        return parseTarget(arg, userRef, false, true);
-    }
-
-    public UserRefResolution resolveUserRefArgument(String arg) {
-        Long explicitUid = parsePositiveLong(arg);
-        if (explicitUid != null) {
-            return new UserRefResolution(new UserRef.ByUid(explicitUid), null);
+        String mentioned = extractMentionedUserId(argument);
+        if (mentioned != null) {
+            Long uid = resolveBoundUid(mentioned);
+            if (uid == null) throw new ResolutionException("被@的用户还没有绑定玩家ID，请先让对方使用 /bind 喵");
+            return uid.toString();
         }
-
-        String mentionedUserId = extractMentionedUserId(arg);
-        if (mentionedUserId != null) {
-            Long boundUid = resolveBoundUid(mentionedUserId);
-            if (boundUid == null) {
-                return new UserRefResolution(null, "被@的用户还没有绑定玩家ID，请先让对方使用 /bind");
-            }
-            return new UserRefResolution(new UserRef.ByUid(boundUid), null);
-        }
-
-//        if (looksLikeMention(arg)) {
-//            return new UserRefResolution(null, "@用户格式无效，请使用 @用户 后再输入指令。示例：/bo 5 @123456");
-//        }
-
-        String username = arg == null ? "" : arg.trim();
-        if (username.startsWith("@")) {
-            username = username.substring(1);
-        }
-
-        if (username.isEmpty()) {
-            return new UserRefResolution(null, null);
-        }
-
-        return new UserRefResolution(new UserRef.ByUsername(username), null);
-    }
-
-    public RscTarget resolveRscTarget(String groupId, String extraUidArg) {
-        Set<String> merged = new LinkedHashSet<>();
-
-        if (extraUidArg == null || extraUidArg.trim().startsWith("+")) {
-            List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(groupId);
-            if (groupBoundUids.isEmpty()) {
-                return new RscTarget(null, "本群还没有已绑定的玩家，请先使用 /bind");
-            }
-            groupBoundUids.stream().map(String::valueOf).forEach(merged::add);
-        }
-
-        if (extraUidArg == null) return new RscTarget(merged.toArray(String[]::new), null);
-
-        String trimmed = extraUidArg.trim();
-        String body = trimmed.substring(1).trim();
-        if (body.isEmpty()) {
-            return new RscTarget(null, "追加ID列表不能为空。");
-        }
-
-        String[] extraTokens = body.split(",");
-        for (String token : extraTokens) {
-            if (Patterns.RSC_TARGET_PATTERN.matcher(token.trim()).matches()) {
-                merged.add(token);
-            } else if (looksLikeMention(token)) {
-                final UserRefResolution userRefResolution = resolveUserRefArgument(token);
-                if (userRefResolution.errorMessage() != null) {
-                    return new RscTarget(null, "解析 " + token + " 时出错:" + userRefResolution.errorMessage());
-                }
-                if (userRefResolution.userRef() instanceof UserRef.ByUid ref) {
-                    merged.add("u" + ref.getUid());
-                } else if (userRefResolution.userRef() instanceof UserRef.ByUsername ref) {
-                    merged.add("@" + ref.getUsername());
-                }
-            } else {
-                return new RscTarget(null, "追加ID列表包含非法值。");
-            }
-        }
-
-        return new RscTarget(merged.toArray(String[]::new), null);
+        String player = argument.trim();
+        if (player.startsWith("@")) player = player.substring(1);
+        if (player.isBlank()) throw new ResolutionException("无法识别指定的玩家喵");
+        return player;
     }
 
     public Long resolveBoundUid(String senderUserId) {
@@ -182,93 +122,6 @@ public final class Resolver {
         } catch (NumberFormatException ignored) {
             return null;
         }
-    }
-
-    private ShortcutTarget parseTarget(String arg, UserRef userRef, boolean mentionedUser, boolean needResolveBound) {
-        Matcher setMatcher = Patterns.SET_MACRO_PATTERN.matcher(arg.trim());
-        if (setMatcher.matches()) {
-            Long setId = parsePositiveLong(setMatcher.group(1));
-            Long index = parsePositiveLong(setMatcher.group(2));
-
-            if (setId == null || index == null || index < 1) {
-                return new ShortcutTarget(null, null, null, null, "谱面集索引无效。例如: 12345#2");
-            }
-
-            return new ShortcutTarget(setId, userRef, "ms", index, null);
-        }
-
-        Matcher userMatcher = Patterns.USER_MACRO_PATTERN.matcher(arg.trim());
-        if (userMatcher.matches()) {
-            String type = userMatcher.group(1).toLowerCase();
-
-            if (!USER_MACRO_TYPES.contains(type)) {
-                return new ShortcutTarget(null, null, null, null, "未知的快捷查询");
-            }
-
-            Long index = parsePositiveLong(userMatcher.group(2));
-
-            if (index == null) {
-                index = 1L;
-            }
-
-            if (index < 1 || index > 200) {
-                return new ShortcutTarget(null, null, null, null, "快捷指令索引无效，请输入 1-200 之间的数字。例如: rs5");
-            }
-
-            if (userRef == null) {
-                String errorMessage;
-                if (needResolveBound) {
-                    errorMessage = mentionedUser
-                            ? "被@的用户还没有绑定玩家ID，无法使用快捷查询。"
-                            : "你还没有绑定玩家ID，无法使用快捷查询。请先使用 /bind";
-                } else {
-                    errorMessage = "无法识别指定的玩家ID";
-                }
-
-                return new ShortcutTarget(null, null, null, null, errorMessage);
-            }
-
-            return new ShortcutTarget(null, userRef, type, index, null);
-        }
-
-        if ("mp".equalsIgnoreCase(arg.trim())) {
-            if (userRef == null) {
-                String errorMessage;
-                if (needResolveBound) {
-                    errorMessage = mentionedUser
-                            ? "被@的用户还没有绑定玩家ID，无法使用快捷查询。"
-                            : "你还没有绑定玩家ID，无法使用快捷查询。请先使用 /bind";
-                } else {
-                    errorMessage = "无法识别指定的玩家ID";
-                }
-
-                return new ShortcutTarget(null, null, null, null, errorMessage);
-            }
-
-            return new ShortcutTarget(null, userRef, "mp", null, null);
-        }
-
-        Matcher beatmapMatcher = Patterns.BEATMAP_MACRO_PATTERN.matcher(arg.trim());
-        if (beatmapMatcher.matches()) {
-            Long mapId = parsePositiveLong(beatmapMatcher.group(1));
-            return new ShortcutTarget(mapId, userRef, "m", null, null);
-        }
-
-        if (Patterns.LOCAL_SCORE_PATTERN.matcher(arg.trim()).matches()) {
-            return ShortcutTarget.localScore(arg.trim().toLowerCase(Locale.ROOT));
-        }
-
-        Long id = parsePositiveLong(arg);
-        if (id == null) {
-            return new ShortcutTarget(null, null, null, null,
-                    "参数无效。请输入数字ID、本地成绩ID或快捷指令 (例如 loc123456789, rs1, 12345#2)。");
-        }
-
-        return new ShortcutTarget(id, null, null, null, null);
-    }
-
-    private boolean isUserMacro(String arg) {
-        return Patterns.USER_MACRO_PATTERN.matcher(arg.trim()).matches();
     }
 
     public boolean looksLikeMention(String token) {
@@ -297,6 +150,18 @@ public final class Resolver {
         return null;
     }
 
+    public Set<String> extractAllMentionedIds(String token) {
+        if (token == null) {
+            return Set.of();
+        }
+
+        Set<String> result = new HashSet<>();
+
+        Patterns.QQ_AT_IDS_PATTERN.matcher(token).results().forEach(m -> result.add(m.group(1)));
+
+        return result;
+    }
+
     public Long parsePositiveLong(String value) {
         try {
             long parsed = Long.parseLong(value);
@@ -311,18 +176,17 @@ public final class Resolver {
     }
 
     private static final class Patterns {
-        private static final Pattern USER_MACRO_PATTERN = Pattern.compile("(?i)^(rs|bo|rp|bp)(\\d+)?$");
         private static final Pattern COMPACT_SCORE_COMMAND_PATTERN = Pattern.compile(
                 "(?i)^(rs|rp|bp)(\\d+)(?:-(\\d+))?(?=\\s|$)"
         );
-        private static final Pattern SET_MACRO_PATTERN = Pattern.compile("^(\\d+)#(\\d+)$");
-        private static final Pattern BEATMAP_MACRO_PATTERN = Pattern.compile("^m(\\d+)$");
-        private static final Pattern LOCAL_SCORE_PATTERN = Pattern.compile("(?i)^loc[1-9]\\d*$");
-        private static final Pattern QQ_AT_PATTERN = Pattern.compile("^<@([A-Z|0-9]{32})>$");
-        private static final Pattern QQ_INLINE_AT_PATTERN = Pattern.compile("(<@[A-Z|0-9]{32}>)");
+        private static final Pattern SPACE_MISSING_COMMAND_PATTERN = Pattern.compile(
+                "^([a-zA-Z]+)(\\d+(?:#\\d+)?)"
+        );
+        private static final Pattern QQ_AT_PATTERN = Pattern.compile("^<@([A-Z0-9]{32})>$");
+        private static final Pattern QQ_AT_IDS_PATTERN = Pattern.compile("<@([A-Z0-9]{32})>");
+        private static final Pattern QQ_INLINE_AT_PATTERN = Pattern.compile("(<@[A-Z0-9]{32}>)");
         private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
         private static final Pattern SEARCH_PATTERN = Pattern.compile("^(?:#(\\d+) )?(.+)$");
-        private static final Pattern RSC_TARGET_PATTERN = Pattern.compile("^[us]?\\d+$");
     }
 }
 

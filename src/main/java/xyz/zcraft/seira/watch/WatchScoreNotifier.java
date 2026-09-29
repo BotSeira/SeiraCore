@@ -1,12 +1,11 @@
 package xyz.zcraft.seira.watch;
 
 import xyz.zcraft.seira.bot.MessageSender;
-import xyz.zcraft.seira.bot.data.FileInfo;
-import xyz.zcraft.seira.bot.data.Message;
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.data.UploadedImage;
 
-import java.util.Base64;
 import java.util.Objects;
+
+import static xyz.zcraft.seira.command.reply.ReplyFactory.s;
 
 public final class WatchScoreNotifier {
     private final MessageSender messageSender;
@@ -15,20 +14,17 @@ public final class WatchScoreNotifier {
         this.messageSender = Objects.requireNonNull(messageSender);
     }
 
-    public boolean sendScore(String groupId, byte[] imageBytes) {
-        String base64 = Base64.getEncoder().encodeToString(imageBytes);
-        FileInfo media = messageSender.uploadGroupMediaBase64(
-                groupId,
-                PendingMessage.FILE_TYPE_IMAGE,
-                base64
-        );
-        if (media == null) {
-            return false;
-        }
+    public boolean sendScore(String groupId, RecentScore score, byte[] imageBytes) {
+        final UploadedImage uploadedImage = messageSender.uploadImageToCos(imageBytes);
 
-        Message message = new Message();
-        message.setMsgType(PendingMessage.MSG_TYPE_MEDIA);
-        message.setMedia(media);
-        return messageSender.sendGroupMessage(groupId, message) != null;
+        if (uploadedImage == null) return false;
+
+        return messageSender.sendGroupMarkdown(
+                groupId,
+                """
+                %s
+                > ID %s
+                """.formatted(uploadedImage.toMarkdown(), s(score.scoreId())).trim()
+        ) != null;
     }
 }

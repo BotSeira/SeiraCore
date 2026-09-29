@@ -22,6 +22,7 @@ public class TokenManager implements AutoCloseable {
     private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
 
+    @Getter
     private final String clientId;
     private final String clientSecret;
 

@@ -85,12 +85,12 @@ public final class RankGuessGameService {
         return Math.abs(guess - actualRank) <= allowedDifference;
     }
 
-    public static List<String> getUsernameFeature(String username) {
+    public static List<Map.Entry<String, Double>> getUsernameFeature(String username) {
         if (username == null || username.isBlank()) {
             return List.of();
         }
 
-        final List<String> features = new ArrayList<>();
+        final List<Map.Entry<String, Double>> features = new ArrayList<>();
 
         final int leftBracket = username.indexOf("[");
         final int rightBracket = username.indexOf("]");
@@ -103,42 +103,42 @@ public final class RankGuessGameService {
             if (leftBracket == 0 && rightBracket < username.length() - 1) {
                 // [Prefix]Example
                 final String prefix = username.substring(0, rightBracket + 1);
-                features.add("有前缀 `" + prefix + "`");
+                features.add(Map.entry("有前缀 `" + prefix + "`", 0.5));
             }
         }
 
         if (username.charAt(0) == username.charAt(username.length() - 1)) {
-            features.add("为 `首尾一样`");
+            features.add(Map.entry("为 `首尾一样`", 0.4));
         }
 
 
         boolean hasLetter = username.chars().anyMatch(Character::isLetter);
         if (hasLetter) {
             if (Objects.equals(username, username.toUpperCase())) {
-                features.add("为 `全大写`");
+                features.add(Map.entry("为 `全大写`", 0.2));
             } else if (Objects.equals(username, username.toLowerCase())) {
-                features.add("为 `全小写`");
+                features.add(Map.entry("为 `全小写`", 0.2));
             }
         }
 
-        features.add("长度为 `" + username.length() + "`");
+        features.add(Map.entry("长度为 `" + username.length() + "`", 0.1));
 
         if (username.contains(" ")) {
-            features.add("有 `空格`");
+            features.add(Map.entry("有 `空格`", 0.15));
         }
 
         if (username.contains("_")) {
-            features.add("有 `下划线(_)`");
+            features.add(Map.entry("有 `下划线(_)`", 0.15));
         }
 
         if (username.contains("-")) {
-            features.add("有 `横杠(-)`");
+            features.add(Map.entry("有 `横杠(-)`", 0.15));
         }
 
         if (PREFIX_NUMBER_PATTERN.matcher(username).matches()) {
-            features.add("是 `一串数字一串字母`");
+            features.add(Map.entry("是 `一串数字一串字母`", 0.25));
         } else if (SUFFIX_NUMBER_PATTERN.matcher(username).matches()) {
-            features.add("是 `一串字母一串数字`");
+            features.add(Map.entry("是 `一串字母一串数字`", 0.25));
         }
 
         return features;

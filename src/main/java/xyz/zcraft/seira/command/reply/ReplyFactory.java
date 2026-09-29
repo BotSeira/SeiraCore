@@ -5,7 +5,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.osu.model.*;
-import xyz.zcraft.seira.api.APIHelper;
+import xyz.zcraft.seira.api.AsteroidApi;
+import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.bot.data.Button;
 import xyz.zcraft.seira.bot.data.PendingMessage;
@@ -26,6 +27,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
+
+import static xyz.zcraft.seira.command.reply.ReplyFactory.ExternalUrls.*;
 
 public final class ReplyFactory {
     private final Supplier<AppConfig> configSupplier;
@@ -100,13 +103,13 @@ public final class ReplyFactory {
     }
 
     @SuppressWarnings("unused")
-    static String url(String text, String url) {
+    public static String url(String text, String url) {
         return "[" + text + "](" + url + ")";
     }
 
     public static PendingMessage replayUploadMessage(ReplayUploadInfo info) {
         return PendingMessage.ofMarkdownRaw(
-                ("\n" + "## Replay上传成功~" + "\n" +
+                ("\n" + "__Replay上传成功~__" + "\n" +
                         "> 成绩: " + s(info.scoreId()) + "\n" +
                         "> 谱面: " + m(info.beatmapId()) + "\n" +
                         "> 用户: " + u(info.userId(), info.username()) + "\n").trim(),
@@ -119,13 +122,13 @@ public final class ReplyFactory {
                 || "upload_queued".equals(status) || "uploading".equals(status);
     }
 
-    public PendingMessage friendStatusMessage(String selfOpenId, Long selfUid, String selfUsername,
-                                              String targetOpenId, Long targetUid, String targetUsername,
+    public PendingMessage friendStatusMessage(String selfOpenId, Long selfUid, String selfOsuAvatar, String selfUsername, String selfAvatar,
+                                              String targetOpenId, Long targetUid, String targetOsuAvatar, String targetUsername, String targetAvatar,
                                               boolean selfFollowed, Boolean targetFollowed) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.friendStatusContent(
-                        selfOpenId, selfUid, selfUsername,
-                        targetOpenId, targetUid, targetUsername,
+                        selfOpenId, selfUid, selfOsuAvatar, selfUsername, selfAvatar,
+                        targetOpenId, targetUid, targetOsuAvatar, targetUsername, targetAvatar,
                         selfFollowed, targetFollowed
                 )
         );
@@ -317,7 +320,7 @@ public final class ReplyFactory {
         );
     }
 
-    public PendingMessage replayMessage(Context ctx, APIHelper.ReplayTaskInfo taskInfo) {
+    public PendingMessage replayMessage(Context ctx, OstellaApi.ReplayTaskInfo taskInfo) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.replayTaskContent(ctx, taskInfo),
                 buttons().replayProgressButtons(taskInfo.taskId(), ctx.senderUserId())
@@ -424,14 +427,18 @@ public final class ReplyFactory {
         );
     }
 
-    public PendingMessage statusMessage(Context ctx, APIHelper.ServerStatus status) {
+    public PendingMessage statusMessage(Context ctx, OstellaApi.ServerStatus status, AsteroidApi.ServerStatus asteroid) {
         return PendingMessage.ofMarkdownRaw(
-                Contents.statContent(ctx, status), null
+                Contents.statContent(ctx, status, asteroid), null
         );
     }
 
     public PendingMessage helpMessage(Context ctx) {
         return PendingMessage.ofMarkdownRaw(Contents.helpContent(ctx));
+    }
+
+    public PendingMessage usagesMessage(Context ctx) {
+        return PendingMessage.ofMarkdownRaw(Contents.usagesContent(ctx));
     }
 
     public PendingMessage faqMessage(Context ctx) {
@@ -463,8 +470,21 @@ public final class ReplyFactory {
         return PendingMessage.ofMarkdownRaw(Contents.supContent(ctx, username, openId, isSupporter, hasSupported, supportLevel));
     }
 
+    public PendingMessage userInfoShortMessage(Context ctx, UserExtended user) {
+        return PendingMessage.ofMarkdownRaw(Contents.userInfoShortContent(ctx, user));
+    }
+
+    public static class ExternalUrls {
+        public static final String COMMANDS = "https://docs.seira.top/overview/commands.html";
+        public static final String PERMISSION = "https://docs.seira.top/overview/use.html#extra-permission";
+        public static final String CHANNEL = "https://pd.qq.com/s/f9icas5gj?b=5";
+        public static final String CHANGELOG = "https://docs.seira.top/overview/changelog.html";
+        public static final String FAQ = "https://docs.seira.top/overview/faq.html";
+        public static final String GITHUB = "https://github.com/BotSeira";
+    }
+
     private static final class Contents {
-        static String replayTaskContent(Context ctx, APIHelper.ReplayTaskInfo taskInfo) {
+        static String replayTaskContent(Context ctx, OstellaApi.ReplayTaskInfo taskInfo) {
             StringBuilder sb = new StringBuilder();
             sb.append(at(ctx)).append("回放生成请求已提交").append("\n");
 
@@ -643,16 +663,16 @@ public final class ReplyFactory {
 
             boolean collapsed = false;
 
-            sb.append("> 好友←→ (").append(mutual.size()).append(")\n>");
+            sb.append("> __好友←→ (").append(mutual.size()).append(")__ \n>");
             collapsed |= appendFriends(ctx, mutual, sb);
 
-            sb.append("\n> 仅关注→ (").append(onlyFollowed.size()).append(")\n>");
+            sb.append("\n> __仅关注→ (").append(onlyFollowed.size()).append(")__ \n>");
             collapsed |= appendFriends(ctx, onlyFollowed, sb);
 
-            sb.append("\n> 仅粉丝← (");
+            sb.append("\n> __仅粉丝← (");
             sb.append(onlyFollower.size()).append(" 已知");
-            if (all) sb.append(" 共 ").append(self.getFollowerCount() - allMutualCount);
-            sb.append(")\n>");
+            if (all) sb.append(" 共 ").append(Math.max(self.getFollowerCount() - allMutualCount, 0));
+            sb.append(")__ \n>");
             collapsed |= appendFriends(ctx, onlyFollower, sb);
 
             if (ctx.inGroup() && collapsed) {
@@ -720,21 +740,29 @@ public final class ReplyFactory {
             return sb.toString().trim();
         }
 
-        public static String statContent(Context ctx, APIHelper.ServerStatus status) {
+        public static String statContent(Context ctx, OstellaApi.ServerStatus status, AsteroidApi.ServerStatus asteroid) {
             String stat = at(ctx) + "\n" +
                     "## 服务器状态\n" +
                     "> 消息网关: ✅ 正常\n" +
                     "> oStella API: " + (status.oStella() ? "✅ 正常" : "❌ 无法访问") + "\n";
 
             if (status.oStella()) {
-                stat += "> osu! API: " + (status.osu() ? "✅ 正常" : "❌ 无法访问") + "\n";
+                stat += "> ↳ osuRenderer: " + (status.onlineWorkers() + " / " + status.allWorkers())
+                        + (status.onlineWorkers() > 0 ? " (✅在线)" : " (❌全部离线)") + "\n";
+                stat += "> ↳ osu! API: " + (status.osu() ? "✅ 正常" : "❌ 无法访问") + "\n";
             }
+
+            stat += "> Asteroid API: " + (asteroid.online() ? "✅ 正常" : "❌ 无法访问") + "\n";
 
             String version = "## 版本信息" + "\n"
                     + "> SeiraCore: " + VersionInfo.getVersion() + "\n";
 
             if (status.oStella() && status.oStellaVersion() != null) {
                 version += "> oStella: " + status.oStellaVersion() + "\n";
+            }
+
+            if (asteroid.online() && asteroid.version() != null) {
+                version += "> Asteroid: " + asteroid.version() + "\n";
             }
 
 
@@ -750,32 +778,51 @@ public final class ReplyFactory {
         }
 
         public static String helpContent(Context ctx) {
-            return at(ctx) + "\n" +
-                    """
-                            常用指令：
-                            > /bind - 绑定你的玩家ID
-                            > /rp - 获取最近通过的一个成绩
-                            > /bo [个数] [玩家ID] - 获取一个或多个最佳成绩
-                            > /rp [个数] [玩家ID] - 获取最近通过一个或多个成绩
-                            > /tb [#天数] [玩家ID] - 获取近N天达成的BP
-                            > /s <成绩ID或快捷查询> - 获取指定成绩
-                            > /m <谱面ID或快捷查询> - 获取谱面
-                            > /bma <谱面ID或快捷查询> [Mod] - 分析谱面PP构成和类型
-                            > /ms <谱面集ID或快捷查询> - 获取谱面集
-                            > /r [成绩ID或快捷查询] [[mm:ss]-[mm:ss]] - 生成成绩高光视频或指定片段
-                            > /rcancel <任务ID> - 取消回放渲染任务
-                            > /rg <start/group/#Rank/end/wish/stats [all]> - 猜 Rank 游戏与个人战绩
-                            > /lb <谱面ID> [玩家ID列表] - 获取指定谱面排行榜
-                            > /watch add <玩家ID/用户名/@用户> [分钟] - 监视群友的新成绩
-                            > /wx start <UID列表> <谱面ID列表> - 监视指定玩家在指定谱面的成绩
-                            > /mpwatch [start] <房间ID> [stable|lazer] - 监视多人房间的逐图结果（链接可自动识别版本，stop all 停止本群全部监视）
-                            > /f - 获取好友列表
-                            
-                            详细指令列表请在 [这里](https://docs.seira.top/overview/commands.html) 查看
-                            配置额外权限请在 [这里](https://docs.seira.top/overview/use.html#extra-permission) 查看
-                            """ + "\n"
-                    + "当前版本: " + VersionInfo.getVersion() + " [更新日志](https://docs.seira.top/overview/changelog.html)" + "\n"
-                    + "[常见问题](https://docs.seira.top/overview/faq.html)" + " " + cmd("/stat", "状态信息").trim();
+            return at(ctx) + "常用指令: \n" + """
+                    > /rp - 获取最近通过的一个或多个成绩
+                    > /bp - 获取一个或多个最佳成绩
+                    > /tb - 获取近日BP
+                    > /s - 获取指定成绩
+                    > /m - 获取谱面
+                    > /r - 生成成绩高光视频或指定片段
+                    > /rg - 猜 Rank 游戏
+                    > /watch - 监视群友的新成绩
+                    > /mpw <MPLink> - 监视多人房间的逐图结果
+                    > /f - 获取好友列表
+                    
+                    [详细指令列表](%s) | [配置额外权限](%s)
+                    [加入官方频道](%s) | [查看常见问题](%s)
+                    [查看更新日志](%s) | %s
+                    %s | [Github主页](%s)
+                    
+                    当前版本: %s
+                    """.formatted(
+                    COMMANDS, PERMISSION,
+                    CHANNEL, FAQ,
+                    CHANGELOG, cmd("/stat", "查看状态信息"),
+                    cmd("/usages", "查看用法示例"), GITHUB,
+                    VersionInfo.getVersion()
+            ) + "\n";
+        }
+
+        public static String usagesContent(Context ctx) {
+            return at(ctx) + "部分指令示例\n" +
+                    "> 注意：所有指令中的@均需要开启权限才能正常读取。权限配置见 [这里]( " + PERMISSION + " )~\n" + """
+                    > /rp -> 查看最近通过的一个成绩
+                    > /rp1-20 -> 查看最近通过的1到20个成绩
+                    > /bp1-20 -> 查看20个最佳成绩
+                    > /bp1-20 @peppy acc>95 -> 查看指定玩家BP1-20中准确率大于95%的成绩
+                    > /sa bp2 -> 查看BP2的成绩分析
+                    > /tb #7 @peppy -> 查看指定玩家近7天的新BP
+                    > /@peppy -> 查看指定玩家的基本信息
+                    > /rg group -> 开始群组猜 Rank 游戏
+                    > /m @peppy rp2 -> 查看指定玩家最近第2条成绩的谱面
+                    > /dl mp -> 获取所在lazer多人房间当前谱面的镜像下载链接
+                    > /r rp -> 渲染最近通过的成绩的高光片段回放视频
+                    > /r @peppy bp2 90- -> 渲染指定玩家BP2从1:30开始的回放视频
+                    > /mpw <mplink> -> 开始多人房间监视
+                    > /romai @peppy -> 开始监视指定玩家所在的RomAI对局
+                    """;
         }
 
         public static String faqContent(Context ctx) {
@@ -790,8 +837,7 @@ public final class ReplyFactory {
 
         public static String luckContent(Context ctx, DailyLuck.Luck luck, Beatmapset mapset, UploadedImage cover) {
             final List<Double> list = mapset.getBeatmaps().stream().map(Beatmap::getDifficultyRating).sorted().toList();
-            String sb = at(ctx) + "\n" +
-                    "## 今日运势" + "\n" +
+            String sb = at(ctx) + "你的今日运势" + "\n" +
                     "> 人品值: **" + luck.luck() + "**/100\n" +
                     "> 宜: " + luck.ups() + "\n" +
                     "> 忌: " + luck.downs() + "\n\n" +
@@ -801,8 +847,8 @@ public final class ReplyFactory {
             return sb.trim();
         }
 
-        public static String friendStatusContent(String selfOpenId, Long selfUid, String selfUsername,
-                                                 String targetOpenId, Long targetUid, String targetUsername,
+        public static String friendStatusContent(String selfOpenId, Long selfUid, String selfOsuAvatar, String selfUsername, String selfAvatar,
+                                                 String targetOpenId, Long targetUid, String targetOsuAvatar, String targetUsername, String targetAvatar,
                                                  boolean selfFollowed, Boolean targetFollowed) {
             final String status;
             if (targetFollowed == null) {
@@ -822,10 +868,20 @@ public final class ReplyFactory {
                     status = "✕ 路人 ✕";
                 }
             }
-            return at(selfOpenId) + "你们的好友状态(点击打开个人主页):" + "\n" +
-                    url(selfUsername, "https://osu.ppy.sh/users/" + selfUid) + " (" + at(selfOpenId) + ")\n" +
-                    "  " + status + "\n" +
-                    url(targetUsername, "https://osu.ppy.sh/users/" + targetUid) + " (" + at(targetOpenId) + ")";
+
+            return """
+                    %s 和 %s 的好友状态:
+                    > # ![image #30px #30px](%s)&ensp;__|__&ensp;%s
+                    
+                    # %s
+                    
+                    > # ![image #30px #30px](%s)&ensp;__|__&ensp;%s
+                    """.formatted(
+                    at(selfOpenId), targetAvatar == null ? targetUsername : at(targetOpenId),
+                    selfOsuAvatar, url(selfUsername, "https://osu.ppy.sh/users/" + selfUid),
+                    status,
+                    targetOsuAvatar, url(targetUsername, "https://osu.ppy.sh/users/" + targetUid)
+            ).trim();
         }
 
         public static String missImageContent(Context ctx, String scoreId, Integer index, int size) {
@@ -863,6 +919,27 @@ public final class ReplyFactory {
             }
 
             return sb.toString().trim();
+        }
+
+        public static String userInfoShortContent(Context ctx, UserExtended user) {
+            final Duration playTime = Duration.ofSeconds(user.getStatistics().getPlayTime());
+            return """
+                    %s `%s` 的用户信息
+                    > - PP: %.2f
+                    > - Rank: #%,d (%s #%,d)
+                    > - 准确率: %.2f%%
+                    > - 游玩次数: %,d
+                    > - 获得总分: %,d
+                    > - 游玩时间: %dd %dh %dm
+                    """.formatted(
+                    at(ctx), user.getUsername(),
+                    user.getStatistics().getPp(),
+                    user.getStatistics().getGlobalRank(), user.getCountry().getCode(), user.getStatistics().getRank().getCountry(),
+                    user.getStatistics().getAccuracy() * 100,
+                    user.getStatistics().getPlayCount(),
+                    user.getStatistics().getRankedScore(),
+                    playTime.toDaysPart(), playTime.toHoursPart(), playTime.toMinutesPart()
+            );
         }
     }
 
@@ -1047,7 +1124,9 @@ public final class ReplyFactory {
             return Button.keyboard(cancelable
                     ? Button.row(
                     Button.command(1, "查询渲染进度", "/rstat " + jobId),
-                    Button.command(2, "取消渲染", "/rcancel " + jobId).permit(userId)
+                    Button.command(2, "取消渲染", "/rcancel " + jobId)
+                            .permit(userId)
+                            .modal("确定要取消渲染吗")
             )
                     : Button.row(Button.command(1, "查询渲染进度", "/rstat " + jobId)));
         }

@@ -20,7 +20,7 @@ public final class ScoreWatchService implements AutoCloseable {
     private final Object lock = new Object();
     private final Map<String, Map<Long, WatchEntry>> watchesByGroup = new LinkedHashMap<>();
     private final Map<String, SpecificWatchEntry> specificWatchesByGroup = new LinkedHashMap<>();
-    private final WatchApi api;
+    private final ScoreWatchApi api;
     private final WatchScoreNotifier notifier;
     private final SpecificScoreNotifier specificNotifier;
     private final SpecificScoreWatchStore specificWatchStore;
@@ -31,7 +31,7 @@ public final class ScoreWatchService implements AutoCloseable {
     private final AtomicBoolean closed = new AtomicBoolean();
 
     public ScoreWatchService(
-            WatchApi api,
+            ScoreWatchApi api,
             WatchScoreNotifier notifier,
             SpecificScoreNotifier specificNotifier,
             SpecificScoreWatchStore specificWatchStore,
@@ -320,7 +320,7 @@ public final class ScoreWatchService implements AutoCloseable {
                         score.scoreId(),
                         _ -> api.renderScore(watch.entry.target.userId(), score.scoreId())
                 );
-                if (!notifier.sendScore(watch.groupId, image)) {
+                if (!notifier.sendScore(watch.groupId, score, image)) {
                     LOG.warn("Failed to send watched score {} to group {}", score.scoreId(), watch.groupId);
                     return;
                 }

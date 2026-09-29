@@ -2,20 +2,18 @@ package xyz.zcraft.seira.command.handler;
 
 import xyz.zcraft.osu.model.User;
 import xyz.zcraft.osu.model.UserExtended;
-import xyz.zcraft.seira.api.APIHelper;
+import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.FriendEntry;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.Response;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
+import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
-import xyz.zcraft.seira.command.parse.ShortcutTarget;
-import xyz.zcraft.seira.command.parse.TargetResolution;
-import xyz.zcraft.seira.command.parse.UserRefResolution;
+import xyz.zcraft.seira.command.parse.TargetInput;
 import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
-import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 
@@ -32,19 +30,22 @@ public final class SocialCommandHandler {
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
     private final Function<String, String> accessTokenProvider;
+    private final Function<String, String> avatarProvider;
 
     public SocialCommandHandler(
             Resolver resolver,
             OsuAuthHelper authHelper,
             TaskCoordinator taskCoordinator,
             ReplyFactory replyFactory,
-            Function<String, String> accessTokenProvider
+            Function<String, String> accessTokenProvider,
+            Function<String, String> avatarProvider
     ) {
         this.resolver = resolver;
         this.authHelper = authHelper;
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
         this.accessTokenProvider = accessTokenProvider;
+        this.avatarProvider = avatarProvider;
     }
 
     public void handleMp(Context ctx) {
@@ -61,7 +62,7 @@ public final class SocialCommandHandler {
         }
 
         try (var _ = taskCoordinator.beginRequest(ctx, "Multiplayer Room")) {
-            var response = APIHelper.getMultiplayerRoom(token.accessToken());
+            var response = OstellaApi.getMultiplayerRoom(token.accessToken());
             ctx.sendReply(replyFactory.mpMessage(ctx, response));
         }
     }
@@ -90,36 +91,52 @@ public final class SocialCommandHandler {
 
         if (ctx.argumentCount() == 0) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/mu @someone\n> 注: 读取@需要开启权限。"));
-        }
-
-        final String s = resolver.extractMentionedUserId(ctx.argument(0));
-        final Long targetId = resolver.resolveBoundUid(s);
-
-        if (targetId == null) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "对方还未绑定喵"));
             return;
         }
+
+        String player = resolver.player(ctx.argument(0), ctx.senderUserId());
+        long uid = OstellaApi.resolveUid(player);
+        final String mention = UserDataStore.findGroupOpenIdByUid(ctx.groupId(), uid)
+                .map(ReplyFactory::at)
+                .orElse("");
+        ctx.sendReply(PendingMessage.ofMarkdownRaw(mention + ": [%d(点击打开)](%s)".formatted(uid, "https://osu.ppy.sh/users/" + uid)));
+        final UserExtended targetUser = OstellaApi.getUserRaw(uid);
+        final String targetOsuAvatar = targetUser.getAvatarUrl();
 
         boolean selfFollowed;
         final AtomicReference<Boolean> targetFollowed = new AtomicReference<>();
 
-        final OsuToken self = authHelper.updateTokenAndGet(ctx.senderUserId());
-        final List<FriendEntry> selfFollowedList = APIHelper.getFollowed(self.accessToken()).getContent();
+        final OsuToken selfToken = authHelper.updateTokenAndGet(ctx.senderUserId());
+        final var selfUser = OstellaApi.getSelf(selfToken.accessToken()).getContent();
+        final String selfOsuAvatar = selfUser.getAvatarUrl();
+
+        if (targetUser.getId() == selfUser.getId()) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + " 和 `" + targetUser.getUsername() + "` 是一个人喵。"));
+            return;
+        }
+
+        final List<FriendEntry> selfFollowedList = OstellaApi.getFollowed(selfToken.accessToken()).getContent();
         updateFriends(selfId, selfFollowedList);
         final Set<User> users = new HashSet<>(selfFollowedList.stream().map(FriendEntry::user).toList());
 
-        selfFollowed = selfFollowedList.stream().anyMatch(e -> e.user().getId() == targetId);
+        users.add(selfUser);
+        users.add(targetUser);
 
-        selfFollowedList.stream().filter(e -> e.user().getId() == targetId).findFirst().ifPresentOrElse(
-                e -> targetFollowed.set(e.mutual()), () -> {
-                }
-        );
+        selfFollowed = selfFollowedList.stream()
+                .anyMatch(e -> e.user().getId() == targetUser.getId());
 
-        if (targetFollowed.get() == null) {
+        selfFollowedList.stream()
+                .filter(e -> e.user().getId() == targetUser.getId())
+                .findFirst()
+                .ifPresent(e -> targetFollowed.set(e.mutual()));
+
+        final var targetOpenId = UserDataStore.findGroupOpenIdByUid(ctx.groupId(), targetUser.getId()).orElse(null);
+
+        if (targetFollowed.get() == null && targetOpenId != null) {
             final List<FriendEntry> targetFollowedList;
-            final OsuToken target = authHelper.updateTokenAndGet(s);
+            final OsuToken target = authHelper.updateTokenAndGet(targetOpenId);
             if (target != null) {
-                targetFollowedList = APIHelper.getFollowed(target.accessToken()).getContent();
+                targetFollowedList = OstellaApi.getFollowed(target.accessToken()).getContent();
                 targetFollowed.set(targetFollowedList.stream().anyMatch(e -> e.user().getId() == selfId));
                 users.addAll(targetFollowedList.stream().map(FriendEntry::user).toList());
             }
@@ -128,8 +145,14 @@ public final class SocialCommandHandler {
         UserDataStore.storeUserInfo(users);
 
         ctx.sendReply(replyFactory.friendStatusMessage(
-                        ctx.senderUserId(), selfId, UserDataStore.findUsername(selfId).orElse("未知"),
-                        s, targetId, UserDataStore.findUsername(targetId).orElse("未知"),
+                        ctx.senderUserId(), selfId, selfOsuAvatar,
+                        UserDataStore.findUsername(selfId).orElse("未知"),
+                        avatarProvider.apply(ctx.senderUserId()),
+
+                        targetOpenId, targetUser.getId(), targetOsuAvatar,
+                        targetUser.getUsername(),
+                        avatarProvider.apply(targetOpenId),
+
                         selfFollowed, targetFollowed.get()
                 )
         );
@@ -145,8 +168,8 @@ public final class SocialCommandHandler {
         }
 
         try (var _ = taskCoordinator.beginRequest(ctx, "Friend List")) {
-            final Response<UserExtended> self = APIHelper.getSelf(token.accessToken());
-            final Response<List<FriendEntry>> response = APIHelper.getFollowed(token.accessToken());
+            final Response<UserExtended> self = OstellaApi.getSelf(token.accessToken());
+            final Response<List<FriendEntry>> response = OstellaApi.getFollowed(token.accessToken());
             final List<FriendEntry> friendEntries = response.getContent();
 
             final Predicate<Long> filter;
@@ -246,7 +269,7 @@ public final class SocialCommandHandler {
                 }
 
                 try (var _ = taskCoordinator.beginRequest(ctx, "Leaderboard")) {
-                    var response = APIHelper.getLeaderboardResponse(groupBoundUids);
+                    var response = OstellaApi.getLeaderboardResponse(groupBoundUids);
                     ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
                 }
                 return;
@@ -258,70 +281,59 @@ public final class SocialCommandHandler {
             }
 
             try (var _ = taskCoordinator.beginRequest(ctx, "Leaderboard")) {
-                var response = APIHelper.getLeaderboardResponse(List.of(uid));
+                var response = OstellaApi.getLeaderboardResponse(List.of(uid));
                 ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
             }
         } else if (ctx.args().length == 1 || ctx.args().length == 2) {
-            TargetResolution targetResolution = resolver.resolveTargetWithOptionalMention(ctx.args(), ctx.senderUserId());
-            ShortcutTarget target = targetResolution.target();
-            if (target.isError()) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + target.errorMessage()));
-                return;
-            }
-
-            int remainingArgs = ctx.args().length - targetResolution.consumedArgs();
-            if (remainingArgs == 0) {
-                if (ctx.groupId() != null && !ctx.groupId().isBlank()) {
-                    List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(ctx.groupId());
-                    if (groupBoundUids.isEmpty()) {
-                        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "本群还没有已绑定的玩家，请先使用 /bind"));
-                        return;
-                    }
-                    try (var _ = taskCoordinator.beginRequest(ctx, "Map Leaderboard")) {
-                        long beatmapId = APIHelper.lookupBeatmap(target, accessTokenProvider.apply(ctx.senderUserId()));
-                        var response = APIHelper.getGroupLeaderboardResponse(beatmapId, groupBoundUids);
-                        ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
-                    }
+            var target = TargetInput.read(ctx.args());
+            int remainingArgs = ctx.argumentCount() - target.consumedArgs();
+            List<Long> uids = new LinkedList<>();
+            if (remainingArgs == 1) {
+                String[] uidTokens = ctx.argument(target.consumedArgs()).split(",");
+                if (uidTokens.length == 0) {
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "玩家ID列表不能为空。"));
                     return;
                 }
+                for (String token : uidTokens) {
+                    Long uid = resolver.parsePositiveLong(token.trim());
+                    if (uid == null) {
+                        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "玩家ID列表包含非法值。"));
+                        return;
+                    }
+                    uids.add(uid);
+                }
+            } else if (remainingArgs != 0) {
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
+                return;
+            } else if (ctx.inGroup()) {
+                uids.addAll(UserDataStore.findBoundUidsByGroup(ctx.groupId()));
+                if (uids.isEmpty()) {
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "本群还没有已绑定的玩家，请先使用 /bind"));
+                    return;
+                }
+            } else {
                 Long uid = resolver.resolveBoundUid(ctx.senderUserId());
                 if (uid == null) {
                     ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.NO_BIND));
-                    return;
-                }
-
-                try (var _ = taskCoordinator.beginRequest(ctx, "Map Leaderboard")) {
-                    long beatmapId = APIHelper.lookupBeatmap(target, accessTokenProvider.apply(ctx.senderUserId()));
-                    var response = APIHelper.getGroupLeaderboardResponse(beatmapId, List.of(uid));
-                    ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
-                }
-                return;
-            }
-
-            if (remainingArgs != 1) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
-                return;
-            }
-
-            String[] uidTokens = ctx.args()[targetResolution.consumedArgs()].split(",");
-            if (uidTokens.length == 0) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "玩家ID列表不能为空。用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
-                return;
-            }
-
-            List<Long> uids = new LinkedList<>();
-            for (String uidToken : uidTokens) {
-                Long uid = resolver.parsePositiveLong(uidToken.trim());
-                if (uid == null) {
-                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "玩家ID列表包含非法值。用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
                     return;
                 }
                 uids.add(uid);
             }
 
             try (var _ = taskCoordinator.beginRequest(ctx, "Map Leaderboard")) {
-                long beatmapId = APIHelper.lookupBeatmap(target, accessTokenProvider.apply(ctx.senderUserId()));
-                var response = APIHelper.getGroupLeaderboardResponse(beatmapId, uids);
+                long beatmapId = switch (target.kind()) {
+                    case ID, MAP -> Long.parseLong(target.id());
+                    case SCORE -> OstellaApi.getScoreBeatmapId(target.id());
+                    case SET -> OstellaApi.lookupBeatmapInSet(Long.parseLong(target.id()), target.index(),
+                            accessTokenProvider.apply(ctx.senderUserId()));
+                    case RS, RP, BP -> {
+                        long uid = OstellaApi.resolveUid(resolver.player(target.player(), ctx.senderUserId()));
+                        yield OstellaApi.lookupPlayerScoreBeatmap(uid, target.scoreList(), target.index(), accessTokenProvider.apply(ctx.senderUserId()));
+                    }
+                    case MP -> OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                    case MEMORY -> throw new ResolutionException("请指定指令目标谱面喵");
+                };
+                var response = OstellaApi.getGroupLeaderboardResponse(beatmapId, uids);
                 ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
             }
         } else {
@@ -330,28 +342,13 @@ public final class SocialCommandHandler {
     }
 
     public void handleSup(Context ctx) {
-        final UserRef target;
-
-        if (ctx.argumentCount() == 0) {
-            Long targetId = resolver.resolveBoundUid(ctx.senderUserId());
-            if (targetId == null) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.NO_BIND));
-                return;
-            }
-            target = new UserRef.ByUid(targetId);
-        } else if (ctx.argumentCount() == 1) {
-            final UserRefResolution res = resolver.resolveUserRefArgument(ctx.argument(0));
-            if (res.errorMessage() != null) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + res.errorMessage()));
-                return;
-            }
-            target = res.userRef();
-        } else {
+        if (ctx.argumentCount() > 1) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.SUP));
             return;
         }
-
-        final UserExtended user = APIHelper.getUserRaw(target);
+        String player = resolver.player(ctx.argumentCount() == 0 ? null : ctx.argument(0), ctx.senderUserId());
+        long uid = OstellaApi.resolveUid(player);
+        final UserExtended user = OstellaApi.getUserRaw(uid);
         final String openId = UserDataStore.findGroupOpenIdByUid(ctx.groupId(), user.getId()).orElse(null);
 
         ctx.sendReply(replyFactory.supMessage(ctx, user.getUsername(), openId, user.isSupporter(), user.getHasSupported(), user.getSupportLevel()));

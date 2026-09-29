@@ -37,6 +37,10 @@ public interface ConsoleRuntimeControl {
 
     ConsoleCommandProcessor.ConsoleResult editPanel(String panelId, String jsonPath);
 
+    ConsoleCommandProcessor.ConsoleResult getGroupInfo(String groupId);
+
+    ConsoleCommandProcessor.ConsoleResult getGroupBotState(String groupId);
+
     record RuntimeStatus(
             boolean running,
             boolean gatewayConnected,

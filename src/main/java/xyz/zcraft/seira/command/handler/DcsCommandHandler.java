@@ -8,6 +8,7 @@ import xyz.zcraft.seira.discord.DiscordBridgeService;
 import java.util.Locale;
 import java.util.Objects;
 
+import static xyz.zcraft.seira.command.reply.ReplyFactory.ExternalUrls.PERMISSION;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class DcsCommandHandler {
@@ -52,7 +53,7 @@ public final class DcsCommandHandler {
 
         final boolean b = ctx.sendMessage(PendingMessage.ofString("正在尝试开启 Discord 消息同步，请稍候...")).success();
         if (!b) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "由于缺少主动消息权限，无法添加消息同步！权限配置请见[这里](https://docs.seira.top/overview/use.html#extra-permission)~"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "由于缺少主动消息权限，无法添加消息同步！权限配置请见[这里](" + PERMISSION + ")~"));
             return;
         }
 

@@ -9,6 +9,7 @@ import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import xyz.zcraft.seira.bot.data.AccessToken;
 import xyz.zcraft.seira.bot.data.Attachment;
+import xyz.zcraft.seira.bot.data.MsgElem;
 import xyz.zcraft.seira.command.AttachmentHandler;
 import xyz.zcraft.seira.command.route.Router;
 import xyz.zcraft.seira.config.AppConfig;
@@ -147,7 +148,38 @@ public class WSClient extends WebSocketClient {
         String content = data.get("content").getAsString();
         String msgId = data.get("id").getAsString();
         String openId = data.get("author").getAsJsonObject().get("user_openid").getAsString();
-        router.onPrivateMessageReceived(openId, msgId, content);
+
+        final JsonArray attachments = data.getAsJsonArray("attachments");
+        List<Attachment> attachmentList = new ArrayList<>();
+
+        if (attachments != null && !attachments.isJsonNull()) {
+            for (JsonElement attachmentElem : attachments) {
+                JsonObject attachmentObj = attachmentElem.getAsJsonObject();
+                Attachment attachment = gson.fromJson(attachmentObj, Attachment.class);
+                attachmentList.add(attachment);
+            }
+        }
+
+        String msgIdx = null;
+
+        final JsonArray extArr = data.get("message_scene").getAsJsonObject().get("ext").getAsJsonArray();
+
+        for (JsonElement elem : extArr) {
+            final String str = elem.getAsString();
+
+            if (str.startsWith("msg_idx=")) {
+                msgIdx = str.substring("msg_idx=".length());
+            }
+        }
+
+        List<MsgElem> msgElemList = new ArrayList<>();
+
+        if (data.has("msg_elements")) {
+            data.get("msg_elements").getAsJsonArray()
+                    .forEach(elem -> msgElemList.add(gson.fromJson(elem, MsgElem.class)));
+        }
+
+        router.onPrivateMessageReceived(openId, msgId, content, msgIdx, attachmentList, msgElemList);
     }
 
     private void onC2CFile(JsonObject payload) {
@@ -177,6 +209,26 @@ public class WSClient extends WebSocketClient {
         JsonObject author = data.get("author").getAsJsonObject();
         String openId = author.get("member_openid").getAsString();
         String groupId = data.get("group_openid").getAsString();
+
+        String msgIdx = null;
+
+        final JsonArray extArr = data.get("message_scene").getAsJsonObject().get("ext").getAsJsonArray();
+
+        for (JsonElement elem : extArr) {
+            final String str = elem.getAsString();
+
+            if (str.startsWith("msg_idx=")) {
+                msgIdx = str.substring("msg_idx=".length());
+            }
+        }
+
+        List<MsgElem> msgElemList = new ArrayList<>();
+
+        if (data.has("msg_elements")) {
+            data.get("msg_elements").getAsJsonArray()
+                    .forEach(elem -> msgElemList.add(gson.fromJson(elem, MsgElem.class)));
+        }
+
         List<Attachment> attachments = parseAttachments(data);
         Map<String, String> mentions = parseMentions(data);
 
@@ -191,7 +243,8 @@ public class WSClient extends WebSocketClient {
                     mentions
             ));
         }
-        router.onGroupMessageReceived(groupId, openId, msgId, content);
+
+        router.onGroupMessageReceived(groupId, openId, msgId, content, msgIdx, attachments, msgElemList);
     }
 
     private Map<String, String> parseMentions(JsonObject data) {
@@ -242,7 +295,20 @@ public class WSClient extends WebSocketClient {
     private void sendIdentify() {
         JsonObject data = new JsonObject();
         data.addProperty("token", "QQBot " + tokenSupplier.get().token());
-        data.addProperty("intents", 1 << 25);
+        /*
+            GUILDS (1 << 0)
+            GUILD_MEMBERS (1 << 1)
+            GUILD_MESSAGES (1 << 9)    // 消息事件，仅 *私域* 机器人能够设置此 intents。
+            GUILD_MESSAGE_REACTIONS (1 << 10)
+            DIRECT_MESSAGE (1 << 12)
+            GROUP_AND_C2C_EVENT (1 << 25)
+            INTERACTION (1 << 26)
+            MESSAGE_AUDIT (1 << 27)
+            FORUMS_EVENT (1 << 28)  // 论坛事件，仅 *私域* 机器人能够设置此 intents。
+            AUDIO_ACTION (1 << 29)
+            PUBLIC_GUILD_MESSAGES (1 << 30) // 消息事件，此为公域的消息事件
+         */
+        data.addProperty("intents", 1 << 25 | 1 << 26 | 1 << 28 | 1 << 30);
 
         JsonObject payload = new JsonObject();
         payload.addProperty("op", 2);

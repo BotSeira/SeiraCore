@@ -1,11 +1,10 @@
 package xyz.zcraft.seira.command;
 
-import com.google.gson.Gson;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
-import xyz.zcraft.seira.api.APIHelper;
 import xyz.zcraft.seira.api.ApiRequestException;
+import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.ReplayRenderException;
 import xyz.zcraft.seira.api.data.Base64Bytes;
 import xyz.zcraft.seira.api.data.QqUploadRequest;
@@ -19,14 +18,17 @@ import xyz.zcraft.seira.services.ApiRequestStats;
 import xyz.zcraft.seira.services.BotStat;
 
 import java.nio.channels.ClosedChannelException;
-import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class TaskCoordinator {
     private static final Logger LOG = LogManager.getLogger(TaskCoordinator.class);
-
+    private static final ScheduledExecutorService TIMEOUT_SCHEDULER = Executors.newSingleThreadScheduledExecutor();
     private final MessageSender messageSender;
     private final DiscordBridgeService discordBridgeService;
     private final ApiRequestStats apiRequestStats = new ApiRequestStats();
@@ -50,7 +52,7 @@ public final class TaskCoordinator {
                     return ApiRequestException.getDefaultMessage(e.getErrorCode());
                 }
                 case ClosedChannelException _ -> {
-                    return "oStella API 无法连接，请稍后再试。";
+                    return "oStella API 无法连接，请稍后再试喵";
                 }
                 case ResolutionException e -> {
                     return e.getMessage();
@@ -63,33 +65,43 @@ public final class TaskCoordinator {
             }
             cursor = cursor.getCause();
         }
-        return "请求处理失败，请稍后再试。";
+        return "请求处理失败，请稍后再试喵";
     }
 
-    public CommandReplyChannel openReplyChannel(
-            String targetId,
-            String messageId,
-            boolean groupMessage,
-            boolean queueMessageInGroup
+    public ReplyChannel openReplyChannel(
+            String targetId, String messageId, boolean groupMessage, boolean queueMessageInGroup, String refMsgIdx
     ) {
-        return new OutboundReplyChannel(targetId, messageId, groupMessage, queueMessageInGroup);
+        return new ReplyChannel(this, targetId, messageId, groupMessage, queueMessageInGroup, refMsgIdx);
     }
 
+    public RequestTiming beginRequest(Context ctx, String requestType, boolean timeoutNotify) {
+        return beginRequest(ctx, requestType, 60, timeoutNotify ? "请求处理时间超过预期，这可能是由于相关数据缺少缓存，请耐心等待喵。" : null);
+    }
 
-    /**
-     * Tracks queue estimates and elapsed time; the caller executes the request directly.
-     */
-    public RequestTiming beginRequest(Context ctx, String requestType) {
+    public RequestTiming beginRequest(Context ctx, String requestType, int timeout, String timeoutNotify) {
         long estimatedSeconds = apiRequestStats.estimateAndEnqueue(requestType);
-        RequestTiming timing = new RequestTiming(requestType);
+        ScheduledFuture<?> schedule = null;
+
+        if (timeoutNotify != null && !timeoutNotify.isBlank()) {
+            schedule = TIMEOUT_SCHEDULER.schedule(
+                    () -> ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + timeoutNotify)),
+                    timeout, TimeUnit.SECONDS
+            );
+        }
+
+        RequestTiming timing = new RequestTiming(requestType, schedule);
+
         try {
-            ctx.sendQueueNotice(PendingMessage.ofMarkdownRaw(
-                    at(ctx) + "请求已加入队列，预计等待时间" + estimatedSeconds + "秒。"));
+            ctx.sendQueueNotice(PendingMessage.ofMarkdownRaw(at(ctx) + "请求已加入队列，预计等待时间" + estimatedSeconds + "秒。"));
             return timing;
         } catch (RuntimeException e) {
             timing.close();
             throw e;
         }
+    }
+
+    public RequestTiming beginRequest(Context ctx, String requestType) {
+        return beginRequest(ctx, requestType, true);
     }
 
     public PendingMessage imageMessage(Response<Base64Bytes> response, PendingMessage completion) {
@@ -102,22 +114,22 @@ public final class TaskCoordinator {
         return messageSender.createVideoUploadRequest(targetId, ctx.inGroup());
     }
 
-    public APIHelper.ReplayRenderResult waitForReplay(APIHelper.ReplayTaskInfo taskInfo) {
+    public OstellaApi.ReplayRenderResult waitForReplay(OstellaApi.ReplayTaskInfo taskInfo) {
         return waitForReplay(taskInfo, -1);
     }
 
-    public APIHelper.ReplayRenderResult waitForReplay(APIHelper.ReplayTaskInfo taskInfo, long timeout) {
+    public OstellaApi.ReplayRenderResult waitForReplay(OstellaApi.ReplayTaskInfo taskInfo, long timeout) {
         if (taskInfo == null || taskInfo.taskId() == null || taskInfo.taskId().isBlank()) {
             throw new IllegalArgumentException("回放任务未返回有效请求ID，无法获取视频结果。");
         }
 
-        APIHelper.ReplayRenderResult result = APIHelper.waitReplayVideo(taskInfo.taskId(), timeout);
+        OstellaApi.ReplayRenderResult result = OstellaApi.waitReplayVideo(taskInfo.taskId(), timeout);
         replayResults.put(taskInfo.taskId(), result);
         BotStat.incrementReplays();
         return result;
     }
 
-    public PendingMessage replayVideoMessage(APIHelper.ReplayRenderResult result) {
+    public PendingMessage replayVideoMessage(OstellaApi.ReplayRenderResult result) {
         if (result == null) {
             return PendingMessage.ofString("回放视频生成失败，请稍后重试。");
         }
@@ -164,12 +176,12 @@ public final class TaskCoordinator {
 
         if (pendingMsg instanceof MDMessage md) {
             message.setMsgType(PendingMessage.MSG_TYPE_MARKDOWN);
-            message.setMarkdown(new Gson().toJsonTree(Map.of("content", md.getMarkdown())).getAsJsonObject());
+            message.setMarkdown(Message.MessageMarkdown.of(md.getMarkdown()));
             if (md.hasKeyboard()) {
                 message.setKeyboard(md.getKeyboard());
             }
         } else if (pendingMsg.getMsgType() == PendingMessage.MSG_TYPE_MARKDOWN) {
-            message.setMarkdown(new Gson().toJsonTree(Map.of("content", pendingMsg.getContent())).getAsJsonObject());
+            message.setMarkdown(Message.MessageMarkdown.of(pendingMsg.getContent()));
         } else {
             message.setContent(pendingMsg.getContent());
         }
@@ -220,63 +232,32 @@ public final class TaskCoordinator {
             discordBridgeService.acceptQqCommandReply(targetId, portableResult);
         }
 
-        return new SendResult(uploadResult && sentMessage != null, sentMessage);
+        final boolean success = uploadResult && sentMessage != null;
+
+        return new SendResult(success, sentMessage);
     }
 
     public final class RequestTiming implements AutoCloseable {
         private final String requestType;
         private final long startedAt = System.nanoTime();
+        private final ScheduledFuture<?> scheduledFuture;
         private boolean closed;
 
-        private RequestTiming(String requestType) {
+        private RequestTiming(String requestType, ScheduledFuture<?> schedule) {
             this.requestType = requestType;
+            this.scheduledFuture = schedule;
         }
 
         @Override
         public void close() {
+            if (scheduledFuture != null) {
+                scheduledFuture.cancel(true);
+            }
+
             if (closed) return;
             closed = true;
             apiRequestStats.complete(requestType,
                     Math.max(1L, (System.nanoTime() - startedAt) / 1_000_000L));
         }
-    }
-
-    private final class OutboundReplyChannel implements CommandReplyChannel {
-        private final String targetId;
-        private final String messageId;
-        private final boolean groupMessage;
-        private final boolean queueMessageInGroup;
-        private final AtomicInteger passiveSequence = new AtomicInteger(1);
-
-        private OutboundReplyChannel(
-                String targetId,
-                String messageId,
-                boolean groupMessage,
-                boolean queueMessageInGroup
-        ) {
-            this.targetId = targetId;
-            this.messageId = messageId;
-            this.groupMessage = groupMessage;
-            this.queueMessageInGroup = queueMessageInGroup;
-        }
-
-        @Override
-        public synchronized SendResult sendReply(PendingMessage message) {
-            return sendOutboundMessage(targetId, messageId, groupMessage, message, passiveSequence);
-        }
-
-        @Override
-        public synchronized SendResult sendProactive(PendingMessage message) {
-            return sendOutboundMessage(targetId, null, groupMessage, message, null);
-        }
-
-        @Override
-        public synchronized SendResult sendQueueNotice(PendingMessage message) {
-            if (groupMessage && !queueMessageInGroup) {
-                return new SendResult(true, null);
-            }
-            return sendReply(message);
-        }
-
     }
 }

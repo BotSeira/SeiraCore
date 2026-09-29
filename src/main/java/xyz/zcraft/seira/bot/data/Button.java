@@ -97,6 +97,16 @@ public class Button {
         return this;
     }
 
+    public Button modal(String content) {
+        if (content != null && !content.isBlank()) {
+            if (this.getAction() != null) {
+                this.getAction().setModal(Action.Modal.of(content));
+            }
+        }
+
+        return this;
+    }
+
     public Button disable() {
         this.renderData.setStyle(0);
 
@@ -114,7 +124,7 @@ public class Button {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
-    private static class RenderData {
+    public static class RenderData {
         private String label;
         @SerializedName("visited_label")
         private String visitedLabel;
@@ -124,20 +134,31 @@ public class Button {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
-    private static class Action {
+    public static class Action {
         private int type;
         private Permission permission;
         private String data;
         private boolean enter;
         private int anchor;
         @SerializedName("unsupport_tips")
-        private String unsupportTips;
+        private String unsupportedTips;
+        private Modal modal;
 
         @Data
-        private static class Permission {
+        public static class Permission {
             private int type;
             @SerializedName("specify_user_ids")
             private List<String> specifyUserIds;
+        }
+
+        public record Modal(
+                String content,
+                @SerializedName("confirm_text") String confirmText,
+                @SerializedName("cancel_text") String cancelText
+        ) {
+            public static Modal of(String content) {
+                return new Modal(content, null, null);
+            }
         }
     }
 }

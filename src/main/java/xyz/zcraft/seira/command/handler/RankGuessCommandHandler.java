@@ -2,18 +2,16 @@ package xyz.zcraft.seira.command.handler;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.seira.api.APIHelper;
+import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.RandomScore;
 import xyz.zcraft.seira.bot.data.MessageReference;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
-import xyz.zcraft.seira.command.parse.ShortcutTarget;
-import xyz.zcraft.seira.command.parse.UserRefResolution;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.data.SendResult;
-import xyz.zcraft.seira.data.UserRef;
+import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.db.RankGuessRecordStore;
 import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.rankguess.HintUtil;
@@ -26,10 +24,12 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static xyz.zcraft.seira.command.reply.ReplyFactory.ExternalUrls.PERMISSION;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.cmd;
 
@@ -44,6 +44,8 @@ public final class RankGuessCommandHandler {
     private final RankGuessGameService games;
     private final Resolver resolver;
     private final Predicate<String> adminAuthorizer;
+    private final Function<String, String> avatarUrlGetter;
+    private final Function<byte[], UploadedImage> imageUploader;
     private final Pattern BP_PATTERN = Pattern.compile("^bp(\\d+)$");
 
     public RankGuessCommandHandler(
@@ -51,13 +53,17 @@ public final class RankGuessCommandHandler {
             ReplyFactory replyFactory,
             RankGuessGameService games,
             Resolver resolver,
-            Predicate<String> adminAuthorizer
+            Predicate<String> adminAuthorizer,
+            Function<String, String> avatarUrlGetter,
+            Function<byte[], UploadedImage> imageUploader
     ) {
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
         this.games = games;
         this.resolver = resolver;
         this.adminAuthorizer = adminAuthorizer;
+        this.avatarUrlGetter = avatarUrlGetter;
+        this.imageUploader = imageUploader;
     }
 
     private static Long parseRank(String argument) {
@@ -261,16 +267,9 @@ public final class RankGuessCommandHandler {
         Long rank;
 
         if (resolver.looksLikeMention(argument)) {
-            final UserRefResolution userRefResolution = resolver.resolveUserRefArgument(argument);
-
-            if (userRefResolution.errorMessage() != null) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + userRefResolution.errorMessage()));
-                return;
-            }
-
-            final UserRef userRef = userRefResolution.userRef();
-
-            rank = APIHelper.getUserRank(userRef);
+            String player = resolver.player(argument, ctx.senderUserId());
+            long uid = OstellaApi.resolveUid(player);
+            rank = OstellaApi.getUserRank(uid);
         } else {
             rank = parseRank(argument);
             if (rank == null) {
@@ -331,7 +330,7 @@ public final class RankGuessCommandHandler {
         reply.append(at(ctx)).append("目前%s在本群权重为 `%.2f` (%s)\n".formatted(ref, probability.weight(), factors.isBlank() ? "基础权重" : factors));
         reply.append("在本群 `%d` 名玩家中，%s被选中的概率为 `%.3f%%`\n".formatted(totalPlayer, ref, probability.chance() * 100));
 
-        final String randomScoreWeight = APIHelper.getRandomScoreWeight(boundUid, games.generateWeights(ctx.groupId()), all);
+        final String randomScoreWeight = OstellaApi.getRandomScoreWeight(boundUid, games.generateWeights(ctx.groupId()), all);
 
         reply.append("%s的成绩当前抽选概率：\n>".formatted(ref)).append(randomScoreWeight).append("\n");
 
@@ -408,9 +407,7 @@ public final class RankGuessCommandHandler {
 
         try {
             scoreId = Long.parseLong(
-                    APIHelper.lookupScoreId(new ShortcutTarget(
-                                    null, new UserRef.ByUid(boundUid), "bp", (long) index, null)
-                            , List.of(), null)
+                    OstellaApi.lookupPlayerScore(boundUid, "bp", index, List.of(), null)
             );
         } catch (Exception e) {
             LOG.error("Failed to lookup score id", e);
@@ -439,7 +436,7 @@ public final class RankGuessCommandHandler {
         }
 
         boolean activated = false;
-        try (var _ = taskCoordinator.beginRequest(ctx, "Rank Guess Render")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "Rank Guess Render", false)) {
             final PendingMessage message = PendingMessage.ofMarkdownRaw(at(ctx) + RandomReply.loading());
             final boolean activeMessageEnabled = ctx.sendMessage(message).success();
             if (!activeMessageEnabled) {
@@ -454,9 +451,9 @@ public final class RankGuessCommandHandler {
                     ctx.sendReply(PendingMessage.ofMarkdownRaw("本群没有绑定的用户，无法开始游戏喵"));
                     return;
                 }
-                randomScore = APIHelper.getRandomScoreFromUsers(uids, games.generateWeights(ctx.groupId()));
+                randomScore = OstellaApi.getRandomScoreFromUsers(uids, games.generateWeights(ctx.groupId()));
             } else {
-                randomScore = APIHelper.getRandomScore();
+                randomScore = OstellaApi.getRandomScore();
             }
 
             Round round = Round.from(randomScore, activeMessageEnabled);
@@ -472,12 +469,12 @@ public final class RankGuessCommandHandler {
             content += "，正在渲染回放片段...";
 
             if (!activeMessageEnabled) {
-                content += "\n\n> 提示: 由于缺少主动消息权限，阶段提示与自动结束已禁用。稍后需要使用 `/rg end` 手动结束。权限配置请见[这里](https://docs.seira.top/overview/use.html#extra-permission)。";
+                content += "\n\n> 提示: 由于缺少主动消息权限，阶段提示与自动结束已禁用。稍后需要使用 `/rg end` 手动结束。权限配置请见[这里](" + PERMISSION + ")。";
             }
 
             ctx.sendReply(PendingMessage.ofMarkdownRaw(content));
 
-            var renderTask = APIHelper.createObscuredReplayRenderTask(
+            var renderTask = OstellaApi.createObscuredReplayRenderTask(
                     round.scoreId(), taskCoordinator.createVideoUploadRequest(ctx)
             );
 
@@ -491,7 +488,7 @@ public final class RankGuessCommandHandler {
                     TimeUnit.SECONDS
             );
 
-            APIHelper.ReplayRenderResult replay = null;
+            OstellaApi.ReplayRenderResult replay = null;
             try {
                 replay = taskCoordinator.waitForReplay(renderTask);
             } catch (Exception e) {
@@ -543,7 +540,8 @@ public final class RankGuessCommandHandler {
             hintSource.addAll(round.getNormalHints());
 
             if (fromGroup) {
-                hintSource.addAll(round.getGroupHints());
+                final Optional<String> groupOpenIdByUid = UserDataStore.findGroupOpenIdByUid(ctx.groupId(), round.userId());
+                hintSource.addAll(round.getGroupHints(avatarUrlGetter.apply(groupOpenIdByUid.orElse(null)), imageUploader));
             }
 
             var hints = HintUtil.prepareHints(hintSource, maxHintCount);
@@ -683,9 +681,7 @@ public final class RankGuessCommandHandler {
             case FINISHED -> replyFactory.rankGuessResultMessage(ctx, result.round(), result.rankType());
         };
 
-        if (!ctx.sendReply(message).success()) {
-            ctx.sendMessage(message);
-        }
+        ctx.send(true, message, false);
     }
 
     enum LeaderboardType {

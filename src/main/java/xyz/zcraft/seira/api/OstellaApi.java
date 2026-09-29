@@ -11,8 +11,6 @@ import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.command.ResolutionException;
-import xyz.zcraft.seira.command.parse.ShortcutTarget;
-import xyz.zcraft.seira.data.UserRef;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
 import java.io.IOException;
@@ -27,8 +25,10 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-public class APIHelper {
+public class OstellaApi {
+    private static final String OSU_AUTHORIZATION_HEADER = "X-Osu-Authorization";
     private static final String ENDPOINT;
+    private static final String TOKEN;
     private static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(Duration.ofMinutes(5)).build();
     private static final Gson GSON = new Gson();
     private static final int REPLAY_POLL_INTERVAL_MS = 5000;
@@ -36,25 +36,37 @@ public class APIHelper {
 
     static {
         ENDPOINT = Seira.getConfig().ostella().endpoint();
+        TOKEN = Seira.getConfig().ostella().token();
+    }
+
+    private static HttpRequest.Builder requestBuilder() {
+        HttpRequest.Builder builder = HttpRequest.newBuilder();
+        if (TOKEN != null && !TOKEN.isBlank()) {
+            builder.header("Authorization", "Bearer " + TOKEN);
+        }
+        return builder;
+    }
+
+    private static HttpRequest.Builder withOsuAuthorization(HttpRequest.Builder builder, String accessToken) {
+        return builder.header(OSU_AUTHORIZATION_HEADER, "Bearer " + accessToken);
     }
 
     public static Response<List<FriendEntry>> getFollowed(String accessToken) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = withOsuAuthorization(requestBuilder(), accessToken)
                     .uri(URI.create(ENDPOINT + "/users/me/friends"))
-                    .header("Authorization", "Bearer " + accessToken)
                     .GET()
                     .build();
 
             final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取多人房间失败");
+                throw ApiUtil.parseHttpError(send.body(), send.statusCode(), "获取多人房间失败");
             }
 
             final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
-            ensureApiSuccess(r, "获取多人房间失败");
-            final JsonArray data = r.getData().getAsJsonArray();
+            ApiUtil.ensureApiSuccess(r, "获取多人房间失败");
+            final JsonArray data = ApiUtil.requireResultArray(r, "获取好友响应缺少结果数组");
 
             LinkedList<FriendEntry> followed = new LinkedList<>();
 
@@ -72,20 +84,19 @@ public class APIHelper {
 
     public static Response<UserExtended> getSelf(String accessToken) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = withOsuAuthorization(requestBuilder(), accessToken)
                     .uri(URI.create(ENDPOINT + "/users/me"))
-                    .header("Authorization", "Bearer " + accessToken)
                     .GET()
                     .build();
 
             final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取用户信息失败");
+                throw ApiUtil.parseHttpError(send.body(), send.statusCode(), "获取用户信息失败");
             }
 
             final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
-            ensureApiSuccess(r, "获取用户信息失败");
+            ApiUtil.ensureApiSuccess(r, "获取用户信息失败");
             final var data = r.getData().getAsJsonObject();
 
             return Response.<UserExtended>fromHeaders(send.headers())
@@ -97,16 +108,15 @@ public class APIHelper {
     }
 
     @SuppressWarnings("unused")
-    public static Response<Base64Bytes> getBoNResponse(int n, UserRef userRef) {
-        return getBoNResponse(n, userRef, List.of());
+    public static Response<Base64Bytes> getBoNResponse(int n, long uid) {
+        return getBoNResponse(n, uid, List.of());
     }
 
-    public static Response<Base64Bytes> getBoNResponse(int n, UserRef userRef, List<String> filters) {
-        return getBoNResponse(n, 1, userRef, filters);
+    public static Response<Base64Bytes> getBoNResponse(int n, long uid, List<String> filters) {
+        return getBoNResponse(n, 1, uid, filters);
     }
 
-    public static Response<Base64Bytes> getBoNResponse(int n, int start, UserRef userRef, List<String> filters) {
-        long uid = resolveUid(userRef);
+    public static Response<Base64Bytes> getBoNResponse(int n, int start, long uid, List<String> filters) {
         return getBase64BytesResponse(
                 "/users/" + uid + "/scores/bestof?n=" + n + encodeScoreRangeStart(start) + encodeScoreFilters(filters),
                 "获取最好成绩失败",
@@ -114,8 +124,7 @@ public class APIHelper {
         );
     }
 
-    public static Response<Base64Bytes> getUserInfoResponse(UserRef userRef) {
-        long uid = resolveUid(userRef);
+    public static Response<Base64Bytes> getUserInfoResponse(long uid) {
         return getBase64BytesResponse(
                 "/users/" + uid,
                 "获取玩家资料失败",
@@ -123,10 +132,9 @@ public class APIHelper {
         );
     }
 
-    public static UserExtended getUserRaw(UserRef userRef) {
-        long uid = resolveUid(userRef);
+    public static UserExtended getUserRaw(long uid) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/users/" + uid))
                     .header("Accept", "application/json")
                     .GET()
@@ -135,11 +143,11 @@ public class APIHelper {
             final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取用户信息失败");
+                throw ApiUtil.parseHttpError(send.body(), send.statusCode(), "获取用户信息失败");
             }
 
             final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
-            ensureApiSuccess(r, "获取用户信息失败");
+            ApiUtil.ensureApiSuccess(r, "获取用户信息失败");
             final var data = r.getData().getAsJsonObject();
 
             return GSON.fromJson(data, UserExtended.class);
@@ -149,12 +157,11 @@ public class APIHelper {
     }
 
     @SuppressWarnings("unused")
-    public static Response<Base64Bytes> getTodayBestResponse(UserRef userRef) {
-        return getTodayBestResponse(userRef, 1);
+    public static Response<Base64Bytes> getTodayBestResponse(long uid) {
+        return getTodayBestResponse(uid, 1);
     }
 
-    public static Response<Base64Bytes> getTodayBestResponse(UserRef userRef, int days) {
-        long uid = resolveUid(userRef);
+    public static Response<Base64Bytes> getTodayBestResponse(long uid, int days) {
         return getBase64BytesResponse(
                 "/users/" + uid + "/scores/today-best?days=" + days,
                 "获取近期BP失败",
@@ -180,7 +187,7 @@ public class APIHelper {
 
     public static String getDaily() {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/daily"))
                     .GET()
                     .build();
@@ -188,11 +195,11 @@ public class APIHelper {
             final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取每日挑战失败");
+                throw ApiUtil.parseHttpError(send.body(), send.statusCode(), "获取每日挑战失败");
             }
 
             final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
-            ensureApiSuccess(r, "获取每日挑战失败");
+            ApiUtil.ensureApiSuccess(r, "获取每日挑战失败");
             final JsonObject data = r.getData().getAsJsonObject();
 
             String mods = null;
@@ -220,20 +227,19 @@ public class APIHelper {
 
     public static Response<MultiplayerRoom> getMultiplayerRoom(String accessToken) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = withOsuAuthorization(requestBuilder(), accessToken)
                     .uri(URI.create(ENDPOINT + "/multiplayer/rooms/current"))
-                    .header("Authorization", "Bearer " + accessToken)
                     .GET()
                     .build();
 
             final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取多人房间失败");
+                throw ApiUtil.parseHttpError(send.body(), send.statusCode(), "获取多人房间失败");
             }
 
             final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
-            ensureApiSuccess(r, "获取多人房间失败");
+            ApiUtil.ensureApiSuccess(r, "获取多人房间失败");
             final JsonObject data = r.getData().getAsJsonObject();
 
             return Response.<MultiplayerRoom>fromHeaders(send.headers())
@@ -245,22 +251,21 @@ public class APIHelper {
     }
 
     @SuppressWarnings("unused")
-    public static Response<Base64Bytes> getRecentResponse(int n, UserRef userRef, boolean includeFail) {
-        return getRecentResponse(n, userRef, includeFail, List.of());
+    public static Response<Base64Bytes> getRecentResponse(int n, long uid, boolean includeFail) {
+        return getRecentResponse(n, uid, includeFail, List.of());
     }
 
-    public static Response<Base64Bytes> getRecentResponse(int n, UserRef userRef, boolean includeFail, List<String> filters) {
-        return getRecentResponse(n, 1, userRef, includeFail, filters);
+    public static Response<Base64Bytes> getRecentResponse(int n, long uid, boolean includeFail, List<String> filters) {
+        return getRecentResponse(n, 1, uid, includeFail, filters);
     }
 
     public static Response<Base64Bytes> getRecentResponse(
             int n,
             int start,
-            UserRef userRef,
+            long uid,
             boolean includeFail,
             List<String> filters
     ) {
-        long uid = resolveUid(userRef);
         return getBase64BytesResponse(
                 "/users/" + uid + "/scores/recent?n=" + n + "&fail=" + includeFail
                         + encodeScoreRangeStart(start) + encodeScoreFilters(filters),
@@ -301,134 +306,30 @@ public class APIHelper {
         return getBase64BytesResponse("/beatmaps/" + beatmapId + "/background", "获取谱面失败", null);
     }
 
-    public static long lookupBeatmap(ShortcutTarget target, String auth) {
-        long beatmapId;
-        if (target.isLocalScore() || "s".equals(target.macroType())) {
-            beatmapId = lookupScoreData(lookupScoreId(target, List.of(), null)).get("beatmap_id").getAsLong();
-        } else if ("m".equals(target.macroType())) {
-            beatmapId = target.explicitId();
-        } else if (!target.isMacro()) {
-            beatmapId = target.explicitId();
-        } else {
-            try {
-                final String query = getBeatmapQuery(target);
-
-                HttpRequest localRequest = HttpRequest.newBuilder()
-                        .uri(URI.create(ENDPOINT + query))
-                        .header("Authorization", "Bearer " + auth)
-                        .GET()
-                        .build();
-
-                final HttpResponse<String> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
-
-                if (send.statusCode() != 200) {
-                    throw parseHttpError(send.body(), send.statusCode(), "查找谱面失败");
-                }
-
-                final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
-
-                ensureApiSuccess(rawResponse, "查找谱面失败");
-
-                beatmapId = rawResponse.getData().getAsJsonObject().get("beatmap_id").getAsLong();
-            } catch (IOException | InterruptedException e) {
-                throw requestFailure(e);
-            }
-        }
-        return beatmapId;
-    }
-
-    private static String getBeatmapQuery(ShortcutTarget target) {
-        String query = "/beatmaps/lookup?";
-        if (target.isMacro()) {
-            switch (target.macroType().toLowerCase()) {
-                case "rs", "bp", "rp" -> {
-                    query += "&of=" + target.macroType() + "&u=" + resolveUid(target.userRef());
-                    query += "&i=" + target.macroIndex();
-                }
-                case "ms" -> {
-                    query += "&ms=" + target.explicitId();
-                    query += "&i=" + target.macroIndex();
-                }
-                case "mp" -> query += "&of=mp";
-            }
-        } else {
-            query = "/beatmap/lookup?m=" + target.explicitId();
-        }
-
-        return query;
-    }
-
     public static Response<Base64Bytes> getBeatmapsetResponse(long beatmapsetId) {
         return getBase64BytesResponse("/beatmapsets/" + beatmapsetId, "获取谱面集失败", null);
     }
 
     public static Beatmapset getBeatmapsetRaw(long id) {
         try {
-            var builder = HttpRequest.newBuilder()
+            var builder = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/beatmapsets/" + id))
                     .header("Accept", "application/json");
 
             final HttpResponse<String> send = CLIENT.send(builder.build(), HttpResponse.BodyHandlers.ofString());
 
             if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取谱面集失败");
+                throw ApiUtil.parseHttpError(send.body(), send.statusCode(), "获取谱面集失败");
             }
 
             final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
-            ensureApiSuccess(r, "获取谱面集失败");
+            ApiUtil.ensureApiSuccess(r, "获取谱面集失败");
             final JsonObject data = r.getData().getAsJsonObject();
 
             return GSON.fromJson(data, Beatmapset.class);
         } catch (IOException | InterruptedException e) {
             throw requestFailure(e);
         }
-    }
-
-    public static long lookupBeatmapset(ShortcutTarget target, String auth) {
-        long beatmapsetId;
-        if (target.isLocalScore() || "s".equals(target.macroType())) {
-            return lookupBeatmapset(new ShortcutTarget(lookupBeatmap(target, auth), null, "m", null, null), auth);
-        } else if (!target.isMacro() || "ms".equals(target.macroType())) {
-            beatmapsetId = target.explicitId();
-        } else {
-            try {
-                final String query = getBeatmapsetQuery(target);
-
-                HttpRequest localRequest = HttpRequest.newBuilder()
-                        .uri(URI.create(ENDPOINT + query))
-                        .header("Authorization", "Bearer " + auth)
-                        .GET()
-                        .build();
-
-                final HttpResponse<String> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
-
-                if (send.statusCode() != 200) {
-                    throw parseHttpError(send.body(), send.statusCode(), "查找谱面集失败");
-                }
-
-                final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
-
-                ensureApiSuccess(rawResponse, "查找谱面集失败");
-
-                beatmapsetId = rawResponse.getData().getAsJsonObject().get("beatmapset_id").getAsLong();
-            } catch (IOException | InterruptedException e) {
-                throw requestFailure(e);
-            }
-        }
-        return beatmapsetId;
-    }
-
-    private static String getBeatmapsetQuery(ShortcutTarget target) {
-        String query = "/beatmapsets/lookup";
-
-        return switch (target.macroType().toLowerCase()) {
-            case "m" -> query + "?m=" + target.explicitId();
-            case "ms" -> query + "?ms=" + target.explicitId();
-            case "rs", "bp", "rp" ->
-                    query + "?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + resolveUid(target.userRef());
-            case "mp" -> query + "?of=mp";
-            case null, default -> throw new ResolutionException("快捷查询格式错误。");
-        };
     }
 
     public static Response<Base64Bytes> getScoreResponse(String scoreId) {
@@ -445,7 +346,7 @@ public class APIHelper {
 
     private static Response<Base64Bytes> getBase64BytesResponse(String query, String failMessage, @Nullable String postBody) {
         try {
-            var builder = HttpRequest.newBuilder()
+            var builder = requestBuilder()
                     .uri(URI.create(ENDPOINT + query));
 
             if (postBody != null) {
@@ -457,7 +358,7 @@ public class APIHelper {
             final HttpResponse<byte[]> send = CLIENT.send(builder.build(), HttpResponse.BodyHandlers.ofByteArray());
 
             if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), failMessage);
+                throw ApiUtil.parseHttpError(send.body(), send.statusCode(), failMessage);
             }
 
             byte[] imageBytes = send.body();
@@ -470,35 +371,23 @@ public class APIHelper {
         }
     }
 
-    private static String getScoreQuery(ShortcutTarget target) {
-        return switch (target.macroType().toLowerCase()) {
-            case "rs", "bp", "rp" ->
-                    "/scores/lookup?of=" + target.macroType() + "&i=" + target.macroIndex() + "&u=" + resolveUid(target.userRef());
-            case "m" -> "/scores/lookup?m=" + target.explicitId() + "&u=" + resolveUid(target.userRef());
-            case "ms" ->
-                    "/scores/lookup?ms=" + target.explicitId() + "&i=" + target.macroIndex() + "&u=" + resolveUid(target.userRef());
-            case null, default -> throw new IllegalArgumentException("Invalid macro type");
-        };
-    }
-
     public static Response<?> getLookupBeatmapsetResponse(long beatmapsetId, String auth) {
         try {
             final String query = "/beatmapsets/lookup?ms=" + beatmapsetId;
 
-            HttpRequest localRequest = HttpRequest.newBuilder()
+            HttpRequest localRequest = withOsuAuthorization(requestBuilder(), auth)
                     .uri(URI.create(ENDPOINT + query))
-                    .header("Authorization", "Bearer " + auth)
                     .GET()
                     .build();
 
             final HttpResponse<String> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
 
             if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取谱面集失败");
+                throw ApiUtil.parseHttpError(send.body(), send.statusCode(), "获取谱面集失败");
             }
 
             final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
-            ensureApiSuccess(rawResponse, "查找谱面集失败");
+            ApiUtil.ensureApiSuccess(rawResponse, "查找谱面集失败");
             final JsonObject data = rawResponse.getData().getAsJsonObject();
 
             return Response.<Void>fromHeaders(send.headers())
@@ -511,7 +400,7 @@ public class APIHelper {
 
     public static Response<List<SearchResultItem>> searchBeatmapSetResponse(SearchQuery query) {
         try {
-            HttpRequest localRequest = HttpRequest.newBuilder()
+            HttpRequest localRequest = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/beatmapsets/search?" + "q=" + URLEncoder.encode(query.query(), StandardCharsets.UTF_8)))
                     .GET()
                     .build();
@@ -519,12 +408,12 @@ public class APIHelper {
             final var send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
 
             if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "搜索谱面集失败");
+                throw ApiUtil.parseHttpError(send.body(), send.statusCode(), "搜索谱面集失败");
             }
 
             final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
-            ensureApiSuccess(rawResponse, "搜索谱面集失败");
-            final JsonArray data = rawResponse.getData().getAsJsonArray();
+            ApiUtil.ensureApiSuccess(rawResponse, "搜索谱面集失败");
+            final JsonArray data = ApiUtil.requireResultArray(rawResponse, "搜索谱面集响应缺少结果数组");
 
             final LinkedList<SearchResultItem> items = new LinkedList<>();
 
@@ -549,7 +438,7 @@ public class APIHelper {
         }
 
         TimeDurationParser.TimeRange timeRange = getScoreHighlight(scoreId, 10);
-        HttpRequest request = HttpRequest.newBuilder()
+        HttpRequest request = requestBuilder()
                 .uri(URI.create(ENDPOINT + "/replays/renders/score/" + scoreId
                         + "?obscured=true" + timeRange.toQueryString()))
                 .header("Content-Type", "application/json")
@@ -561,19 +450,19 @@ public class APIHelper {
 
     public static RandomScore getRandomScore() {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/scores/random?min_rank=500000"))
                     .GET()
                     .build();
 
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-            if (codeNotOk(response.statusCode())) {
-                throw parseHttpError(response.body(), response.statusCode(), "获取随机成绩失败");
+            if (ApiUtil.codeNotOk(response.statusCode())) {
+                throw ApiUtil.parseHttpError(response.body(), response.statusCode(), "获取随机成绩失败");
             }
 
             RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
-            ensureApiSuccess(payload, "获取随机成绩失败");
-            JsonObject data = requireDataObject(payload, "随机成绩响应缺少data");
+            ApiUtil.ensureApiSuccess(payload, "获取随机成绩失败");
+            JsonObject data = ApiUtil.requireDataObject(payload, "随机成绩响应缺少data");
             if (!data.has("user") || !data.get("user").isJsonObject()
                     || !data.has("score") || !data.get("score").isJsonObject()) {
                 throw new RuntimeException("随机成绩响应缺少用户或成绩数据");
@@ -599,18 +488,18 @@ public class APIHelper {
 
             body.add("weight_factor", weights);
 
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/scores/random/users/" + userId + "/weights?all=" + all))
                     .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                     .build();
 
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-            if (codeNotOk(response.statusCode())) {
-                throw parseHttpError(response.body(), response.statusCode(), "获取成绩权重失败");
+            if (ApiUtil.codeNotOk(response.statusCode())) {
+                throw ApiUtil.parseHttpError(response.body(), response.statusCode(), "获取成绩权重失败");
             }
 
             RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
-            ensureApiSuccess(payload, "获取成绩权重失败");
+            ApiUtil.ensureApiSuccess(payload, "获取成绩权重失败");
 
             return payload.getData().getAsString();
         } catch (IOException e) {
@@ -632,19 +521,19 @@ public class APIHelper {
             body.add("uids", uidsArray);
             body.add("weight_factor", weights);
 
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/scores/random/users"))
                     .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                     .build();
 
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-            if (codeNotOk(response.statusCode())) {
-                throw parseHttpError(response.body(), response.statusCode(), "获取随机成绩失败");
+            if (ApiUtil.codeNotOk(response.statusCode())) {
+                throw ApiUtil.parseHttpError(response.body(), response.statusCode(), "获取随机成绩失败");
             }
 
             RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
-            ensureApiSuccess(payload, "获取随机成绩失败");
-            JsonObject data = requireDataObject(payload, "随机成绩响应缺少data");
+            ApiUtil.ensureApiSuccess(payload, "获取随机成绩失败");
+            JsonObject data = ApiUtil.requireDataObject(payload, "随机成绩响应缺少data");
             if (!data.has("user") || !data.get("user").isJsonObject()
                     || !data.has("score") || !data.get("score").isJsonObject()) {
                 throw new RuntimeException("随机成绩响应缺少用户或成绩数据");
@@ -664,8 +553,7 @@ public class APIHelper {
         }
     }
 
-
-    public static ReplayTaskInfo createBeatmapPreviewTask(long beatmapId, String mods,
+    public static ReplayTaskInfo createBeatmapPreviewTask(long beatmapId, String mods, TimeDurationParser.TimeRange range,
                                                           QqUploadRequest qqUpload) {
         JsonObject body = new JsonObject();
         if (mods != null && !mods.isBlank()) {
@@ -675,8 +563,14 @@ public class APIHelper {
             body.add("qqUpload", GSON.toJsonTree(qqUpload));
         }
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(ENDPOINT + "/replays/renders/preview/" + beatmapId))
+        String rangeQuery = "?";
+
+        if (range != null) {
+            rangeQuery += range.toQueryString();
+        }
+
+        HttpRequest request = requestBuilder()
+                .uri(URI.create(ENDPOINT + "/replays/renders/preview/" + beatmapId + rangeQuery))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                 .build();
@@ -695,7 +589,7 @@ public class APIHelper {
         if (qqUpload != null) {
             body.add("qqUpload", GSON.toJsonTree(qqUpload));
         }
-        HttpRequest request = HttpRequest.newBuilder()
+        HttpRequest request = requestBuilder()
                 .uri(URI.create(ENDPOINT + "/replays/renders/showcase/" + beatmapId))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
@@ -717,7 +611,7 @@ public class APIHelper {
             timeRange = getScoreHighlight(scoreId, 5);
         }
 
-        HttpRequest request = HttpRequest.newBuilder()
+        HttpRequest request = requestBuilder()
                 .uri(URI.create(ENDPOINT + "/replays/renders/score/" + scoreId + "?" + timeRange.toQueryString()))
                 .header("Content-Type", "application/json")
                 .POST(renderRequestBody(qqUpload))
@@ -733,7 +627,7 @@ public class APIHelper {
 
     private static TimeDurationParser.TimeRange getScoreHighlight(String scoreId, int extend) {
         try {
-            HttpRequest localRequest = HttpRequest.newBuilder()
+            HttpRequest localRequest = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/scores/" + scoreId + "/highlight"))
                     .GET()
                     .build();
@@ -741,11 +635,11 @@ public class APIHelper {
             final var send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
 
             if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "高光获取失败");
+                throw ApiUtil.parseHttpError(send.body(), send.statusCode(), "高光获取失败");
             }
 
             final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
-            ensureApiSuccess(rawResponse, "高光获取失败");
+            ApiUtil.ensureApiSuccess(rawResponse, "高光获取失败");
             final JsonObject data = rawResponse.getData().getAsJsonObject();
 
             return new TimeDurationParser.TimeRange(
@@ -757,38 +651,65 @@ public class APIHelper {
         }
     }
 
-    public static String lookupScoreId(ShortcutTarget target, List<String> filters, String mod) {
-        String scoreId;
-        if (target.isLocalScore()) {
-            scoreId = target.localScoreId();
-        } else if (!target.isMacro() || "s".equals(target.macroType())) {
-            scoreId = String.valueOf(target.explicitId());
-        } else {
-            try {
-                final String query = getScoreQuery(target) + encodeScoreFilters(filters)
-                        + (mod == null ? "" : "&mod=" + URLEncoder.encode(mod, StandardCharsets.UTF_8));
+    /**
+     * 每个查找方法只请求一个接口；目标类型转换和记忆由指令处理方法决定。
+     */
+    public static long lookupBeatmapInSet(long setId, long index, String auth) {
+        return lookupTargetData("/beatmaps/lookup?ms=" + setId + "&i=" + index, auth, "查找谱面失败")
+                .get("beatmap_id").getAsLong();
+    }
 
-                HttpRequest localRequest = HttpRequest.newBuilder()
-                        .uri(URI.create(ENDPOINT + query))
-                        .GET()
-                        .build();
+    public static long lookupMultiplayerBeatmap(String auth) {
+        return lookupTargetData("/beatmaps/lookup?of=mp", auth, "查找谱面失败").get("beatmap_id").getAsLong();
+    }
 
-                final HttpResponse<String> send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
+    public static long lookupPlayerScoreBeatmap(long uid, String list, long index, String auth) {
+        if (!List.of("rs", "rp", "bp").contains(list)) throw new IllegalArgumentException("Invalid score list");
+        return lookupTargetData("/beatmaps/lookup?of=" + list + "&u=" + uid + "&i=" + index,
+                auth, "查找谱面失败").get("beatmap_id").getAsLong();
+    }
 
-                if (send.statusCode() != 200) {
-                    throw parseHttpError(send.body(), send.statusCode(), "获取成绩失败");
-                }
+    public static long lookupMultiplayerBeatmapset(String auth) {
+        return lookupTargetData("/beatmapsets/lookup?of=mp", auth, "查找谱面集失败").get("beatmapset_id").getAsLong();
+    }
 
-                final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
+    public static long lookupBeatmapsetForBeatmap(long beatmapId, String auth) {
+        return lookupTargetData("/beatmapsets/lookup?m=" + beatmapId, auth, "查找谱面集失败")
+                .get("beatmapset_id").getAsLong();
+    }
 
-                ensureApiSuccess(rawResponse, "获取成绩失败");
+    public static String lookupPlayerScore(long uid, String list, long index, List<String> filters, String mod) {
+        if (!List.of("rs", "rp", "bp").contains(list)) throw new IllegalArgumentException("Invalid score list");
+        return lookupScore("/scores/lookup?of=" + list + "&i=" + index + "&u=" + uid, filters, mod);
+    }
 
-                scoreId = rawResponse.getData().getAsJsonObject().get("score_id").getAsString();
-            } catch (IOException | InterruptedException e) {
-                throw requestFailure(e);
-            }
+    public static String lookupBeatmapScore(long beatmapId, long uid, List<String> filters, String mod) {
+        return lookupScore("/scores/lookup?m=" + beatmapId + "&u=" + uid, filters, mod);
+    }
+
+    public static String lookupBeatmapsetScore(long setId, long index, long uid, List<String> filters, String mod) {
+        return lookupScore("/scores/lookup?ms=" + setId + "&i=" + index + "&u=" + uid, filters, mod);
+    }
+
+    private static String lookupScore(String query, List<String> filters, String mod) {
+        return lookupTargetData(query + encodeScoreFilters(filters)
+                        + (mod == null ? "" : "&mod=" + URLEncoder.encode(mod, StandardCharsets.UTF_8)),
+                null, "获取成绩失败").get("score_id").getAsString();
+    }
+
+    private static JsonObject lookupTargetData(String query, String auth, String error) {
+        try {
+            var request = requestBuilder().uri(URI.create(ENDPOINT + query)).GET();
+            if (auth != null) withOsuAuthorization(request, auth);
+            var response = CLIENT.send(request.build(), HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200)
+                throw ApiUtil.parseHttpError(response.body(), response.statusCode(), error);
+            RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
+            ApiUtil.ensureApiSuccess(payload, error);
+            return ApiUtil.requireDataObject(payload, error);
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
         }
-        return scoreId;
     }
 
     public static long getScoreBeatmapId(String scoreId) {
@@ -797,17 +718,17 @@ public class APIHelper {
 
     private static JsonObject lookupScoreData(String scoreId) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/scores/lookup?s=" + scoreId))
                     .GET()
                     .build();
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
-                throw parseHttpError(response.body(), response.statusCode(), "获取本地成绩信息失败");
+                throw ApiUtil.parseHttpError(response.body(), response.statusCode(), "获取本地成绩信息失败");
             }
             RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
-            ensureApiSuccess(payload, "获取本地成绩信息失败");
-            return requireDataObject(payload, "本地成绩响应缺少data");
+            ApiUtil.ensureApiSuccess(payload, "获取本地成绩信息失败");
+            return ApiUtil.requireDataObject(payload, "本地成绩响应缺少data");
         } catch (IOException | InterruptedException e) {
             throw requestFailure(e);
         }
@@ -818,13 +739,13 @@ public class APIHelper {
         try {
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
-            if (codeNotOk(response.statusCode())) {
-                throw parseHttpError(response.body(), response.statusCode(), "回放渲染请求失败");
+            if (ApiUtil.codeNotOk(response.statusCode())) {
+                throw ApiUtil.parseHttpError(response.body(), response.statusCode(), "回放渲染请求失败");
             }
 
-            ensureApiSuccess(payload, "回放渲染请求失败");
+            ApiUtil.ensureApiSuccess(payload, "回放渲染请求失败");
 
-            JsonObject data = requireDataObject(payload, "回放渲染请求缺少任务信息");
+            JsonObject data = ApiUtil.requireDataObject(payload, "回放渲染请求缺少任务信息");
 
             if (!data.has("id") || data.get("id").isJsonNull()) {
                 throw new RuntimeException("回放渲染请求缺少任务ID");
@@ -891,17 +812,17 @@ public class APIHelper {
 
     private static JsonObject getReplayStatus(String taskId) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/replays/" + taskId + "/status"))
                     .GET()
                     .build();
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
-            if (codeNotOk(response.statusCode())) {
-                throw parseHttpError(response.body(), response.statusCode(), "查询回放渲染状态失败");
+            if (ApiUtil.codeNotOk(response.statusCode())) {
+                throw ApiUtil.parseHttpError(response.body(), response.statusCode(), "查询回放渲染状态失败");
             }
-            ensureApiSuccess(payload, "查询回放渲染状态失败");
-            JsonObject data = requireDataObject(payload, "回放渲染状态响应缺少data");
+            ApiUtil.ensureApiSuccess(payload, "查询回放渲染状态失败");
+            JsonObject data = ApiUtil.requireDataObject(payload, "回放渲染状态响应缺少data");
             if (!data.has("status") || data.get("status").isJsonNull()) {
                 throw new RuntimeException("回放渲染状态响应缺少status");
             }
@@ -923,79 +844,9 @@ public class APIHelper {
         return HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8);
     }
 
-    private static void ensureApiSuccess(RawResponse payload, String fallbackMessage) {
-        if (payload == null) {
-            throw new RuntimeException(fallbackMessage);
-        }
-        if (!payload.isSuccess()) {
-            Integer errorCode = extractErrorCode(payload);
-            String message = payload.getMessage() != null ? payload.getMessage() : fallbackMessage;
-            throw new ApiRequestException(errorCode, message);
-        }
-    }
-
-    private static RuntimeException parseHttpError(String responseBody, int statusCode, String fallbackMessage) {
-        Integer errorCode = null;
-        String message = fallbackMessage;
-        try {
-            JsonObject root = GSON.fromJson(responseBody, JsonObject.class);
-            if (root != null) {
-                if (root.has("data") && root.get("data").isJsonObject()) {
-                    JsonObject data = root.getAsJsonObject("data");
-                    errorCode = readCodeFromJsonObject(data);
-                }
-                if (errorCode == null) {
-                    errorCode = readCodeFromJsonObject(root);
-                }
-            }
-        } catch (Exception ignored) {
-        }
-
-        if (statusCode == 500) {
-            message += "(" + (errorCode == null ? "未知错误码" : errorCode) + " / HTTP " + statusCode + " / 发生了一个内部错误)";
-        }
-
-        return new ApiRequestException(errorCode, message);
-    }
-
-    private static RuntimeException parseHttpError(byte[] responseBody, int statusCode, String fallbackMessage) {
-        String bodyAsText = responseBody == null ? null : new String(responseBody, StandardCharsets.UTF_8);
-        return parseHttpError(bodyAsText, statusCode, fallbackMessage);
-    }
-
-    private static Integer extractErrorCode(RawResponse payload) {
-        if (payload.getData() != null && payload.getData().isJsonObject()) {
-            JsonObject data = payload.getData().getAsJsonObject();
-            return readCodeFromJsonObject(data);
-        }
-        return null;
-    }
-
-    private static boolean codeNotOk(int statusCode) {
-        return statusCode < 200 || statusCode >= 300;
-    }
-
-    private static Integer readCodeFromJsonObject(JsonObject object) {
-        if (object == null || !object.has("code") || !object.get("code").isJsonPrimitive()) {
-            return null;
-        }
-        try {
-            return object.get("code").getAsInt();
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    private static JsonObject requireDataObject(RawResponse payload, String message) {
-        if (payload.getData() == null || !payload.getData().isJsonObject()) {
-            throw new RuntimeException(message);
-        }
-        return payload.getData().getAsJsonObject();
-    }
-
     public static RenderStat getRenderStat(String jobId) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/replays/" + jobId + "/status"))
                     .GET()
                     .build();
@@ -1003,11 +854,11 @@ public class APIHelper {
             final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取渲染进度失败");
+                throw ApiUtil.parseHttpError(send.body(), send.statusCode(), "获取渲染进度失败");
             }
 
             final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
-            ensureApiSuccess(r, "获取渲染进度失败");
+            ApiUtil.ensureApiSuccess(r, "获取渲染进度失败");
             final JsonObject data = r.getData().getAsJsonObject();
 
             return GSON.fromJson(data, RenderStat.class);
@@ -1018,18 +869,18 @@ public class APIHelper {
 
     public static RenderStat cancelReplayRender(String jobId) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/replays/" + jobId + "/cancel"))
                     .POST(HttpRequest.BodyPublishers.noBody())
                     .build();
 
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-            if (codeNotOk(response.statusCode())) {
-                throw parseHttpError(response.body(), response.statusCode(), "取消回放渲染失败");
+            if (ApiUtil.codeNotOk(response.statusCode())) {
+                throw ApiUtil.parseHttpError(response.body(), response.statusCode(), "取消回放渲染失败");
             }
             RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
-            ensureApiSuccess(payload, "取消回放渲染失败");
-            return GSON.fromJson(requireDataObject(payload, "取消回放渲染响应缺少data"), RenderStat.class);
+            ApiUtil.ensureApiSuccess(payload, "取消回放渲染失败");
+            return GSON.fromJson(ApiUtil.requireDataObject(payload, "取消回放渲染响应缺少data"), RenderStat.class);
         } catch (IOException e) {
             throw requestFailure(e);
         } catch (InterruptedException e) {
@@ -1042,8 +893,10 @@ public class APIHelper {
         boolean oStella = false;
         boolean osu = false;
         String oStellaVersion = null;
+        int allWorkers = 0;
+        int onlineWorkers = 0;
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/health"))
                     .GET()
                     .build();
@@ -1064,17 +917,23 @@ public class APIHelper {
                     if (data.has("osu_api") && !data.get("osu_api").isJsonNull()) {
                         osu = data.get("osu_api").getAsBoolean();
                     }
+                    if (data.has("all_render_workers") && !data.get("all_render_workers").isJsonNull()) {
+                        allWorkers = data.get("all_render_workers").getAsInt();
+                    }
+                    if (data.has("online_render_workers") && !data.get("online_render_workers").isJsonNull()) {
+                        onlineWorkers = data.get("online_render_workers").getAsInt();
+                    }
                 }
             }
         } catch (Exception _) {
         }
 
-        return new ServerStatus(true, oStella, oStellaVersion, osu);
+        return new ServerStatus(true, oStella, oStellaVersion, allWorkers, onlineWorkers, osu);
     }
 
     public static Response<List<MissData>> getScoreMissesResponse(String scoreId) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/scores/" + scoreId + "/misses"))
                     .GET()
                     .build();
@@ -1082,12 +941,12 @@ public class APIHelper {
             final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取 Miss 数据失败");
+                throw ApiUtil.parseHttpError(send.body(), send.statusCode(), "获取 Miss 数据失败");
             }
 
             final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
-            ensureApiSuccess(r, "获取 Miss 数据失败");
-            final JsonArray data = r.getData().getAsJsonArray();
+            ApiUtil.ensureApiSuccess(r, "获取 Miss 数据失败");
+            final JsonArray data = ApiUtil.requireResultArray(r, "获取 Miss 数据响应缺少结果数组");
 
             List<MissData> misses = new LinkedList<>();
             for (JsonElement datum : data) {
@@ -1107,20 +966,19 @@ public class APIHelper {
         }
     }
 
-    public static long resolveUid(UserRef userRef) {
-        if (userRef instanceof UserRef.ByUid byUid) {
-            return byUid.getUid();
+    public static long resolveUid(String player) {
+        if (player == null || player.isBlank()) throw new ResolutionException("无法识别指定的玩家");
+        try {
+            long uid = Long.parseLong(player);
+            if (uid > 0) return uid;
+        } catch (NumberFormatException ignored) {
         }
-        if (userRef instanceof UserRef.ByUsername byUsername) {
-            return lookupUser(byUsername.getUsername()).getContent().getId();
-        }
-        throw new ResolutionException("无法识别指定的玩家");
+        return lookupUser(player).getContent().getId();
     }
 
-    public static long getUserRank(UserRef userRef) {
-        long uid = resolveUid(userRef);
+    public static long getUserRank(long uid) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/users/" + uid + "/rank"))
                     .header("Content-Type", "application/json")
                     .GET()
@@ -1129,12 +987,12 @@ public class APIHelper {
             final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取玩家Rank失败");
+                throw ApiUtil.parseHttpError(send.body(), send.statusCode(), "获取玩家Rank失败");
             }
 
             final RawResponse response = GSON.fromJson(send.body(), RawResponse.class);
-            ensureApiSuccess(response, "获取玩家Rank失败");
-            final JsonObject data = requireDataObject(response, "获取玩家Rank响应缺少用户数据");
+            ApiUtil.ensureApiSuccess(response, "获取玩家Rank失败");
+            final JsonObject data = ApiUtil.requireDataObject(response, "获取玩家Rank响应缺少用户数据");
             return data.get("global_rank").getAsLong();
         } catch (IOException e) {
             throw requestFailure(e);
@@ -1146,7 +1004,7 @@ public class APIHelper {
 
     public static Response<User> lookupUser(String username) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/users/lookup"))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(
@@ -1157,12 +1015,12 @@ public class APIHelper {
             final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "查找玩家失败");
+                throw ApiUtil.parseHttpError(send.body(), send.statusCode(), "查找玩家失败");
             }
 
             final RawResponse response = GSON.fromJson(send.body(), RawResponse.class);
-            ensureApiSuccess(response, "查找玩家失败");
-            final JsonObject data = requireDataObject(response, "查找玩家响应缺少用户数据");
+            ApiUtil.ensureApiSuccess(response, "查找玩家失败");
+            final JsonObject data = ApiUtil.requireDataObject(response, "查找玩家响应缺少用户数据");
 
             return Response.<User>fromHeaders(send.headers())
                     .content(GSON.fromJson(data, User.class))
@@ -1177,7 +1035,7 @@ public class APIHelper {
 
     public static List<User> getUsers(List<Long> u) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/users"))
                     .POST(HttpRequest.BodyPublishers.ofString(GSON.toJsonTree(Map.of("ids", u)).toString()))
                     .build();
@@ -1185,12 +1043,12 @@ public class APIHelper {
             final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (send.statusCode() != 200) {
-                throw parseHttpError(send.body(), send.statusCode(), "获取用户信息失败");
+                throw ApiUtil.parseHttpError(send.body(), send.statusCode(), "获取用户信息失败");
             }
 
             final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
-            ensureApiSuccess(r, "获取用户信息失败");
-            final JsonArray data = r.getData().getAsJsonArray();
+            ApiUtil.ensureApiSuccess(r, "获取用户信息失败");
+            final JsonArray data = ApiUtil.requireResultArray(r, "获取用户信息响应缺少结果数组");
 
             List<User> users = new LinkedList<>();
             for (JsonElement datum : data) {
@@ -1205,7 +1063,7 @@ public class APIHelper {
 
     public static ReplayUploadInfo uploadReplay(byte[] replayBytes) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/replays/upload"))
                     .POST(HttpRequest.BodyPublishers.ofByteArray(replayBytes))
                     .build();
@@ -1213,19 +1071,19 @@ public class APIHelper {
             final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (send.statusCode() != 200 && send.statusCode() != 404) {
-                throw parseHttpError(send.body(), send.statusCode(), "回放上传失败");
+                throw ApiUtil.parseHttpError(send.body(), send.statusCode(), "回放上传失败");
             }
 
             final RawResponse r = GSON.fromJson(send.body(), RawResponse.class);
 
             if (send.statusCode() == 404) {
-                final Integer errCode = extractErrorCode(r);
+                final Integer errCode = ApiUtil.extractErrorCode(r);
                 if (errCode != null && errCode == ErrorCode.NO_SCORE_FOUND.getCode()) {
                     throw new ApiRequestException(ErrorCode.NO_SCORE_FOUND.getCode(), "回放上传失败：无法获取对应的成绩");
                 }
             }
 
-            ensureApiSuccess(r, "回放上传失败");
+            ApiUtil.ensureApiSuccess(r, "回放上传失败");
 
             return GSON.fromJson(r.getData().getAsJsonObject(), ReplayUploadInfo.class);
         } catch (IOException | InterruptedException e) {
@@ -1240,7 +1098,8 @@ public class APIHelper {
         return new RuntimeException(exception);
     }
 
-    public record ServerStatus(boolean gateway, boolean oStella, String oStellaVersion, boolean osu) {
+    public record ServerStatus(boolean gateway, boolean oStella, String oStellaVersion,
+                               int allWorkers, int onlineWorkers, boolean osu) {
     }
 
     public record ReplayRenderResult(String videoUrl, String taskId, FileInfo qqFile) {

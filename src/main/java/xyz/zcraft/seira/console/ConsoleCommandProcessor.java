@@ -9,6 +9,7 @@ import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.route.Router;
 import xyz.zcraft.seira.config.RuntimeConfig;
 import xyz.zcraft.seira.db.SqliteDatabase;
+import xyz.zcraft.seira.services.AiPermission;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.services.handler.ConfigHandler;
 import xyz.zcraft.seira.services.handler.NoticeHandler;
@@ -21,6 +22,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 public final class ConsoleCommandProcessor {
@@ -30,27 +32,34 @@ public final class ConsoleCommandProcessor {
     private static final Pattern SQL_IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
     private static final List<String> ROOT_COMMANDS = List.of(
             "help", "status", "metrics", "system", "config", "admin", "data", "send",
-            "watch", "cache", "gateway", "log", "inspect", "stop", "panel", "notice"
+            "watch", "cache", "gateway", "log", "inspect", "stop", "panel", "notice", "group",
+            "ai"
     );
-    private static final Map<String, List<String>> SUBCOMMANDS = Map.of(
-            "config", List.of("show", "check", "reload"),
-            "admin", List.of("list", "check", "add", "remove"),
-            "data", List.of("stats", "tables", "describe", "query"),
-            "send", List.of("group", "private"),
-            "watch", List.of("status", "list", "poll", "remove", "clear"),
-            "cache", List.of("query", "delete", "get", "fetch"),
-            "gateway", List.of("status", "reconnect"),
-            "log", List.of("show", "level"),
-            "panel", List.of("list", "create", "delete", "edit", "get"),
-            "notice", List.of("new", "reload", "publish", "revoke", "list")
-    );
+
+    private static final Map<String, List<String>> SUBCOMMANDS;
+    private static final Pattern ID_PATTERN = Pattern.compile("^[A-Z0-9]{32}$");
+
+    static {
+        SUBCOMMANDS = new HashMap<>();
+        SUBCOMMANDS.put("config", List.of("show", "check", "reload"));
+        SUBCOMMANDS.put("admin", List.of("list", "check", "add", "remove"));
+        SUBCOMMANDS.put("data", List.of("stats", "tables", "describe", "query"));
+        SUBCOMMANDS.put("send", List.of("group", "private"));
+        SUBCOMMANDS.put("watch", List.of("status", "list", "poll", "remove", "clear"));
+        SUBCOMMANDS.put("cache", List.of("query", "delete", "get", "fetch"));
+        SUBCOMMANDS.put("gateway", List.of("status", "reconnect"));
+        SUBCOMMANDS.put("log", List.of("show", "level"));
+        SUBCOMMANDS.put("panel", List.of("list", "create", "delete", "edit", "get"));
+        SUBCOMMANDS.put("notice", List.of("new", "reload", "publish", "revoke", "list"));
+        SUBCOMMANDS.put("group", List.of("info", "state"));
+        SUBCOMMANDS.put("ai", List.of("reload"));
+    }
 
     private final RuntimeConfig runtimeConfig;
     private final AdminRegistry admins;
     private final ConsoleDataAccess dataAccess;
     private final MessageSender messenger;
     private final ConsoleRuntimeControl runtimeControl;
-
     private final ConfigHandler configHandler;
     private final NoticeHandler noticeHandler;
 
@@ -93,10 +102,7 @@ public final class ConsoleCommandProcessor {
     }
 
     private static ConsoleResult exact(
-            ConsoleInputParser.ParsedInput input,
-            int size,
-            java.util.function.Supplier<ConsoleResult> action,
-            String usage
+            ConsoleInputParser.ParsedInput input, int size, Supplier<ConsoleResult> action, String usage
     ) {
         return input.size() == size ? action.get() : ConsoleResult.failure(usage);
     }
@@ -144,6 +150,17 @@ public final class ConsoleCommandProcessor {
     private static long positiveLong(String value, String name) {
         try {
             long parsed = Long.parseLong(value);
+            if (parsed > 0) {
+                return parsed;
+            }
+        } catch (NumberFormatException ignored) {
+        }
+        throw new IllegalArgumentException(name + " must be a positive long.");
+    }
+
+    private static int positiveInt(String value, String name) {
+        try {
+            int parsed = Integer.parseInt(value);
             if (parsed > 0) {
                 return parsed;
             }
@@ -236,7 +253,9 @@ public final class ConsoleCommandProcessor {
                 case "watch" -> watch(input);
                 case "cache" -> cache(input);
                 case "panel" -> panel(input);
+                case "group" -> group(input);
                 case "gateway" -> gateway(input);
+                case "ai" -> ai(input);
                 case "log" -> log(input);
                 case "inspect" -> exact(input, 1, this::inspect, "Usage: inspect");
                 case "stop", "shutdown", "exit", "quit" -> stop(input);
@@ -250,6 +269,61 @@ public final class ConsoleCommandProcessor {
             LOG.error("Console command failed", e);
             return ConsoleResult.failure("Command failed: " + rootMessage(e));
         }
+    }
+
+    private ConsoleResult ai(ConsoleInputParser.ParsedInput input) {
+        if (input.size() == 1) {
+            final String value = input.value(0).toLowerCase(Locale.ROOT);
+            if (value.equalsIgnoreCase("reload")) {
+                AiPermission.loadFromFile();
+                return ConsoleResult.success("AI permission reloaded.");
+            } else if (ID_PATTERN.matcher(value).matches()) {
+                return ConsoleResult.success("AI chat for group " + value + " is: " + AiPermission.permits(value));
+            } else {
+                return ConsoleResult.failure("Group id " + value + " not a valid id.");
+            }
+        } else if (input.size() == 2) {
+            final String target = input.value(0).toLowerCase(Locale.ROOT);
+            final String option = input.value(1).toLowerCase(Locale.ROOT);
+
+            if (!ID_PATTERN.matcher(target).matches()) {
+                return ConsoleResult.failure("Group id " + target + " not a valid id.");
+            }
+
+            if ("on".equalsIgnoreCase(option)) {
+                AiPermission.permits(target);
+                AiPermission.activate(target);
+                return ConsoleResult.success("AI chat for group " + target + " is activated.");
+            } else if ("off".equalsIgnoreCase(option)) {
+                AiPermission.deactivate(target);
+                return ConsoleResult.success("AI chat for group " + target + " is deactivated.");
+            } else if ("grant".equalsIgnoreCase(option)) {
+                AiPermission.grant(target);
+                return ConsoleResult.success("AI chat for group " + target + " is granted.");
+            } else if ("revoke".equalsIgnoreCase(option)) {
+                AiPermission.revoke(target);
+                return ConsoleResult.success("AI chat for group " + target + " is revoked.");
+            } else if ("parallel".equalsIgnoreCase(option)) {
+                final int parallel = AiPermission.getParallel(target);
+                return ConsoleResult.success("Parallel count of AI chat for group " + target + " is " +  parallel + ".");
+            }
+        } else if (input.size() == 3) {
+            final String target = input.value(0).toLowerCase(Locale.ROOT);
+            final String option = input.value(1).toLowerCase(Locale.ROOT);
+            final String value = input.value(2).toLowerCase(Locale.ROOT);
+
+            if (!ID_PATTERN.matcher(target).matches()) {
+                return ConsoleResult.failure("Group id " + target + " not a valid id.");
+            }
+
+            if (option.equalsIgnoreCase("parallel")) {
+                final int l = positiveInt(value, "parallel count");
+                AiPermission.setParallel(target, l);
+                return ConsoleResult.success("Parallel count of AI chat for group " + target + " is now set to " + l + ".");
+            }
+        }
+
+        return ConsoleResult.failure("Usage: ai <on|off> <group-id>");
     }
 
     private ConsoleResult help(ConsoleInputParser.ParsedInput input) {
@@ -273,6 +347,7 @@ public final class ConsoleCommandProcessor {
                                                          Manage command panels
                       cache <query|delete|get|fetch> <type> <id>
                                                          Inspect/delete cache through oStella and workers
+                      ai <on|off> <group-id>             Manage AI chat status
                       gateway <status|reconnect>         Inspect or reconnect the QQ gateway
                       log <show|level>                   Inspect or change the runtime log level
                       inspect                            Show the last dispatched message context
@@ -318,9 +393,14 @@ public final class ConsoleCommandProcessor {
                     watch clear <group-id> confirm
                     Polling runs in the watch worker. Clearing a group requires explicit confirmation.""";
             case "cache" -> """
-                    cache <query|delete|get|fetch> <score|beatmap|beatmapset|replay> <id>
+                    cache <query|delete|get|fetch> <score|beatmap|beatmapset|replay|beatmap-json|beatmapset-json> <id>
                     query reports presence at oStella and every osuRenderer worker.
                     get includes metadata; fetch populates oStella and downstream workers; delete removes every reachable copy.""";
+            case "ai" -> """
+                    ai <group-id> [on|off]
+                    ai reload
+                    Turn on or off AI chat function for specific group.
+                    """;
             case "gateway" -> """
                     gateway status
                     gateway reconnect
@@ -442,6 +522,20 @@ public final class ConsoleCommandProcessor {
         };
     }
 
+    private ConsoleResult group(ConsoleInputParser.ParsedInput input) {
+        if (input.size() < 2) {
+            return ConsoleResult.failure("Usage: group <info|state> [args]");
+        }
+
+        return switch (input.value(1).toLowerCase(Locale.ROOT)) {
+            case "info" ->
+                    input.size() == 3 ? runtimeControl.getGroupInfo(input.value(2)) : ConsoleResult.failure("Usage: group info <group-id>");
+            case "state" ->
+                    input.size() == 3 ? runtimeControl.getGroupBotState(input.value(2)) : ConsoleResult.failure("Usage: group state <group-id>");
+            default -> ConsoleResult.failure("Usage: group <info|state> [args]");
+        };
+    }
+
     private ConsoleResult panel(ConsoleInputParser.ParsedInput input) {
         if (input.size() < 2) {
             return ConsoleResult.failure("Usage: panel <list|delete|get|create|edit> [args]");
@@ -555,8 +649,8 @@ public final class ConsoleCommandProcessor {
         }
 
         boolean sent = switch (targetType) {
-            case "group" -> messenger.sendGroupText(targetId, content) != null;
-            case "private" -> messenger.sendPrivateText(targetId, content) != null;
+            case "group" -> messenger.sendGroupMarkdown(targetId, content) != null;
+            case "private" -> messenger.sendPrivateMarkdown(targetId, content) != null;
             default -> throw new IllegalArgumentException("Message type must be 'group' or 'private'.");
         };
         return sent
@@ -655,7 +749,7 @@ public final class ConsoleCommandProcessor {
     private ConsoleResult cache(ConsoleInputParser.ParsedInput input) {
         if (input.size() != 4) {
             return ConsoleResult.failure(
-                    "Usage: cache <query|delete|get|fetch> <score|beatmap|beatmapset|replay> <id>"
+                    "Usage: cache <query|delete|get|fetch> <score|beatmap|beatmapset|replay|beatmap-json|beatmapset-json> <id>"
             );
         }
         String operation = input.value(1).toLowerCase(Locale.ROOT);
@@ -663,8 +757,8 @@ public final class ConsoleCommandProcessor {
             return ConsoleResult.failure("Cache operation must be query, delete, get, or fetch.");
         }
         String type = input.value(2).toUpperCase(Locale.ROOT);
-        if (!List.of("SCORE", "BEATMAP", "BEATMAPSET", "REPLAY").contains(type)) {
-            return ConsoleResult.failure("Cache type must be score, beatmap, beatmapset, or replay.");
+        if (!List.of("SCORE", "BEATMAP", "BEATMAPSET", "REPLAY", "BEATMAP-JSON", "BEATMAPSET-JSON").contains(type)) {
+            return ConsoleResult.failure("Cache type must be score, beatmap, beatmapset, replay, beatmap-json, or beatmapset-json.");
         }
         long id = positiveLong(input.value(3), "id");
         return ConsoleResult.success(formatCacheControl(runtimeControl.controlCache(operation, type, id)));
@@ -721,6 +815,10 @@ public final class ConsoleCommandProcessor {
         }
         CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS).execute(runtimeControl::requestStop);
         return ConsoleResult.success("Graceful shutdown requested.");
+    }
+
+    public RuntimeConfig getRuntimeConfig() {
+        return runtimeConfig;
     }
 
     public record ConsoleResult(boolean success, String message) {

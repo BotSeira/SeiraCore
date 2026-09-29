@@ -1,6 +1,5 @@
 package xyz.zcraft.seira.bot;
 
-import com.google.gson.Gson;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.api.data.QqUploadRequest;
@@ -12,7 +11,6 @@ import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.services.CosService;
 import xyz.zcraft.seira.util.TokenManager;
 
-import java.util.Map;
 import java.util.function.Supplier;
 
 public class MessageSender {
@@ -149,8 +147,15 @@ public class MessageSender {
     public SentMessage sendGroupMarkdown(String groupId, String content) {
         Message message = new Message();
         message.setMsgType(PendingMessage.MSG_TYPE_MARKDOWN);
-        message.setMarkdown(new Gson().toJsonTree(Map.of("content", content)).getAsJsonObject());
+        message.setMarkdown(Message.MessageMarkdown.of(content));
         return sendGroupMessage(groupId, message);
+    }
+
+    public SentMessage sendPrivateMarkdown(String userId, String content) {
+        Message message = new Message();
+        message.setMsgType(PendingMessage.MSG_TYPE_MARKDOWN);
+        message.setMarkdown(Message.MessageMarkdown.of(content));
+        return sendPrivateMessage(userId, message);
     }
 
     private FileInfo retryUpload(Supplier<FileInfo> operation, long baseDelayMillis, String description) {

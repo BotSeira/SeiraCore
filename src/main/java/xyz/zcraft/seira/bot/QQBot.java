@@ -4,10 +4,9 @@ import com.google.gson.Gson;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.seira.bot.data.Panel;
-import xyz.zcraft.seira.bot.data.PanelItem;
-import xyz.zcraft.seira.bot.data.PanelRecord;
-import xyz.zcraft.seira.bot.data.QQUser;
+import xyz.zcraft.seira.ai.provider.ChatProvider;
+import xyz.zcraft.seira.ai.provider.ChatProviders;
+import xyz.zcraft.seira.bot.data.*;
 import xyz.zcraft.seira.command.AttachmentHandler;
 import xyz.zcraft.seira.command.route.Router;
 import xyz.zcraft.seira.config.AppConfig;
@@ -37,7 +36,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
     private static final Logger LOG = LogManager.getLogger(QQBot.class);
-
+    final AtomicReference<QQUser> self = new AtomicReference<>();
     @Getter
     private final TokenManager tokenManager;
     @Getter
@@ -45,8 +44,9 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
     @Getter
     private final MessageSender sender;
     private final ScoreWatchService watchService;
-    private final MultiplayerRoomWatchService multiplayerRoomWatchService;
+    private final MPWatchService mpWatchService;
     private final RankGuessGameService rankGuessGameService;
+    private final ChatProvider chatProvider;
     private final RealtimeServiceInterruptionNotifier interruptionNotifier;
     private final DiscordBridgeService discordBridgeService;
     private final AppConfig startupConfig;
@@ -69,7 +69,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         AppConfig config = runtimeConfig.current();
         this.startupConfig = config;
         this.executors = executors;
-        this.cacheControlClient = new OstellaCacheControlClient(config.ostella().endpoint());
+        this.cacheControlClient = new OstellaCacheControlClient(config.ostella().endpoint(), config.ostella().token());
 
         LOG.info("Authorizing QQ API");
         this.tokenManager = new TokenManager(config.qq().appId(), config.qq().appSecret());
@@ -85,7 +85,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
 
         LOG.info("Initializing score watch service");
         this.watchService = new ScoreWatchService(
-                new OstellaWatchApi(config.ostella().endpoint()),
+                new ScoreWatchApi(config.ostella().endpoint(), config.ostella().token()),
                 new WatchScoreNotifier(sender),
                 new SpecificScoreNotifier(sender),
                 new SqliteSpecificScoreWatchStore(),
@@ -93,14 +93,19 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         );
 
         LOG.info("Initializing multiplayer room watch service");
-        this.multiplayerRoomWatchService = new MultiplayerRoomWatchService(
-                new OstellaMultiplayerRoomWatchApi(config.ostella().endpoint()),
-                new QqMultiplayerRoomNotifier(sender),
+        this.mpWatchService = new MPWatchService(
+                new MPWatchApi(config.ostella().endpoint(), config.ostella().token()),
+                new MPNotifier(sender),
                 Duration.ofSeconds(config.seira().effectiveMultiplayerWatchIntervalSeconds())
         );
 
+
         LOG.info("Initializing rank guess service");
         this.rankGuessGameService = new RankGuessGameService();
+
+        LOG.info("Initializing agents service");
+        this.chatProvider = ChatProviders.newHiAgentChatProvider(config.llm());
+
         this.attachmentHandler = new AttachmentHandler(executors.attachmentDownloads());
         this.router = new Router(
                 sender,
@@ -108,11 +113,23 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                 admins,
                 bindingService,
                 watchService,
-                multiplayerRoomWatchService,
+                mpWatchService,
                 discordBridgeService,
                 rankGuessGameService,
                 executors.commandTasks(),
-                BotStat::incrementCommands
+                BotStat::incrementCommands,
+                bytes -> {
+                    try {
+                        return cos.uploadImage(bytes);
+                    } catch (Exception e) {
+                        LOG.error("Error uploading image", e);
+                        return null;
+                    }
+                },
+                self::get,
+                chatProvider,
+                s -> QQApi.getGroupBotState(tokenManager.getToken(), s)
+
         );
     }
 
@@ -126,7 +143,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         runnerThread = Thread.currentThread();
         tokenManager.start();
         watchService.start();
-        multiplayerRoomWatchService.start();
+        mpWatchService.start();
         discordBridgeService.start();
         LOG.info("Starting bot connection loop...");
 
@@ -141,9 +158,9 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                 String wssEndpoint = QQApi.getWSSEndpoint(tokenManager.getToken());
                 LOG.info("Endpoint: {}", wssEndpoint);
 
-                final QQUser self = QQApi.getSelf(tokenManager.getToken());
+                self.set(QQApi.getSelf(tokenManager.getToken()));
 
-                LOG.info("Self info: id={}, nickname={}", self.id(), self.username());
+                LOG.info("Self info: id={}, nickname={}", self.get().id(), self.get().username());
 
                 WSClient client = new WSClient(
                         URI.create(wssEndpoint),
@@ -223,7 +240,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
             thread.interrupt();
         }
         watchService.close();
-        multiplayerRoomWatchService.close();
+        mpWatchService.close();
         discordBridgeService.close();
         tokenManager.close();
     }
@@ -296,7 +313,8 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         RealtimeServiceInterruptionNotifier.NotificationResult result = interruptionNotifier.notifyGroups(
                 watchService.activeTransientGroupIds(),
                 rankGuessGameService.activeGroupIds(),
-                multiplayerRoomWatchService.activeGroupIds()
+                mpWatchService.activeGroupIds(),
+                chatProvider.activeGroupIds()
         );
         if (result.failedGroups() == 0) {
             LOG.info("Sent restart interruption notices to {} affected groups", result.sentGroups());
@@ -401,6 +419,46 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
             return ConsoleCommandProcessor.ConsoleResult.success("Panel edited with ID: " + panelId + ", version: " + version);
         } catch (Exception e) {
             return ConsoleCommandProcessor.ConsoleResult.failure("Error editing panel: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public ConsoleCommandProcessor.ConsoleResult getGroupInfo(String groupId) {
+        try {
+            final GroupInfo groupInfo = QQApi.getGroupInfo(tokenManager.getToken(), groupId);
+
+            String sb = "=== Group info ===\n" +
+                    "group_id: " + groupId + "\n" +
+                    "group_name: " + groupInfo.groupName() + "\n" +
+                    "group_finger_memo: " + groupInfo.groupFingerMemo() + "\n" +
+                    "group_class_text: " + groupInfo.groupClassText() + "\n" +
+                    "group_tags: " + String.join(", ", groupInfo.groupTags()) + "\n" +
+                    "group_member_num: " + groupInfo.groupMemberNum() + "\n" +
+                    "==================";
+
+            return ConsoleCommandProcessor.ConsoleResult.success(sb);
+        } catch (Exception e) {
+            return ConsoleCommandProcessor.ConsoleResult.failure("Error editing panel: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public ConsoleCommandProcessor.ConsoleResult getGroupBotState(String groupId) {
+        try {
+            final GroupBotState groupBotState = QQApi.getGroupBotState(tokenManager.getToken(), groupId);
+
+            String sb = "=== Group bot state ===\n" +
+                    "group_id: " + groupId + "\n" +
+                    "member_openid: " + groupBotState.memberOpenId() + "\n" +
+                    "joined_at: " + groupBotState.joinedAt() + "\n" +
+                    "allow_proactive_msg: " + groupBotState.allowProactiveMsg() + "\n" +
+                    "recv_msg_setting: " + groupBotState.receiveMsgSetting() + "\n" +
+                    "member_role: " + groupBotState.memberRole() + "\n" +
+                    "=======================";
+
+            return ConsoleCommandProcessor.ConsoleResult.success(sb);
+        } catch (Exception e) {
+            return ConsoleCommandProcessor.ConsoleResult.failure("Error getting group bot state: " + e.getMessage());
         }
     }
 }
