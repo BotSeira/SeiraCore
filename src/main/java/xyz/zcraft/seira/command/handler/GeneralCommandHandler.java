@@ -20,6 +20,7 @@ import xyz.zcraft.seira.util.dice.result.DiceResult;
 
 import java.util.Objects;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
@@ -142,12 +143,14 @@ public final class GeneralCommandHandler {
                 .filter(Notice::isActive)
                 .findFirst()
                 .ifPresentOrElse(notice -> {
-                    sb.append(at(context)).append("公告#").append(notice.id()).append(" ").append(notice.title()).append("\n");
+                    sb.append(at(context)).append("公告 `#").append(notice.id()).append("` - `").append(notice.title()).append("`\n");
                     sb.append(NoticeStore.getContentFor(notice));
                 }, () -> sb.append(at(context)).append("未找到公告#").append(noticeId));
 
         context.sendReply(PendingMessage.ofMarkdownRaw(sb.toString()));
     }
+
+    private static final Pattern SERVER_PATTERN = Pattern.compile("^(?:https?://)?([a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)+)(?::[0-9]+)?$");
 
     public void handleMc(Context ctx) {
         if (ctx.argumentCount() != 1) {
@@ -157,6 +160,11 @@ public final class GeneralCommandHandler {
 
         try {
             final String address = ctx.argument(0);
+
+            if (!SERVER_PATTERN.matcher(address).matches()) {
+                ctx.sendReply(at(ctx) + "服务器地址无效喵。");
+                return;
+            }
 
             final var probe = AsteroidApi.getMinecraftServerStatus(address);
 
@@ -188,7 +196,7 @@ public final class GeneralCommandHandler {
                     )
             );
         } catch (Exception e) {
-            ctx.sendReply(at(ctx) + "状态获取失败了喵，请稍后再试。");
+            ctx.sendReply(at(ctx) + "无法获取目标服务器状态喵，这可能是因为目标服务器未开启或者存在网络问题。");
         }
     }
 

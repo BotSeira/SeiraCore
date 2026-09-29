@@ -152,7 +152,7 @@ public class WSClient extends WebSocketClient {
         final JsonArray attachments = data.getAsJsonArray("attachments");
         List<Attachment> attachmentList = new ArrayList<>();
 
-        if  (attachments != null && !attachments.isJsonNull()) {
+        if (attachments != null && !attachments.isJsonNull()) {
             for (JsonElement attachmentElem : attachments) {
                 JsonObject attachmentObj = attachmentElem.getAsJsonObject();
                 Attachment attachment = gson.fromJson(attachmentObj, Attachment.class);
@@ -295,7 +295,20 @@ public class WSClient extends WebSocketClient {
     private void sendIdentify() {
         JsonObject data = new JsonObject();
         data.addProperty("token", "QQBot " + tokenSupplier.get().token());
-        data.addProperty("intents", 1 << 25 | 1 << 26);
+        /*
+            GUILDS (1 << 0)
+            GUILD_MEMBERS (1 << 1)
+            GUILD_MESSAGES (1 << 9)    // 消息事件，仅 *私域* 机器人能够设置此 intents。
+            GUILD_MESSAGE_REACTIONS (1 << 10)
+            DIRECT_MESSAGE (1 << 12)
+            GROUP_AND_C2C_EVENT (1 << 25)
+            INTERACTION (1 << 26)
+            MESSAGE_AUDIT (1 << 27)
+            FORUMS_EVENT (1 << 28)  // 论坛事件，仅 *私域* 机器人能够设置此 intents。
+            AUDIO_ACTION (1 << 29)
+            PUBLIC_GUILD_MESSAGES (1 << 30) // 消息事件，此为公域的消息事件
+         */
+        data.addProperty("intents", 1 << 25 | 1 << 26 | 1 << 28 | 1 << 30);
 
         JsonObject payload = new JsonObject();
         payload.addProperty("op", 2);
