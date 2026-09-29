@@ -246,14 +246,15 @@ public class Router {
                 return;
             }
 
-            final boolean permitAi = AiPermission.doPermit(groupId);
+            final boolean permitAi = AiPermission.permits(groupId);
+            final boolean activatedAi = AiPermission.isActivated(groupId);
 
             if (parseResult.status() == CommandParser.ParseResult.Status.TEXT) {
                 ReplyChannel replies = taskCoordinator.openReplyChannel(
                         targetId, messageId, groupMessage, false, msgIdx
                 );
 
-                if (beingAt && permitAi) {
+                if (beingAt && permitAi && activatedAi) {
                     aiChatHandler.handleChat(parseResult.context().withReplies(replies), msgToRecord, msgElems);
                 } else if (permitAi) {
                     aiChatHandler.recordHistory(groupId, userId, msgToRecord, attachments);

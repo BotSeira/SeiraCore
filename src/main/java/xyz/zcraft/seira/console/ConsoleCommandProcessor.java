@@ -37,6 +37,7 @@ public final class ConsoleCommandProcessor {
     );
 
     private static final Map<String, List<String>> SUBCOMMANDS;
+    private static final Pattern ID_PATTERN = Pattern.compile("^[A-Z0-9]{32}$");
 
     static {
         SUBCOMMANDS = new HashMap<>();
@@ -59,7 +60,6 @@ public final class ConsoleCommandProcessor {
     private final ConsoleDataAccess dataAccess;
     private final MessageSender messenger;
     private final ConsoleRuntimeControl runtimeControl;
-
     private final ConfigHandler configHandler;
     private final NoticeHandler noticeHandler;
 
@@ -150,6 +150,17 @@ public final class ConsoleCommandProcessor {
     private static long positiveLong(String value, String name) {
         try {
             long parsed = Long.parseLong(value);
+            if (parsed > 0) {
+                return parsed;
+            }
+        } catch (NumberFormatException ignored) {
+        }
+        throw new IllegalArgumentException(name + " must be a positive long.");
+    }
+
+    private static int positiveInt(String value, String name) {
+        try {
+            int parsed = Integer.parseInt(value);
             if (parsed > 0) {
                 return parsed;
             }
@@ -267,7 +278,7 @@ public final class ConsoleCommandProcessor {
                 AiPermission.loadFromFile();
                 return ConsoleResult.success("AI permission reloaded.");
             } else if (ID_PATTERN.matcher(value).matches()) {
-                return ConsoleResult.success("AI chat for group " + value + " is: " + AiPermission.doPermit(value));
+                return ConsoleResult.success("AI chat for group " + value + " is: " + AiPermission.permits(value));
             } else {
                 return ConsoleResult.failure("Group id " + value + " not a valid id.");
             }
@@ -280,11 +291,35 @@ public final class ConsoleCommandProcessor {
             }
 
             if ("on".equalsIgnoreCase(option)) {
-                AiPermission.permit(target);
-                return ConsoleResult.success("AI chat for group " + target + " is on.");
+                AiPermission.permits(target);
+                AiPermission.activate(target);
+                return ConsoleResult.success("AI chat for group " + target + " is activated.");
             } else if ("off".equalsIgnoreCase(option)) {
+                AiPermission.deactivate(target);
+                return ConsoleResult.success("AI chat for group " + target + " is deactivated.");
+            } else if ("grant".equalsIgnoreCase(option)) {
+                AiPermission.grant(target);
+                return ConsoleResult.success("AI chat for group " + target + " is granted.");
+            } else if ("revoke".equalsIgnoreCase(option)) {
                 AiPermission.revoke(target);
-                return ConsoleResult.success("AI chat for group " + target + " is off.");
+                return ConsoleResult.success("AI chat for group " + target + " is revoked.");
+            } else if ("parallel".equalsIgnoreCase(option)) {
+                final int parallel = AiPermission.getParallel(target);
+                return ConsoleResult.success("Parallel count of AI chat for group " + target + " is " +  parallel + ".");
+            }
+        } else if (input.size() == 3) {
+            final String target = input.value(0).toLowerCase(Locale.ROOT);
+            final String option = input.value(1).toLowerCase(Locale.ROOT);
+            final String value = input.value(2).toLowerCase(Locale.ROOT);
+
+            if (!ID_PATTERN.matcher(target).matches()) {
+                return ConsoleResult.failure("Group id " + target + " not a valid id.");
+            }
+
+            if (option.equalsIgnoreCase("parallel")) {
+                final int l = positiveInt(value, "parallel count");
+                AiPermission.setParallel(target, l);
+                return ConsoleResult.success("Parallel count of AI chat for group " + target + " is now set to " + l + ".");
             }
         }
 
@@ -493,8 +528,10 @@ public final class ConsoleCommandProcessor {
         }
 
         return switch (input.value(1).toLowerCase(Locale.ROOT)) {
-            case "info" -> input.size() == 3 ? runtimeControl.getGroupInfo(input.value(2)) : ConsoleResult.failure("Usage: group info <group-id>");
-            case "state" -> input.size() == 3 ? runtimeControl.getGroupBotState(input.value(2)) : ConsoleResult.failure("Usage: group state <group-id>");
+            case "info" ->
+                    input.size() == 3 ? runtimeControl.getGroupInfo(input.value(2)) : ConsoleResult.failure("Usage: group info <group-id>");
+            case "state" ->
+                    input.size() == 3 ? runtimeControl.getGroupBotState(input.value(2)) : ConsoleResult.failure("Usage: group state <group-id>");
             default -> ConsoleResult.failure("Usage: group <info|state> [args]");
         };
     }
@@ -592,8 +629,6 @@ public final class ConsoleCommandProcessor {
         }
         return ConsoleResult.success(formatQueryResult(dataAccess.query(sql, QUERY_ROW_LIMIT)));
     }
-
-    private static final Pattern ID_PATTERN = Pattern.compile("^[A-Z0-9]{32}$");
 
     private ConsoleResult send(ConsoleInputParser.ParsedInput input) {
         if (input.size() < 4) {

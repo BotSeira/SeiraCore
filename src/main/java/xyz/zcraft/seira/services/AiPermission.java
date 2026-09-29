@@ -8,8 +8,11 @@ import lombok.Getter;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class AiPermission {
     private static final Object LOCK = new Object();
@@ -18,6 +21,8 @@ public class AiPermission {
     private static Set<String> groups = null;
     @Getter
     private static Mode mode = Mode.WHITELIST;
+    private static Set<String> activated = null;
+    private static Map<String, Integer> parallel = null;
 
     public static void initialize() {
         loadFromFile();
@@ -32,14 +37,26 @@ public class AiPermission {
                     if (!json.isBlank()) {
                         JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
 
-                        final PermissionSnapshot permissionSnapshot = GSON.fromJson(obj, PermissionSnapshot.class);
+                        final PermissionSnapshot snapshot = GSON.fromJson(obj, PermissionSnapshot.class);
 
-                        mode = permissionSnapshot.mode;
-                        groups = new HashSet<>();
+                        AiPermission.mode = snapshot.mode;
+                        AiPermission.groups = new HashSet<>();
+                        AiPermission.activated = new HashSet<>();
+                        AiPermission.parallel = new HashMap<>();
 
-                        final Set<String> groups = permissionSnapshot.groups;
+                        final Set<String> groups = snapshot.groups;
                         if (groups != null) {
                             AiPermission.groups.addAll(groups);
+                        }
+
+                        final Set<String> activated = snapshot.activated;
+                        if (activated != null) {
+                            AiPermission.activated.addAll(activated);
+                        }
+
+                        final Map<String, Integer> parallel = snapshot.parallel;
+                        if (parallel != null) {
+                            AiPermission.parallel.putAll(parallel);
                         }
                     }
                 }
@@ -54,6 +71,14 @@ public class AiPermission {
             if (groups == null) {
                 groups = new HashSet<>();
             }
+
+            if (activated == null) {
+                activated = new HashSet<>();
+            }
+
+            if (parallel == null) {
+                parallel = new ConcurrentHashMap<>();
+            }
         }
     }
 
@@ -62,7 +87,7 @@ public class AiPermission {
             try {
                 Files.createDirectories(STORE.getParent());
 
-                PermissionSnapshot snapshot = new PermissionSnapshot(mode, groups);
+                PermissionSnapshot snapshot = new PermissionSnapshot(mode, groups, activated, parallel);
 
                 Files.writeString(STORE, GSON.toJson(snapshot));
             } catch (Exception e) {
@@ -71,7 +96,7 @@ public class AiPermission {
         }
     }
 
-    public static boolean doPermit(String groupId) {
+    public static boolean permits(String groupId) {
         if (mode == null || groups == null) return false;
 
         if (mode == Mode.WHITELIST) {
@@ -83,7 +108,7 @@ public class AiPermission {
         }
     }
 
-    public static void permit(String groupId) {
+    public static void grant(String groupId) {
         if (mode == null || groups == null) return;
 
         if (mode == Mode.WHITELIST) {
@@ -104,6 +129,41 @@ public class AiPermission {
             groups.add(groupId);
         }
 
+        if (activated != null) {
+            activated.remove(groupId);
+        }
+
+        saveToFile();
+    }
+
+    public static int getParallel(String groupId) {
+        if (parallel == null) return 1;
+        return parallel.getOrDefault(groupId, 1);
+    }
+
+    public static void activate(String groupId) {
+        if (activated == null) return;
+        activated.add(groupId);
+
+        saveToFile();
+    }
+
+    public static void deactivate(String groupId) {
+        if (activated == null) return;
+        activated.remove(groupId);
+
+        saveToFile();
+    }
+
+    public static boolean isActivated(String groupId) {
+        if (activated == null) return false;
+        return activated.contains(groupId);
+    }
+
+    public static void setParallel(String groupId, int parallel) {
+        if (AiPermission.parallel == null) return;
+        AiPermission.parallel.put(groupId, parallel);
+
         saveToFile();
     }
 
@@ -114,7 +174,9 @@ public class AiPermission {
 
     public record PermissionSnapshot(
             Mode mode,
-            Set<String> groups
+            Set<String> groups,
+            Set<String> activated,
+            Map<String, Integer> parallel
     ) {
     }
 }

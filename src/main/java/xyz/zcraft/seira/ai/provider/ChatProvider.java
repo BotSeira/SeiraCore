@@ -22,6 +22,8 @@ public interface ChatProvider {
 
     boolean isRunning(String groupId, String openId);
 
+    int runningCount(String groupId);
+
     boolean clearState(String groupId, String openId);
 
     int clearStateOfGroup(String groupId);

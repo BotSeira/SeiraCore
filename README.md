@@ -103,6 +103,7 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 | `/mpwatch`      | `/mpwatch start/stop/status [目标]`                     | 按群成员添加、停止或查看多人房间监视；`stop all` 可停止本群全部监视             |
 | `/romai`        | `/romai [目标]`                                         | 开始监视自己或目标正在进行的RomAI比赛                                           |
 | `/mc`           | `/mc <服务器地址>`                                      | 获取指定MC服务器状态                                                            |
+| `/ai`           | `/ai [on/off/reset/reset all]`                          | 开启/关闭/重置本群的AI对话                                                      |
 | `/wx`           | `/wx start <UID列表> <谱面ID列表>` / `/wx stop`         | 监视指定玩家在指定谱面取得的成绩，重启后自动恢复                                |
 | `/dcs`          | `/dcs start <guild-id>.<channel-id>` / `/dcs stop`      | 开启或解除当前 QQ 群与 Discord 频道的双向消息同步                               |
 | `/stat`         | `/stat`                                                 | 服务状态和统计信息文本                                                          |
