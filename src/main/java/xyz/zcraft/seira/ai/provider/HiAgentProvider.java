@@ -98,7 +98,7 @@ class HiAgentProvider implements ChatProvider {
     private static String parseQqMeme(String original) {
         final Matcher qqFaceMatcher = QQ_FACE.matcher(original);
 
-        if (qqFaceMatcher.matches()) {
+        if (qqFaceMatcher.find()) {
             original = qqFaceMatcher.replaceAll(r -> {
                 final String extBase64 = r.group(2);
                 final String ext = new String(Base64.getDecoder().decode(extBase64));
@@ -109,13 +109,13 @@ class HiAgentProvider implements ChatProvider {
 
         final Matcher qqMemeMatcher = QQ_MEME.matcher(original);
 
-        if (qqMemeMatcher.matches()) {
+        if (qqMemeMatcher.find()) {
             original = qqMemeMatcher.replaceAll("[表情]");
         }
 
         final Matcher qqMemeAltMatcher = QQ_MEME_ALT.matcher(original);
 
-        if (qqMemeAltMatcher.matches()) {
+        if (qqMemeAltMatcher.find()) {
             original = qqMemeAltMatcher.replaceAll(r -> {
                 final String extBase64 = r.group(1);
                 final String ext = new String(Base64.getDecoder().decode(extBase64));
