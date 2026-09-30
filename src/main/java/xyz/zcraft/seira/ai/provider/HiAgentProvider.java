@@ -14,7 +14,6 @@ import xyz.zcraft.seira.ai.data.AppConversationBrief;
 import xyz.zcraft.seira.ai.data.ChatQueryResponse;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.config.LLMConfig;
-import xyz.zcraft.seira.services.AiPermission;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -288,7 +287,9 @@ class HiAgentProvider implements ChatProvider {
                 continue;
             }
 
-            count++;
+            if (entry.getValue().getRunning().get()) {
+                count++;
+            }
         }
 
         return count;
