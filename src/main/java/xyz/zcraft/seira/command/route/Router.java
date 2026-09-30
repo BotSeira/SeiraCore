@@ -3,8 +3,8 @@ package xyz.zcraft.seira.command.route;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.seira.ai.provider.ChatProvider;
 import xyz.zcraft.seira.ai.AiChatHandler;
+import xyz.zcraft.seira.ai.provider.ChatProvider;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.MessageSender;
@@ -182,7 +182,7 @@ public class Router {
 
     public void onPrivateMessageReceived(
             String userId, String messageId, String rawContent,
-            String msgIdx ,List<Attachment> attachments, List<MsgElem> msgElems
+            String msgIdx, List<Attachment> attachments, List<MsgElem> msgElems
     ) {
         handleMessageReceived(userId, null, userId, messageId, rawContent, false, msgIdx, attachments, msgElems);
     }
@@ -266,9 +266,10 @@ public class Router {
                     targetId, messageId, groupMessage, config.seira().queueMessageInGroup(), msgIdx
             );
 
-            if (parseResult.status() == CommandParser.ParseResult.Status.EMPTY_COMMAND
-                    && !group) {
-                replies.sendReply(PendingMessage.ofString("请输入指令。使用/help获取帮助。"));
+            if (parseResult.status() == CommandParser.ParseResult.Status.EMPTY_COMMAND) {
+                if (!group) {
+                    replies.sendReply(PendingMessage.ofString("请输入指令。使用/help获取帮助。"));
+                }
                 return;
             }
 
