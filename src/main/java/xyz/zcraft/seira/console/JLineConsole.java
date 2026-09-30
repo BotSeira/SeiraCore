@@ -47,7 +47,7 @@ public final class JLineConsole implements AutoCloseable {
             LineReader reader = LineReaderBuilder.builder()
                     .appName("SeiraCore")
                     .terminal(createdTerminal)
-                    .parser(new DefaultParser())
+                    .parser(new DefaultParser().eofOnEscapedNewLine(true))
                     .completer(new CommandCompleter())
                     .variable(LineReader.HISTORY_FILE, Path.of("data", "console-history"))
                     .variable(LineReader.HISTORY_SIZE, 500)
