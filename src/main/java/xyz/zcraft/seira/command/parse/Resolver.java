@@ -162,7 +162,7 @@ public final class Resolver {
         return result;
     }
 
-    public Long parsePositiveLong(String value) {
+    public static Long parsePositiveLong(String value) {
         try {
             long parsed = Long.parseLong(value);
             return parsed > 0 ? parsed : null;

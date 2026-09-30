@@ -140,7 +140,21 @@ public class WSClient extends WebSocketClient {
             }
         } else if ("GROUP_AT_MESSAGE_CREATE".equals(eventType) || "GROUP_MESSAGE_CREATE".equals(eventType)) {
             onGroupMsg(payload);
+        } else if ("INTERACTION_CREATE".equals(eventType)) {
+            onInteraction(payload);
         }
+    }
+
+    private void onInteraction(JsonObject payload) {
+        JsonObject data = payload.get("d").getAsJsonObject();
+        String id = data.get("id").getAsString();
+        int type = data.get("type").getAsInt();
+        String scene = data.get("scene").getAsString();
+        int chatType = data.get("chat_type").getAsInt();
+        String userOpenId = data.get("user_openid").getAsString();
+        String groupOpenId = data.get("group_openid").getAsString();
+        String groupMemberOpenId = data.get("group_member_openid").getAsString();
+
     }
 
     private void onC2CMsg(JsonObject payload) {

@@ -65,7 +65,7 @@ public record DiceExpr(List<DiceExprPart> parts) {
     public static boolean isInvalid(String exp) {
         if (exp == null || exp.isBlank()) return true;
         return !exp.chars().allMatch(value -> (value >= '0' && value <= '9') ||
-                value == 'd' || value == '+' || value == '*');
+                value == 'd' || value == '+' || value == '*' || value == '-');
     }
 
     @NotNull

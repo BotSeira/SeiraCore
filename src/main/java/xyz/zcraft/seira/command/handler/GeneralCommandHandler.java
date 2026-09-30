@@ -25,6 +25,7 @@ import java.util.regex.Pattern;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class GeneralCommandHandler {
+    private static final Pattern SERVER_PATTERN = Pattern.compile("^(?:https?://)?([a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)+)(?::[0-9]+)?$");
     private final MessageSender messageSender;
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
@@ -61,6 +62,11 @@ public final class GeneralCommandHandler {
 
         if (ctx.argumentCount() == 0) {
             diceExpr = DiceExpr.HUNDRED;
+        } else if ("0d00".equals(ctx.argument(0))) {
+            ctx.sendReply(at(ctx) + "0d00 = __0721__");
+            return;
+        } else if (Resolver.parsePositiveLong(ctx.argument(0)) != null) {
+            diceExpr = DiceExpr.parse("1d" + Resolver.parsePositiveLong(ctx.argument(0)));
         } else {
             try {
                 diceExpr = DiceExpr.parse(ctx.query());
@@ -150,8 +156,6 @@ public final class GeneralCommandHandler {
         context.sendReply(PendingMessage.ofMarkdownRaw(sb.toString()));
     }
 
-    private static final Pattern SERVER_PATTERN = Pattern.compile("^(?:https?://)?([a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)+)(?::[0-9]+)?$");
-
     public void handleMc(Context ctx) {
         if (ctx.argumentCount() != 1) {
             ctx.sendReply(at(ctx) + "用法：/mc <服务器地址>");
@@ -170,7 +174,7 @@ public final class GeneralCommandHandler {
 
             final var status = probe.status();
             final var players = status.players();
-            final var samples = players.samples();
+            final var samples = players.sample();
 
             String playersSample = "";
 
