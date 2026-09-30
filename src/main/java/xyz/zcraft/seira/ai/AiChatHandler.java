@@ -12,6 +12,7 @@ import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.services.AiPermission;
+import xyz.zcraft.seira.util.ResourceUtil;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,6 +31,7 @@ public class AiChatHandler {
     private final ChatProvider chatProvider;
     private final Function<String, GroupBotState> botStateGetter;
     private final Map<String, Deque<String>> groupMentionedHistory = new ConcurrentHashMap<>();
+    private final Set<String> consented = new HashSet<>();
 
     public AiChatHandler(
             Resolver resolver, ChatProvider chatProvider, Predicate<String> isAdmin,
@@ -60,7 +62,13 @@ public class AiChatHandler {
             if ("on".equalsIgnoreCase(ctx.argument(0))) {
                 final GroupBotState apply = botStateGetter.apply(ctx.groupId());
                 if (apply.allowProactiveMsg() && apply.receiveMsgSetting() == GroupBotState.ReceiveMsgSetting.ALL) {
-                    if (AiPermission.permits(ctx.groupId())) {
+                    if (AiPermission.isActivated(ctx.groupId())) {
+                        ctx.sendReply(at(ctx) + "已启用本群AI已为启用状态喵。");
+                    } else if (!consented.contains(ctx.groupId())) {
+                        final String terms = ResourceUtil.loadString("/ai-chat-terms.md").orElse("文件加载失败了喵");
+                        ctx.sendReply("> 使用 AI 对话功能即表示群内成员同意并遵守以下条款：\n\n" + terms + "\n\n> 本消息仅展示一次，再次使用 `/ai on` 即可开启 AI 对话。");
+                        consented.add(ctx.groupId());
+                    } else if (AiPermission.permits(ctx.groupId())) {
                         AiPermission.activate(ctx.groupId());
                         ctx.sendReply(at(ctx) + "已启用本群AI对话喵。");
                     } else {
