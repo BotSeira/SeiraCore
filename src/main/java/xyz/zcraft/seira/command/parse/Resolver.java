@@ -37,7 +37,7 @@ public final class Resolver {
                 || rawContent.trim().equalsIgnoreCase("//")) {
             return "ux";
         } else if (looksLikeMention(rawContent.trim())) {
-            return "ux " + rawContent;
+            return "ux " + rawContent.replace(" ", "_");
         }
 
         // Add surrounding space to <@> before expanding compact commands so /bp5<@...> is recognized.
