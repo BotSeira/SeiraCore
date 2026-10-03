@@ -18,5 +18,6 @@ public final class TargetHistory {
         users.put(ctx.senderUserId(), ids);
     }
 
-    public record Ids(Long beatmapsetId, Long beatmapId, String scoreId) {}
+    public record Ids(Long beatmapsetId, Long beatmapId, String scoreId) {
+    }
 }

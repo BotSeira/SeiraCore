@@ -22,6 +22,7 @@ public class AsteroidApi {
     private static final String TOKEN;
     private static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(Duration.ofMinutes(5)).build();
     private static final Gson GSON = new Gson();
+    private static final Logger LOG = LogManager.getLogger(AsteroidApi.class);
 
     static {
         ENDPOINT = Seira.getConfig().asteroid().endpoint();
@@ -58,8 +59,6 @@ public class AsteroidApi {
         }
     }
 
-    public record ServerStatus(boolean online, String version){}
-
     public static ServerStatus getServerStatus() {
         try {
             var request = requestBuilder("/health")
@@ -88,5 +87,6 @@ public class AsteroidApi {
         return new ServerStatus(false, null);
     }
 
-    private static final Logger LOG = LogManager.getLogger(AsteroidApi.class);
+    public record ServerStatus(boolean online, String version) {
+    }
 }

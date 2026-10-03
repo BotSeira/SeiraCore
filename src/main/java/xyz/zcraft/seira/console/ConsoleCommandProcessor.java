@@ -305,10 +305,10 @@ public final class ConsoleCommandProcessor {
                 return ConsoleResult.success("AI chat for group " + target + " is revoked.");
             } else if ("parallel".equalsIgnoreCase(option)) {
                 final int parallel = AiPermission.getParallel(target);
-                return ConsoleResult.success("Parallel count of AI chat for group " + target + " is " +  parallel + ".");
+                return ConsoleResult.success("Parallel count of AI chat for group " + target + " is " + parallel + ".");
             }
         } else if (input.size() == 4) {
-            final String target = input.value(1).toUpperCase(Locale.ROOT);;
+            final String target = input.value(1).toUpperCase(Locale.ROOT);
             final String option = input.value(2).toLowerCase(Locale.ROOT);
             final String value = input.value(3).toLowerCase(Locale.ROOT);
 

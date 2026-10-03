@@ -10,14 +10,10 @@ public record Notice(
         NoticeLevel level,
         Long publishedAt,
         Long expiresInMinutes
-) implements Comparable<Notice>{
+) implements Comparable<Notice> {
     @Override
     public int compareTo(@NotNull Notice other) {
         return Long.compare(this.id, other.id);
-    }
-
-    public enum NoticeLevel {
-        INFO, UPDATE, IMPORTANT, MAINTENANCE
     }
 
     public boolean isActive() {
@@ -36,5 +32,9 @@ public record Notice(
     public boolean valid() {
         return title != null && !title.isEmpty()
                 && fileName != null && !fileName.isEmpty();
+    }
+
+    public enum NoticeLevel {
+        INFO, UPDATE, IMPORTANT, MAINTENANCE
     }
 }

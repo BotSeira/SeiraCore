@@ -3,6 +3,7 @@ package xyz.zcraft.seira.command.route;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.seira.addpp.AddPpApi;
 import xyz.zcraft.seira.ai.AiChatHandler;
 import xyz.zcraft.seira.ai.provider.ChatProvider;
 import xyz.zcraft.seira.api.data.OsuToken;
@@ -10,6 +11,7 @@ import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.QQApi;
 import xyz.zcraft.seira.bot.data.*;
+import xyz.zcraft.seira.challenge.ChallengeService;
 import xyz.zcraft.seira.command.*;
 import xyz.zcraft.seira.command.handler.*;
 import xyz.zcraft.seira.command.parse.CommandParser;
@@ -27,6 +29,7 @@ import xyz.zcraft.seira.util.NoticesHelper;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 import xyz.zcraft.seira.watch.MPWatchService;
 import xyz.zcraft.seira.watch.ScoreWatchService;
+import xyz.zcraft.seira.whatif.WhatIfService;
 
 import java.util.List;
 import java.util.Optional;
@@ -56,7 +59,7 @@ public class Router {
 
     public Router(
             MessageSender messageSender, Supplier<AppConfig> configSupplier, AdminRegistry admins,
-            BindingService bindingService, ScoreWatchService watchService, MPWatchService mpWatchService,
+            BindingService bindingService, ScoreWatchService watchService, ChallengeService challengeService, MPWatchService mpWatchService,
             DiscordBridgeService discordBridgeService, RankGuessGameService rankGuessGameService, Executor commandExecutor,
             Runnable commandMetric, Function<byte[], UploadedImage> imageUploader, Supplier<QQUser> selfSupplier,
             ChatProvider chatProvider, Function<String, GroupBotState> botStateGetter
@@ -93,6 +96,8 @@ public class Router {
                 resolver, chatProvider, admins::isAdmin, botStateGetter
         );
         WatchCommandHandler watchCommands = new WatchCommandHandler(resolver, taskCoordinator, watchService, admins::isAdmin);
+        ChallengeCommandHandler challengeCommands = new ChallengeCommandHandler(
+                challengeService, UserDataStore::findBoundUid, admins::isAdmin, watchService::requestPoll);
         SpecificScoreWatchCommandHandler specificScoreWatchCommands =
                 new SpecificScoreWatchCommandHandler(taskCoordinator, watchService);
         MPWatchCommandHandler multiplayerRoomWatchCommands =
@@ -102,11 +107,16 @@ public class Router {
                 taskCoordinator, replyFactory, rankGuessGameService, resolver, admins::isAdmin, this::getAvatar, imageUploader
         );
         this.unknownCommand = generalCommands::handleUnknown;
+        WhatIfService rankPpService = WhatIfService.create();
+        WhatIfCommandHandler whatIfCommands = new WhatIfCommandHandler(rankPpService);
+        AddPpCommandHandler addPpCommands = new AddPpCommandHandler(
+                new AddPpApi(startupConfig.ostella().endpoint(), startupConfig.ostella().token()),
+                rankPpService, UserDataStore::findBoundUid);
         this.commandParser = new CommandParser(resolver::sanitize);
         this.commandRegistry = createCommandRegistry(
                 bindingCommands, scoreCommands, beatmapCommands, socialCommands,
                 replayCommands, generalCommands, watchCommands, specificScoreWatchCommands,
-                multiplayerRoomWatchCommands, dcsCommands, rankGuessCommands, aiChatHandler
+                multiplayerRoomWatchCommands, dcsCommands, rankGuessCommands, aiChatHandler, whatIfCommands, challengeCommands, addPpCommands
         );
         this.debugRoutes = new DebugRoutes(
                 configSupplier, messageSender, replyFactory, taskCoordinator,
@@ -120,7 +130,8 @@ public class Router {
             ReplayCommandHandler replayCommands, GeneralCommandHandler generalCommands,
             WatchCommandHandler watchCommands, SpecificScoreWatchCommandHandler specificScoreWatchCommands,
             MPWatchCommandHandler multiplayerRoomWatchCommands, DcsCommandHandler dcsCommands,
-            RankGuessCommandHandler rankGuessCommands, AiChatHandler aiChatHandler
+            RankGuessCommandHandler rankGuessCommands, AiChatHandler aiChatHandler, WhatIfCommandHandler whatIfCommands,
+            ChallengeCommandHandler challengeCommands, AddPpCommandHandler addPpCommands
     ) {
         return CommandRegistry.builder()
                 .register(bindingCommands::handleBind, "bind")
@@ -148,6 +159,7 @@ public class Router {
                 .register(scoreCommands::handleSm, "sm")
                 .register(scoreCommands::handleSa, "sa")
                 .register(scoreCommands::handleMa, "ma")
+                .register(scoreCommands::handleSnapshot, "snap", "snapshot")
                 .register(replayCommands::handleR, "r")
                 .register(replayCommands::handleRsc, "rsc")
                 .register(beatmapCommands::handleMs, "ms")
@@ -157,6 +169,8 @@ public class Router {
                 .register(generalCommands::handleU, "u")
                 .register(generalCommands::handleUx, "ux")
                 .register(generalCommands::handleLuck, "luck")
+                .register(whatIfCommands::handleWhatIf, "whatif")
+                .register(addPpCommands::handleAddPp, "addpp")
                 .register(generalCommands::handleRoll, "roll")
                 .register(replayCommands::handleRstat, "rstat")
                 .register(replayCommands::handleRcancel, "rcancel")
@@ -165,6 +179,7 @@ public class Router {
                 .register(generalCommands::handleUsages, "usages")
                 .register(generalCommands::handleFaq, "faq")
                 .register(watchCommands::handleWatch, "watch")
+                .register(challengeCommands::handleChallenge, "gch")
                 .register(specificScoreWatchCommands::handleWx, "wx")
                 .register(multiplayerRoomWatchCommands::handleMpWatch, "mpwatch", "mpw")
                 .register(multiplayerRoomWatchCommands::handleRomAI, "romai")

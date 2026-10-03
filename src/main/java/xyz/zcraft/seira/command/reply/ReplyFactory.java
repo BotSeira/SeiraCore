@@ -427,6 +427,11 @@ public final class ReplyFactory {
         );
     }
 
+    public PendingMessage snapshotImageMessage(Context ctx, String scoreId, String position) {
+        return PendingMessage.ofMarkdownRaw(at(ctx) + "回放快照：" + position + "\n成绩 " + scoreId
+                + " · WhiteCat 2.1\n" + cmd("/ma " + scoreId, "查看 Miss 列表"));
+    }
+
     public PendingMessage statusMessage(Context ctx, OstellaApi.ServerStatus status, AsteroidApi.ServerStatus asteroid) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.statContent(ctx, status, asteroid), null
@@ -786,7 +791,11 @@ public final class ReplyFactory {
                     > /m - 获取谱面
                     > /r - 生成成绩高光视频或指定片段
                     > /rg - 猜 Rank 游戏
+                    > /whatif - 估算总 PP 与全球排名的对应关系
+                    > /addpp - 估算新增成绩后的总 PP 与排名变化
+                    > /snap - 生成指定时间、物件或 Miss 的回放快照
                     > /watch - 监视群友的新成绩
+                    > /gch - 群挑战，自选难度，按水平调整成绩
                     > /mpw <MPLink> - 监视多人房间的逐图结果
                     > /f - 获取好友列表
                     
@@ -809,6 +818,12 @@ public final class ReplyFactory {
             return at(ctx) + "部分指令示例\n" +
                     "> 注意：所有指令中的@均需要开启权限才能正常读取。权限配置见 [这里]( " + PERMISSION + " )~\n" + """
                     > /rp -> 查看最近通过的一个成绩
+                    > /whatif 12345pp -> 估算总 PP 对应的全球排名
+                    > /addpp 200*4 -> 估算新增4条200pp成绩后的总 PP 与排名
+                    > /addpp m1234567 HDDT 98% FC -> 估算指定谱面成绩加入 BP 后的变化
+                    > /snap rp1 01:23.456 -> 最近通过成绩在指定歌曲时间的快照
+                    > /snap #3 -50ms -> 最近查询成绩的第3个Miss前50ms的快照
+                    > /whatif #12345 -> 估算全球排名所需的总 PP（纯数字也按排名解析）
                     > /rp1-20 -> 查看最近通过的1到20个成绩
                     > /bp1-20 -> 查看20个最佳成绩
                     > /bp1-20 @peppy acc>95 -> 查看指定玩家BP1-20中准确率大于95%的成绩
@@ -816,6 +831,8 @@ public final class ReplyFactory {
                     > /tb #7 @peppy -> 查看指定玩家近7天的新BP
                     > /@peppy -> 查看指定玩家的基本信息
                     > /rg group -> 开始群组猜 Rank 游戏
+                    > /gch start 12345 24 -> 开始24小时的自选难度群挑战
+                    > /gch join -> 加入本群挑战
                     > /m @peppy rp2 -> 查看指定玩家最近第2条成绩的谱面
                     > /dl mp -> 获取所在lazer多人房间当前谱面的镜像下载链接
                     > /r rp -> 渲染最近通过的成绩的高光片段回放视频

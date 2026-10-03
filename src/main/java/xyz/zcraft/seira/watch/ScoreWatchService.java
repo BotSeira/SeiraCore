@@ -29,6 +29,7 @@ public final class ScoreWatchService implements AutoCloseable {
     private final ScheduledExecutorService scheduler;
     private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final List<RecentScoreListener> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     public ScoreWatchService(
             ScoreWatchApi api,
@@ -92,6 +93,10 @@ public final class ScoreWatchService implements AutoCloseable {
             result.add(id);
         }
         return Set.copyOf(result);
+    }
+
+    public void addListener(RecentScoreListener listener) {
+        listeners.add(Objects.requireNonNull(listener));
     }
 
     public void start() {
@@ -292,11 +297,10 @@ public final class ScoreWatchService implements AutoCloseable {
         Map<Long, List<SpecificWatchRef>> specificWatchesByUid = snapshotSpecificByUid();
         Set<Long> watchedUserIds = new LinkedHashSet<>(watchesByUid.keySet());
         watchedUserIds.addAll(specificWatchesByUid.keySet());
-        if (watchedUserIds.isEmpty()) {
-            return;
-        }
+        for (RecentScoreListener listener : listeners) watchedUserIds.addAll(listener.watchedUserIds());
 
-        Map<Long, List<RecentScore>> recentScores = api.getRecentScores(watchedUserIds, BATCH_SCORE_LIMIT);
+        Map<Long, List<RecentScore>> recentScores = watchedUserIds.isEmpty() ? Map.of()
+                : api.getRecentScores(watchedUserIds, BATCH_SCORE_LIMIT);
         Map<Long, byte[]> renderedScores = new HashMap<>();
         for (long userId : watchedUserIds) {
             List<RecentScore> scores = recentScores.getOrDefault(userId, List.of());
@@ -305,6 +309,13 @@ public final class ScoreWatchService implements AutoCloseable {
             }
             for (SpecificWatchRef watch : specificWatchesByUid.getOrDefault(userId, List.of())) {
                 sendNewSpecificScores(watch, scores);
+            }
+        }
+        for (RecentScoreListener listener : listeners) {
+            try {
+                listener.acceptRecentScores(recentScores);
+            } catch (RuntimeException e) {
+                LOG.error("Failed to process additional recent-score consumer", e);
             }
         }
     }

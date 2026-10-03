@@ -16,7 +16,7 @@ public record GroupBotState(
     }
 
     public enum MemberRole {
-        @SerializedName("member")  MEMBER,
+        @SerializedName("member") MEMBER,
         @SerializedName("owner") OWNER,
         @SerializedName("admin") ADMIN
     }

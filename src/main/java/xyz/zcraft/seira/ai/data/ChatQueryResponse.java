@@ -23,7 +23,7 @@ import java.util.List;
     "tool_messages": ["工具消息输出内容"]
 }
  */
-public record ChatQueryResponse (
+public record ChatQueryResponse(
         @SerializedName("total_tokens") Long totalTokens,
         @SerializedName("event") String event,
         @SerializedName("task_id") String taskId,
@@ -38,5 +38,5 @@ public record ChatQueryResponse (
         @SerializedName("latency_first_resp") Long latencyFirstResp,
         @SerializedName("think_messages") List<String> thinkMessages,
         @SerializedName("tool_messages") List<String> toolMessages
-){
+) {
 }

@@ -90,8 +90,10 @@ public final class ReplayCommandHandler {
                     long uid = OstellaApi.resolveUid(player);
                     scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
                 }
-                case MP -> beatmapId = OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
-                case MEMORY -> {}
+                case MP ->
+                        beatmapId = OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                case MEMORY -> {
+                }
             }
             if (scoreId == null) {
                 if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
@@ -207,8 +209,10 @@ public final class ReplayCommandHandler {
                     long uid = OstellaApi.resolveUid(player);
                     scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
                 }
-                case MP -> beatmapId = OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
-                case MEMORY -> {}
+                case MP ->
+                        beatmapId = OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                case MEMORY -> {
+                }
             }
             if (beatmapId == null && scoreId != null) beatmapId = OstellaApi.getScoreBeatmapId(scoreId);
             if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");

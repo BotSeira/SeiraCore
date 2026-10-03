@@ -36,7 +36,9 @@ public final class MPWatchCommandHandler {
     private static final Pattern STABLE_ROOM_URL = Pattern.compile(
             "(?i)^https?://(?:www\\.)?osu\\.ppy\\.sh/(?:community/matches|mp)/(\\d+)(?:[/?#].*)?$"
     );
-
+    private static final Pattern BO = Pattern.compile(
+            "^bo(\\d+)$"
+    );
     private final TaskCoordinator taskCoordinator;
     private final MPWatchService watchService;
     private final Resolver resolver;
@@ -254,9 +256,6 @@ public final class MPWatchCommandHandler {
         }
     }
 
-    private static final Pattern BO = Pattern.compile(
-            "^bo(\\d+)$"
-    );
     private void handleStop(Context ctx) {
         if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
             int stoppedCount = watchService.stopAll(ctx.groupId()).size();

@@ -10,6 +10,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class Resolver {
+    private static final Map<List<String>, String> ALIASES = Map.of(
+            List.of("+", "＋"), "+",
+            List.of("~", "～"), "~",
+            List.of("=", "＝"), "="
+    );
     private final java.util.function.Function<String, Long> boundUid;
 
     public Resolver() {
@@ -20,11 +25,14 @@ public final class Resolver {
         this.boundUid = Objects.requireNonNull(boundUid);
     }
 
-    private static final Map<List<String>, String> ALIASES = Map.of(
-            List.of("+", "＋"), "+",
-            List.of("~", "～"), "~",
-            List.of("=", "＝"), "="
-    );
+    public static Long parsePositiveLong(String value) {
+        try {
+            long parsed = Long.parseLong(value);
+            return parsed > 0 ? parsed : null;
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
 
     public String sanitize(String rawContent) {
         for (Map.Entry<List<String>, String> entry : ALIASES.entrySet()) {
@@ -160,15 +168,6 @@ public final class Resolver {
         Patterns.QQ_AT_IDS_PATTERN.matcher(token).results().forEach(m -> result.add(m.group(1)));
 
         return result;
-    }
-
-    public static Long parsePositiveLong(String value) {
-        try {
-            long parsed = Long.parseLong(value);
-            return parsed > 0 ? parsed : null;
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
     }
 
     public boolean looksLikeUid(String arg) {

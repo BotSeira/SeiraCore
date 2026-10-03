@@ -9,6 +9,7 @@ import xyz.zcraft.seira.command.TargetHistory;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.parse.ScoreFilterArguments;
+import xyz.zcraft.seira.command.parse.SnapshotSelection;
 import xyz.zcraft.seira.command.parse.TargetInput;
 import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
@@ -271,8 +272,10 @@ public final class ScoreCommandHandler {
                     scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), filters, mod);
                     selectedPlayerScore = true;
                 }
-                case MP -> beatmapId = OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
-                case MEMORY -> {}
+                case MP ->
+                        beatmapId = OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                case MEMORY -> {
+                }
             }
             if ((userOverride != null || mod != null) && scoreId != null && !selectedPlayerScore) {
                 if (beatmapId == null) beatmapId = OstellaApi.getScoreBeatmapId(scoreId);
@@ -346,8 +349,10 @@ public final class ScoreCommandHandler {
                     long uid = OstellaApi.resolveUid(player);
                     scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
                 }
-                case MP -> beatmapId = OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
-                case MEMORY -> {}
+                case MP ->
+                        beatmapId = OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                case MEMORY -> {
+                }
             }
             if (beatmapId == null && scoreId != null) beatmapId = OstellaApi.getScoreBeatmapId(scoreId);
             if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
@@ -392,8 +397,10 @@ public final class ScoreCommandHandler {
                     long uid = OstellaApi.resolveUid(player);
                     scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
                 }
-                case MP -> beatmapId = OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
-                case MEMORY -> {}
+                case MP ->
+                        beatmapId = OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                case MEMORY -> {
+                }
             }
             if (scoreId == null) {
                 if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
@@ -441,8 +448,10 @@ public final class ScoreCommandHandler {
                     long uid = OstellaApi.resolveUid(player);
                     scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
                 }
-                case MP -> beatmapId = OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
-                case MEMORY -> {}
+                case MP ->
+                        beatmapId = OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                case MEMORY -> {
+                }
             }
             if (scoreId == null) {
                 if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
@@ -482,6 +491,66 @@ public final class ScoreCommandHandler {
         return resolver.parsePositiveInt(value);
     }
 
+    public void handleSnapshot(Context ctx) {
+        if (ctx.argumentCount() == 0) {
+            ctx.sendReply(at(ctx) + CommandUsage.SNAP);
+            return;
+        }
+        var target = SnapshotSelection.looksLikeSelector(ctx.argument(0))
+                ? TargetInput.memory() : TargetInput.read(ctx.args());
+        var remembered = history.get(ctx);
+        int selectorIndex = target.consumedArgs();
+        if ((target.kind() == TargetInput.Kind.MEMORY && remembered == null)
+                || ctx.argumentCount() < selectorIndex + 1 || ctx.argumentCount() > selectorIndex + 2) {
+            ctx.sendReply(at(ctx) + CommandUsage.SNAP);
+            return;
+        }
+        final SnapshotSelection selection;
+        try {
+            selection = SnapshotSelection.parse(ctx.argument(selectorIndex),
+                    ctx.argumentCount() == selectorIndex + 2 ? ctx.argument(selectorIndex + 1) : null);
+        } catch (IllegalArgumentException e) {
+            ctx.sendReply(at(ctx) + e.getMessage() + "\n" + CommandUsage.SNAP);
+            return;
+        }
+        try (var _ = taskCoordinator.beginRequest(ctx, "Replay Snapshot")) {
+            var previous = target.kind() == TargetInput.Kind.MEMORY ? remembered : null;
+            Long beatmapId = previous == null ? null : previous.beatmapId();
+            Long beatmapsetId = previous == null ? null : previous.beatmapsetId();
+            String scoreId = previous == null ? null : previous.scoreId();
+            switch (target.kind()) {
+                case ID, SCORE -> scoreId = target.id();
+                case MAP -> beatmapId = Long.parseLong(target.id());
+                case SET -> {
+                    beatmapsetId = Long.parseLong(target.id());
+                    String player = resolver.player(target.player(), ctx.senderUserId());
+                    long uid = OstellaApi.resolveUid(player);
+                    scoreId = OstellaApi.lookupBeatmapsetScore(beatmapsetId, target.index(), uid, List.of(), null);
+                }
+                case RS, RP, BP -> {
+                    String player = resolver.player(target.player(), ctx.senderUserId());
+                    long uid = OstellaApi.resolveUid(player);
+                    scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
+                }
+                case MP ->
+                        beatmapId = OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
+                case MEMORY -> {
+                }
+            }
+            if (scoreId == null) {
+                if (beatmapId == null) throw new ResolutionException("请指定指令目标成绩喵");
+                String player = resolver.player(target.player(), ctx.senderUserId());
+                long uid = OstellaApi.resolveUid(player);
+                scoreId = OstellaApi.lookupBeatmapScore(beatmapId, uid, List.of(), null);
+            }
+            var response = OstellaApi.getReplaySnapshotResponse(scoreId, selection);
+            if (response.getBeatmapId() != null) beatmapId = Long.parseLong(response.getBeatmapId());
+            history.remember(ctx, beatmapsetId, beatmapId, scoreId);
+            ctx.sendReply(taskCoordinator.imageMessage(response,
+                    replyFactory.snapshotImageMessage(ctx, scoreId, selection.label())));
+        }
+    }
+
     private ScoreListRequest parseScoreListRequest(Context ctx, String usage) {
         String[] args = ctx.args();
         ScoreListRange range = parseScoreListRange(args[0]);
@@ -508,7 +577,8 @@ public final class ScoreCommandHandler {
         return new ScoreListRequest(range, player, filters);
     }
 
-    private record ScoreListRequest(ScoreListRange range, String player, ScoreFilterArguments.ParseResult filters) {}
+    private record ScoreListRequest(ScoreListRange range, String player, ScoreFilterArguments.ParseResult filters) {
+    }
 
     record TbArguments(int days, String target) {
     }

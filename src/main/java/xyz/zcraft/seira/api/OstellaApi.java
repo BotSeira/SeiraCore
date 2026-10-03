@@ -11,6 +11,7 @@ import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.command.ResolutionException;
+import xyz.zcraft.seira.command.parse.SnapshotSelection;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
 import java.io.IOException;
@@ -342,6 +343,10 @@ public class OstellaApi {
 
     public static Response<Base64Bytes> getMissVisualizeResponse(String scoreId, int index) {
         return getBase64BytesResponse("/scores/" + scoreId + "/misses/" + index + "/visualize", "获取Miss可视化失败", null);
+    }
+
+    public static Response<Base64Bytes> getReplaySnapshotResponse(String scoreId, SnapshotSelection selection) {
+        return getBase64BytesResponse("/scores/" + scoreId + "/snapshot?" + selection.queryString(), "获取回放快照失败", null);
     }
 
     private static Response<Base64Bytes> getBase64BytesResponse(String query, String failMessage, @Nullable String postBody) {
@@ -1034,9 +1039,22 @@ public class OstellaApi {
     }
 
     public static List<User> getUsers(List<Long> u) {
+        return getUsers(u, Duration.ofMinutes(5));
+    }
+
+    /**
+     * Bounded background sampling; a failed refresh must not hang indefinitely.
+     */
+    public static List<User> getWhatIfUsers(List<Long> u) {
+        return getUsers(u, Duration.ofSeconds(30));
+    }
+
+    private static List<User> getUsers(List<Long> u, Duration timeout) {
         try {
             HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/users"))
+                    .timeout(timeout)
+                    .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(GSON.toJsonTree(Map.of("ids", u)).toString()))
                     .build();
 

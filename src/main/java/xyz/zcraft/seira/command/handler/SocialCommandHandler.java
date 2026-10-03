@@ -295,7 +295,7 @@ public final class SocialCommandHandler {
                     return;
                 }
                 for (String token : uidTokens) {
-                    Long uid = resolver.parsePositiveLong(token.trim());
+                    Long uid = Resolver.parsePositiveLong(token.trim());
                     if (uid == null) {
                         ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "玩家ID列表包含非法值。"));
                         return;

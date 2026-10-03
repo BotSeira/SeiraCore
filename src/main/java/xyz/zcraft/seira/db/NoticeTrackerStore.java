@@ -51,10 +51,10 @@ public class NoticeTrackerStore {
         SqliteDatabase.ensureInitialized();
 
         String sql = """
-            SELECT last_notified_id, last_notified_at
-            FROM group_notice_tracker
-            WHERE group_id = ?
-            """;
+                SELECT last_notified_id, last_notified_at
+                FROM group_notice_tracker
+                WHERE group_id = ?
+                """;
 
         try (Connection connection = SqliteDatabase.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {

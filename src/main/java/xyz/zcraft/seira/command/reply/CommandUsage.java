@@ -1,6 +1,8 @@
 package xyz.zcraft.seira.command.reply;
 
 public final class CommandUsage {
+    public static final String ADDPP = "用法：/addpp <PP或PP*条数>，或 /addpp m谱面ID [Mod] <ACC或判定数量> [Combo/FC]；例：/addpp 200*4、/addpp m1234567 HDDT 97.41% 13miss 18ok 1200x。条件顺序不限；有 Miss 时需提供 Combo。";
+    public static final String WHATIF = "用法：/whatif <总PPpp 或 #排名>；如 /whatif 12345pp、/whatif #12345。纯数字按排名解析。";
     public static final String BP = "用法：/bp <个数或范围> [玩家ID/用户名/@用户] [过滤条件 ...]";
     public static final String NO_BIND = "你还没有绑定玩家ID，请先使用 /bind 绑定喵";
     public static final String REBIND = "由于发生了一个技术问题，使用此功能需要重新绑定。请使用 `/unbind` 解除绑定，再使用 `/bind` 重新绑定~";
@@ -17,6 +19,7 @@ public final class CommandUsage {
     public static final String SM = "用法：/sm [谱面ID 或 快捷查询] [@玩家] [+Mod]（省略目标时使用记忆，省略玩家时使用自己的绑定账号）";
     public static final String SA = "用法：/sa <成绩ID 或 快捷查询>";
     public static final String MA = "用法：/ma [成绩ID 或 快捷查询] [序号]；省略目标并指定序号时请使用 #序号";
+    public static final String SNAP = "用法：/snap [成绩ID 或 快捷查询] <mm:ss.fff / 秒数s / 毫秒数ms / obj物件序号 / #Miss序号> [±偏移ms]；省略成绩时使用最近目标。例：/snap rp1 01:23.456、/snap obj123、/snap #3 -50ms。";
     public static final String R = "用法：/r [成绩ID 或 快捷查询] [[mm:ss]-[mm:ss]]";
     public static final String RSC = "用法：/rsc [谱面ID或快捷查询] [+/=用户ID列表，逗号分隔]";
     public static final String F = "用法：/f [@用户]";

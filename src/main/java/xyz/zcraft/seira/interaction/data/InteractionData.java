@@ -10,5 +10,6 @@ public record InteractionData(
             @SerializedName("button_data") String buttonData,
             @SerializedName("button_id") String buttonId,
             @SerializedName("message_id") String messageId
-    ){}
+    ) {
+    }
 }

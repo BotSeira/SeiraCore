@@ -83,12 +83,14 @@ public record RomAIMatch(
         Integer customELO
 ) {
 
-    public record Teams(List<String> teamA, List<String> teamB){}
+    public record Teams(List<String> teamA, List<String> teamB) {
+    }
 
     public record PlayerData(
             String osuUserName,
             Long osuUserId,
             Map<String, Integer> elo,
             String country
-    ){}
+    ) {
+    }
 }

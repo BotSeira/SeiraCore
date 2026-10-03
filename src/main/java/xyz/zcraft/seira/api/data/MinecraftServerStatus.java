@@ -16,7 +16,8 @@ public record MinecraftServerStatus(
             String description,
             JsonElement descriptionRaw,
             String favicon
-    ){}
+    ) {
+    }
 
     public record Version(
             String name,

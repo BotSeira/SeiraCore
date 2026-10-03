@@ -10,8 +10,6 @@ public record TargetInput(Kind kind, String id, long index, String player, int c
     private static final Pattern PLAYER_SCORE = Pattern.compile("(?i)^(rs|rp|bp)(\\d+)?$");
     private static final Pattern SET = Pattern.compile("^(\\d+)#(\\d+)$");
 
-    public enum Kind { MEMORY, ID, MAP, SET, SCORE, RS, RP, BP, MP }
-
     public static TargetInput memory() {
         return new TargetInput(Kind.MEMORY, null, 1, null, 0);
     }
@@ -46,10 +44,6 @@ public record TargetInput(Kind kind, String id, long index, String player, int c
         return new TargetInput(Kind.ID, Long.toString(id), 1, null, consumed);
     }
 
-    public String scoreList() {
-        return kind.name().toLowerCase(Locale.ROOT);
-    }
-
     private static long positive(String value, String message) {
         try {
             long id = Long.parseLong(value);
@@ -58,4 +52,10 @@ public record TargetInput(Kind kind, String id, long index, String player, int c
         }
         throw new ResolutionException(message);
     }
+
+    public String scoreList() {
+        return kind.name().toLowerCase(Locale.ROOT);
+    }
+
+    public enum Kind {MEMORY, ID, MAP, SET, SCORE, RS, RP, BP, MP}
 }

@@ -7,6 +7,9 @@ import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.ai.provider.ChatProvider;
 import xyz.zcraft.seira.ai.provider.ChatProviders;
 import xyz.zcraft.seira.bot.data.*;
+import xyz.zcraft.seira.challenge.ChallengeService;
+import xyz.zcraft.seira.challenge.OstellaChallengeApi;
+import xyz.zcraft.seira.challenge.SqliteChallengeStore;
 import xyz.zcraft.seira.command.AttachmentHandler;
 import xyz.zcraft.seira.command.route.Router;
 import xyz.zcraft.seira.config.AppConfig;
@@ -14,6 +17,7 @@ import xyz.zcraft.seira.config.RuntimeConfig;
 import xyz.zcraft.seira.console.ConsoleCommandProcessor;
 import xyz.zcraft.seira.console.ConsoleRuntimeControl;
 import xyz.zcraft.seira.console.OstellaCacheControlClient;
+import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.discord.DiscordBridgeService;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
 import xyz.zcraft.seira.services.BindingService;
@@ -84,13 +88,21 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         this.discordBridgeService = new DiscordBridgeService(config.discord(), config.bridge(), sender);
 
         LOG.info("Initializing score watch service");
+        ScoreWatchApi scoreWatchApi = new ScoreWatchApi(config.ostella().endpoint(), config.ostella().token());
         this.watchService = new ScoreWatchService(
-                new ScoreWatchApi(config.ostella().endpoint(), config.ostella().token()),
+                scoreWatchApi,
                 new WatchScoreNotifier(sender),
                 new SpecificScoreNotifier(sender),
                 new SqliteSpecificScoreWatchStore(),
                 Duration.ofMinutes(config.seira().effectiveWatchIntervalMinutes())
         );
+        ChallengeService challengeService = new ChallengeService(
+                new OstellaChallengeApi(config.ostella().endpoint(), config.ostella().token()),
+                new SqliteChallengeStore(), scoreWatchApi,
+                (group, openId, uid) -> UserDataStore.isGroupMember(group, openId)
+                        && java.util.Objects.equals(UserDataStore.findBoundUid(openId), uid),
+                (group, message) -> sender.sendGroupMarkdown(group, message) != null);
+        watchService.addListener(challengeService);
 
         LOG.info("Initializing multiplayer room watch service");
         this.mpWatchService = new MPWatchService(
@@ -113,6 +125,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                 admins,
                 bindingService,
                 watchService,
+                challengeService,
                 mpWatchService,
                 discordBridgeService,
                 rankGuessGameService,

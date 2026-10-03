@@ -12,6 +12,7 @@ public enum InteractionResponse {
 
     @Getter
     private final int code;
+
     InteractionResponse(int code) {
         this.code = code;
     }
