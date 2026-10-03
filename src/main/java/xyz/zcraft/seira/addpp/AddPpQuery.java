@@ -13,7 +13,7 @@ public record AddPpQuery(Double pp, Integer count, Long beatmapId, List<String> 
 
     public static AddPpQuery parse(String[] args) {
         if (args == null || args.length == 0)
-            throw new IllegalArgumentException("请提供单条成绩的 PP，或 m谱面ID 与成绩条件喵。");
+            throw new IllegalArgumentException("请提供单条成绩的 PP，或 m谱面ID/rs/bp/rp[N] 与成绩条件喵。");
         if (args[0].matches("(?i)m\\d+")) {
             long id;
             try {
@@ -27,7 +27,7 @@ public record AddPpQuery(Double pp, Integer count, Long beatmapId, List<String> 
         }
         var matcher = PP.matcher(String.join(" ", args));
         if (!matcher.matches())
-            throw new IllegalArgumentException("无法解析参数。请使用 123、200*4，或 m谱面ID 后接成绩条件喵。");
+            throw new IllegalArgumentException("无法解析参数。请使用 123、200*4，或 m谱面ID/rs/bp/rp[N] 后接成绩条件喵。");
         try {
             double pp = Double.parseDouble(matcher.group(1));
             int count = matcher.group(2) == null ? 1 : Integer.parseInt(matcher.group(2));

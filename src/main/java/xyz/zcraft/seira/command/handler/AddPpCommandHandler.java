@@ -9,6 +9,7 @@ import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.whatif.WhatIfService;
 
 import java.util.Locale;
+import java.util.List;
 import java.util.function.Function;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
@@ -85,7 +86,11 @@ public final class AddPpCommandHandler {
                 ctx.sendReply(at(ctx) + CommandUsage.NO_BIND);
                 return;
             }
-            var result = api.estimate(uid, request.query());
+            var query = request.resolveQuery(shortcut -> {
+                String scoreId = OstellaApi.lookupPlayerScore(uid, shortcut.scoreList(), shortcut.index(), List.of(), null);
+                return OstellaApi.getScoreBeatmapId(scoreId);
+            });
+            var result = api.estimate(uid, query);
             String target = request.player() == null ? "" : "目标玩家：" + uid + "\n";
             ctx.sendReply(at(ctx) + target + format(result, ranks.current()));
         } catch (IllegalArgumentException e) {

@@ -51,7 +51,7 @@ public final class ReplayCommandHandler {
 
     public void handleR(Context ctx) {
         var target = ctx.argumentCount() == 0 || TimeDurationParser.isTimeRange(ctx.argument(0))
-                ? TargetInput.memory() : TargetInput.read(ctx.args());
+                ? TargetInput.memory() : TargetInput.readScoreTarget(ctx.args());
         var remembered = history.get(ctx);
         if ((target.kind() == TargetInput.Kind.MEMORY && remembered == null)
                 || ctx.argumentCount() - target.consumedArgs() > 1) {

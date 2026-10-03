@@ -15,8 +15,18 @@ public record TargetInput(Kind kind, String id, long index, String player, int c
     }
 
     public static TargetInput read(String[] args) {
+        return read(args, false);
+    }
+
+    /** Score commands can select a player's score on an explicit beatmap. */
+    public static TargetInput readScoreTarget(String[] args) {
+        return read(args, true);
+    }
+
+    private static TargetInput read(String[] args, boolean scoreTarget) {
         if (args.length == 0) return memory();
-        int consumed = args.length >= 2 && PLAYER_SCORE.matcher(args[1]).matches() ? 2 : 1;
+        int consumed = args.length >= 2 && (PLAYER_SCORE.matcher(args[1]).matches()
+                || (scoreTarget && args[1].matches("(?i)m\\d+"))) ? 2 : 1;
         String player = consumed == 2 ? args[0] : null;
         String value = args[consumed - 1].trim().toLowerCase(Locale.ROOT);
         if (value.equals("rbp")) {
@@ -38,7 +48,7 @@ public record TargetInput(Kind kind, String id, long index, String player, int c
         if (value.matches("loc[1-9]\\d*")) return new TargetInput(Kind.SCORE, value, 1, null, consumed);
         if (value.matches("m\\d+")) {
             long id = positive(value.substring(1), "谱面ID无效");
-            return new TargetInput(Kind.MAP, Long.toString(id), 1, null, consumed);
+            return new TargetInput(Kind.MAP, Long.toString(id), 1, player, consumed);
         }
         long id = positive(value, "参数无效。请输入数字ID、本地成绩ID或快捷指令 (例如 loc123456789, rp1, 12345#2)。");
         return new TargetInput(Kind.ID, Long.toString(id), 1, null, consumed);

@@ -821,6 +821,7 @@ public final class ReplyFactory {
                     > /whatif 12345pp -> 估算总 PP 对应的全球排名
                     > /addpp [user] 200*4 -> 估算新增4条200pp成绩后的总 PP 与排名
                     > /addpp [user] m1234567 HDDT 98% FC -> 估算指定谱面成绩加入 BP 后的变化
+                    > /addpp [user] rp2 HD 98% -> 用第2条最近通过成绩的谱面估算 PP
                     > /snap rp1 01:23.456 -> 最近通过成绩在指定歌曲时间的快照
                     > /snap #3 -50ms -> 最近查询成绩的第3个Miss前50ms的快照
                     > /whatif #12345 -> 估算全球排名所需的总 PP（纯数字也按排名解析）

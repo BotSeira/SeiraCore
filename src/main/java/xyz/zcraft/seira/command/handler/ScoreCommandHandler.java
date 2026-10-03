@@ -225,7 +225,7 @@ public final class ScoreCommandHandler {
         if (playerOnly || ctx.argumentCount() == 0 || ctx.argument(0).startsWith("+")) {
             target = TargetInput.memory();
         } else {
-            target = TargetInput.read(ctx.args());
+            target = TargetInput.readScoreTarget(ctx.args());
         }
         optionIndex = target.consumedArgs();
         if (optionIndex < ctx.argumentCount() && !ctx.argument(optionIndex).startsWith("+")) {
@@ -283,7 +283,7 @@ public final class ScoreCommandHandler {
             }
             if (scoreId == null) {
                 if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
-                String player = userOverride == null ? resolver.player(null, ctx.senderUserId()) : userOverride;
+                String player = userOverride == null ? resolver.player(target.player(), ctx.senderUserId()) : userOverride;
                 long uid = OstellaApi.resolveUid(player);
                 scoreId = OstellaApi.lookupBeatmapScore(beatmapId, uid, filters, mod);
             }
@@ -371,7 +371,7 @@ public final class ScoreCommandHandler {
 
     public void handleSa(Context ctx) {
         var target = ctx.argumentCount() == 0
-                ? TargetInput.memory() : TargetInput.read(ctx.args());
+                ? TargetInput.memory() : TargetInput.readScoreTarget(ctx.args());
         var remembered = history.get(ctx);
         if ((target.kind() == TargetInput.Kind.MEMORY && remembered == null)
                 || ctx.argumentCount() - target.consumedArgs() > 0) {
@@ -416,7 +416,7 @@ public final class ScoreCommandHandler {
 
     public void handleMa(Context ctx) {
         var target = ctx.argumentCount() == 0 || ctx.argument(0).startsWith("#")
-                ? TargetInput.memory() : TargetInput.read(ctx.args());
+                ? TargetInput.memory() : TargetInput.readScoreTarget(ctx.args());
         var remembered = history.get(ctx);
         if ((target.kind() == TargetInput.Kind.MEMORY && remembered == null)
                 || ctx.argumentCount() - target.consumedArgs() > 1) {
@@ -497,7 +497,7 @@ public final class ScoreCommandHandler {
             return;
         }
         var target = SnapshotSelection.looksLikeSelector(ctx.argument(0))
-                ? TargetInput.memory() : TargetInput.read(ctx.args());
+                ? TargetInput.memory() : TargetInput.readScoreTarget(ctx.args());
         var remembered = history.get(ctx);
         int selectorIndex = target.consumedArgs();
         if ((target.kind() == TargetInput.Kind.MEMORY && remembered == null)
