@@ -1,7 +1,7 @@
 package xyz.zcraft.seira.command.reply;
 
 public final class CommandUsage {
-    public static final String ADDPP = "用法：/addpp <PP或PP*条数>，或 /addpp m谱面ID [Mod] <ACC或判定数量> [Combo/FC]；例：/addpp 200*4、/addpp m1234567 HDDT 97.41% 13miss 18ok 1200x。条件顺序不限；有 Miss 时需提供 Combo。";
+    public static final String ADDPP = "用法：/addpp [user] <PP或PP*条数>，或 /addpp [user] m谱面ID [Mod/ACC/判定数量/Combo/FC...]；例：/addpp 200*4、/addpp 用户名 200*4、/addpp 用户名 m1234567 HD 98% FC。user 支持 UID、用户名或 @用户，含空格用户名用双引号包裹；目标须放在成绩参数前；省略时使用自己的绑定账号。条件可省略、顺序不限；未提供的值由 rosu-pp 处理。";
     public static final String WHATIF = "用法：/whatif <总PPpp 或 #排名>；如 /whatif 12345pp、/whatif #12345。纯数字按排名解析。";
     public static final String BP = "用法：/bp <个数或范围> [玩家ID/用户名/@用户] [过滤条件 ...]";
     public static final String NO_BIND = "你还没有绑定玩家ID，请先使用 /bind 绑定喵";

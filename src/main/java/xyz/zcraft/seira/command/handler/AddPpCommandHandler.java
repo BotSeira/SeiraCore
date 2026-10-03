@@ -1,8 +1,10 @@
 package xyz.zcraft.seira.command.handler;
 
 import xyz.zcraft.seira.addpp.AddPpApi;
-import xyz.zcraft.seira.addpp.AddPpQuery;
+import xyz.zcraft.seira.addpp.AddPpRequest;
+import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.command.Context;
+import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.whatif.WhatIfService;
 
@@ -76,16 +78,18 @@ public final class AddPpCommandHandler {
 
     public void handleAddPp(Context ctx) {
         try {
-            var query = AddPpQuery.parse(ctx.args());
-            Long uid = binding.apply(ctx.senderUserId());
+            var request = AddPpRequest.parse(ctx.args());
+            Long uid = request.player() == null ? binding.apply(ctx.senderUserId())
+                    : OstellaApi.resolveUid(new Resolver(binding).player(request.player(), ctx.senderUserId()));
             if (uid == null || uid <= 0) {
                 ctx.sendReply(at(ctx) + CommandUsage.NO_BIND);
                 return;
             }
-            var result = api.estimate(uid, query);
-            ctx.sendReply(at(ctx) + format(result, ranks.current()));
+            var result = api.estimate(uid, request.query());
+            String target = request.player() == null ? "" : "目标玩家：" + uid + "\n";
+            ctx.sendReply(at(ctx) + target + format(result, ranks.current()));
         } catch (IllegalArgumentException e) {
-            ctx.sendReply(at(ctx) + e.getMessage() + "/n> " + CommandUsage.ADDPP);
+            ctx.sendReply(at(ctx) + e.getMessage() + "\n> " + CommandUsage.ADDPP);
         }
     }
 }

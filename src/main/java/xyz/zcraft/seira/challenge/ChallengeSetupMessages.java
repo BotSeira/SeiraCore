@@ -81,6 +81,10 @@ public final class ChallengeSetupMessages {
         return Button.command(id, label, command).permit(user);
     }
 
+    private static Button button(int id, String label, String command, List<String> user) {
+        return Button.command(id, label, command).permit(user);
+    }
+
     private static Button input(int id, String label, String command, String user) {
         Button button = button(id, label, command, user);
         button.getAction().setEnter(false);

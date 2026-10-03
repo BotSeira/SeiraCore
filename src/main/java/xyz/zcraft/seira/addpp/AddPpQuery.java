@@ -22,8 +22,6 @@ public record AddPpQuery(Double pp, Integer count, Long beatmapId, List<String> 
                 throw new IllegalArgumentException("无法解析谱面 ID 喵。");
             }
             if (id <= 0) throw new IllegalArgumentException("谱面 ID 必须为正整数喵。");
-            if (args.length < 2)
-                throw new IllegalArgumentException("条件不足：请提供 ACC 或判定数量，例如 /addpp m" + id + " 98% FC喵。");
             if (args.length > 21) throw new IllegalArgumentException("成绩条件过多喵。");
             return new AddPpQuery(null, 1, id, Arrays.asList(args).subList(1, args.length));
         }

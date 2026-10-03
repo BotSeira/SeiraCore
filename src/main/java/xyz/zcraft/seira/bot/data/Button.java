@@ -97,6 +97,14 @@ public class Button {
         return this;
     }
 
+    public Button permit(List<String> userId) {
+        Action.Permission permission = new Action.Permission();
+        permission.setType(0);
+        permission.setSpecifyUserIds(userId);
+        this.getAction().setPermission(permission);
+        return this;
+    }
+
     public Button modal(String content) {
         if (content != null && !content.isBlank()) {
             if (this.getAction() != null) {
