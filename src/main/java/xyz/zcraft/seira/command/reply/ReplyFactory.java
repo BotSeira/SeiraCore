@@ -428,8 +428,8 @@ public final class ReplyFactory {
     }
 
     public PendingMessage snapshotImageMessage(Context ctx, String scoreId, String position) {
-        return PendingMessage.ofMarkdownRaw(at(ctx) + "回放快照：" + position + "\n成绩 " + scoreId
-                + " · WhiteCat 2.1\n" + cmd("/ma " + scoreId, "查看 Miss 列表"));
+        return PendingMessage.ofMarkdownRaw(at(ctx) + "> 回放快照：" + position + "\n> 成绩 " + scoreId
+                + "\n> " + cmd("/ma " + scoreId, "查看 Miss 列表"));
     }
 
     public PendingMessage statusMessage(Context ctx, OstellaApi.ServerStatus status, AsteroidApi.ServerStatus asteroid) {
