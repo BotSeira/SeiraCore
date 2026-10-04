@@ -2,24 +2,24 @@ package xyz.zcraft.seira.challenge;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.seira.watch.RecentScore;
-import xyz.zcraft.seira.watch.RecentScoreListener;
-import xyz.zcraft.seira.watch.ScoreWatchApi;
 
 import java.time.Clock;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static xyz.zcraft.seira.challenge.ChallengeModels.*;
 
-public final class ChallengeService implements RecentScoreListener {
+public final class ChallengeService implements AutoCloseable {
     public static final int DEFAULT_HOURS = 24;
     public static final int MAX_HOURS = 168;
     public static final int MAX_PARTICIPANTS = 100;
     private static final Logger LOG = LogManager.getLogger(ChallengeService.class);
     private final ChallengeApi api;
     private final ChallengeStore store;
-    private final ScoreWatchApi watchApi;
     private final Eligibility eligibility;
     private final Notifier notifier;
     private final Clock clock;
@@ -27,22 +27,28 @@ public final class ChallengeService implements RecentScoreListener {
     private final Map<String, String> latestByGroup = new HashMap<>();
     private final Map<String, Draft> drafts = new HashMap<>();
     private final List<Long> randomPool;
+    private final ScheduledExecutorService scheduler =
+            Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread thread = new Thread(r, "challenge-settlement");
+                thread.setDaemon(true);
+                return thread;
+            });
+    private final AtomicBoolean started = new AtomicBoolean();
 
-    public ChallengeService(ChallengeApi api, ChallengeStore store, ScoreWatchApi watchApi,
+    public ChallengeService(ChallengeApi api, ChallengeStore store,
                             Eligibility eligibility, Notifier notifier) {
-        this(api, store, watchApi, eligibility, notifier, Clock.systemUTC());
+        this(api, store, eligibility, notifier, Clock.systemUTC());
     }
 
-    public ChallengeService(ChallengeApi api, ChallengeStore store, ScoreWatchApi watchApi,
+    public ChallengeService(ChallengeApi api, ChallengeStore store,
                             Eligibility eligibility, Notifier notifier, Clock clock) {
-        this(api, store, watchApi, eligibility, notifier, clock, loadRandomPool());
+        this(api, store, eligibility, notifier, clock, loadRandomPool());
     }
 
-    public ChallengeService(ChallengeApi api, ChallengeStore store, ScoreWatchApi watchApi,
+    public ChallengeService(ChallengeApi api, ChallengeStore store,
                             Eligibility eligibility, Notifier notifier, Clock clock, List<Long> randomPool) {
         this.api = Objects.requireNonNull(api);
         this.store = Objects.requireNonNull(store);
-        this.watchApi = Objects.requireNonNull(watchApi);
         this.eligibility = Objects.requireNonNull(eligibility);
         this.notifier = Objects.requireNonNull(notifier);
         this.clock = Objects.requireNonNull(clock);
@@ -286,9 +292,6 @@ public final class ChallengeService implements RecentScoreListener {
                 : new SkillData(Long.toString(uid), 0, 0);
         if (before.rules().skillAdjustment() && (!Double.isFinite(skill.stars()) || skill.stars() <= 0 || skill.samples() < 5))
             throw new IllegalArgumentException("有效 BP 不足，暂时无法估计水平喵。");
-        var baseline = watchApi.getRecentScores(List.of(uid), 1);
-        if (!baseline.containsKey(uid)) throw new IllegalStateException("无法获取参赛账号的最近成绩喵。");
-        Long cursor = baseline.get(uid).stream().findFirst().map(RecentScore::scoreId).orElse(null);
         synchronized (this) {
             Round current = requireActive(groupId);
             if (!current.id().equals(before.id())) throw new IllegalStateException("挑战已更换，请重新加入喵。");
@@ -298,7 +301,7 @@ public final class ChallengeService implements RecentScoreListener {
             if (existing != null) return existing;
             if (current.participants().size() >= MAX_PARTICIPANTS)
                 throw new IllegalArgumentException("本次挑战人数已满喵。");
-            var participant = new Participant(openId, uid, skill.username(), skill.stars(), skill.samples(), clock.millis(), cursor, null);
+            var participant = new Participant(openId, uid, skill.username(), skill.stars(), skill.samples(), clock.millis(), null, null);
             updateParticipant(current, participant);
             return participant;
         }
@@ -319,13 +322,13 @@ public final class ChallengeService implements RecentScoreListener {
         synchronized (this) {
             Round round = requireRound(groupId);
             requireParticipant(round, openId, uid);
-            if (round.finished()) throw new IllegalArgumentException("本次挑战已经结束喵。");
+            if (round.finished() || clock.millis() >= round.endsAt()) throw new IllegalArgumentException("本次挑战已经结束喵。");
             roundId = round.id();
         }
         ScoreData score = api.getScore(scoreId);
         synchronized (this) {
             Round round = requireRound(groupId);
-            if (!round.id().equals(roundId) || round.finished())
+            if (!round.id().equals(roundId) || round.finished() || clock.millis() >= round.endsAt())
                 throw new IllegalArgumentException("本次挑战已经结束或更换。");
             Participant participant = requireParticipant(round, openId, uid);
             String rejection = validate(round, participant, score);
@@ -340,11 +343,12 @@ public final class ChallengeService implements RecentScoreListener {
         if (!round.creator().equals(sender) && !admin)
             throw new IllegalArgumentException("只有挑战发起者或机器人管理员可以结束挑战喵。");
         if (round.finished()) throw new IllegalArgumentException("本次挑战已经结束喵。");
-        // Finalize after one last shared poll so plays completed before the cutoff are collected.
+        // Settle only results already collected by queries or explicit submissions.
         Round stopped = new Round(round.id(), groupId, round.creator(), round.beatmapset(), round.startedAt(),
-                Math.min(clock.millis(), round.endsAt()), false, false, round.participants(), round.settings());
+                Math.min(clock.millis(), round.endsAt()), true, false, round.participants(), round.settings());
         persist(stopped);
-        return stopped;
+        announce(stopped.id());
+        return rounds.get(stopped.id());
     }
 
     public synchronized Round get(String groupId) {
@@ -355,71 +359,55 @@ public final class ChallengeService implements RecentScoreListener {
         return clock.millis();
     }
 
-    @Override
-    public synchronized Collection<Long> watchedUserIds() {
-        Set<Long> ids = new LinkedHashSet<>();
-        rounds.values().stream().filter(round -> !round.finished()).forEach(round -> round.participants().values().stream()
-                .filter(p -> eligibility.eligible(round.groupId(), p.openId(), p.userId())).forEach(p -> ids.add(p.userId())));
-        return Set.copyOf(ids);
+    public void start() {
+        if (started.compareAndSet(false, true)) scheduler.scheduleWithFixedDelay(() -> {
+            try {
+                settleExpired();
+            } catch (RuntimeException e) {
+                LOG.warn("Failed to settle challenges", e);
+            }
+        }, 0, 30, TimeUnit.SECONDS);
     }
 
     @Override
-    public void acceptRecentScores(Map<Long, List<RecentScore>> scores) {
-        List<Round> snapshot;
-        synchronized (this) {
-            snapshot = List.copyOf(rounds.values());
-        }
-        Map<Long, ScoreData> details = new HashMap<>();
-        for (Round round : snapshot) {
-            if (round.finished()) {
-                announce(round.id());
-                continue;
-            }
-            boolean complete = true;
-            for (Participant participant : round.participants().values()) {
-                if (!eligibility.eligible(round.groupId(), participant.openId(), participant.userId())) continue;
-                if (!scores.containsKey(participant.userId())) {
-                    complete = false;
-                    continue;
-                }
-                List<RecentScore> recent = scores.get(participant.userId());
-                int cursor = -1;
-                if (participant.lastScoreId() != null)
-                    for (int i = 0; i < recent.size(); i++)
-                        if (recent.get(i).scoreId() == participant.lastScoreId()) {
-                            cursor = i;
-                            break;
-                        }
-                List<RecentScore> unseen = cursor < 0 ? recent : recent.subList(0, cursor);
-                for (RecentScore item : unseen.reversed()) {
-                    try {
-                        ScoreData detail = item.beatmapsetId() == round.beatmapset().id()
-                                ? details.computeIfAbsent(item.scoreId(), api::getScore) : null;
-                        synchronized (this) {
-                            Round current = rounds.get(round.id());
-                            if (current.finished()) break;
-                            Participant member = current.participants().get(participant.userId());
-                            if (!eligibility.eligible(current.groupId(), member.openId(), member.userId())) break;
-                            if (detail != null && validate(current, member, detail) == null)
-                                recordResult(current, member, detail, item.scoreId());
-                            else
-                                updateParticipant(current, new Participant(member.openId(), member.userId(), member.username(),
-                                        member.skillStars(), member.skillSamples(), member.joinedAt(), item.scoreId(), member.best()));
-                        }
-                    } catch (RuntimeException e) {
-                        complete = false;
-                        LOG.warn("Failed to collect challenge score {} for group {}", item.scoreId(), round.groupId(), e);
-                        break;
-                    }
-                }
-            }
-            synchronized (this) {
-                Round current = rounds.get(round.id());
-                // A concurrent join must receive a poll before finalisation too.
-                if (complete && current.participants().keySet().equals(round.participants().keySet())
-                        && clock.millis() >= current.endsAt()) persist(current.finish());
-            }
+    public void close() {
+        scheduler.shutdownNow();
+    }
+
+    public synchronized void settleExpired() {
+        for (Round round : List.copyOf(rounds.values())) {
+            if (!round.finished() && clock.millis() >= round.endsAt()) persist(round.finish());
             announce(round.id());
+        }
+    }
+
+    /** Only scores actually returned by a query in this group may enter its challenge. */
+    public void acceptQueriedScores(String groupId, Collection<Long> scoreIds) {
+        if (groupId == null || groupId.isBlank() || scoreIds.isEmpty()) return;
+        String roundId;
+        synchronized (this) {
+            Round round = get(groupId);
+            if (round == null || round.finished() || clock.millis() >= round.endsAt()
+                    || round.participants().values().stream().noneMatch(p ->
+                    eligibility.eligible(groupId, p.openId(), p.userId()))) return;
+            roundId = round.id();
+        }
+        for (long scoreId : new LinkedHashSet<>(scoreIds)) {
+            if (scoreId <= 0) continue;
+            try {
+                ScoreData score = api.getScore(scoreId);
+                synchronized (this) {
+                    Round current = get(groupId);
+                    if (current == null || !current.id().equals(roundId) || current.finished()
+                            || clock.millis() >= current.endsAt()) return;
+                    Participant member = current.participants().get(score.userId());
+                    if (member != null && eligibility.eligible(groupId, member.openId(), member.userId())
+                            && validate(current, member, score) == null)
+                        recordResult(current, member, score, member.lastScoreId());
+                }
+            } catch (RuntimeException e) {
+                LOG.warn("Failed to collect queried challenge score {} for group {}", scoreId, groupId, e);
+            }
         }
     }
 

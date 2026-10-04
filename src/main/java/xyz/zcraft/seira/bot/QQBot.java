@@ -48,6 +48,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
     @Getter
     private final MessageSender sender;
     private final ScoreWatchService watchService;
+    private final ChallengeService challengeService;
     private final MPWatchService mpWatchService;
     private final RankGuessGameService rankGuessGameService;
     private final ChatProvider chatProvider;
@@ -96,13 +97,12 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                 new SqliteSpecificScoreWatchStore(),
                 Duration.ofMinutes(config.seira().effectiveWatchIntervalMinutes())
         );
-        ChallengeService challengeService = new ChallengeService(
+        this.challengeService = new ChallengeService(
                 new OstellaChallengeApi(config.ostella().endpoint(), config.ostella().token()),
-                new SqliteChallengeStore(), scoreWatchApi,
+                new SqliteChallengeStore(),
                 (group, openId, uid) -> UserDataStore.isGroupMember(group, openId)
                         && java.util.Objects.equals(UserDataStore.findBoundUid(openId), uid),
                 (group, message) -> sender.sendGroupMarkdown(group, message) != null);
-        watchService.addListener(challengeService);
 
         LOG.info("Initializing multiplayer room watch service");
         this.mpWatchService = new MPWatchService(
@@ -156,6 +156,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         runnerThread = Thread.currentThread();
         tokenManager.start();
         watchService.start();
+        challengeService.start();
         mpWatchService.start();
         discordBridgeService.start();
         LOG.info("Starting bot connection loop...");
@@ -253,6 +254,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
             thread.interrupt();
         }
         watchService.close();
+        challengeService.close();
         mpWatchService.close();
         discordBridgeService.close();
         tokenManager.close();

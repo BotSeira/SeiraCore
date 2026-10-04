@@ -8,10 +8,10 @@ import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.Response;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
-import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.parse.TargetInput;
+import xyz.zcraft.seira.command.parse.TargetResolver;
 import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.db.UserDataStore;
@@ -26,10 +26,10 @@ import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class SocialCommandHandler {
     private final Resolver resolver;
+    private final TargetResolver targets;
     private final OsuAuthHelper authHelper;
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
-    private final Function<String, String> accessTokenProvider;
     private final Function<String, String> avatarProvider;
 
     public SocialCommandHandler(
@@ -41,10 +41,10 @@ public final class SocialCommandHandler {
             Function<String, String> avatarProvider
     ) {
         this.resolver = resolver;
+        this.targets = new TargetResolver(resolver, accessTokenProvider);
         this.authHelper = authHelper;
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
-        this.accessTokenProvider = accessTokenProvider;
         this.avatarProvider = avatarProvider;
     }
 
@@ -321,18 +321,7 @@ public final class SocialCommandHandler {
             }
 
             try (var _ = taskCoordinator.beginRequest(ctx, "Map Leaderboard")) {
-                long beatmapId = switch (target.kind()) {
-                    case ID, MAP -> Long.parseLong(target.id());
-                    case SCORE -> OstellaApi.getScoreBeatmapId(target.id());
-                    case SET -> OstellaApi.lookupBeatmapInSet(Long.parseLong(target.id()), target.index(),
-                            accessTokenProvider.apply(ctx.senderUserId()));
-                    case RS, RP, BP -> {
-                        long uid = OstellaApi.resolveUid(resolver.player(target.player(), ctx.senderUserId()));
-                        yield OstellaApi.lookupPlayerScoreBeatmap(uid, target.scoreList(), target.index(), accessTokenProvider.apply(ctx.senderUserId()));
-                    }
-                    case MP -> OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
-                    case MEMORY -> throw new ResolutionException("请指定指令目标谱面喵");
-                };
+                long beatmapId = targets.beatmapId(ctx, target);
                 var response = OstellaApi.getGroupLeaderboardResponse(beatmapId, uids);
                 ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
             }

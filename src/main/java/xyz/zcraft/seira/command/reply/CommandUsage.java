@@ -19,6 +19,7 @@ public final class CommandUsage {
     public static final String SM = "用法：/sm [谱面ID 或 快捷查询] [@玩家] [+Mod]（省略目标时使用记忆，省略玩家时使用自己的绑定账号）";
     public static final String SA = "用法：/sa <成绩ID、[@用户] m谱面ID 或 快捷查询>";
     public static final String MA = "用法：/ma [成绩ID、[@用户] m谱面ID 或 快捷查询] [序号]；省略目标并指定序号时请使用 #序号";
+    public static final String REP = "用法：/rep [成绩ID、玩家及快捷查询] <时间 / obj物件序号 / #Miss序号> [±偏移ms] [window]；window 默认 3-1，X 表示前后各 X 秒，X-Y 表示向前 X 秒、向后 Y 秒，总计不超过 6 秒。";
     public static final String SNAP = "用法：/snap [成绩ID、[@用户] m谱面ID 或 快捷查询] <mm:ss.fff / 秒数s / 毫秒数ms / obj物件序号 / #Miss序号> [±偏移ms]；省略成绩时使用最近目标。例：/snap rp1 01:23.456、/snap obj123、/snap #3 -50ms。";
     public static final String R = "用法：/r [成绩ID、[@用户] m谱面ID 或 快捷查询] [[mm:ss]-[mm:ss]]";
     public static final String RSC = "用法：/rsc [谱面ID或快捷查询] [+/=用户ID列表，逗号分隔]";

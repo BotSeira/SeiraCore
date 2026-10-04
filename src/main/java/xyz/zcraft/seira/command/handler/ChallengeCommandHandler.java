@@ -24,14 +24,12 @@ public final class ChallengeCommandHandler {
     private final ChallengeService service;
     private final Function<String, Long> binding;
     private final Predicate<String> admins;
-    private final Runnable requestPoll;
 
     public ChallengeCommandHandler(ChallengeService service, Function<String, Long> binding,
-                                   Predicate<String> admins, Runnable requestPoll) {
+                                   Predicate<String> admins) {
         this.service = service;
         this.binding = binding;
         this.admins = admins;
-        this.requestPoll = requestPoll;
     }
 
     private static long positive(String value) {
@@ -146,8 +144,7 @@ public final class ChallengeCommandHandler {
                         return;
                     }
                     service.end(ctx.groupId(), ctx.senderUserId(), admins.test(ctx.senderUserId()));
-                    requestPoll.run();
-                    ctx.sendReply(at(ctx) + "挑战已停止接受新成绩，正在收集截止前的成绩并结算。结果将自动公布，也可用 /gch lb 查看。");
+                    ctx.sendReply(at(ctx) + "挑战已结束，已按收录的成绩结算。可用 /gch lb 查看结果。");
                 }
                 case "lb" -> {
                     if (ctx.argumentCount() > 2) {

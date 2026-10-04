@@ -427,6 +427,10 @@ public final class ReplyFactory {
         );
     }
 
+    public PendingMessage replayClipMessage(Context ctx, String scoreId, String position) {
+        return PendingMessage.ofMarkdownRaw(at(ctx) + "> 回放动图：" + position + "\n> 成绩 " + scoreId);
+    }
+
     public PendingMessage snapshotImageMessage(Context ctx, String scoreId, String position) {
         return PendingMessage.ofMarkdownRaw(at(ctx) + "> 回放快照：" + position + "\n> 成绩 " + scoreId
                 + "\n> " + cmd("/ma " + scoreId, "查看 Miss 列表"));
@@ -793,6 +797,7 @@ public final class ReplyFactory {
                     > /rg - 猜 Rank 游戏
                     > /whatif - 估算总 PP 与全球排名的对应关系
                     > /addpp - 估算新增成绩后的总 PP 与排名变化
+                    > /rep - 生成指定时刻周围的 GIF，范围最多 6 秒
                     > /snap - 生成指定时间、物件或 Miss 的回放快照
                     > /watch - 监视群友的新成绩
                     > /gch - 群挑战，自选难度，按水平调整成绩
@@ -836,6 +841,9 @@ public final class ReplyFactory {
                     > /gch join -> 加入本群挑战
                     > /m @peppy rp2 -> 查看指定玩家最近第2条成绩的谱面
                     > /dl mp -> 获取所在lazer多人房间当前谱面的镜像下载链接
+                    > /m mp123456 -> 查询指定lazer多人房间的当前谱面
+                    > /dl mp123456 -> 下载指定lazer多人房间当前谱面的谱面集
+                    > /s mp123456 -> 查询自己在该房间当前谱面的成绩
                     > /r rp -> 渲染最近通过的成绩的高光片段回放视频
                     > /r @peppy bp2 90- -> 渲染指定玩家BP2从1:30开始的回放视频
                     > /mpw <mplink> -> 开始多人房间监视

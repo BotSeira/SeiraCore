@@ -345,6 +345,11 @@ public class OstellaApi {
         return getBase64BytesResponse("/scores/" + scoreId + "/misses/" + index + "/visualize", "获取Miss可视化失败", null);
     }
 
+    public static Response<Base64Bytes> getReplayClipResponse(String scoreId, SnapshotSelection selection,
+            xyz.zcraft.seira.command.parse.ReplayWindow window) {
+        return getBase64BytesResponse("/scores/" + scoreId + "/clip?" + selection.queryString() + "&" + window.queryString(), "获取回放动图失败", null);
+    }
+
     public static Response<Base64Bytes> getReplaySnapshotResponse(String scoreId, SnapshotSelection selection) {
         return getBase64BytesResponse("/scores/" + scoreId + "/snapshot?" + selection.queryString(), "获取回放快照失败", null);
     }
@@ -665,7 +670,12 @@ public class OstellaApi {
     }
 
     public static long lookupMultiplayerBeatmap(String auth) {
-        return lookupTargetData("/beatmaps/lookup?of=mp", auth, "查找谱面失败").get("beatmap_id").getAsLong();
+        return lookupMultiplayerBeatmap(null, auth);
+    }
+
+    public static long lookupMultiplayerBeatmap(String roomId, String auth) {
+        return lookupTargetData("/beatmaps/lookup?of=mp" + MultiplayerRoomQuery.query(roomId), auth, "查找谱面失败")
+                .get("beatmap_id").getAsLong();
     }
 
     public static long lookupPlayerScoreBeatmap(long uid, String list, long index, String auth) {
@@ -675,7 +685,12 @@ public class OstellaApi {
     }
 
     public static long lookupMultiplayerBeatmapset(String auth) {
-        return lookupTargetData("/beatmapsets/lookup?of=mp", auth, "查找谱面集失败").get("beatmapset_id").getAsLong();
+        return lookupMultiplayerBeatmapset(null, auth);
+    }
+
+    public static long lookupMultiplayerBeatmapset(String roomId, String auth) {
+        return lookupTargetData("/beatmapsets/lookup?of=mp" + MultiplayerRoomQuery.query(roomId), auth, "查找谱面集失败")
+                .get("beatmapset_id").getAsLong();
     }
 
     public static long lookupBeatmapsetForBeatmap(long beatmapId, String auth) {

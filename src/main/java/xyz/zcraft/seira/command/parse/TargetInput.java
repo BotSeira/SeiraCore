@@ -26,7 +26,7 @@ public record TargetInput(Kind kind, String id, long index, String player, int c
     private static TargetInput read(String[] args, boolean scoreTarget) {
         if (args.length == 0) return memory();
         int consumed = args.length >= 2 && (PLAYER_SCORE.matcher(args[1]).matches()
-                || (scoreTarget && args[1].matches("(?i)m\\d+"))) ? 2 : 1;
+                || (scoreTarget && args[1].matches("(?i)(?:m\\d+|mp\\d*)"))) ? 2 : 1;
         String player = consumed == 2 ? args[0] : null;
         String value = args[consumed - 1].trim().toLowerCase(Locale.ROOT);
         if (value.equals("rbp")) {
@@ -44,7 +44,12 @@ public record TargetInput(Kind kind, String id, long index, String player, int c
             long index = positive(set.group(2), "谱面集索引无效。例如: 12345#2");
             return new TargetInput(Kind.SET, Long.toString(id), index, null, consumed);
         }
-        if (value.equals("mp")) return new TargetInput(Kind.MP, null, 1, null, consumed);
+        if (value.equals("mp")) return new TargetInput(Kind.MP, null, 1, player, consumed);
+        if (value.startsWith("mp")) {
+            String room = value.substring(2);
+            if (!room.matches("[0-9]+")) throw new ResolutionException("多人房间ID无效，请使用 mp房间ID，例如 mp123456。");
+            return new TargetInput(Kind.MP, Long.toString(positive(room, "多人房间ID必须为正整数。")), 1, player, consumed);
+        }
         if (value.matches("loc[1-9]\\d*")) return new TargetInput(Kind.SCORE, value, 1, null, consumed);
         if (value.matches("m\\d+")) {
             long id = positive(value.substring(1), "谱面ID无效");

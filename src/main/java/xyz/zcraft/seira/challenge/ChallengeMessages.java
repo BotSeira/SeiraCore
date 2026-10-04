@@ -24,7 +24,7 @@ public final class ChallengeMessages {
             - 只计报名后、截止前通过的在线成绩；辅助/自动 Mod 与自定义 Mod 设置不计入。
             - 支持 NM/NF/EZ/HD/HR/SD/DT/NC/HT/FL/SO/PF/CL/MR（默认设置）。
             - 必选/禁用规则中 NC 等同 DT，PF 等同 SD；NM 要求不加其他 Mod（CL 除外，仍可单独禁用 CL）。
-            - 自动收集最近成绩；可用 /gch submit <成绩ID> 补交漏掉的成绩。
+            - 在本群使用 /rp、/rs、/s、/bp 等查询成绩时自动收录；请在结束前查询或用 /gch submit <成绩ID> 提交。
             - 每人取最高挑战分；同分按准确率、较早完成时间排序。
             - 发起者或机器人管理员可提前结束；结束后自动公布结果。
             """;

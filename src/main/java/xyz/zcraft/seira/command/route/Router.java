@@ -78,7 +78,7 @@ public class Router {
         this.authHelper = new OsuAuthHelper(startupConfig.binding());
         BindingCommandHandler bindingCommands = new BindingCommandHandler(startupConfig, replyFactory, bindingService);
         ScoreCommandHandler scoreCommands = new ScoreCommandHandler(
-                resolver, history, taskCoordinator, replyFactory, this::getAccessTokenFor
+                resolver, history, taskCoordinator, replyFactory, this::getAccessTokenFor, challengeService
         );
         BeatmapCommandHandler beatmapCommands = new BeatmapCommandHandler(
                 resolver, history, taskCoordinator, replyFactory, videoRenderRecord, this::getAccessTokenFor
@@ -97,7 +97,7 @@ public class Router {
         );
         WatchCommandHandler watchCommands = new WatchCommandHandler(resolver, taskCoordinator, watchService, admins::isAdmin);
         ChallengeCommandHandler challengeCommands = new ChallengeCommandHandler(
-                challengeService, UserDataStore::findBoundUid, admins::isAdmin, watchService::requestPoll);
+                challengeService, UserDataStore::findBoundUid, admins::isAdmin);
         SpecificScoreWatchCommandHandler specificScoreWatchCommands =
                 new SpecificScoreWatchCommandHandler(taskCoordinator, watchService);
         MPWatchCommandHandler multiplayerRoomWatchCommands =
@@ -160,6 +160,7 @@ public class Router {
                 .register(scoreCommands::handleSa, "sa")
                 .register(scoreCommands::handleMa, "ma")
                 .register(scoreCommands::handleSnapshot, "snap", "snapshot")
+                .register(scoreCommands::handleReplayClip, "rep")
                 .register(replayCommands::handleR, "r")
                 .register(replayCommands::handleRsc, "rsc")
                 .register(beatmapCommands::handleMs, "ms")
