@@ -428,11 +428,11 @@ public final class ReplyFactory {
     }
 
     public PendingMessage replayClipMessage(Context ctx, String scoreId, String position) {
-        return PendingMessage.ofMarkdownRaw(at(ctx) + "> 回放动图：" + position + "\n> 成绩 " + scoreId);
+        return PendingMessage.ofMarkdownRaw(at(ctx) + "\n > 回放动图：" + position + "\n> 成绩 " + s(scoreId));
     }
 
     public PendingMessage snapshotImageMessage(Context ctx, String scoreId, String position) {
-        return PendingMessage.ofMarkdownRaw(at(ctx) + "> 回放快照：" + position + "\n> 成绩 " + scoreId
+        return PendingMessage.ofMarkdownRaw(at(ctx) + "\n > 回放快照：" + position + "\n> 成绩 " + s(scoreId)
                 + "\n> " + cmd("/ma " + scoreId, "查看 Miss 列表"));
     }
 
