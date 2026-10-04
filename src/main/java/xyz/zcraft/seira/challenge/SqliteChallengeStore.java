@@ -13,6 +13,7 @@ import java.util.List;
 public final class SqliteChallengeStore implements ChallengeStore {
     private final Connections connections;
     private final Gson gson = new Gson();
+
     public SqliteChallengeStore() {
         this(SqliteDatabase::getConnection);
     }

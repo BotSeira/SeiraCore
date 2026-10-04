@@ -350,7 +350,7 @@ public class OstellaApi {
     }
 
     public static Response<Base64Bytes> getReplayClipResponse(String scoreId, SnapshotSelection selection,
-            xyz.zcraft.seira.command.parse.ReplayWindow window) {
+                                                              xyz.zcraft.seira.command.parse.ReplayWindow window) {
         return getBase64BytesResponse("/scores/" + scoreId + "/clip?" + selection.queryString() + "&" + window.queryString(), "获取回放动图失败", null);
     }
 

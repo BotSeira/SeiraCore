@@ -1,11 +1,15 @@
 package xyz.zcraft.seira.whatif;
 
 import com.google.gson.JsonObject;
+
 import java.net.http.HttpHeaders;
 
-/** Optional query metadata must never cause the original query to fail. */
+/**
+ * Optional query metadata must never cause the original query to fail.
+ */
 public final class WhatIfObservations {
-    private WhatIfObservations() {}
+    private WhatIfObservations() {
+    }
 
     public static RankPpModel.Sample fromUser(JsonObject user, boolean standardStatistics) {
         try {
@@ -22,7 +26,9 @@ public final class WhatIfObservations {
             var sample = new RankPpModel.Sample(user.get("id").getAsLong(),
                     stats.get("global_rank").getAsLong(), stats.get("pp").getAsDouble());
             return sample.valid() ? sample : null;
-        } catch (RuntimeException ignored) { return null; }
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     public static RankPpModel.Sample fromHeaders(HttpHeaders headers) {
@@ -34,6 +40,8 @@ public final class WhatIfObservations {
                     Double.parseDouble(headers.firstValue("X-Osu-Total-Pp").orElseThrow()),
                     Long.parseLong(headers.firstValue("X-Osu-Observed-At").orElseThrow()));
             return sample.valid() && sample.observedAt() > 0 ? sample : null;
-        } catch (RuntimeException ignored) { return null; }
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 }

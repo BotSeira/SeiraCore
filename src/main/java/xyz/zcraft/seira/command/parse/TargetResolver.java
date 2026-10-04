@@ -38,9 +38,8 @@ public final class TargetResolver {
                 long uid = OstellaApi.resolveUid(player);
                 scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
             }
-            case MP ->
-                    beatmapId = OstellaApi.lookupMultiplayerBeatmap(target.id(),
-                            target.id() == null ? accessTokenProvider.apply(ctx.senderUserId()) : null);
+            case MP -> beatmapId = OstellaApi.lookupMultiplayerBeatmap(target.id(),
+                    target.id() == null ? accessTokenProvider.apply(ctx.senderUserId()) : null);
             case MEMORY -> {
             }
         }
@@ -64,9 +63,8 @@ public final class TargetResolver {
                 long uid = OstellaApi.resolveUid(player);
                 scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
             }
-            case MP ->
-                    beatmapsetId = OstellaApi.lookupMultiplayerBeatmapset(target.id(),
-                            target.id() == null ? accessTokenProvider.apply(ctx.senderUserId()) : null);
+            case MP -> beatmapsetId = OstellaApi.lookupMultiplayerBeatmapset(target.id(),
+                    target.id() == null ? accessTokenProvider.apply(ctx.senderUserId()) : null);
             case MEMORY -> {
             }
         }
@@ -106,9 +104,8 @@ public final class TargetResolver {
                 scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), filters, mod);
                 selectedPlayerScore = true;
             }
-            case MP ->
-                    beatmapId = OstellaApi.lookupMultiplayerBeatmap(target.id(),
-                            target.id() == null ? accessTokenProvider.apply(ctx.senderUserId()) : null);
+            case MP -> beatmapId = OstellaApi.lookupMultiplayerBeatmap(target.id(),
+                    target.id() == null ? accessTokenProvider.apply(ctx.senderUserId()) : null);
             case MEMORY -> {
             }
         }

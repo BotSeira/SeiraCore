@@ -3,17 +3,13 @@ package xyz.zcraft.seira.command.handler;
 import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.MissData;
 import xyz.zcraft.seira.api.data.Response;
-import xyz.zcraft.seira.challenge.ChallengeService;
 import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.challenge.ChallengeService;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.command.TargetHistory;
 import xyz.zcraft.seira.command.TaskCoordinator;
-import xyz.zcraft.seira.command.parse.Resolver;
-import xyz.zcraft.seira.command.parse.ScoreFilterArguments;
-import xyz.zcraft.seira.command.parse.SnapshotSelection;
-import xyz.zcraft.seira.command.parse.TargetInput;
-import xyz.zcraft.seira.command.parse.TargetResolver;
+import xyz.zcraft.seira.command.parse.*;
 import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 
@@ -51,27 +47,6 @@ public final class ScoreCommandHandler {
         this.replyFactory = replyFactory;
     }
 
-    void collectChallengeScores(Context ctx, Response<?> response) {
-        if (!ctx.inGroup()) return;
-        var ids = new java.util.LinkedHashSet<Long>();
-        var values = new java.util.ArrayList<String>();
-        if (response.getScoreId() != null) values.add(response.getScoreId());
-        if (response.getScoreIds() != null) values.addAll(response.getScoreIds());
-        for (String value : values) {
-            try {
-                ids.add(Long.parseLong(value.trim()));
-            } catch (NumberFormatException ignored) {
-                // Ignore malformed optional response metadata.
-            }
-        }
-        try {
-            challengeService.acceptQueriedScores(ctx.groupId(), ids);
-        } catch (RuntimeException e) {
-            org.apache.logging.log4j.LogManager.getLogger(ScoreCommandHandler.class)
-                    .warn("Failed to update group challenge from score query", e);
-        }
-    }
-
     static TbArguments parseTbArguments(String[] args) {
         int days = 1;
         int targetIndex = 0;
@@ -100,6 +75,27 @@ public final class ScoreCommandHandler {
             return new ScoreListRange(start, end);
         } catch (NumberFormatException ignored) {
             return null;
+        }
+    }
+
+    void collectChallengeScores(Context ctx, Response<?> response) {
+        if (!ctx.inGroup()) return;
+        var ids = new java.util.LinkedHashSet<Long>();
+        var values = new java.util.ArrayList<String>();
+        if (response.getScoreId() != null) values.add(response.getScoreId());
+        if (response.getScoreIds() != null) values.addAll(response.getScoreIds());
+        for (String value : values) {
+            try {
+                ids.add(Long.parseLong(value.trim()));
+            } catch (NumberFormatException ignored) {
+                // Ignore malformed optional response metadata.
+            }
+        }
+        try {
+            challengeService.acceptQueriedScores(ctx.groupId(), ids);
+        } catch (RuntimeException e) {
+            org.apache.logging.log4j.LogManager.getLogger(ScoreCommandHandler.class)
+                    .warn("Failed to update group challenge from score query", e);
         }
     }
 
@@ -418,8 +414,13 @@ public final class ScoreCommandHandler {
         return resolver.parsePositiveInt(value);
     }
 
-    public void handleSnapshot(Context ctx) { handleReplayImage(ctx, false); }
-    public void handleReplayClip(Context ctx) { handleReplayImage(ctx, true); }
+    public void handleSnapshot(Context ctx) {
+        handleReplayImage(ctx, false);
+    }
+
+    public void handleReplayClip(Context ctx) {
+        handleReplayImage(ctx, true);
+    }
 
     private void handleReplayImage(Context ctx, boolean animated) {
         String usage = animated ? CommandUsage.REP : CommandUsage.SNAP;

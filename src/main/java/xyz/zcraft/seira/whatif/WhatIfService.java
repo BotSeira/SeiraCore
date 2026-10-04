@@ -30,19 +30,20 @@ public final class WhatIfService {
     private static final Gson GSON = new Gson();
     private static final Duration REFRESH_INTERVAL = Duration.ofDays(1);
     private static final Duration RETRY_INTERVAL = Duration.ofMinutes(30);
+    private static final int MAX_SAMPLES = 1024;
+    private static final Duration IDLE_INTERVAL = Duration.ofMinutes(5);
+    private static volatile WhatIfService shared;
     private final Path cache;
     private final Function<List<Long>, List<RankPpModel.Sample>> fetcher;
     private final Clock clock;
     private final Executor executor;
-    private static final int MAX_SAMPLES = 1024;
-    private static final Duration IDLE_INTERVAL = Duration.ofMinutes(5);
-    private static volatile WhatIfService shared;
     private final Map<Long, RankPpModel.Sample> pending = new LinkedHashMap<>();
+    private final AtomicBoolean refreshing = new AtomicBoolean();
     private volatile Instant lastActivity;
     private volatile Instant lastWork;
-    private final AtomicBoolean refreshing = new AtomicBoolean();
     private volatile State state;
     private volatile Instant lastAttempt;
+
     public WhatIfService(Snapshot seed, Path cache,
                          Function<List<Long>, List<RankPpModel.Sample>> fetcher, Clock clock, Executor executor) {
         this.cache = cache;

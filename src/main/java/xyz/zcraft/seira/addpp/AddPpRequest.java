@@ -1,11 +1,14 @@
 package xyz.zcraft.seira.addpp;
 
+import xyz.zcraft.seira.command.parse.TargetInput;
+
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.ToLongFunction;
-import xyz.zcraft.seira.command.parse.TargetInput;
 
-/** Separates the optional player from the score conditions. */
+/**
+ * Separates the optional player from the score conditions.
+ */
 public record AddPpRequest(AddPpQuery query, String player, TargetInput shortcut) {
     public AddPpRequest(AddPpQuery query, String player) {
         this(query, player, null);

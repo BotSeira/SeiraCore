@@ -322,7 +322,8 @@ public final class ChallengeService implements AutoCloseable {
         synchronized (this) {
             Round round = requireRound(groupId);
             requireParticipant(round, openId, uid);
-            if (round.finished() || clock.millis() >= round.endsAt()) throw new IllegalArgumentException("本次挑战已经结束喵。");
+            if (round.finished() || clock.millis() >= round.endsAt())
+                throw new IllegalArgumentException("本次挑战已经结束喵。");
             roundId = round.id();
         }
         ScoreData score = api.getScore(scoreId);
@@ -381,7 +382,9 @@ public final class ChallengeService implements AutoCloseable {
         }
     }
 
-    /** Only scores actually returned by a query in this group may enter its challenge. */
+    /**
+     * Only scores actually returned by a query in this group may enter its challenge.
+     */
     public void acceptQueriedScores(String groupId, Collection<Long> scoreIds) {
         if (groupId == null || groupId.isBlank() || scoreIds.isEmpty()) return;
         String roundId;

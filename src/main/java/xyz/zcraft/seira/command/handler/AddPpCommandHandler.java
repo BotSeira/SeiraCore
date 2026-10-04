@@ -8,8 +8,8 @@ import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.whatif.WhatIfService;
 
-import java.util.Locale;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Function;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
