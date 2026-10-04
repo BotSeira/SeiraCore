@@ -464,37 +464,11 @@ public class OstellaApi {
     }
 
     public static RandomScore getRandomScore() {
-        try {
-            HttpRequest request = requestBuilder()
-                    .uri(URI.create(ENDPOINT + "/scores/random?min_rank=500000"))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-            if (ApiUtil.codeNotOk(response.statusCode())) {
-                throw ApiUtil.parseHttpError(response.body(), response.statusCode(), "获取随机成绩失败");
-            }
-
-            RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
-            ApiUtil.ensureApiSuccess(payload, "获取随机成绩失败");
-            JsonObject data = ApiUtil.requireDataObject(payload, "随机成绩响应缺少data");
-            if (!data.has("user") || !data.get("user").isJsonObject()
-                    || !data.has("score") || !data.get("score").isJsonObject()) {
-                throw new RuntimeException("随机成绩响应缺少用户或成绩数据");
-            }
-
-            return new RandomScore(
-                    GSON.fromJson(data.getAsJsonObject("user"), UserExtended.class),
-                    GSON.fromJson(data.getAsJsonObject("score"), Score.class),
-                    data.get("best_index").getAsInt(),
-                    data.get("diff").getAsString()
-            );
-        } catch (IOException e) {
-            throw requestFailure(e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("随机成绩请求被中断", e);
-        }
+        HttpRequest request = requestBuilder()
+                .uri(URI.create(ENDPOINT + "/scores/random?min_rank=500000"))
+                .GET()
+                .build();
+        return requestRandomScore(request);
     }
 
     public static String getRandomScoreWeight(Long userId, JsonObject weights, boolean all) {
@@ -526,21 +500,25 @@ public class OstellaApi {
     }
 
     public static RandomScore getRandomScoreFromUsers(List<Long> uids, JsonObject weights) {
+        JsonObject body = new JsonObject();
+        final JsonArray uidsArray = new JsonArray();
+        for (Long uid : uids) {
+            uidsArray.add(uid);
+        }
+
+        body.add("uids", uidsArray);
+        body.add("weight_factor", weights);
+
+        HttpRequest request = requestBuilder()
+                .uri(URI.create(ENDPOINT + "/scores/random/users"))
+                .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                .build();
+
+        return requestRandomScore(request);
+    }
+
+    private static RandomScore requestRandomScore(HttpRequest request) {
         try {
-            JsonObject body = new JsonObject();
-            final JsonArray uidsArray = new JsonArray();
-            for (Long uid : uids) {
-                uidsArray.add(uid);
-            }
-
-            body.add("uids", uidsArray);
-            body.add("weight_factor", weights);
-
-            HttpRequest request = requestBuilder()
-                    .uri(URI.create(ENDPOINT + "/scores/random/users"))
-                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
-                    .build();
-
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             if (ApiUtil.codeNotOk(response.statusCode())) {
                 throw ApiUtil.parseHttpError(response.body(), response.statusCode(), "获取随机成绩失败");

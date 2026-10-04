@@ -138,6 +138,22 @@ public final class TaskCoordinator {
                 : PendingMessage.ofVideoUrl(result.videoUrl());
     }
 
+    public void finishReplay(Context ctx, OstellaApi.ReplayTaskInfo task) {
+        OstellaApi.ReplayRenderResult result;
+        try {
+            result = waitForReplay(task);
+        } catch (Exception e) {
+            LOG.error("Error while waiting for replay", e);
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + e.getMessage()));
+            return;
+        }
+
+        // Keep the cached result when both passive and proactive delivery fail, so /rstat can retry.
+        if (ctx.send(true, replayVideoMessage(result)).success()) {
+            removeReplayResult(task.taskId());
+        }
+    }
+
     public void removeReplayResult(String taskId) {
         if (taskId != null) {
             replayResults.remove(taskId);
@@ -189,31 +205,27 @@ public final class TaskCoordinator {
         boolean uploadResult = true;
         if (pendingMsg.getUploadedMedia() != null) {
             message.setMedia(pendingMsg.getUploadedMedia());
-        } else if (pendingMsg.getFileUrl() != null) {
-            LOG.info("Uploading media for {}", messageId);
-            FileInfo fileInfo = groupMessage
-                    ? messageSender.uploadGroupMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl(), pendingMsg.isUpload())
-                    : messageSender.uploadPrivateMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl(), pendingMsg.isUpload());
-            if (fileInfo == null) {
-                LOG.error("Failed to upload media for message {}", messageId);
-                message.setContent("媒体文件上传失败");
-                message.setMsgType(0);
-                uploadResult = false;
+        } else if (pendingMsg.getFileUrl() != null || pendingMsg.getFileBase64() != null) {
+            FileInfo fileInfo;
+            boolean fromUrl = pendingMsg.getFileUrl() != null;
+            if (fromUrl) {
+                LOG.info("Uploading media for {}", messageId);
+                fileInfo = groupMessage
+                        ? messageSender.uploadGroupMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl(), pendingMsg.isUpload())
+                        : messageSender.uploadPrivateMedia(targetId, pendingMsg.getFileType(), pendingMsg.getFileUrl(), pendingMsg.isUpload());
             } else {
-                LOG.debug("Media uploaded for message {}", messageId);
-                message.setMedia(fileInfo);
+                fileInfo = groupMessage
+                        ? messageSender.uploadGroupMediaBase64(targetId, pendingMsg.getFileType(), pendingMsg.getFileBase64())
+                        : messageSender.uploadPrivateMediaBase64(targetId, pendingMsg.getFileType(), pendingMsg.getFileBase64());
             }
-        } else if (pendingMsg.getFileBase64() != null) {
-            FileInfo fileInfo = groupMessage
-                    ? messageSender.uploadGroupMediaBase64(targetId, pendingMsg.getFileType(), pendingMsg.getFileBase64())
-                    : messageSender.uploadPrivateMediaBase64(targetId, pendingMsg.getFileType(), pendingMsg.getFileBase64());
             if (fileInfo == null) {
-                LOG.error("Failed to upload base64 media for message {}", messageId);
+                LOG.error(fromUrl ? "Failed to upload media for message {}"
+                        : "Failed to upload base64 media for message {}", messageId);
                 message.setContent("媒体文件上传失败");
                 message.setMsgType(0);
                 uploadResult = false;
             } else {
-                LOG.debug("Base64 media uploaded for message {}", messageId);
+                LOG.debug(fromUrl ? "Media uploaded for message {}" : "Base64 media uploaded for message {}", messageId);
                 message.setMedia(fileInfo);
             }
         }

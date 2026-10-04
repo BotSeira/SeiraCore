@@ -1,6 +1,5 @@
 package xyz.zcraft.seira.command.handler;
 
-import org.jline.utils.Log;
 import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.Response;
 import xyz.zcraft.seira.api.data.SearchQuery;
@@ -15,7 +14,6 @@ import xyz.zcraft.seira.command.parse.TargetInput;
 import xyz.zcraft.seira.command.parse.TargetResolver;
 import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
-import xyz.zcraft.seira.data.SendResult;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
 import java.util.List;
@@ -143,25 +141,7 @@ public final class BeatmapCommandHandler {
             videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
             ctx.sendReply(replyFactory.replayMessage(ctx, task));
 
-            OstellaApi.ReplayRenderResult result;
-
-            try {
-                result = taskCoordinator.waitForReplay(task);
-            } catch (Exception e) {
-                Log.error("Error while waiting for replay", e);
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + e.getMessage()));
-                return;
-            }
-
-            SendResult sendResult = ctx.sendReply(taskCoordinator.replayVideoMessage(result));
-
-            if (!sendResult.success()) {
-                sendResult = ctx.sendMessage(taskCoordinator.replayVideoMessage(result));
-            }
-
-            if (sendResult.success()) {
-                taskCoordinator.removeReplayResult(task.taskId());
-            }
+            taskCoordinator.finishReplay(ctx, task);
         }
     }
 
