@@ -42,7 +42,12 @@ public final class WhatIfCommandHandler {
         } else {
             result = String.format(Locale.ROOT, "全球排名 #%,d ≈ 总 PP __%.2fpp__ 喵", query.rank(), model.ppAtRank(query.rank()));
         }
-        return result;
+        String date = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+                .withZone(java.time.ZoneId.of("Asia/Shanghai")).format(state.snapshot().updatedAt());
+        boolean stale = java.time.Duration.between(state.snapshot().updatedAt(), java.time.Instant.now())
+                .compareTo(java.time.Duration.ofHours(48)) >= 0;
+        return result + "\n整体采样：" + date + "（北京时间）"
+                + (stale ? "；数据较旧，估算仅供参考。" : "；估算仅供参考。");
     }
 
     public void handleWhatIf(Context ctx) {

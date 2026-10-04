@@ -986,7 +986,10 @@ public final class ReplyFactory {
 
             row.addAll(List.of(prev, center, next));
 
-            return Button.keyboard(row);
+            final Button repButton = Button.command(4, "查看动图", "/rep " + scoreId + " #" + index);
+            return Button.keyboard(row, List.of(
+                    repButton
+            ));
         }
 
         List<List<Button>> beatmapsetButtons(String beatmapsetId) {

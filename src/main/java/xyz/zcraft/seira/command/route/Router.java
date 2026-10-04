@@ -217,6 +217,7 @@ public class Router {
             boolean groupMessage, String msgIdx, List<Attachment> attachments, List<MsgElem> msgElems
     ) {
         AtomicInteger messageSeqCounter = new AtomicInteger(1);
+        WhatIfService.recordActivity();
         try {
             final boolean group = groupMessage && groupId != null && !groupId.isBlank();
             if (group && userId != null && !userId.isBlank()) {

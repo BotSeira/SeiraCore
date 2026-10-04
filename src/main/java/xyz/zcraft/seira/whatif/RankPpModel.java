@@ -49,25 +49,35 @@ public final class RankPpModel {
         if (rank < first().rank() || rank > last().rank()) {
             throw new IllegalArgumentException("排名超出样本范围。");
         }
-        for (int i = 1; i < samples.size(); i++) {
-            Sample a = samples.get(i - 1), b = samples.get(i);
-            if (rank <= b.rank()) return interpolate(rank, a.rank(), b.rank(), a.pp(), b.pp());
+        int low = 1, high = samples.size() - 1;
+        while (low < high) {
+            int mid = (low + high) >>> 1;
+            if (samples.get(mid).rank() < rank) low = mid + 1;
+            else high = mid;
         }
-        return last().pp();
+        Sample a = samples.get(low - 1), b = samples.get(low);
+        return interpolate(rank, a.rank(), b.rank(), a.pp(), b.pp());
     }
 
     public double rankAtPp(double pp) {
         if (!Double.isFinite(pp) || pp < last().pp() || pp > first().pp()) {
             throw new IllegalArgumentException("PP 超出样本范围。");
         }
-        for (int i = 1; i < samples.size(); i++) {
-            Sample a = samples.get(i - 1), b = samples.get(i);
-            if (pp >= b.pp()) return interpolate(pp, a.pp(), b.pp(), a.rank(), b.rank());
+        int low = 1, high = samples.size() - 1;
+        while (low < high) {
+            int mid = (low + high) >>> 1;
+            if (samples.get(mid).pp() > pp) low = mid + 1;
+            else high = mid;
         }
-        return last().rank();
+        Sample a = samples.get(low - 1), b = samples.get(low);
+        return interpolate(pp, a.pp(), b.pp(), a.rank(), b.rank());
     }
 
-    public record Sample(long userId, long rank, double pp) {
+    public record Sample(long userId, long rank, double pp, long observedAt) {
+        public Sample(long userId, long rank, double pp) {
+            this(userId, rank, pp, 0);
+        }
+
         public boolean valid() {
             return userId > 0 && rank > 0 && Double.isFinite(pp) && pp > 0;
         }
