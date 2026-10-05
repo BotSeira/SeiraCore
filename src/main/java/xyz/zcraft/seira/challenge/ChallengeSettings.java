@@ -1,5 +1,7 @@
 package xyz.zcraft.seira.challenge;
 
+import xyz.zcraft.osu.model.ModSettings;
+
 import xyz.zcraft.seira.challenge.ChallengeModels.MapChoice;
 import xyz.zcraft.seira.challenge.ChallengeModels.ScoreData;
 import xyz.zcraft.seira.challenge.ChallengeModels.SetData;
@@ -64,7 +66,9 @@ public record ChallengeSettings(boolean differentDifficulties, Long fixedMapId, 
     }
 
     public static Set<String> scoreMods(String value) {
-        return parseMods(value == null || value.isEmpty() ? "none" : value, false);
+        if (value == null || value.isEmpty()) return Set.of();
+        return parseMods(ModSettings.parse(value).stream()
+                .map(mod -> mod.getAcronym()).collect(java.util.stream.Collectors.joining()), false);
     }
 
     public static String displayMods(Set<String> mods) {

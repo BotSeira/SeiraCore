@@ -7,6 +7,7 @@ import com.google.gson.JsonObject;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import xyz.zcraft.osu.model.*;
+import xyz.zcraft.osu.model.multiplayer.Room;
 import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.bot.data.FileInfo;
@@ -230,7 +231,7 @@ public class OstellaApi {
         }
     }
 
-    public static Response<MultiplayerRoom> getMultiplayerRoom(String accessToken) {
+    public static Response<Room> getMultiplayerRoom(String accessToken) {
         try {
             HttpRequest request = withOsuAuthorization(requestBuilder(), accessToken)
                     .uri(URI.create(ENDPOINT + "/multiplayer/rooms/current"))
@@ -247,8 +248,8 @@ public class OstellaApi {
             ApiUtil.ensureApiSuccess(r, "获取多人房间失败");
             final JsonObject data = r.getData().getAsJsonObject();
 
-            return Response.<MultiplayerRoom>fromHeaders(send.headers())
-                    .content(GSON.fromJson(data, MultiplayerRoom.class))
+            return Response.<Room>fromHeaders(send.headers())
+                    .content(GSON.fromJson(data, Room.class))
                     .build();
         } catch (IOException | InterruptedException e) {
             throw requestFailure(e);

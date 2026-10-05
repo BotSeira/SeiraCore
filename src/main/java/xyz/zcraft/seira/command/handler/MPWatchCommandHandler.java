@@ -1,8 +1,8 @@
 package xyz.zcraft.seira.command.handler;
 
-import xyz.zcraft.osu.model.MultiplayerRoom;
 import xyz.zcraft.osu.model.User;
 import xyz.zcraft.osu.model.UserExtended;
+import xyz.zcraft.osu.model.multiplayer.Room;
 import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.RomAIApi;
 import xyz.zcraft.seira.api.data.OsuToken;
@@ -209,8 +209,8 @@ public final class MPWatchCommandHandler {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "由于未绑定账户，无法获取当前房间，请手动提供ID~"));
                 return;
             }
-            final Response<MultiplayerRoom> multiplayerRoom = OstellaApi.getMultiplayerRoom(osuToken.accessToken());
-            target = new RoomTarget(multiplayerRoom.getContent().getId(), MPVersion.LAZER, null);
+            final Response<Room> Room = OstellaApi.getMultiplayerRoom(osuToken.accessToken());
+            target = new RoomTarget(Room.getContent().getId(), MPVersion.LAZER, null);
         } else {
             MPVersion version = null;
             Integer customBo = null;

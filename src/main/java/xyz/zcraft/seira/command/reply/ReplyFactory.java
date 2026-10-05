@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.osu.model.*;
+import xyz.zcraft.osu.model.multiplayer.Room;
 import xyz.zcraft.seira.api.AsteroidApi;
 import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.*;
@@ -367,7 +368,7 @@ public final class ReplyFactory {
         );
     }
 
-    public PendingMessage mpMessage(Context ctx, Response<MultiplayerRoom> response) {
+    public PendingMessage mpMessage(Context ctx, Response<Room> response) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.mpContent(ctx, response.getContent()),
                 buttons().mpButtons(response.getContent())
@@ -708,12 +709,12 @@ public final class ReplyFactory {
             return cmd("/u " + u.getId(), "[" + (u.isOnline() ? "▶" : "") + u.getUsername() + "]");
         }
 
-        public static String mpContent(Context ctx, MultiplayerRoom content) {
+        public static String mpContent(Context ctx, Room content) {
             String sb = at(ctx) + "进行中的多人游戏" + "\n" +
                     "> 房间名: " + content.getName() + "\n" +
                     "> 人数: " + content.getParticipantCount() + "\n" +
                     "> ID: " + content.getId() + "\n";
-            final MultiplayerRoom.CurrentPlaylistItem cur = content.getCurrentPlaylistItem();
+            final Room.PlaylistItem cur = content.getCurrentPlaylistItem();
             if (cur != null) {
                 sb += "> 当前: " + "%s - %s - %s [%.2f★ %s]".formatted(
                         m(cur.getBeatmapId()),
@@ -1005,7 +1006,7 @@ public final class ReplyFactory {
             );
         }
 
-        List<List<Button>> mpButtons(MultiplayerRoom room) {
+        List<List<Button>> mpButtons(Room room) {
             List<List<Button>> rows = new ArrayList<>();
 
             rows.add(Button.row(
@@ -1015,7 +1016,7 @@ public final class ReplyFactory {
             ));
 
             Optional.ofNullable(room.getCurrentPlaylistItem())
-                    .map(MultiplayerRoom.CurrentPlaylistItem::getBeatmap)
+                    .map(Room.PlaylistItem::getBeatmap)
                     .map(Beatmap::getBeatmapsetId)
                     .map(String::valueOf)
                     .ifPresent(id -> {

@@ -270,7 +270,7 @@ public final class ScoreCommandHandler {
             return;
         }
         String option = optionIndex < ctx.argumentCount() ? ctx.argument(optionIndex) : null;
-        String mod = option == null ? null : option.substring(1).toUpperCase(java.util.Locale.ROOT);
+        String mod = option == null ? null : option.substring(1);
         List<String> filters = List.of();
         if (mod != null) {
             var parsed = ScoreFilterArguments.parse(new String[]{"mod=" + mod}, 0);
@@ -318,7 +318,7 @@ public final class ScoreCommandHandler {
             return;
         }
         String option = optionIndex < ctx.argumentCount() ? ctx.argument(optionIndex) : null;
-        String mod = option == null ? null : option.substring(1).toUpperCase(java.util.Locale.ROOT);
+        String mod = option == null ? null : option.substring(1);
         List<String> filters = List.of();
         if (mod != null) {
             var parsed = ScoreFilterArguments.parse(new String[]{"mod=" + mod}, 0);

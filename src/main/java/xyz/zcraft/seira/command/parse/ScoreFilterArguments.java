@@ -1,5 +1,7 @@
 package xyz.zcraft.seira.command.parse;
 
+import xyz.zcraft.osu.model.ModSettings;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -186,11 +188,7 @@ public final class ScoreFilterArguments {
     }
 
     private static void validateMods(String value) {
-        String normalized = value.toUpperCase(Locale.ROOT).replace("+", "");
-        if (normalized.equals("NM")) return;
-        if (normalized.isEmpty() || normalized.length() % 2 != 0 || !normalized.matches("[A-Z]+")) {
-            throw new IllegalArgumentException("mod 值应为 NM 或 Mod 缩写组合，例如 HDDT");
-        }
+        ModSettings.parse(value);
     }
 
     private static double parseDuration(String value) {
