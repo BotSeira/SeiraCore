@@ -26,6 +26,7 @@ import xyz.zcraft.seira.services.CosService;
 import xyz.zcraft.seira.util.AdminRegistry;
 import xyz.zcraft.seira.util.ApplicationExecutors;
 import xyz.zcraft.seira.util.TokenManager;
+import xyz.zcraft.seira.util.ShutdownRequest;
 import xyz.zcraft.seira.watch.*;
 
 import java.net.URI;
@@ -63,6 +64,8 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicReference<WSClient> activeClient = new AtomicReference<>();
     private volatile Thread runnerThread;
+    private final ShutdownRequest shutdownRequest = new ShutdownRequest(
+            this::prepareStop, this::stop, Duration.ofSeconds(10));
 
     public QQBot(
             RuntimeConfig runtimeConfig,
@@ -323,11 +326,17 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
 
     @Override
     public void requestStop() {
+        shutdownRequest.run();
+    }
+
+    private void prepareStop() {
+        // Snapshot before stopAll removes the active games.
+        var rankGuessGroups = rankGuessGameService.activeGroupIds();
         rankGuessGameService.stopAll();
 
         RealtimeServiceInterruptionNotifier.NotificationResult result = interruptionNotifier.notifyGroups(
                 watchService.activeTransientGroupIds(),
-                rankGuessGameService.activeGroupIds(),
+                rankGuessGroups,
                 mpWatchService.activeGroupIds(),
                 chatProvider.activeGroupIds()
         );
@@ -339,7 +348,6 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                     result.sentGroups(), result.targetGroups()
             );
         }
-        stop();
     }
 
     @Override

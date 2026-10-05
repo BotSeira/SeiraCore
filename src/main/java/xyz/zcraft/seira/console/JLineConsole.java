@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 
 /**
  * Interactive local administration console backed by JLine.
@@ -57,18 +59,7 @@ public final class JLineConsole implements AutoCloseable {
 
             try (createdLogBridge) {
                 logBridge = createdLogBridge;
-                while (running.get()) {
-                    try {
-                        String line = reader.readLine(PROMPT);
-                        ConsoleCommandProcessor.ConsoleResult result = processor.execute(line);
-                        if (!result.message().isBlank()) {
-                            reader.printAbove((result.success() ? "" : "Error: ") + result.message());
-                        }
-                    } catch (UserInterruptException ignored) {
-                    } catch (EndOfFileException e) {
-                        break;
-                    }
-                }
+                readCommands(reader, processor::execute, running::get);
             } finally {
                 logBridge = null;
             }
@@ -82,9 +73,30 @@ public final class JLineConsole implements AutoCloseable {
         }
     }
 
+    static void readCommands(LineReader reader,
+                             Function<String, ConsoleCommandProcessor.ConsoleResult> execute,
+                             BooleanSupplier running) {
+        while (running.getAsBoolean()) {
+            try {
+                String line = reader.readLine(PROMPT);
+                ConsoleCommandProcessor.ConsoleResult result = execute.apply(line);
+                if (!result.message().isBlank()) {
+                    reader.printAbove((result.success() ? "" : "Error: ") + result.message());
+                }
+            } catch (UserInterruptException ignored) {
+                execute.apply("stop confirm");
+                break;
+            } catch (EndOfFileException e) {
+                break;
+            }
+        }
+    }
+
     @Override
     public void close() {
         running.set(false);
+        // Wake readLine before closing the terminal it is currently reading from.
+        consoleThread.shutdownNow();
         JLineLogBridge currentBridge = logBridge;
         if (currentBridge != null) {
             currentBridge.close();
@@ -98,7 +110,6 @@ public final class JLineConsole implements AutoCloseable {
                 LOG.warn("Failed to close interactive console terminal", e);
             }
         }
-        consoleThread.shutdownNow();
     }
 
     private static final class CommandCompleter implements Completer {

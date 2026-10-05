@@ -43,6 +43,7 @@ public final class RealtimeServiceInterruptionNotifier {
 
         int sent = 0;
         for (Map.Entry<String, LinkedHashSet<String>> entry : servicesByGroup.entrySet()) {
+            if (Thread.currentThread().isInterrupted()) break;
             if (sender.sendGroupText(entry.getKey(), message(entry.getValue())) != null) {
                 sent++;
             }

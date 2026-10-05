@@ -25,7 +25,8 @@ import java.util.concurrent.*;
 
 public class QQApi {
     private static final String ENDPOINT = "https://api.sgroup.qq.com";
-    private static final HttpClient CLIENT = HttpClient.newBuilder().build();
+    private static final HttpClient CLIENT = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10)).build();
     private static final HttpClient MEDIA_CLIENT = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.NORMAL)
             .connectTimeout(Duration.ofSeconds(30))
@@ -95,6 +96,7 @@ public class QQApi {
         try {
             final var request = newRequestBuilder(accessToken)
                     .uri(URI.create(ENDPOINT + "/v2/groups/" + groupId + "/messages"))
+                    .timeout(Duration.ofSeconds(30))
                     .POST(HttpRequest.BodyPublishers.ofString(buildMessageJson(message)))
                     .build();
 
