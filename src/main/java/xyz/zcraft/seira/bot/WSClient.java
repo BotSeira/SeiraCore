@@ -161,7 +161,8 @@ public class WSClient extends WebSocketClient {
         JsonObject data = payload.get("d").getAsJsonObject();
         String content = data.get("content").getAsString();
         String msgId = data.get("id").getAsString();
-        String openId = data.get("author").getAsJsonObject().get("user_openid").getAsString();
+        final JsonObject author = data.get("author").getAsJsonObject();
+        String openId = author.get("user_openid").getAsString();
 
         final JsonArray attachments = data.getAsJsonArray("attachments");
         List<Attachment> attachmentList = new ArrayList<>();
@@ -223,6 +224,7 @@ public class WSClient extends WebSocketClient {
         JsonObject author = data.get("author").getAsJsonObject();
         String openId = author.get("member_openid").getAsString();
         String groupId = data.get("group_openid").getAsString();
+        String username = author.get("username").getAsString();
 
         String msgIdx = null;
 
@@ -258,7 +260,7 @@ public class WSClient extends WebSocketClient {
             ));
         }
 
-        router.onGroupMessageReceived(groupId, openId, msgId, content, msgIdx, attachments, msgElemList);
+        router.onGroupMessageReceived(groupId, openId, msgId, content, msgIdx, attachments, msgElemList, username);
     }
 
     private Map<String, String> parseMentions(JsonObject data) {

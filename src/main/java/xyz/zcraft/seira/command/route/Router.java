@@ -200,21 +200,22 @@ public class Router {
             String userId, String messageId, String rawContent,
             String msgIdx, List<Attachment> attachments, List<MsgElem> msgElems
     ) {
-        handleMessageReceived(userId, null, userId, messageId, rawContent, false, msgIdx, attachments, msgElems);
+        handleMessageReceived(userId, null, userId, messageId, rawContent, false, msgIdx, attachments, msgElems, null);
     }
 
     public void onGroupMessageReceived(
             String groupId, String senderUserId,
             String messageId, String rawContent,
             String msgIdx, List<Attachment> attachments,
-            List<MsgElem> msgElems
+            List<MsgElem> msgElems, String nickname
     ) {
-        handleMessageReceived(groupId, groupId, senderUserId, messageId, rawContent, true, msgIdx, attachments, msgElems);
+        handleMessageReceived(groupId, groupId, senderUserId, messageId, rawContent, true, msgIdx, attachments, msgElems, nickname);
     }
 
     private void handleMessageReceived(
             String targetId, String groupId, String userId, String messageId, String rawContent,
-            boolean groupMessage, String msgIdx, List<Attachment> attachments, List<MsgElem> msgElems
+            boolean groupMessage, String msgIdx, List<Attachment> attachments, List<MsgElem> msgElems,
+            String nickname
     ) {
         AtomicInteger messageSeqCounter = new AtomicInteger(1);
         WhatIfService.recordActivity();
@@ -222,6 +223,9 @@ public class Router {
             final boolean group = groupMessage && groupId != null && !groupId.isBlank();
             if (group && userId != null && !userId.isBlank()) {
                 UserDataStore.upsertGroupMember(groupId, userId);
+                if (nickname != null && !nickname.isBlank()) {
+                    aiChatHandler.recordNickname(groupId, userId, nickname);
+                }
             }
 
             rawContent = rawContent == null ? "" : rawContent.trim();

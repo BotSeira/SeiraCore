@@ -41,11 +41,18 @@ public class Seira {
             LOG.warn("Debug mode is enabled");
         }
 
-        try (SeiraApplication application = new SeiraApplication(config)) {
-            Thread shutdownHook = new Thread(application::close, "seira-shutdown");
-            Runtime.getRuntime().addShutdownHook(shutdownHook);
+        SeiraApplication application = new SeiraApplication(config);
+        runApplication(application::run, application::close);
+    }
+
+    static void runApplication(Runnable run, Runnable close) {
+        Thread shutdownHook = new Thread(close, "seira-shutdown");
+        Runtime.getRuntime().addShutdownHook(shutdownHook);
+        try {
+            run.run();
+        } finally {
             try {
-                application.run();
+                close.run();
             } finally {
                 try {
                     Runtime.getRuntime().removeShutdownHook(shutdownHook);
@@ -54,5 +61,8 @@ public class Seira {
                 }
             }
         }
+        // This standalone application owns the process. Libraries may retain
+        // non-daemon threads even after all application resources have closed.
+        System.exit(0);
     }
 }

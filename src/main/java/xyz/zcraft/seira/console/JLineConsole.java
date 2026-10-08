@@ -84,8 +84,7 @@ public final class JLineConsole implements AutoCloseable {
                     reader.printAbove((result.success() ? "" : "Error: ") + result.message());
                 }
             } catch (UserInterruptException ignored) {
-                execute.apply("stop confirm");
-                break;
+                // JLine has cancelled the current input; display a fresh prompt.
             } catch (EndOfFileException e) {
                 break;
             }

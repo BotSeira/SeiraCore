@@ -32,6 +32,7 @@ public class AiChatHandler {
     private final Function<String, GroupBotState> botStateGetter;
     private final Map<String, Deque<String>> groupMentionedHistory = new ConcurrentHashMap<>();
     private final Set<String> consented = new HashSet<>();
+    private final Map<String, Map<String, String>> groupNicknames = new ConcurrentHashMap<>();
 
     public AiChatHandler(
             Resolver resolver, ChatProvider chatProvider, Predicate<String> isAdmin,
@@ -41,6 +42,11 @@ public class AiChatHandler {
         this.adminAuthorizer = isAdmin;
         this.chatProvider = chatProvider;
         this.botStateGetter = botStateGetter;
+    }
+
+    public void recordNickname(String groupId, String openId, String nickname) {
+        groupNicknames.computeIfAbsent(groupId, _ -> new ConcurrentHashMap<>());
+        groupNicknames.get(groupId).put(openId, nickname);
     }
 
     public void handleAi(Context ctx) {
@@ -235,7 +241,7 @@ public class AiChatHandler {
         qqContext.addProperty("sender_open_id", ctx.senderUserId());
         qqContext.addProperty("group_id", ctx.groupId());
 
-        Map<String, Map<String, String>> bindings = new HashMap<>();
+        Map<String, JsonObject> bindings = new HashMap<>();
 
         final Deque<String> mentionedHistory = groupMentionedHistory.computeIfAbsent(ctx.groupId(), _ -> new ArrayDeque<>(100));
 
@@ -254,11 +260,19 @@ public class AiChatHandler {
         ids.add(ctx.senderUserId());
         ids.addAll(mentionedHistory);
 
+        final Map<String, String> nicknames = groupNicknames.getOrDefault(ctx.groupId(), Map.of());
+
         for (String openId : ids) {
             final Long uid = resolver.resolveBoundUid(openId);
             if (uid != null) {
                 final String username = UserDataStore.findUsername(uid).orElse("");
-                bindings.put(openId, Map.of("uid", uid.toString(), "username", username));
+                JsonObject qqUser = new JsonObject();
+                qqUser.addProperty("uid", uid.toString());
+                qqUser.addProperty("username", username);
+                if (nicknames.containsKey(openId)) {
+                    qqUser.addProperty("qq_nickname", nicknames.get(openId));
+                }
+                bindings.put(openId, qqUser);
             }
         }
 
