@@ -73,8 +73,8 @@
     },
     {
       "type": "command",
-      "name": "/rstat",
-      "desc": "查询回放渲染状态"
+      "name": "/addpp",
+      "desc": "PP估算"
     },
     {
       "type": "command",
@@ -88,8 +88,8 @@
     },
     {
       "type": "command",
-      "name": "/watch",
-      "desc": "成绩监视"
+      "name": "/whatif",
+      "desc": "排名估算"
     },
     {
       "type": "link",
