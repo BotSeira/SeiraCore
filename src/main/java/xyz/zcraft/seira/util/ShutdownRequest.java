@@ -10,7 +10,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Runs best-effort shutdown preparation with a deadline, then always stops the bot. */
+/**
+ * Runs best-effort shutdown preparation with a deadline, then always stops the bot.
+ */
 public final class ShutdownRequest implements Runnable {
     private static final Logger LOG = LogManager.getLogger(ShutdownRequest.class);
     private final Runnable prepare;

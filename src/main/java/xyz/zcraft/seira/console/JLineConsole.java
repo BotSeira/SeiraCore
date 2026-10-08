@@ -36,6 +36,24 @@ public final class JLineConsole implements AutoCloseable {
         this.processor = processor;
     }
 
+    static void readCommands(LineReader reader,
+                             Function<String, ConsoleCommandProcessor.ConsoleResult> execute,
+                             BooleanSupplier running) {
+        while (running.getAsBoolean()) {
+            try {
+                String line = reader.readLine(PROMPT);
+                ConsoleCommandProcessor.ConsoleResult result = execute.apply(line);
+                if (!result.message().isBlank()) {
+                    reader.printAbove((result.success() ? "" : "Error: ") + result.message());
+                }
+            } catch (UserInterruptException ignored) {
+                // JLine has cancelled the current input; display a fresh prompt.
+            } catch (EndOfFileException e) {
+                break;
+            }
+        }
+    }
+
     public void start() {
         if (running.compareAndSet(false, true)) {
             consoleThread.execute(this::runLoop);
@@ -70,24 +88,6 @@ public final class JLineConsole implements AutoCloseable {
         } finally {
             terminal = null;
             running.set(false);
-        }
-    }
-
-    static void readCommands(LineReader reader,
-                             Function<String, ConsoleCommandProcessor.ConsoleResult> execute,
-                             BooleanSupplier running) {
-        while (running.getAsBoolean()) {
-            try {
-                String line = reader.readLine(PROMPT);
-                ConsoleCommandProcessor.ConsoleResult result = execute.apply(line);
-                if (!result.message().isBlank()) {
-                    reader.printAbove((result.success() ? "" : "Error: ") + result.message());
-                }
-            } catch (UserInterruptException ignored) {
-                // JLine has cancelled the current input; display a fresh prompt.
-            } catch (EndOfFileException e) {
-                break;
-            }
         }
     }
 

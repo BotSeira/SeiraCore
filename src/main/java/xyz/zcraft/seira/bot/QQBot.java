@@ -25,8 +25,8 @@ import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.services.CosService;
 import xyz.zcraft.seira.util.AdminRegistry;
 import xyz.zcraft.seira.util.ApplicationExecutors;
-import xyz.zcraft.seira.util.TokenManager;
 import xyz.zcraft.seira.util.ShutdownRequest;
+import xyz.zcraft.seira.util.TokenManager;
 import xyz.zcraft.seira.watch.*;
 
 import java.net.URI;
@@ -63,9 +63,9 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
     private final AtomicBoolean running = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicReference<WSClient> activeClient = new AtomicReference<>();
-    private volatile Thread runnerThread;
     private final ShutdownRequest shutdownRequest = new ShutdownRequest(
             this::prepareStop, this::stop, Duration.ofSeconds(10));
+    private volatile Thread runnerThread;
 
     public QQBot(
             RuntimeConfig runtimeConfig,

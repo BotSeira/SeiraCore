@@ -82,7 +82,7 @@ public final class AddPpCommandHandler {
             var request = AddPpRequest.parse(ctx.args());
             Long uid = request.player() == null ? binding.apply(ctx.senderUserId())
                     : OstellaApi.resolveUid(new Resolver(binding).player(request.player(), ctx.senderUserId()));
-            if (uid == null || uid <= 0) {
+            if (uid <= 0) {
                 ctx.sendReply(at(ctx) + CommandUsage.NO_BIND);
                 return;
             }
