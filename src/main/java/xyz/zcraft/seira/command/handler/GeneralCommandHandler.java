@@ -1,5 +1,7 @@
 package xyz.zcraft.seira.command.handler;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import xyz.zcraft.osu.model.Beatmapset;
 import xyz.zcraft.seira.api.AsteroidApi;
 import xyz.zcraft.seira.api.OstellaApi;
@@ -31,6 +33,7 @@ public final class GeneralCommandHandler {
     private final ReplyFactory replyFactory;
     private final Resolver resolver;
     private final Predicate<String> adminAuthorizer;
+    private static final Logger LOG = LogManager.getLogger(GeneralCommandHandler.class);
 
     public GeneralCommandHandler(
             MessageSender messageSender,
@@ -201,6 +204,7 @@ public final class GeneralCommandHandler {
             );
         } catch (Exception e) {
             ctx.sendReply(at(ctx) + "无法获取目标服务器状态喵，这可能是因为目标服务器未开启或者存在网络问题。");
+            LOG.warn("Failed to probe Minecraft server", e);
         }
     }
 
