@@ -56,20 +56,22 @@ public class Router {
     private final Executor commandExecutor;
     private final Supplier<QQUser> selfSupplier;
     private final AiChatHandler aiChatHandler;
+    private final InteractionHandler interactionHandler;
 
     public Router(
             MessageSender messageSender, Supplier<AppConfig> configSupplier, AdminRegistry admins,
             BindingService bindingService, ScoreWatchService watchService, ChallengeService challengeService, MPWatchService mpWatchService,
             DiscordBridgeService discordBridgeService, RankGuessGameService rankGuessGameService, Executor commandExecutor,
             Runnable commandMetric, Function<byte[], UploadedImage> imageUploader, Supplier<QQUser> selfSupplier,
-            ChatProvider chatProvider, Function<String, GroupBotState> botStateGetter
+            ChatProvider chatProvider, Function<String, GroupBotState> botStateGetter, InteractionHandler interactionHandler
     ) {
         this.configSupplier = java.util.Objects.requireNonNull(configSupplier);
         this.commandExecutor = commandExecutor;
         this.commandMetric = java.util.Objects.requireNonNull(commandMetric);
         this.selfSupplier = selfSupplier;
+        this.interactionHandler = interactionHandler;
         AppConfig startupConfig = configSupplier.get();
-        ReplyFactory replyFactory = new ReplyFactory(configSupplier);
+        ReplyFactory replyFactory = new ReplyFactory(configSupplier, interactionHandler);
         Resolver resolver = new Resolver();
         TargetHistory history = new TargetHistory();
         ReplayResultStore replayResults = new ReplayResultStore();
@@ -120,7 +122,7 @@ public class Router {
         );
         this.debugRoutes = new DebugRoutes(
                 configSupplier, messageSender, replyFactory, taskCoordinator,
-                authHelper, admins::isAdmin, unknownCommand
+                authHelper, admins::isAdmin, unknownCommand, interactionHandler
         );
     }
 
@@ -260,7 +262,7 @@ public class Router {
             }
 
             CommandParser.ParseResult parseResult = commandParser.parse(
-                    rawContent, userId, groupId, messageId
+                    rawContent, userId, groupId, messageId, nickname
             );
 
             if (parseResult.status() == CommandParser.ParseResult.Status.IGNORED) {

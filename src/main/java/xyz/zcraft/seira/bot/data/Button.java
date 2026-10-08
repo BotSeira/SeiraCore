@@ -77,6 +77,31 @@ public class Button {
         return button;
     }
 
+    public static Button interaction(int id, String identifier, String label) {
+        Button button = new Button();
+        button.id = String.valueOf(id);
+
+        RenderData renderData = new RenderData();
+        renderData.setLabel(label);
+        renderData.setVisitedLabel(label);
+        renderData.setStyle(1);
+
+        button.setRenderData(renderData);
+
+        Action action = new Action();
+        action.setType(1);
+        action.setData(identifier);
+
+        Action.Permission permission = new Action.Permission();
+        permission.setType(2);
+
+        action.setPermission(permission);
+
+        button.setAction(action);
+
+        return button;
+    }
+
     public static List<Button> row(Button... buttons) {
         if (buttons == null || buttons.length == 0) {
             return List.of(command(0, "_", "/help"));

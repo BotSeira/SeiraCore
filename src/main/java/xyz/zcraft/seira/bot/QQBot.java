@@ -11,6 +11,7 @@ import xyz.zcraft.seira.challenge.ChallengeService;
 import xyz.zcraft.seira.challenge.OstellaChallengeApi;
 import xyz.zcraft.seira.challenge.SqliteChallengeStore;
 import xyz.zcraft.seira.command.AttachmentHandler;
+import xyz.zcraft.seira.command.InteractionHandler;
 import xyz.zcraft.seira.command.route.Router;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.RuntimeConfig;
@@ -63,8 +64,8 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
     private final AtomicBoolean running = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicReference<WSClient> activeClient = new AtomicReference<>();
-    private final ShutdownRequest shutdownRequest = new ShutdownRequest(
-            this::prepareStop, this::stop, Duration.ofSeconds(10));
+    private final ShutdownRequest shutdownRequest = new ShutdownRequest(this::prepareStop, this::stop, Duration.ofSeconds(10));
+    private final InteractionHandler interactionHandler;
     private volatile Thread runnerThread;
 
     public QQBot(
@@ -122,6 +123,9 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         this.chatProvider = ChatProviders.newHiAgentChatProvider(config.llm());
 
         this.attachmentHandler = new AttachmentHandler(executors.attachmentDownloads());
+
+        this.interactionHandler = new InteractionHandler(tokenManager);
+
         this.router = new Router(
                 sender,
                 runtimeConfig::current,
@@ -144,8 +148,8 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                 },
                 self::get,
                 chatProvider,
-                s -> QQApi.getGroupBotState(tokenManager.getToken(), s)
-
+                s -> QQApi.getGroupBotState(tokenManager.getToken(), s),
+                interactionHandler
         );
     }
 
@@ -186,7 +190,8 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                         router,
                         attachmentHandler,
                         discordBridgeService,
-                        executors.gatewayEvents()
+                        executors.gatewayEvents(),
+                        interactionHandler
                 );
                 activeClient.set(client);
 

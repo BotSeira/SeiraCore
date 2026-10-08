@@ -4,6 +4,7 @@ import com.google.gson.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.bot.data.*;
+import xyz.zcraft.seira.interaction.data.InteractionResponse;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -87,6 +88,22 @@ public class QQApi {
             }
 
             return GSON.fromJson(send.body(), SentMessage.class);
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
+        }
+    }
+
+    public static void putInteractionResponse(AccessToken accessToken, String interactionId, InteractionResponse response) {
+        try {
+            final var request = newRequestBuilder(accessToken)
+                    .uri(URI.create(ENDPOINT + "/interactions/" + interactionId))
+                    .PUT(HttpRequest.BodyPublishers.ofString(GSON.toJson(Map.of("code", response.getCode()))))
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            if (send.statusCode() != 200) {
+                throw new RuntimeException("Failed to put interaction response to " + interactionId + " " + send.body());
+            }
         } catch (IOException | InterruptedException e) {
             throw requestFailure(e);
         }
@@ -355,6 +372,7 @@ public class QQApi {
                 if (System.nanoTime() >= deadline) {
                     break;
                 }
+                //noinspection BusyWait
                 Thread.sleep(TimeUnit.SECONDS.toMillis(prepare.retryDelaySeconds()));
             }
         } while (System.nanoTime() < deadline);

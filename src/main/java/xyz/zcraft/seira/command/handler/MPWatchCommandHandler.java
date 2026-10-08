@@ -170,7 +170,7 @@ public final class MPWatchCommandHandler {
                         """.formatted(
                         match.lobbyId(), match.mode(),
                         (match.customELO() == null ? "?" : match.customELO().toString()),
-                        (match.customBO() == null ? "?" : match.customBO().toString()),
+                        (match.customBO() == null ? "7" : match.customBO().toString()),
                         teamString
                 ).trim()
         );
@@ -184,7 +184,11 @@ public final class MPWatchCommandHandler {
             }
             try {
                 RoomWatchView view = watchService.watch(
-                        ctx.groupId(), ctx.senderUserId(), MPVersion.STABLE, Long.parseLong(match.lobbyId()), match.customBO()
+                        ctx.groupId(),
+                        ctx.senderUserId(),
+                        MPVersion.STABLE,
+                        Long.parseLong(match.lobbyId()),
+                        (match.customBO() == null ? 7 : match.customBO())
                 );
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(
                         at(ctx) + "已开始监视" + formatRoom(view) + "喵。"

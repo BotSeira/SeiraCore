@@ -12,6 +12,7 @@ import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.bot.data.Button;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
+import xyz.zcraft.seira.command.InteractionHandler;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.BindingConfig;
 import xyz.zcraft.seira.data.UploadedImage;
@@ -33,13 +34,11 @@ import static xyz.zcraft.seira.command.reply.ReplyFactory.ExternalUrls.*;
 
 public final class ReplyFactory {
     private final Supplier<AppConfig> configSupplier;
+    private final InteractionHandler interactionHandler;
 
-    public ReplyFactory(AppConfig config) {
-        this(() -> config);
-    }
-
-    public ReplyFactory(Supplier<AppConfig> configSupplier) {
+    public ReplyFactory(Supplier<AppConfig> configSupplier, InteractionHandler interactionHandler) {
         this.configSupplier = Objects.requireNonNull(configSupplier);
+        this.interactionHandler = interactionHandler;
     }
 
     public static String cmd(String command, String text) {

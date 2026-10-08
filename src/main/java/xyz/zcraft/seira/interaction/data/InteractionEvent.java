@@ -15,7 +15,7 @@ public record InteractionEvent(
         @SerializedName("group_member_openid") String groupMemberOpenId,
         @SerializedName("data") InteractionData data,
         @SerializedName("version") Integer version,
-        @SerializedName("application_id") String application_id
+        @SerializedName("application_id") String applicationId
 ) {
     public String resolveUserId() {
         return switch (scene) {

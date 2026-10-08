@@ -11,10 +11,12 @@ import xyz.zcraft.seira.bot.data.AccessToken;
 import xyz.zcraft.seira.bot.data.Attachment;
 import xyz.zcraft.seira.bot.data.MsgElem;
 import xyz.zcraft.seira.command.AttachmentHandler;
+import xyz.zcraft.seira.command.InteractionHandler;
 import xyz.zcraft.seira.command.route.Router;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.discord.DiscordBridgeService;
 import xyz.zcraft.seira.discord.QqIncomingMessage;
+import xyz.zcraft.seira.interaction.data.InteractionEvent;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -44,6 +46,7 @@ public class WSClient extends WebSocketClient {
     private volatile boolean heartbeatAcked = true;
     @Setter
     private Runnable onCloseCallback = null;
+    private final InteractionHandler interactionHandler;
 
     public WSClient(
             URI serverUri,
@@ -52,7 +55,8 @@ public class WSClient extends WebSocketClient {
             Router router,
             AttachmentHandler attachmentHandler,
             DiscordBridgeService discordBridgeService,
-            Executor eventExecutor
+            Executor eventExecutor,
+            InteractionHandler interactionHandler
     ) {
         super(serverUri);
         this.config = config;
@@ -61,6 +65,7 @@ public class WSClient extends WebSocketClient {
         this.attachmentHandler = java.util.Objects.requireNonNull(attachmentHandler);
         this.discordBridgeService = java.util.Objects.requireNonNull(discordBridgeService);
         this.eventExecutor = java.util.Objects.requireNonNull(eventExecutor);
+        this.interactionHandler = interactionHandler;
 
         LOG.info("QQ Gateway WebSocket Client created");
     }
@@ -147,14 +152,8 @@ public class WSClient extends WebSocketClient {
 
     private void onInteraction(JsonObject payload) {
         JsonObject data = payload.get("d").getAsJsonObject();
-        String id = data.get("id").getAsString();
-        int type = data.get("type").getAsInt();
-        String scene = data.get("scene").getAsString();
-        int chatType = data.get("chat_type").getAsInt();
-        String userOpenId = data.get("user_openid").getAsString();
-        String groupOpenId = data.get("group_openid").getAsString();
-        String groupMemberOpenId = data.get("group_member_openid").getAsString();
-
+        final var event = gson.fromJson(data, InteractionEvent.class);
+        interactionHandler.onInteraction(event);
     }
 
     private void onC2CMsg(JsonObject payload) {

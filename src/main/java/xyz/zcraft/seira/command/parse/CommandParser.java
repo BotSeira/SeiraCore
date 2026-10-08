@@ -45,14 +45,14 @@ public final class CommandParser {
         return parts.toArray(String[]::new);
     }
 
-    public ParseResult parse(String rawContent, String senderUserId, String groupId, String messageId) {
+    public ParseResult parse(String rawContent, String senderUserId, String groupId, String messageId, String senderNickname) {
         if (rawContent == null) {
             return ParseResult.ignored();
         }
 
         String normalized = rawContent.trim();
         if (!normalized.startsWith(PREFIX)) {
-            return ParseResult.text(new Context(senderUserId, groupId, messageId, null, null, rawContent, null));
+            return ParseResult.text(new Context(senderNickname, senderUserId, groupId, messageId, null, null, rawContent, null));
         }
 
         String body = normalized.substring(PREFIX.length()).trim();
@@ -70,7 +70,7 @@ public final class CommandParser {
         String query = body.substring(parts[0].length()).trim();
         String[] args = Arrays.copyOfRange(parts, 1, parts.length);
 
-        return ParseResult.parsed(new Context(senderUserId, groupId, messageId, command, args, rawContent, query));
+        return ParseResult.parsed(new Context(senderNickname, senderUserId, groupId, messageId, command, args, rawContent, query));
     }
 
     public record ParseResult(Status status, Context context) {
