@@ -444,8 +444,13 @@ public final class ScoreCommandHandler {
             String offset = next < ctx.argumentCount() && (!animated || ctx.argument(next).endsWith("ms"))
                     ? ctx.argument(next++) : null;
             selection = SnapshotSelection.parse(ctx.argument(selectorIndex), offset);
-            window = animated ? xyz.zcraft.seira.command.parse.ReplayWindow.parse(
-                    next < ctx.argumentCount() ? ctx.argument(next++) : null) : null;
+            window = animated
+                    ? xyz.zcraft.seira.command.parse.ReplayWindow.parse(
+                            next < ctx.argumentCount()
+                                    ? ctx.argument(next++)
+                                    : null
+                    )
+                    : null;
             if (next != ctx.argumentCount()) throw new IllegalArgumentException("参数过多。");
         } catch (IllegalArgumentException e) {
             ctx.sendReply(at(ctx) + e.getMessage() + "\n" + usage);

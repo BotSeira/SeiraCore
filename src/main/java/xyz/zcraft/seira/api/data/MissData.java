@@ -6,13 +6,14 @@ public record MissData(
         Type type
 ) {
     public enum Type {
-        HIT_CIRCLE, SLIDER, SPINNER;
+        HIT_CIRCLE, SLIDER, SLIDER_BREAK, SPINNER;
 
         @Override
         public String toString() {
             return switch (this) {
                 case HIT_CIRCLE -> "圈圈";
                 case SLIDER -> "滑条";
+                case SLIDER_BREAK -> "断条";
                 case SPINNER -> "转盘";
             };
         }
