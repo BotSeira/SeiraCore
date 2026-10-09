@@ -5,7 +5,7 @@ import java.math.BigDecimal;
 public record ReplayWindow(BigDecimal before, BigDecimal after) {
     public ReplayWindow {
         if (before == null || after == null || before.signum() < 0 || after.signum() < 0
-                || before.add(after).signum() == 0 || before.add(after).compareTo(new BigDecimal("6")) > 0)
+                || before.add(after).signum() == 0 || before.add(after).compareTo(new BigDecimal("20")) > 0)
             throw new IllegalArgumentException("GIF 时间范围必须大于 0 且不超过 20 秒。");
     }
 
