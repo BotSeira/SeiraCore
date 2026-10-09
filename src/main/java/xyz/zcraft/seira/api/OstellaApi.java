@@ -14,8 +14,6 @@ import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.command.parse.SnapshotSelection;
 import xyz.zcraft.seira.util.TimeDurationParser;
-import xyz.zcraft.seira.whatif.WhatIfObservations;
-import xyz.zcraft.seira.whatif.WhatIfService;
 
 import java.io.IOException;
 import java.net.URI;
@@ -103,7 +101,6 @@ public class OstellaApi {
             ApiUtil.ensureApiSuccess(r, "获取用户信息失败");
             final var data = r.getData().getAsJsonObject();
 
-            WhatIfService.observeAvailable(WhatIfObservations.fromUser(data, false));
             return Response.<UserExtended>fromHeaders(send.headers())
                     .content(GSON.fromJson(data, UserExtended.class))
                     .build();
@@ -155,7 +152,6 @@ public class OstellaApi {
             ApiUtil.ensureApiSuccess(r, "获取用户信息失败");
             final var data = r.getData().getAsJsonObject();
 
-            WhatIfService.observeAvailable(WhatIfObservations.fromUser(data, true));
             return GSON.fromJson(data, UserExtended.class);
         } catch (IOException | InterruptedException e) {
             throw requestFailure(e);
@@ -376,7 +372,6 @@ public class OstellaApi {
                 throw ApiUtil.parseHttpError(send.body(), send.statusCode(), failMessage);
             }
 
-            WhatIfService.observeAvailable(WhatIfObservations.fromHeaders(send.headers()));
             byte[] imageBytes = send.body();
 
             return Response.<Base64Bytes>fromHeaders(send.headers())
@@ -1026,7 +1021,6 @@ public class OstellaApi {
             ApiUtil.ensureApiSuccess(response, "查找玩家失败");
             final JsonObject data = ApiUtil.requireDataObject(response, "查找玩家响应缺少用户数据");
 
-            WhatIfService.observeAvailable(WhatIfObservations.fromUser(data, false));
             return Response.<User>fromHeaders(send.headers())
                     .content(GSON.fromJson(data, User.class))
                     .build();
@@ -1039,17 +1033,7 @@ public class OstellaApi {
     }
 
     public static List<User> getUsers(List<Long> u) {
-        return getUsers(u, Duration.ofMinutes(5), true);
-    }
-
-    /**
-     * Bounded background sampling; a failed refresh must not hang indefinitely.
-     */
-    public static List<User> getWhatIfUsers(List<Long> u) {
-        return getUsers(u, Duration.ofSeconds(30), false);
-    }
-
-    private static List<User> getUsers(List<Long> u, Duration timeout, boolean observe) {
+        Duration timeout = Duration.ofMinutes(5);
         try {
             HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/users"))
@@ -1071,9 +1055,6 @@ public class OstellaApi {
             List<User> users = new LinkedList<>();
             for (JsonElement datum : data) {
                 users.add(GSON.fromJson(datum, User.class));
-                if (observe && datum.isJsonObject()) {
-                    WhatIfService.observeAvailable(WhatIfObservations.fromUser(datum.getAsJsonObject(), false));
-                }
             }
 
             return users;

@@ -6,7 +6,6 @@ import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.reply.CommandUsage;
-import xyz.zcraft.seira.whatif.WhatIfService;
 
 import java.util.List;
 import java.util.Locale;
@@ -16,16 +15,14 @@ import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class AddPpCommandHandler {
     private final AddPpApi api;
-    private final WhatIfService ranks;
     private final Function<String, Long> binding;
 
-    public AddPpCommandHandler(AddPpApi api, WhatIfService ranks, Function<String, Long> binding) {
+    public AddPpCommandHandler(AddPpApi api, Function<String, Long> binding) {
         this.api = api;
-        this.ranks = ranks;
         this.binding = binding;
     }
 
-    public static String format(AddPpApi.Result result, WhatIfService.State state) {
+    public static String format(AddPpApi.Result result) {
         StringBuilder text = new StringBuilder();
         text.append(String.format(Locale.ROOT, "如果新增成绩：%.2fpp × %d", result.scorePp(), result.count()));
         if (result.map() != null) {
@@ -41,23 +38,16 @@ public final class AddPpCommandHandler {
         if (result.change() < 1e-9) {
             text.append("\n全球排名：").append(rank(result.rank())).append(" → __").append(rank(result.rank())).append("__ (+0)");
         } else {
-            var model = state.model();
-            boolean covered = result.afterPp() >= model.last().pp() && result.afterPp() <= model.first().pp();
+            var projection = result.rankProjection();
             text.append("\n全球排名：").append(rank(result.rank())).append(" → ");
-            if (covered) {
-                double predicted = model.rankAtPp(result.afterPp());
-                if (result.rank() != null && result.rank() > 0) {
-                    if (result.beforePp() >= model.last().pp() && result.beforePp() <= model.first().pp())
-                        predicted *= result.rank() / model.rankAtPp(result.beforePp());
-                    predicted = Math.min(result.rank(), predicted);
-                }
-                long next = Math.max(1, Math.round(predicted));
+            if ("COVERED".equals(projection.status())) {
+                long next = projection.rank();
                 text.append("__#").append(next).append("__");
                 if (result.rank() != null && result.rank() > 0)
                     text.append(" (+").append(result.rank() - next).append(")");
-            } else if (result.afterPp() > model.first().pp()) {
-                text.append(model.first().rank() == 1 ? "预计 #1" : "预计 #" + model.first().rank() + " 或更靠前");
-            } else text.append("预计在 #").append(model.last().rank()).append(" 之后");
+            } else if ("HIGH_PP".equals(projection.status())) {
+                text.append(projection.rank() == 1 ? "预计 #1" : "预计 #" + projection.rank() + " 或更靠前");
+            } else text.append("预计在 #").append(projection.rank()).append(" 之后");
         }
         if (result.positions() != null && !result.positions().isEmpty()) {
             int first = result.positions().getFirst(), last = result.positions().getLast();
@@ -82,7 +72,7 @@ public final class AddPpCommandHandler {
             var request = AddPpRequest.parse(ctx.args());
             Long uid = request.player() == null ? binding.apply(ctx.senderUserId())
                     : OstellaApi.resolveUid(new Resolver(binding).player(request.player(), ctx.senderUserId()));
-            if (uid <= 0) {
+            if (uid == null || uid <= 0) {
                 ctx.sendReply(at(ctx) + CommandUsage.NO_BIND);
                 return;
             }
@@ -92,7 +82,7 @@ public final class AddPpCommandHandler {
             });
             var result = api.estimate(uid, query);
             String target = request.player() == null ? "" : "目标玩家：" + uid + "\n";
-            ctx.sendReply(at(ctx) + target + format(result, ranks.current()));
+            ctx.sendReply(at(ctx) + target + format(result));
         } catch (IllegalArgumentException e) {
             ctx.sendReply(at(ctx) + e.getMessage() + "\n> " + CommandUsage.ADDPP);
         }

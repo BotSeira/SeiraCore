@@ -29,7 +29,7 @@ import xyz.zcraft.seira.util.NoticesHelper;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 import xyz.zcraft.seira.watch.MPWatchService;
 import xyz.zcraft.seira.watch.ScoreWatchService;
-import xyz.zcraft.seira.whatif.WhatIfService;
+import xyz.zcraft.seira.whatif.WhatIfApi;
 
 import java.util.List;
 import java.util.Optional;
@@ -109,11 +109,11 @@ public class Router {
                 taskCoordinator, replyFactory, rankGuessGameService, resolver, admins::isAdmin, this::getAvatar, imageUploader
         );
         this.unknownCommand = generalCommands::handleUnknown;
-        WhatIfService rankPpService = WhatIfService.create();
+        WhatIfApi rankPpService = new WhatIfApi(startupConfig.ostella().endpoint(), startupConfig.ostella().token());
         WhatIfCommandHandler whatIfCommands = new WhatIfCommandHandler(rankPpService);
         AddPpCommandHandler addPpCommands = new AddPpCommandHandler(
                 new AddPpApi(startupConfig.ostella().endpoint(), startupConfig.ostella().token()),
-                rankPpService, UserDataStore::findBoundUid);
+                UserDataStore::findBoundUid);
         this.commandParser = new CommandParser(resolver::sanitize);
         this.commandRegistry = createCommandRegistry(
                 bindingCommands, scoreCommands, beatmapCommands, socialCommands,
@@ -220,7 +220,6 @@ public class Router {
             String nickname
     ) {
         AtomicInteger messageSeqCounter = new AtomicInteger(1);
-        WhatIfService.recordActivity();
         try {
             final boolean group = groupMessage && groupId != null && !groupId.isBlank();
             if (group && userId != null && !userId.isBlank()) {
