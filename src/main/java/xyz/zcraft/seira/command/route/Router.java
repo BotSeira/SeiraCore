@@ -16,6 +16,7 @@ import xyz.zcraft.seira.command.*;
 import xyz.zcraft.seira.command.handler.*;
 import xyz.zcraft.seira.command.parse.CommandParser;
 import xyz.zcraft.seira.command.parse.Resolver;
+import xyz.zcraft.seira.command.parse.TargetResolver;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.data.UploadedImage;
@@ -73,6 +74,7 @@ public class Router {
         AppConfig startupConfig = configSupplier.get();
         ReplyFactory replyFactory = new ReplyFactory(configSupplier, interactionHandler);
         Resolver resolver = new Resolver();
+        TargetResolver targetResolver = new TargetResolver(resolver, this::getAccessTokenFor);
         TargetHistory history = new TargetHistory();
         ReplayResultStore replayResults = new ReplayResultStore();
         VideoRenderRecord videoRenderRecord = new VideoRenderRecord();
@@ -80,19 +82,19 @@ public class Router {
         this.authHelper = new OsuAuthHelper(startupConfig.binding());
         BindingCommandHandler bindingCommands = new BindingCommandHandler(startupConfig, replyFactory, bindingService);
         ScoreCommandHandler scoreCommands = new ScoreCommandHandler(
-                resolver, history, taskCoordinator, replyFactory, this::getAccessTokenFor, challengeService
+                resolver, targetResolver, history, taskCoordinator, replyFactory, challengeService
         );
         BeatmapCommandHandler beatmapCommands = new BeatmapCommandHandler(
-                resolver, history, taskCoordinator, replyFactory, videoRenderRecord, this::getAccessTokenFor
-        );
+                resolver, targetResolver, history, taskCoordinator, replyFactory, videoRenderRecord, this::getAccessTokenFor
+                );
         SocialCommandHandler socialCommands = new SocialCommandHandler(
-                resolver, authHelper, taskCoordinator, replyFactory, this::getAccessTokenFor, this::getAvatar
+                resolver, targetResolver, authHelper, taskCoordinator, replyFactory, this::getAvatar
         );
         ReplayCommandHandler replayCommands = new ReplayCommandHandler(
-                resolver, history, taskCoordinator, replyFactory, videoRenderRecord, replayResults, admins::isAdmin, this::getAccessTokenFor
+                resolver, targetResolver, history, taskCoordinator, replyFactory, videoRenderRecord, replayResults, admins::isAdmin
         );
         GeneralCommandHandler generalCommands = new GeneralCommandHandler(
-                messageSender, taskCoordinator, replyFactory, resolver, admins::isAdmin
+                messageSender, taskCoordinator, replyFactory, resolver, targetResolver, history, admins::isAdmin
         );
         this.aiChatHandler = new AiChatHandler(
                 resolver, chatProvider, admins::isAdmin, botStateGetter
@@ -149,6 +151,7 @@ public class Router {
                 .register(beatmapCommands::handleM, "m")
                 .register(beatmapCommands::handleBma, "bma")
                 .register(beatmapCommands::handleAp, "ap")
+                .register(generalCommands::handleNcm, "ncm")
                 .register(beatmapCommands::handleBpv, "bpv")
                 .register(beatmapCommands::handleBgp, "bgp")
                 .register(ctx -> socialCommands.handleF(ctx, !ctx.inGroup()), "f")

@@ -33,15 +33,15 @@ public final class ScoreCommandHandler {
 
     public ScoreCommandHandler(
             Resolver resolver,
+            TargetResolver targets,
             TargetHistory history,
             TaskCoordinator taskCoordinator,
             ReplyFactory replyFactory,
-            java.util.function.Function<String, String> accessTokenProvider,
             ChallengeService challengeService
     ) {
         this.challengeService = challengeService;
         this.resolver = resolver;
-        this.targets = new TargetResolver(resolver, accessTokenProvider);
+        this.targets = targets;
         this.history = history;
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;

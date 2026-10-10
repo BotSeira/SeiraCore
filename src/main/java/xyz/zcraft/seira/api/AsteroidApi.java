@@ -1,6 +1,7 @@
 package xyz.zcraft.seira.api;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import org.apache.logging.log4j.LogManager;
@@ -8,6 +9,8 @@ import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.api.data.MinecraftServerStatus;
 import xyz.zcraft.seira.api.data.RawResponse;
+import xyz.zcraft.seira.api.data.ncm.MatchResult;
+import xyz.zcraft.seira.api.data.ncm.Song;
 
 import java.net.URI;
 import java.net.URLEncoder;
@@ -16,6 +19,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 public class AsteroidApi {
     private static final String ENDPOINT;
@@ -85,6 +90,98 @@ public class AsteroidApi {
 
         LOG.warn("Asteroid server is down.");
         return new ServerStatus(false, null);
+    }
+
+    public static List<Song> searchSong(String keywords) {
+        try {
+            var request = requestBuilder("/ncm/songs/search?q=" + URLEncoder.encode(keywords, StandardCharsets.UTF_8))
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            final RawResponse rawResponse = GSON.fromJson(response.body(), RawResponse.class);
+
+            ApiUtil.ensureApiSuccess(rawResponse, "搜索歌曲失败");
+
+            final JsonElement rawResponseData = rawResponse.getData();
+            if (rawResponseData != null && rawResponseData.isJsonObject()) {
+                JsonObject data = rawResponseData.getAsJsonObject();
+                final JsonArray resultArr = data.getAsJsonArray("result");
+
+                List<Song> songs = new ArrayList<>(resultArr.size());
+
+                for (JsonElement jsonElement : resultArr) {
+                    songs.add(GSON.fromJson(jsonElement, Song.class));
+                }
+
+                return songs;
+            } else {
+                return List.of();
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to search songs", e);
+            throw new RuntimeException("搜索歌曲失败", e);
+        }
+    }
+
+    public static String getSongUrl(long id) {
+        try {
+            var request = requestBuilder("/ncm/songs/" + id + "/url")
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            final RawResponse rawResponse = GSON.fromJson(response.body(), RawResponse.class);
+
+            ApiUtil.ensureApiSuccess(rawResponse, "获取歌曲URL失败");
+
+            final JsonElement rawResponseData = rawResponse.getData();
+            if (rawResponseData != null && rawResponseData.isJsonObject()) {
+                JsonObject data = rawResponseData.getAsJsonObject();
+                return data.get("url").getAsString();
+            } else {
+                return null;
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to get song url", e);
+            throw new RuntimeException("获取歌曲URL失败", e);
+        }
+    }
+
+    public static List<MatchResult> matchSong(long beatmapsetId) {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("url", "https://b.ppy.sh/preview/" + beatmapsetId + ".mp3");
+        payload.addProperty("startSeconds", 1);
+        payload.addProperty("duration", 3);
+        try {
+            var request = requestBuilder("/ncm/songs/match")
+                    .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            final RawResponse rawResponse = GSON.fromJson(response.body(), RawResponse.class);
+
+            ApiUtil.ensureApiSuccess(rawResponse, "识曲失败");
+
+            final JsonElement rawResponseData = rawResponse.getData();
+            if (rawResponseData != null && rawResponseData.isJsonObject()) {
+                JsonObject data = rawResponseData.getAsJsonObject();
+                final JsonArray resultArr = data.getAsJsonArray("result");
+
+                List<MatchResult> songs = new ArrayList<>(resultArr.size());
+
+                for (JsonElement jsonElement : resultArr) {
+                    songs.add(GSON.fromJson(jsonElement, MatchResult.class));
+                }
+
+                return songs;
+            } else {
+                return List.of();
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to match song", e);
+            return List.of();
+        }
     }
 
     public record ServerStatus(boolean online, String version) {

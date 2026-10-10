@@ -32,16 +32,16 @@ public final class ReplayCommandHandler {
 
     public ReplayCommandHandler(
             Resolver resolver,
+            TargetResolver targets,
             TargetHistory history,
             TaskCoordinator taskCoordinator,
             ReplyFactory replyFactory,
             VideoRenderRecord videoRenderRecord,
             ReplayResultStore replayResults,
-            Predicate<String> adminAuthorizer,
-            java.util.function.Function<String, String> accessTokenProvider
+            Predicate<String> adminAuthorizer
     ) {
         this.resolver = resolver;
-        this.targets = new TargetResolver(resolver, accessTokenProvider);
+        this.targets = targets;
         this.history = history;
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;

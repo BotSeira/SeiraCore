@@ -34,14 +34,14 @@ public final class SocialCommandHandler {
 
     public SocialCommandHandler(
             Resolver resolver,
+            TargetResolver targets,
             OsuAuthHelper authHelper,
             TaskCoordinator taskCoordinator,
             ReplyFactory replyFactory,
-            Function<String, String> accessTokenProvider,
             Function<String, String> avatarProvider
     ) {
         this.resolver = resolver;
-        this.targets = new TargetResolver(resolver, accessTokenProvider);
+        this.targets = targets;
         this.authHelper = authHelper;
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
