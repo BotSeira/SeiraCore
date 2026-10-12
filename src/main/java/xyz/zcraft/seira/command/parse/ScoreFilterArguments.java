@@ -16,7 +16,7 @@ public final class ScoreFilterArguments {
     private static final Pattern FILTER_PATTERN = Pattern.compile(
             "(?i)^(acc(?:uracy)?|combo|pp|time|length|len|star|stars|sr|bpm|miss|misses|score|mod|mods|rank|replay"
                     + "|any|title|artist|mapper|genre|language|tag|source|nsfw|video|storyboard|fullcombo"
-                    + "|ar|od|cs|hp|t|a|cb|cmb|m|vid|sb|fc|rep|rp|type)"
+                    + "|ar|od|cs|hp|t|a|cb|cmb|m|vid|sb|fc|rep|rp|type|ur)"
                     + "(>=|<=|!=|!~|>|<|=|~)(.+)$"
     );
     private static final Pattern MISS_SHORTHAND_PATTERN = Pattern.compile("(?i)^(!?)(\\d+)miss(?:es)?$");
@@ -132,6 +132,7 @@ public final class ScoreFilterArguments {
             case "bpm" -> "bpm";
             case "miss", "misses" -> "miss";
             case "score" -> "score";
+            case "ur" -> "ur";
             case "ar" -> "ar";
             case "od" -> "od";
             case "cs" -> "cs";
