@@ -32,9 +32,13 @@ public final class AddPpCommandHandler {
             text.append(String.format(Locale.ROOT, "\n> +%s · %.2f★ · %.4f%% · %dx/%dx\n300/100/50/Miss：%d/%d/%d/%d",
                     map.mods().isEmpty() ? "NM" : map.mods(), map.stars(), hit.accuracy(), hit.combo(), map.maxCombo(),
                     hit.great(), hit.ok(), hit.meh(), hit.misses()));
-            if (result.replaced()) text.append("\n> 同图已有 BP：取更高 PP 替换，不重复计入。");
-        } else text.append("\n> (视为不同谱面的新成绩)");
-        text.append(String.format(Locale.ROOT, "\n总 PP：%.2f → __%.2f__ (+%.2f)", result.beforePp(), result.afterPp(), result.change()));
+            if (result.replaced())
+                text.append("\n> 同图已有 BP：取更高 PP 替换，不重复计入。");
+        } else {
+            text.append("\n> (视为不同谱面的新成绩)");
+        }
+
+        text.append(String.format(Locale.ROOT, "\n\n总 PP：%.2f → __%.2f__ (+%.2f)", result.beforePp(), result.afterPp(), result.change()));
         if (result.change() < 1e-9) {
             text.append("\n全球排名：").append(rank(result.rank())).append(" → __").append(rank(result.rank())).append("__ (+0)");
         } else {
@@ -55,6 +59,11 @@ public final class AddPpCommandHandler {
                 text.append("\n成绩位置：BP #").append(first).append(first == last ? "" : "–#" + last);
             else text.append("\n成绩未进入前 200 BP喵");
         }
+
+        if (!result.ranked()) {
+            text.append("\n> ...但是本成绩不能计入排名喵。");
+        }
+
         return text.toString();
     }
 
@@ -70,9 +79,10 @@ public final class AddPpCommandHandler {
     public void handleAddPp(Context ctx) {
         try {
             var request = AddPpRequest.parse(ctx.args());
-            Long uid = request.player() == null ? binding.apply(ctx.senderUserId())
+            long uid = request.player() == null
+                    ? binding.apply(ctx.senderUserId())
                     : OstellaApi.resolveUid(new Resolver(binding).player(request.player(), ctx.senderUserId()));
-            if (uid == null || uid <= 0) {
+            if (uid <= 0) {
                 ctx.sendReply(at(ctx) + CommandUsage.NO_BIND);
                 return;
             }

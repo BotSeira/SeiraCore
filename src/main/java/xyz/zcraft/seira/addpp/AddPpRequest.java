@@ -20,11 +20,8 @@ public record AddPpRequest(AddPpQuery query, String player, TargetInput shortcut
             var target = TargetInput.read(args);
             var conditions = List.copyOf(Arrays.asList(args).subList(target.consumedArgs(), args.length));
             if (conditions.size() > 20) throw new IllegalArgumentException("成绩条件过多喵。");
-            // The map ID is resolved before this pending query is sent to oStella.
             return new AddPpRequest(new AddPpQuery(null, 1, null, conditions), target.player(), target);
         }
-        // A single number is PP; spaced multiplication still belongs to the score.
-        // A leading map ID keeps all remaining tokens as map conditions.
         if (args == null || args.length < 2 || args[0].matches("(?i)m\\d+"))
             return new AddPpRequest(AddPpQuery.parse(args), null);
         try {

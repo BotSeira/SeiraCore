@@ -30,18 +30,25 @@ public final class AddPpApi {
         try {
             var response = client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
             JsonObject root = gson.fromJson(response.body(), JsonObject.class);
+
             if ((response.statusCode() == 400 || response.statusCode() == 404) && root != null && root.has("message"))
                 throw new IllegalArgumentException(root.get("message").getAsString());
+
             if (response.statusCode() != 200 || root == null || !root.has("success") || !root.get("success").getAsBoolean())
                 throw new IllegalStateException("PP 估算请求失败（HTTP " + response.statusCode() + "）。");
+
             AddPpApi.Result result = gson.fromJson(root.get("data"), Result.class);
+
             if (result == null || result.userId() != userId || !Double.isFinite(result.beforePp()) || !Double.isFinite(result.afterPp()))
                 throw new IllegalStateException("PP 估算返回数据不完整。");
+
             var projection = result.rankProjection();
+
             if (projection == null || projection.status() == null
                     || !java.util.Set.of("UNCHANGED", "COVERED", "HIGH_PP", "LOW_PP").contains(projection.status())
                     || (!"UNCHANGED".equals(projection.status()) && (projection.rank() == null || projection.rank() < 1)))
                 throw new IllegalStateException("排名估算数据缺失，请同步更新 oStella。");
+
             return result;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -51,7 +58,8 @@ public final class AddPpApi {
         }
     }
 
-    public record RankProjection(Long rank, String status, String updatedAt, boolean stale) {}
+    public record RankProjection(Long rank, String status, String updatedAt, boolean stale) {
+    }
 
     public record Hits(int great, int ok, int meh, int misses, int combo, double accuracy) {
     }
@@ -62,6 +70,6 @@ public final class AddPpApi {
 
     public record Result(String username, long userId, Long rank, double beforePp, double afterPp, double change,
                          double scorePp, int count, int sampled, List<Integer> positions, boolean replaced,
-                         MapResult map, RankProjection rankProjection) {
+                         MapResult map, RankProjection rankProjection, boolean ranked) {
     }
 }
