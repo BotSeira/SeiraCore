@@ -136,14 +136,14 @@ class HiAgentProvider implements ChatProvider {
     }
 
     @Override
-    public void recordHistory(String groupId, String sender, String message) {
+    public void recordHistory(String groupId, String username, String senderId, String message) {
         if (groupId == null || groupId.isEmpty()
-                || sender == null || sender.isEmpty()
+                || senderId == null || senderId.isEmpty()
                 || message == null || message.isEmpty()) {
             return;
         }
 
-        final String historyMessage = "**<@" + sender + ">**" + ": " + processMessage(message);
+        final String historyMessage = "**<" + username + "@" + senderId + ">**" + ": " + processMessage(message);
 
         final Deque<String> log = chatLog.computeIfAbsent(groupId, _ -> new ArrayDeque<>());
 
@@ -166,7 +166,7 @@ class HiAgentProvider implements ChatProvider {
 
     @Override
     public String input(
-            String groupId, String openId, String rawContent,
+            String groupId, String username, String openId, String rawContent,
             Function<String, String> contextFunc, StreamHandler handler,
             List<AgentFile> attachments, String refContent
     ) {
@@ -210,7 +210,7 @@ class HiAgentProvider implements ChatProvider {
                         .append("**<@").append(openId).append(">**").append(": ").append(message);
             }
 
-            recordHistory(groupId, openId, message);
+            recordHistory(groupId, username, openId, message);
 
             state.resetIfNeeded(api, groupId);
 
@@ -241,7 +241,7 @@ class HiAgentProvider implements ChatProvider {
                 throw e;
             }
 
-            recordHistory(groupId, "Seira(你,回复" + openId + "的消息)", shorten(answer));
+            recordHistory(groupId, "Seira(你,回复", username + "@" + openId + "的消息)", shorten(answer));
             return answer;
         } finally {
             state.running.set(false);

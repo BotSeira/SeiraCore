@@ -10,10 +10,10 @@ import java.util.function.Function;
 public interface ChatProvider {
     int CONTEXT_SIZE = 30;
 
-    void recordHistory(String groupId, String sender, String message);
+    void recordHistory(String groupId, String username, String senderId, String message);
 
     String input(
-            String groupId, String openId, String rawContent,
+            String groupId, String username, String openId, String rawContent,
             Function<String, String> contextFunc, StreamHandler handler,
             List<AgentFile> attachments, String refContent
     );

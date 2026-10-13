@@ -200,6 +200,7 @@ public class AiChatHandler {
 
         chatProvider.input(
                 ctx.groupId(),
+                ctx.senderNickname(),
                 ctx.senderUserId(),
                 message,
                 input -> generateVar(ctx, input),
@@ -281,21 +282,21 @@ public class AiChatHandler {
         return qqContext.toString();
     }
 
-    public void recordHistory(String groupId, String userId, String rawContent) {
+    public void recordHistory(String groupId, String username, String userId, String rawContent) {
         if (rawContent == null || rawContent.isBlank()) {
             return;
         }
 
-        recordHistory(groupId, userId, rawContent.trim(), List.of());
+        recordHistory(groupId, username, userId, rawContent.trim(), List.of());
     }
 
-    public void recordHistory(String groupId, String userId, String rawContent, List<Attachment> attachments) {
+    public void recordHistory(String groupId, String username, String userId, String rawContent, List<Attachment> attachments) {
         StringBuilder sb = new StringBuilder(rawContent.trim());
         if (attachments != null && !attachments.isEmpty()) {
             for (Attachment attachment : attachments) {
                 sb.append("\n").append("![%s](%s)".formatted(attachment.filename(), attachment.url()));
             }
         }
-        chatProvider.recordHistory(groupId, userId, sb.toString());
+        chatProvider.recordHistory(groupId, username, userId, sb.toString());
     }
 }

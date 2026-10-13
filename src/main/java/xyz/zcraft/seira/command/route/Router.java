@@ -283,7 +283,7 @@ public class Router {
                 if (beingAt && permitAi && activatedAi) {
                     aiChatHandler.handleChat(parseResult.context().withReplies(replies), msgToRecord, msgElems);
                 } else if (permitAi) {
-                    aiChatHandler.recordHistory(groupId, userId, msgToRecord, attachments);
+                    aiChatHandler.recordHistory(groupId, nickname, userId, msgToRecord, attachments);
                 }
                 return;
             }
@@ -303,14 +303,14 @@ public class Router {
                     .withReplies(replies)
                     .withRecorder(s -> {
                         if (permitAi) {
-                            aiChatHandler.recordHistory(groupId, "Seira(你,回复" + userId + "的消息)", s);
+                            aiChatHandler.recordHistory(groupId, "Seira(你,回复", nickname + "@" + userId + "的消息)", s);
                         }
                     });
 
             commandExecutor.execute(() -> {
                 try {
                     if (permitAi) {
-                        aiChatHandler.recordHistory(groupId, userId, context.rawContent());
+                        aiChatHandler.recordHistory(groupId, nickname, userId, context.rawContent());
                     }
                     LOG.info("Routing {} message : {}", groupMessage ? "group" : "private", context.rawContent());
                     dispatch(context);
