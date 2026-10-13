@@ -330,7 +330,7 @@ public final class ReplyFactory {
     public PendingMessage replayStatMessage(Context ctx, String jobId, RenderStat renderStat) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.replayStatContent(ctx, renderStat, jobId),
-                buttons().replayProgressButtons(jobId, isCancelableReplayStatus(renderStat.getStatus()), ctx.senderUserId())
+                buttons().replayProgressButtons(jobId, "done".equalsIgnoreCase(renderStat.getStatus()), isCancelableReplayStatus(renderStat.getStatus()), ctx.senderUserId())
         );
     }
 
@@ -1142,22 +1142,26 @@ public final class ReplyFactory {
         }
 
         List<List<Button>> replayProgressButtons(String jobId, String userId) {
-            return replayProgressButtons(jobId, true, userId);
+            return replayProgressButtons(jobId, false, true, userId);
         }
 
-        List<List<Button>> replayProgressButtons(String jobId, boolean cancelable, String userId) {
+        List<List<Button>> replayProgressButtons(String jobId, boolean gettable, boolean cancelable, String userId) {
             if (jobId == null || jobId.isBlank()) {
                 return null;
             }
 
-            return Button.keyboard(cancelable
-                    ? Button.row(
-                    Button.command(1, "查询渲染进度", "/rstat " + jobId),
-                    Button.command(2, "取消渲染", "/rcancel " + jobId)
-                            .permit(userId)
-                            .modal("确定要取消渲染吗")
-            )
-                    : Button.row(Button.command(1, "查询渲染进度", "/rstat " + jobId)));
+            if (gettable) {
+                return Button.keyboard(Button.command(1, "获取回放", "/rget " + jobId));
+            } else if (cancelable) {
+                return Button.keyboard(
+                        Button.command(1, "查询渲染进度", "/rstat " + jobId),
+                        Button.command(2, "取消渲染", "/rcancel " + jobId)
+                                .permit(userId)
+                                .modal("确定要取消渲染吗")
+                );
+            } else {
+                return Button.keyboard(Button.command(1, "查询渲染进度", "/rstat " + jobId));
+            }
         }
 
         List<List<Button>> beatmapButtons(String beatmapId) {

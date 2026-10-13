@@ -83,13 +83,14 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 | `/s`            | `/s <id/locId/rsN/bpN>`                                 | 获取指定的在线或本地成绩图                                                      |
 | `/sa`           | `/sa <id/locId/rsN/bpN>`                                | 获取指定成绩分析图                                                              |
 | `/ma`           | `/ma [id/locId/rsN/bpN] [n/#n]`                         | 获取指定或最近目标成绩的Miss分析；省略目标时用`#n`指定Miss                      |
-| `/snap`         | `/snap [成绩目标] <mm:ss.fff/秒数s/objN/#N> [±偏移ms]` | 使用 WhiteCat 2.1 生成指定时间、物件或 Miss 的完整回放快照；别名 `/snapshot` |
+| `/snap`         | `/snap [成绩目标] <mm:ss.fff/秒数s/objN/#N> [±偏移ms]`  | 生成指定时间、物件或 Miss 的完整回放快照；别名 `/snapshot`                      |
 | `/u`            | `/u [uid/username/@user]`                               | 获取指定用户信息                                                                |
 | `/@`            | `/@[someone]`                                           | 获取自己或指定用户的文字版信息                                                  |
 | `/r`            | `/r [id/locId/rsN/bpN] [[mm:ss]-[mm:ss]]`               | 生成并发送指定或最近目标的回放视频。省略范围时自动识别高光，使用`-`渲染整个回放 |
 | `/rg`           | `/rg <start/group/#Rank/end/wish/stats [all]/lb [all]>` | 猜 Rank 游戏及个人战绩查询                                                      |
 | `/rsc`          | `/rsc [id/locId/rsN/bpN] [+<id1>,<id2>...]`             | 生成并发送指定或最近目标的成绩同屏回放视频；追加用户和范围顺序不限              |
 | `/rstat`        | `/rstat [id]`                                           | 获取视频生成进度                                                                |
+| `/rget`         | `/rget [id]`                                            | 获取视频                                                                        |
 | `/rcancel`      | `/rcancel <id>`                                         | 取消排队中、渲染中或上传中的回放任务                                            |
 | `/ms`           | `/ms <id/rsN/bpN>`                                      | 获取指定谱面集信息                                                              |
 | `/dl`           | `/dl <id/rsN/bpN/mp>`                                   | 获取指定谱面集的镜像下载链接                                                    |
@@ -98,12 +99,12 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 | `/daily`        | `/daily`                                                | 每日挑战信息                                                                    |
 | `/roll`         | `/roll [dice]`                                          | 掷骰子                                                                          |
 | `/luck`         | `/luck`                                                 | 今日人品                                                                        |
-| `/whatif`       | `/whatif <总PPpp 或 #排名>`                              | 估算 osu!standard 总 PP 与全球排名；纯数字默认按排名解析                         |
-| `/addpp`        | `/addpp 200*4` 或 `/addpp m谱面ID [条件...]`             | 估算新增成绩后的总 PP、排名和变化；成绩条件顺序不限                              |
+| `/whatif`       | `/whatif <总PPpp 或 #排名>`                             | 估算 osu!standard 总 PP 与全球排名；纯数字默认按排名解析                        |
+| `/addpp`        | `/addpp 200*4` 或 `/addpp m谱面ID [条件...]`            | 估算新增成绩后的总 PP、排名和变化；成绩条件顺序不限                             |
 | `/rbp`          | `/rbp [uid/username/@user]`                             | 获取随机BP                                                                      |
 | `/mp`           | `/mp`                                                   | 多人房间列表                                                                    |
 | `/watch`        | `/watch add/del/list [目标]`                            | 添加/删除/列出监视任务                                                          |
-| `/challenge`    | `/challenge configure` → `/challenge start`             | 配置并开始群挑战：指定/随机谱面、自由/固定难度、必选/禁用Mod、水平计分             |
+| `/challenge`    | `/challenge configure` → `/challenge start`             | 配置并开始群挑战：指定/随机谱面、自由/固定难度、必选/禁用Mod、水平计分          |
 | `/mpwatch`      | `/mpwatch start/stop/status [目标]`                     | 按群成员添加、停止或查看多人房间监视；`stop all` 可停止本群全部监视             |
 | `/romai`        | `/romai [目标]`                                         | 开始监视自己或目标正在进行的RomAI比赛                                           |
 | `/mc`           | `/mc <服务器地址>`                                      | 获取指定MC服务器状态                                                            |

@@ -185,16 +185,34 @@ public final class ReplayCommandHandler {
             jobId = ctx.args()[0];
         }
 
-        OstellaApi.ReplayRenderResult replayResult = replayResults.get(jobId);
-        if (replayResult != null) {
-            PendingMessage video = taskCoordinator.replayVideoMessage(replayResult);
-            if (ctx.sendReply(video).success()) {
-                replayResults.remove(jobId);
-            }
+        ctx.sendReply(replyFactory.replayStatMessage(ctx, jobId, OstellaApi.getRenderStat(jobId)));
+    }
+
+    public void handleRget(Context ctx) {
+        if (ctx.args().length != 1 && ctx.args().length != 0) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/rget [任务ID]"));
             return;
         }
 
-        ctx.sendReply(replyFactory.replayStatMessage(ctx, jobId, OstellaApi.getRenderStat(jobId)));
+        String jobId;
+        if (ctx.args().length == 0) {
+            if (videoRenderRecord.hasRenderTask(ctx.senderUserId())) {
+                jobId = videoRenderRecord.getRenderTask(ctx.senderUserId());
+            } else {
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "未找到渲染请求"));
+                return;
+            }
+        } else {
+            jobId = ctx.args()[0];
+        }
+
+        OstellaApi.ReplayRenderResult replayResult = replayResults.get(jobId);
+        if (replayResult != null) {
+            PendingMessage video = taskCoordinator.replayVideoMessage(replayResult);
+            ctx.sendReply(video);
+        } else {
+            ctx.sendReply(at(ctx) + "回放渲染未完成喵。");
+        }
     }
 
     public void handleRcancel(Context ctx) {

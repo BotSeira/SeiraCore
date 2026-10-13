@@ -114,6 +114,14 @@ public class Button {
         return List.of(rows);
     }
 
+    public static List<List<Button>> keyboard(Button... row) {
+        return List.of(List.of(row));
+    }
+
+    public static List<List<Button>> keyboard(Button button) {
+        return List.of(List.of(button));
+    }
+
     public Button permit(String userId) {
         Action.Permission permission = new Action.Permission();
         permission.setType(0);

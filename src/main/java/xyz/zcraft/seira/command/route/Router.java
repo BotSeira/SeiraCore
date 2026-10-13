@@ -179,6 +179,7 @@ public class Router {
                 .register(addPpCommands::handleAddPp, "addpp")
                 .register(generalCommands::handleRoll, "roll")
                 .register(replayCommands::handleRstat, "rstat")
+                .register(replayCommands::handleRget, "rget")
                 .register(replayCommands::handleRcancel, "rcancel")
                 .register(generalCommands::handleInspect, "inspect")
                 .register(generalCommands::handleHelp, "help")

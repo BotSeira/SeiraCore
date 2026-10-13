@@ -91,7 +91,8 @@ public final class BeatmapCommandHandler {
 
     public void handleAp(Context ctx) {
         var target = ctx.argumentCount() == 0
-                ? TargetInput.memory() : TargetInput.read(ctx.args());
+                ? TargetInput.memory()
+                : TargetInput.read(ctx.args());
         var remembered = history.get(ctx);
         if (target.kind() == TargetInput.Kind.MEMORY && remembered == null) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.AP));

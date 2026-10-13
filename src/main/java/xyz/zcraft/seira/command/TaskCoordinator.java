@@ -148,10 +148,7 @@ public final class TaskCoordinator {
             return;
         }
 
-        // Keep the cached result when both passive and proactive delivery fail, so /rstat can retry.
-        if (ctx.send(true, replayVideoMessage(result)).success()) {
-            removeReplayResult(task.taskId());
-        }
+        ctx.send(true, replayVideoMessage(result));
     }
 
     public void removeReplayResult(String taskId) {
