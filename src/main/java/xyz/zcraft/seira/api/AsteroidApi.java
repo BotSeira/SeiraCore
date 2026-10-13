@@ -10,6 +10,7 @@ import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.api.data.MinecraftServerStatus;
 import xyz.zcraft.seira.api.data.RawResponse;
 import xyz.zcraft.seira.api.data.ncm.MatchResult;
+import xyz.zcraft.seira.api.data.ncm.Playlist;
 import xyz.zcraft.seira.api.data.ncm.Song;
 import xyz.zcraft.seira.util.Query;
 
@@ -210,6 +211,29 @@ public class AsteroidApi {
                 return songs;
             } else {
                 return List.of();
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to get playlist songs", e);
+            throw new RuntimeException("获取歌单失败", e);
+        }
+    }
+
+    public static Playlist getPlaylistDetail(long playlistId) {
+        try {
+            var request = requestBuilder("/ncm/playlists/" + playlistId)
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            final RawResponse rawResponse = GSON.fromJson(response.body(), RawResponse.class);
+
+            ApiUtil.ensureApiSuccess(rawResponse, "获取歌单失败");
+
+            final JsonElement rawResponseData = rawResponse.getData();
+            if (rawResponseData != null && rawResponseData.isJsonObject()) {
+                return GSON.fromJson(rawResponseData.getAsJsonObject(), Playlist.class);
+            } else {
+                return null;
             }
         } catch (Exception e) {
             LOG.error("Failed to get playlist songs", e);

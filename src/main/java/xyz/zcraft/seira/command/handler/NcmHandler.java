@@ -7,6 +7,7 @@ import xyz.zcraft.seira.api.AsteroidApi;
 import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.ncm.Artist;
 import xyz.zcraft.seira.api.data.ncm.MatchResult;
+import xyz.zcraft.seira.api.data.ncm.Playlist;
 import xyz.zcraft.seira.api.data.ncm.Song;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.PendingMessage;
@@ -170,10 +171,24 @@ public class NcmHandler {
                 }
             }
 
+            final Playlist playlistDetail = AsteroidApi.getPlaylistDetail(playlistId);
+
+            if (playlistDetail == null) {
+                ctx.sendReply(at(ctx) + "获取歌单详情失败喵。");
+                return;
+            }
+
+            if (offset + limit > playlistDetail.trackCount()) {
+                ctx.sendReply(at(ctx) + "给定的范围 `%d-%d` 超出歌单范围(%d)了喵。".formatted(offset + 1, offset + limit, playlistDetail.trackCount()));
+                return;
+            }
+
+            ctx.sendReply(at(ctx) + "正在获取歌单 `%s` 的第 `%d-%d` 首歌曲...".formatted(playlistDetail.name(), offset + 1, offset + limit));
+
             List<Song> songs = AsteroidApi.getPlaylistSongs(playlistId, limit, offset);
 
             if (songs.isEmpty()) {
-                ctx.sendReply(at(ctx) + "歌单为空或获取失败。");
+                ctx.sendReply(at(ctx) + "歌单为空或获取失败喵。");
                 return;
             }
 
@@ -187,28 +202,26 @@ public class NcmHandler {
 
             StringBuilder sb = new StringBuilder(at(ctx));
 
-            sb.append(" 歌单 ").append(playlistId).append(" 的 ").append(offset + 1).append(" - ").append(offset + limit).append(" 首歌曲:\n");
+            sb.append(" 歌单 `").append(playlistDetail.name()).append("` 的 ").append(offset + 1).append(" - ").append(offset + limit).append(" 首歌曲:\n");
 
-            sb.append("| 匹配 | 标题 | 作者 | 匹配ID |\n").append("|:--:|:--:|:--:|:--:|\n");
+            sb.append("| 标题 | 作者 | 匹配ID |\n").append("|:--:|:--:|:--:|\n");
 
             for (var result : results) {
                 if (result.status().equalsIgnoreCase("no_match")) {
                     continue;
                 }
 
-                final String matchedSets = result.matches()
+                String matchedSets = result.matches()
                         .stream()
                         .sorted(Comparator.comparing(OstellaApi.BatchSearchResult.Match::score).reversed())
                         .map(match -> "%s (%.1f)".formatted(ms(match.beatmapset().id()), match.score()))
                         .limit(3).collect(Collectors.joining("\n"));
 
-                String symbol = switch (result.status()) {
-                    case "matched" -> "✓";
-                    case "no_match" -> "✗";
-                    default -> "?";
-                };
+                if (!result.status().equalsIgnoreCase("matched")) {
+                    matchedSets = "(?)" + matchedSets;
+                }
 
-                sb.append("| %s | %s | %s | %s |\n".formatted(symbol, result.title(), result.artist(), matchedSets));
+                sb.append("| %s | %s | %s |\n".formatted(result.title(), result.artist(), matchedSets));
             }
 
             final long noMatch = results.stream()
