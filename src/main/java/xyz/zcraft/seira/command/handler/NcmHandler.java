@@ -155,9 +155,9 @@ public class NcmHandler {
                 String[] range = ctx.argument(1).split("-");
                 if (range.length == 2) {
                     try {
-                        offset = Integer.parseInt(range[0]);
+                        offset = Integer.parseInt(range[0]) - 1;
                         limit = Integer.parseInt(range[1]) - offset;
-                        if (limit <= 0) {
+                        if (offset < 0 || limit <= 0) {
                             throw new IllegalArgumentException();
                         }
                     } catch (Exception e) {

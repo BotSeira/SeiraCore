@@ -16,13 +16,17 @@ import xyz.zcraft.seira.util.ResourceUtil;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
-import static xyz.zcraft.seira.command.reply.ReplyFactory.*;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.ExternalUrls.CHANNEL;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.ExternalUrls.PERMISSION;
+import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
+import static xyz.zcraft.seira.command.reply.ReplyFactory.cmd;
 
 public class AiChatHandler {
     private static final Gson GSON = new Gson();
@@ -167,6 +171,7 @@ public class AiChatHandler {
 
     private static final Pattern CHAT_INLINE_FILE = Pattern.compile("%%\\[file:(.+?)]%%");
 
+    private static final ExecutorService executor = Executors.newSingleThreadExecutor();
     public void handleChat(Context ctx, String message, List<MsgElem> elems) {
         if (!AiPermission.isActivated(ctx.groupId())) {
             return;
@@ -213,7 +218,14 @@ public class AiChatHandler {
                                 .forEach(r -> {
                                     if (r.groupCount() != 1) return;
                                     final String fileUrl = r.group(1);
-                                    ctx.send(true, PendingMessage.ofFileUrl(fileUrl));
+                                    executor.submit(() -> {
+                                        if (fileUrl.endsWith(".flac") || fileUrl.endsWith(".wav")
+                                                || fileUrl.endsWith(".ogg") || fileUrl.endsWith(".mp3")) {
+                                            return ctx.send(true, PendingMessage.ofVoiceUrl(fileUrl).doUpload(false));
+                                        } else {
+                                            return ctx.send(true, PendingMessage.ofFileUrl(fileUrl).doUpload(false));
+                                        }
+                                    });
                                 });
 
                         message = CHAT_INLINE_FILE.matcher(message).replaceAll("");
