@@ -97,12 +97,13 @@ public final class MPWatchApi {
         return snapshot;
     }
 
-    public byte[] renderResult(MPVersion version, long roomId, long playlistItemId, Integer customBo) {
+    public byte[] renderResult(MPVersion version, long roomId, long playlistItemId, Integer customBo, Integer customWarmups) {
         HttpResponse<byte[]> response = get(
                 "/multiplayer/rooms/" + requirePositive(roomId, "roomId")
                         + "/playlist/" + requirePositive(playlistItemId, "playlistItemId") + "/result?version="
                         + requireVersion(version).value()
-                        + (customBo == null ? "" : "&bo=" + customBo),
+                        + (customBo == null ? "" : "&bo=" + customBo)
+                        + (customWarmups == null ? "" : "&warmup=" + customBo),
                 HttpResponse.BodyHandlers.ofByteArray()
         );
         ensureSuccessfulStatus(response.statusCode(), response.body(), "生成多人房间结果图片");

@@ -52,7 +52,7 @@ public final class TaskCoordinator {
                     return ApiRequestException.getDefaultMessage(e.getErrorCode());
                 }
                 case ClosedChannelException _ -> {
-                    return "oStella API 无法连接，请稍后再试喵";
+                    return "oStella API 无法连接，请稍后再试喵\n> 这可能是因为正在进行后端更新，请稍作等待...";
                 }
                 case ResolutionException e -> {
                     return e.getMessage();
