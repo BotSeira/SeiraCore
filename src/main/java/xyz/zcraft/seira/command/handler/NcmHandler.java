@@ -215,7 +215,7 @@ public class NcmHandler {
                         .stream()
                         .sorted(Comparator.comparing(OstellaApi.BatchSearchResult.Match::score).reversed())
                         .map(match -> "%s (%.1f)".formatted(ms(match.beatmapset().id()), match.score()))
-                        .limit(3).collect(Collectors.joining("\n"));
+                        .limit(3).collect(Collectors.joining(","));
 
                 if (!result.status().equalsIgnoreCase("matched")) {
                     matchedSets = "(?)" + matchedSets;
