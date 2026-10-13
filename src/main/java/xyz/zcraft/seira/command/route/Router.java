@@ -110,6 +110,7 @@ public class Router {
         RankGuessCommandHandler rankGuessCommands = new RankGuessCommandHandler(
                 taskCoordinator, replyFactory, rankGuessGameService, resolver, admins::isAdmin, this::getAvatar, imageUploader
         );
+        NcmHandler ncmHandler = new NcmHandler(messageSender, taskCoordinator, replyFactory, resolver, targetResolver, history, admins::isAdmin);
         this.unknownCommand = generalCommands::handleUnknown;
         WhatIfApi rankPpService = new WhatIfApi(startupConfig.ostella().endpoint(), startupConfig.ostella().token());
         WhatIfCommandHandler whatIfCommands = new WhatIfCommandHandler(rankPpService);
@@ -120,7 +121,7 @@ public class Router {
         this.commandRegistry = createCommandRegistry(
                 bindingCommands, scoreCommands, beatmapCommands, socialCommands,
                 replayCommands, generalCommands, watchCommands, specificScoreWatchCommands,
-                multiplayerRoomWatchCommands, dcsCommands, rankGuessCommands, aiChatHandler, whatIfCommands, challengeCommands, addPpCommands
+                multiplayerRoomWatchCommands, dcsCommands, rankGuessCommands, aiChatHandler, whatIfCommands, challengeCommands, addPpCommands, ncmHandler
         );
         this.debugRoutes = new DebugRoutes(
                 configSupplier, messageSender, replyFactory, taskCoordinator,
@@ -135,7 +136,7 @@ public class Router {
             WatchCommandHandler watchCommands, SpecificScoreWatchCommandHandler specificScoreWatchCommands,
             MPWatchCommandHandler multiplayerRoomWatchCommands, DcsCommandHandler dcsCommands,
             RankGuessCommandHandler rankGuessCommands, AiChatHandler aiChatHandler, WhatIfCommandHandler whatIfCommands,
-            ChallengeCommandHandler challengeCommands, AddPpCommandHandler addPpCommands
+            ChallengeCommandHandler challengeCommands, AddPpCommandHandler addPpCommands, NcmHandler ncmHandler
     ) {
         return CommandRegistry.builder()
                 .register(bindingCommands::handleBind, "bind")
@@ -151,7 +152,8 @@ public class Router {
                 .register(beatmapCommands::handleM, "m")
                 .register(beatmapCommands::handleBma, "bma")
                 .register(beatmapCommands::handleAp, "ap")
-                .register(generalCommands::handleNcm, "ncm")
+                .register(ncmHandler::handleNcm, "ncm")
+                .register(ncmHandler::handleNcmPlaylist, "ncmp")
                 .register(beatmapCommands::handleBpv, "bpv")
                 .register(beatmapCommands::handleBgp, "bgp")
                 .register(ctx -> socialCommands.handleF(ctx, !ctx.inGroup()), "f")

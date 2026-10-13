@@ -40,7 +40,6 @@ import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 public final class GeneralCommandHandler {
     private static final Pattern SERVER_PATTERN = Pattern.compile("^(?:https?://)?([a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)+)(?::[0-9]+)?$");
     private static final Logger LOG = LogManager.getLogger(GeneralCommandHandler.class);
-    private static final Pattern TITLE_PATTERN = Pattern.compile("^([^()]+)((?:\\(.+\\))+)$");
     private final MessageSender messageSender;
     private final TargetResolver targets;
     private final TargetHistory history;
@@ -126,87 +125,6 @@ public final class GeneralCommandHandler {
                 context, context.senderUserId(), adminAuthorizer.test(context.senderUserId()),
                 context.groupId(), context.messageId()
         ));
-    }
-
-    public void handleNcm(Context ctx) {
-        var target = ctx.argumentCount() == 0 ? TargetInput.memory() : TargetInput.read(ctx.args());
-        var remembered = history.get(ctx);
-        if ((target.kind() == TargetInput.Kind.MEMORY && remembered == null)
-                || ctx.argumentCount() - target.consumedArgs() > 0) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/ncm <谱面集ID 或 快捷查询>"));
-            return;
-        }
-        try (var _ = taskCoordinator.beginRequest(ctx, "Beatmapset")) {
-            var ids = targets.beatmapset(ctx, target, remembered);
-            history.remember(ctx, ids);
-            final Beatmapset beatmapset = OstellaApi.getBeatmapsetRaw(ids.beatmapsetId());
-
-            ctx.sendReply(
-                    at(ctx) + "正在网易云音乐搜索 `%s` 喵..."
-                            .formatted(beatmapset.getTitleUnicode() + " - " + beatmapset.getArtistUnicode())
-            );
-
-            StringBuilder sb = new StringBuilder(at(ctx) + "网易云音乐搜索结果:\n");
-
-            final List<MatchResult> matchResults = AsteroidApi.matchSong(ids.beatmapsetId());
-
-            final Set<Long> listedIds = new HashSet<>();
-
-            if (matchResults.isEmpty()) {
-                sb.append("听歌识曲未找到结果喵。\n");
-            } else {
-                sb.append("| 来源: | 听歌识曲 | 网易云 |\n|:---|:---|:---:|\n");
-                for (int i = 0; i < Math.min(matchResults.size(), 5); i++) {
-                    MatchResult result = matchResults.get(i);
-                    final Matcher matcher = TITLE_PATTERN.matcher(result.song().name());
-                    String title;
-                    String subtitle;
-                    if (matcher.matches() && matcher.groupCount() == 2) {
-                        title = matcher.group(1);
-                        subtitle = matcher.group(2);
-                    } else {
-                        title = result.song().name();
-                        subtitle = "";
-                    }
-                    sb.append("| ![Cover #80px #80px](%s) | $\\begin{array}{l}\\large{\\textbf{%s}}%s\\\\\\small{\\textsf{%s}}\\\\\\tiny{\\textsf{%s}}\\end{array}$ | [打开](https://music.163.com/song?id=%d) |".formatted(
-                            result.song().album().picUrl(),
-                            escape(title),
-                            !subtitle.isEmpty() ? "\\\\\\small{\\textit{%s}}".formatted(escape(subtitle)) : "",
-                            escape("By: " + result.song().artists().stream().map(Artist::name).collect(Collectors.joining(", "))),
-                            escape("专辑: " + result.song().album().name()),
-                            result.song().id()
-                    )).append("\n");
-                    listedIds.add(result.song().id());
-                }
-            }
-
-            sb.append("\n");
-
-            final List<Song> searchResults = AsteroidApi.searchSong(beatmapset.getTitleUnicode() + " " + beatmapset.getArtistUnicode());
-
-            if (searchResults.isEmpty()) {
-                sb.append("搜索未找到结果喵。\n");
-            } else {
-                sb.append("| 来源: 搜索 | 网易云 |\n|:---|:---:|\n");
-                for (int i = 0; i < Math.min(searchResults.size(), 2); i++) {
-                    Song result = searchResults.get(i);
-                    if (listedIds.contains(result.id())) continue;
-
-                    sb.append("| $\\begin{array}{l}\\large{\\textbf{%s}}\\\\\\small{\\textsf{%s}}\\\\\\tiny{\\textsf{%s}}\\end{array}$ | [打开](https://music.163.com/song?id=%d) |".formatted(
-                            escape(result.name()),
-                            escape("By: " + result.artists().stream().map(Artist::name).collect(Collectors.joining(", "))),
-                            escape("专辑: " + result.album().name()),
-                            result.id()
-                    )).append("\n");
-                }
-            }
-
-            ctx.sendReply(sb.toString().trim());
-        }
-    }
-
-    public String escape(String text) {
-        return text.replaceAll("([\\\\$%#&_])", "\\\\$1");
     }
 
     public void handleHelp(Context context) {

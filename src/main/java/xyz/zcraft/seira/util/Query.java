@@ -1,5 +1,6 @@
 package xyz.zcraft.seira.util;
 
+import org.jetbrains.annotations.Nullable;
 import org.snakeyaml.engine.v2.common.UriEncoder;
 
 import java.util.HashMap;
@@ -16,8 +17,10 @@ public class Query {
         return this;
     }
 
-    public Query param(String key, Object value) {
-        params.put(key, UriEncoder.encode(value.toString()));
+    public Query param(String key, @Nullable Object value) {
+        if (value != null) {
+            params.put(key, UriEncoder.encode(value.toString()));
+        }
         return this;
     }
 

@@ -11,6 +11,7 @@ import xyz.zcraft.seira.api.data.MinecraftServerStatus;
 import xyz.zcraft.seira.api.data.RawResponse;
 import xyz.zcraft.seira.api.data.ncm.MatchResult;
 import xyz.zcraft.seira.api.data.ncm.Song;
+import xyz.zcraft.seira.util.Query;
 
 import java.net.URI;
 import java.net.URLEncoder;
@@ -181,6 +182,38 @@ public class AsteroidApi {
         } catch (Exception e) {
             LOG.error("Failed to match song", e);
             return List.of();
+        }
+    }
+
+    public static List<Song> getPlaylistSongs(long playlistId, Integer limit, Integer offset) {
+        try {
+            var request = requestBuilder("/ncm/playlists/" + playlistId + "/songs" + Query.create().param("limit", limit).param("offset", offset).build())
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            final RawResponse rawResponse = GSON.fromJson(response.body(), RawResponse.class);
+
+            ApiUtil.ensureApiSuccess(rawResponse, "获取歌单失败");
+
+            final JsonElement rawResponseData = rawResponse.getData();
+            if (rawResponseData != null && rawResponseData.isJsonObject()) {
+                JsonObject data = rawResponseData.getAsJsonObject();
+                final JsonArray resultArr = data.getAsJsonArray("result");
+
+                List<Song> songs = new ArrayList<>(resultArr.size());
+
+                for (JsonElement jsonElement : resultArr) {
+                    songs.add(GSON.fromJson(jsonElement, Song.class));
+                }
+
+                return songs;
+            } else {
+                return List.of();
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to get playlist songs", e);
+            throw new RuntimeException("获取歌单失败", e);
         }
     }
 

@@ -24,6 +24,7 @@ public record AddPpRequest(AddPpQuery query, String player, TargetInput shortcut
         }
         if (args == null || args.length < 2 || args[0].matches("(?i)m\\d+"))
             return new AddPpRequest(AddPpQuery.parse(args), null);
+
         try {
             return new AddPpRequest(AddPpQuery.parse(args), null);
         } catch (IllegalArgumentException ignored) {

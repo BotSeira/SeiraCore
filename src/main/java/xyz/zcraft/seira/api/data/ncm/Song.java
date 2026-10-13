@@ -1,5 +1,7 @@
 package xyz.zcraft.seira.api.data.ncm;
 
+import com.google.gson.annotations.SerializedName;
+
 import java.util.List;
 
 public record Song(
@@ -8,7 +10,7 @@ public record Song(
         long duration,
         int rtype,
         int ftype,
-        List<Artist> artists,
+        @SerializedName(value = "artists", alternate = {"ar"}) List<Artist> artists,
         long copyrightId,
         long mvid,
         String name,

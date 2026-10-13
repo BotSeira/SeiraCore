@@ -18,11 +18,11 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 
+import static xyz.zcraft.seira.command.reply.ReplyFactory.*;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.ExternalUrls.CHANNEL;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.ExternalUrls.PERMISSION;
-import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
-import static xyz.zcraft.seira.command.reply.ReplyFactory.cmd;
 
 public class AiChatHandler {
     private static final Gson GSON = new Gson();
@@ -165,6 +165,8 @@ public class AiChatHandler {
         ctx.sendReply(at(ctx) + "用法：/ai [on|off|reset|stop]");
     }
 
+    private static final Pattern CHAT_INLINE_FILE = Pattern.compile("%%\\[file:(.+?)]%%");
+
     public void handleChat(Context ctx, String message, List<MsgElem> elems) {
         if (!AiPermission.isActivated(ctx.groupId())) {
             return;
@@ -207,6 +209,14 @@ public class AiChatHandler {
                 new StreamHandler() {
                     @Override
                     public void onText(String message) {
+                        CHAT_INLINE_FILE.matcher(message).results()
+                                .forEach(r -> {
+                                    if (r.groupCount() != 1) return;
+                                    final String fileUrl = r.group(1);
+                                    ctx.send(true, PendingMessage.ofFileUrl(fileUrl));
+                                });
+
+                        message = CHAT_INLINE_FILE.matcher(message).replaceAll("");
                         if (!message.trim().startsWith(at.trim())) {
                             message = at + message;
                         }

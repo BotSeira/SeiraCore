@@ -31,8 +31,8 @@ public record AddPpQuery(Double pp, Integer count, Long beatmapId, List<String> 
         try {
             double pp = Double.parseDouble(matcher.group(1));
             int count = matcher.group(2) == null ? 1 : Integer.parseInt(matcher.group(2));
-            if (!Double.isFinite(pp) || pp <= 0 || pp > 100_000 || count < 1 || count > 100)
-                throw new IllegalArgumentException("单条 PP 必须为 0–100000 之间的正数，条数为 1–100喵。");
+            if (!Double.isFinite(pp) || pp <= 0 || pp > 100_000_000 || count < 1 || count > 200)
+                throw new IllegalArgumentException("单条 PP 必须为 0–100000000 之间的正数，条数为 1–200喵。");
             return new AddPpQuery(pp, count, null, List.of());
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("PP 或条数过大喵。");

@@ -438,6 +438,48 @@ public class OstellaApi {
         }
     }
 
+    public static List<BatchSearchResult> searchBeatmapSetBatch(List<BatchSearchQuery> queries) {
+        JsonObject payload = new JsonObject();
+        payload.add("queries", GSON.toJsonTree(queries));
+        try {
+            HttpRequest localRequest = requestBuilder()
+                    .uri(URI.create(ENDPOINT + "/beatmapsets/search/batch"))
+                    .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
+                    .build();
+
+            final var send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw ApiUtil.parseHttpError(send.body(), send.statusCode(), "搜索谱面集失败");
+            }
+
+            final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
+            ApiUtil.ensureApiSuccess(rawResponse, "搜索谱面集失败");
+            final JsonArray data = ApiUtil.requireResultArray(rawResponse, "搜索谱面集响应缺少结果数组");
+
+            final LinkedList<BatchSearchResult> items = new LinkedList<>();
+
+            data.forEach(item -> items.add(GSON.fromJson(item, BatchSearchResult.class)));
+
+            return items;
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
+        }
+    }
+
+    public record BatchSearchQuery(String title, String artist) {
+    }
+
+    public record BatchSearchResult(String title, String artist, String status, List<Match> matches,
+                                    boolean truncated) {
+        public record Match(Metadata beatmapset, double score, String reason, boolean exact) {
+        }
+
+        public record Metadata(long id, String artist, String artistUnicode, String title,
+                               String titleUnicode, String status, long playCount, long favouriteCount) {
+        }
+    }
+
     @SuppressWarnings("unused")
     public static ReplayTaskInfo createObscuredReplayRenderTask(long scoreId) {
         return createObscuredReplayRenderTask(scoreId, null);
