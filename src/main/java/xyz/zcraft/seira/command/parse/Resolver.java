@@ -69,6 +69,12 @@ public final class Resolver {
             }
         }
 
+        matcher = Patterns.COMPACT_TB_COMMAND_PATTERN.matcher(rawContent);
+        if (matcher.find()) {
+            String target = matcher.groupCount() == 1 ? "" : matcher.group(2);
+            rawContent = "tb #" + matcher.group(1) + " " + target;
+        }
+
         matcher = Patterns.SPACE_MISSING_COMMAND_PATTERN.matcher(rawContent);
         if (matcher.find()) {
             String command = matcher.group(1).toLowerCase(Locale.ROOT);
@@ -177,6 +183,9 @@ public final class Resolver {
     private static final class Patterns {
         private static final Pattern COMPACT_SCORE_COMMAND_PATTERN = Pattern.compile(
                 "(?i)^(rs|rp|bp)(\\d+)(?:-(\\d+))?(?=\\s|$)"
+        );
+        private static final Pattern COMPACT_TB_COMMAND_PATTERN = Pattern.compile(
+                "(?i)^tb#?(\\d+)(.*)"
         );
         private static final Pattern SPACE_MISSING_COMMAND_PATTERN = Pattern.compile(
                 "^([a-zA-Z]+)(\\d+(?:#\\d+)?)"
