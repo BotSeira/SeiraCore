@@ -1063,7 +1063,8 @@ public final class ReplyFactory {
         }
 
         List<List<Button>> bpButtons(String userId) {
-            return Button.keyboard(
+            return null;
+            /* return Button.keyboard(
                     Button.row(
                             Button.command(1, "查询最好成绩", "/s bo1"),
                             Button.command(2, "查询最近成绩", "/s rs1")
@@ -1071,11 +1072,12 @@ public final class ReplyFactory {
                     Button.row(
                             Button.openUrl(3, "在游戏中查看", directUrl + "/u/" + userId)
                     )
-            );
+            ); */
         }
 
         List<List<Button>> userInfoButtons(String userId) {
-            return Button.keyboard(
+            return null;
+            /* return Button.keyboard(
                     Button.row(
                             Button.command(1, "查询最好成绩", "/bo 5 " + userId),
                             Button.command(2, "查询最近成绩", "/rs 5 " + userId)
@@ -1083,14 +1085,15 @@ public final class ReplyFactory {
                     Button.row(
                             Button.openUrl(3, "在游戏中查看", directUrl + "/u/" + userId)
                     )
-            );
+            ); */
         }
 
         List<List<Button>> rsButtons() {
-            return Button.keyboard(Button.row(
-                    Button.command(1, "查询最好成绩", "/s bo1"),
-                    Button.command(2, "查询最近成绩", "/s rs1")
-            ));
+            return null;
+            // return Button.keyboard(Button.row(
+            //        Button.command(1, "查询最好成绩", "/s bo1"),
+            //        Button.command(2, "查询最近成绩", "/s rs1")
+            // ));
         }
 
         List<List<Button>> sButtons(String beatmapId, String scoreId) {
@@ -1099,15 +1102,15 @@ public final class ReplyFactory {
             }
 
             return Button.keyboard(
-                    Button.row(
+                    /* Button.row(
                             Button.openUrl(1, "查看谱面", directUrl + "/b/" + beatmapId),
                             Button.command(2, "查询谱面", "/m " + beatmapId),
                             Button.command(3, "查询谱面集", "/ms m" + beatmapId)
-                    ),
+                    ), */
                     Button.row(
-                            Button.command(4, "成绩分析", "/sa " + scoreId),
-                            Button.command(5, "查询排行", "/lb " + beatmapId),
-                            Button.command(6, "渲染高光", "/r " + scoreId)
+                            Button.command(4, "成绩分析", "/sa " + scoreId)
+                            // , Button.command(5, "查询排行", "/lb " + beatmapId)
+                            , Button.command(6, "渲染高光", "/r " + scoreId)
                     )
             );
         }
@@ -1118,14 +1121,14 @@ public final class ReplyFactory {
             }
 
             return Button.keyboard(
-                    Button.row(
+                    /* Button.row(
                             Button.openUrl(1, "查看谱面", directUrl + "/b/" + beatmapId),
                             Button.command(2, "查询谱面", "/m " + beatmapId),
                             Button.command(3, "查询谱面集", "/ms m" + beatmapId)
-                    ),
+                    ), */
                     Button.row(
-                            Button.command(4, "Misses", "/ma " + scoreId),
-                            Button.command(5, "查询排行", "/lb " + beatmapId),
+                            Button.command(4, "Miss分析", "/ma " + scoreId),
+                            // Button.command(5, "查询排行", "/lb " + beatmapId),
                             Button.command(6, "渲染高光", "/r " + scoreId)
                     )
             );
@@ -1171,17 +1174,19 @@ public final class ReplyFactory {
 
             return Button.keyboard(
                     Button.row(
-                            Button.command(1, "查询排行榜", "/lb " + beatmapId),
-                            Button.openUrl(2, "在游戏中查看", directUrl + "/b/" + beatmapId)
+                            // Button.command(1, "查询排行榜", "/lb " + beatmapId),
+                            Button.command(5, "预览", "/bpv " + beatmapId),
+                            Button.command(6, "分析", "/bma " + beatmapId)
+                            Button.openUrl(2, "打开游戏", directUrl + "/b/" + beatmapId)
                     ),
                     Button.row(
                             Button.command(3, "预览音频", "/ap m" + beatmapId),
-                            Button.command(4, "查询自己的分数", "/s m" + beatmapId)
-                    ),
-                    Button.row(
+                            Button.command(4, "查询分数", "/s m" + beatmapId)
+                    )
+                    /* Button.row(
                             Button.command(5, "预览谱面", "/bpv " + beatmapId),
                             Button.command(6, "分析谱面", "/bma " + beatmapId)
-                    )
+                    ) */
             );
         }
 
