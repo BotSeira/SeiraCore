@@ -1176,7 +1176,7 @@ public final class ReplyFactory {
                     Button.row(
                             // Button.command(1, "查询排行榜", "/lb " + beatmapId),
                             Button.command(5, "预览", "/bpv " + beatmapId),
-                            Button.command(6, "分析", "/bma " + beatmapId)
+                            Button.command(6, "分析", "/bma " + beatmapId),
                             Button.openUrl(2, "打开游戏", directUrl + "/b/" + beatmapId)
                     ),
                     Button.row(
