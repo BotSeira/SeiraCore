@@ -54,6 +54,7 @@ public final class Resolver {
 
         rawContent = rawContent.replace("+", " +");
 
+        Matcher matcher;
         // Support for other bot's style's commands
         // /bs -> /bp 20 & /ps -> /rp 20 & /b -> /bp & /p -> /rp
         if (rawContent.equalsIgnoreCase("bs")) {
@@ -70,7 +71,7 @@ public final class Resolver {
             rawContent = command + (target == null ? "" : target);
         }
 
-        Matcher matcher = Patterns.COMPACT_SCORE_COMMAND_PATTERN.matcher(rawContent);
+        matcher = Patterns.COMPACT_SCORE_COMMAND_PATTERN.matcher(rawContent);
         if (matcher.find()) {
             String type = matcher.group(1).toLowerCase(Locale.ROOT);
             String start = matcher.group(2);
