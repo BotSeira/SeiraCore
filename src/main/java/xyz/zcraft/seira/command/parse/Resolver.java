@@ -41,6 +41,7 @@ public final class Resolver {
             }
         }
 
+        // /@someone -> /ux @someone
         if (rawContent.trim().equalsIgnoreCase("@")
                 || rawContent.trim().equalsIgnoreCase("//")) {
             return "ux";
@@ -69,12 +70,30 @@ public final class Resolver {
             }
         }
 
+        // /tb#30@someone -> /tb #30 @someone
         matcher = Patterns.COMPACT_TB_COMMAND_PATTERN.matcher(rawContent);
         if (matcher.find()) {
-            String target = matcher.groupCount() == 1 ? "" : matcher.group(2);
+            String target = matcher.group(2) == null ? "" : matcher.group(2);
             rawContent = "tb #" + matcher.group(1) + " " + target;
         }
 
+        // Support for other bot's style's commands
+        // /bs -> /bp 20 & /ps -> /rp 20 & /b -> /bp & /p -> /rp
+        if (rawContent.equalsIgnoreCase("bs")) {
+            rawContent = "bp 20";
+        } else if (rawContent.equalsIgnoreCase("ps")) {
+            rawContent = "rp 20";
+        } else if ((matcher = Patterns.B_P_SHORT.matcher(rawContent)).matches()) {
+            String command = switch (matcher.group(1)) {
+                case "b" -> "bp";
+                case "p" -> "rp";
+                default -> throw new IllegalArgumentException("Invalid command");
+            };
+            String target = matcher.group(2);
+            rawContent = command + (target == null ? "" : " " + target);
+        }
+
+        // General /abc12345 -> /abc 12345
         matcher = Patterns.SPACE_MISSING_COMMAND_PATTERN.matcher(rawContent);
         if (matcher.find()) {
             String command = matcher.group(1).toLowerCase(Locale.ROOT);
@@ -195,6 +214,7 @@ public final class Resolver {
         private static final Pattern QQ_INLINE_AT_PATTERN = Pattern.compile("(<@[A-Z0-9]{32}>)");
         private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
         private static final Pattern SEARCH_PATTERN = Pattern.compile("^(?:#(\\d+) )?(.+)$");
+        private static final Pattern B_P_SHORT = Pattern.compile("^([bp])(\\d+)?$");
     }
 }
 

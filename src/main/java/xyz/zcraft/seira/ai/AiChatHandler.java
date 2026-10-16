@@ -216,7 +216,7 @@ public class AiChatHandler {
                     public void onText(String message) {
                         CHAT_INLINE_FILE.matcher(message).results()
                                 .forEach(r -> {
-                                    if (r.groupCount() != 1) return;
+                                    if (r.group(1) == null || r.group(1).isBlank()) return;
                                     final String fileUrl = r.group(1);
                                     executor.submit(() -> {
                                         if (fileUrl.endsWith(".flac") || fileUrl.endsWith(".wav")

@@ -93,7 +93,7 @@ public class NcmHandler {
                     final Matcher matcher = TITLE_PATTERN.matcher(result.song().name());
                     String title;
                     String subtitle;
-                    if (matcher.matches() && matcher.groupCount() == 2) {
+                    if (matcher.matches() && matcher.group(2) != null && !matcher.group(2).isEmpty()) {
                         title = matcher.group(1);
                         subtitle = matcher.group(2);
                     } else {
