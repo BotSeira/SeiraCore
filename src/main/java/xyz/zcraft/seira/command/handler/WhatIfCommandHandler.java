@@ -2,8 +2,8 @@ package xyz.zcraft.seira.command.handler;
 
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.reply.CommandUsage;
-import xyz.zcraft.seira.whatif.WhatIfQuery;
 import xyz.zcraft.seira.whatif.WhatIfApi;
+import xyz.zcraft.seira.whatif.WhatIfQuery;
 
 import java.util.Locale;
 

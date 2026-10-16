@@ -205,7 +205,7 @@ public final class MPWatchCommandHandler {
             } else if (ctx.argument(index).matches("\\d+")) {
                 roomId = Long.parseLong(ctx.argument(index));
                 if (ctx.argumentCount() > index + 1) {
-                    String arg =  ctx.argument(index + 1);
+                    String arg = ctx.argument(index + 1);
                     if ("stable".equalsIgnoreCase(arg) || "stb".equalsIgnoreCase(arg)) {
                         version = MPVersion.STABLE;
                         index++;

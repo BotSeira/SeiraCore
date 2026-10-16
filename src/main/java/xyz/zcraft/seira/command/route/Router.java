@@ -86,7 +86,7 @@ public class Router {
         );
         BeatmapCommandHandler beatmapCommands = new BeatmapCommandHandler(
                 resolver, targetResolver, history, taskCoordinator, replyFactory, videoRenderRecord, this::getAccessTokenFor
-                );
+        );
         SocialCommandHandler socialCommands = new SocialCommandHandler(
                 resolver, targetResolver, authHelper, taskCoordinator, replyFactory, this::getAvatar
         );

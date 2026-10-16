@@ -18,7 +18,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
@@ -30,6 +29,8 @@ import static xyz.zcraft.seira.command.reply.ReplyFactory.cmd;
 
 public class AiChatHandler {
     private static final Gson GSON = new Gson();
+    private static final Pattern CHAT_INLINE_FILE = Pattern.compile("%%\\[file:(.+?)]%%");
+    private static final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Resolver resolver;
     private final Predicate<String> adminAuthorizer;
     private final ChatProvider chatProvider;
@@ -169,9 +170,6 @@ public class AiChatHandler {
         ctx.sendReply(at(ctx) + "用法：/ai [on|off|reset|stop]");
     }
 
-    private static final Pattern CHAT_INLINE_FILE = Pattern.compile("%%\\[file:(.+?)]%%");
-
-    private static final ExecutorService executor = Executors.newSingleThreadExecutor();
     public void handleChat(Context ctx, String message, List<MsgElem> elems) {
         if (!AiPermission.isActivated(ctx.groupId())) {
             return;

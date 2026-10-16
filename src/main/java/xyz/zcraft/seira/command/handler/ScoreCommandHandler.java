@@ -446,10 +446,10 @@ public final class ScoreCommandHandler {
             selection = SnapshotSelection.parse(ctx.argument(selectorIndex), offset);
             window = animated
                     ? xyz.zcraft.seira.command.parse.ReplayWindow.parse(
-                            next < ctx.argumentCount()
-                                    ? ctx.argument(next++)
-                                    : null
-                    )
+                    next < ctx.argumentCount()
+                            ? ctx.argument(next++)
+                            : null
+            )
                     : null;
             if (next != ctx.argumentCount()) throw new IllegalArgumentException("参数过多。");
         } catch (IllegalArgumentException e) {

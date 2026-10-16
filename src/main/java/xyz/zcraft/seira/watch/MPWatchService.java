@@ -297,7 +297,8 @@ public final class MPWatchService implements AutoCloseable {
     }
 
     public record WatchEntry(
-            MPVersion version, long roomId, String roomName, Set<Long> sentPlaylistItemIds, Integer customBo, Integer customWarmups
+            MPVersion version, long roomId, String roomName, Set<Long> sentPlaylistItemIds, Integer customBo,
+            Integer customWarmups
     ) {
         public WatchEntry(
                 MPVersion version, long roomId, String roomName, Set<Long> sentPlaylistItemIds, Integer customBo, Integer customWarmups

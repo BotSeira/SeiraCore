@@ -43,10 +43,10 @@ public class WSClient extends WebSocketClient {
     private final Router router;
     private final AttachmentHandler attachmentHandler;
     private final DiscordBridgeService discordBridgeService;
+    private final InteractionHandler interactionHandler;
     private volatile boolean heartbeatAcked = true;
     @Setter
     private Runnable onCloseCallback = null;
-    private final InteractionHandler interactionHandler;
 
     public WSClient(
             URI serverUri,

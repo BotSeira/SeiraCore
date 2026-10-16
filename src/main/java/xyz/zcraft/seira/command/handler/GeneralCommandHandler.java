@@ -6,16 +6,12 @@ import xyz.zcraft.osu.model.Beatmapset;
 import xyz.zcraft.seira.api.AsteroidApi;
 import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.MinecraftServerStatus;
-import xyz.zcraft.seira.api.data.ncm.Artist;
-import xyz.zcraft.seira.api.data.ncm.MatchResult;
-import xyz.zcraft.seira.api.data.ncm.Song;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.TargetHistory;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
-import xyz.zcraft.seira.command.parse.TargetInput;
 import xyz.zcraft.seira.command.parse.TargetResolver;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.data.Notice;
@@ -26,14 +22,9 @@ import xyz.zcraft.seira.util.dice.Dice;
 import xyz.zcraft.seira.util.dice.expr.DiceExpr;
 import xyz.zcraft.seira.util.dice.result.DiceResult;
 
-import java.util.HashSet;
-import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.function.Predicate;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 

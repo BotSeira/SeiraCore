@@ -2,6 +2,7 @@ package xyz.zcraft.seira.whatif;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -11,7 +12,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Set;
 
-/** Query-only client. oStella owns samples, interpolation, persistence and refresh. */
+/**
+ * Query-only client. oStella owns samples, interpolation, persistence and refresh.
+ */
 public final class WhatIfApi {
     private static final Gson GSON = new Gson();
     private final String endpoint;
@@ -21,6 +24,17 @@ public final class WhatIfApi {
     public WhatIfApi(String endpoint, String token) {
         this.endpoint = endpoint.replaceAll("/+$", "");
         this.token = token;
+    }
+
+    private static void validate(Result result, WhatIfQuery query) {
+        Set<String> statuses = query.byPp() ? Set.of("COVERED", "HIGH_PP", "LOW_PP")
+                : Set.of("COVERED", "LOW_RANK", "HIGH_RANK");
+        if (result == null || !"osu".equals(result.mode()) || result.status() == null || !statuses.contains(result.status())
+                || !Double.isFinite(result.pp()) || result.pp() <= 0 || !Double.isFinite(result.rank()) || result.rank() < 1
+                || result.updatedAt() == null || result.sampleCount() < 2
+                || (query.byPp() ? result.pp() != query.pp() : result.rank() != (double) query.rank()))
+            throw new IllegalArgumentException("Invalid estimate");
+        Instant.parse(result.updatedAt());
     }
 
     public Result estimate(WhatIfQuery query) {
@@ -48,17 +62,7 @@ public final class WhatIfApi {
         }
     }
 
-    private static void validate(Result result, WhatIfQuery query) {
-        Set<String> statuses = query.byPp() ? Set.of("COVERED", "HIGH_PP", "LOW_PP")
-                : Set.of("COVERED", "LOW_RANK", "HIGH_RANK");
-        if (result == null || !"osu".equals(result.mode()) || result.status() == null || !statuses.contains(result.status())
-                || !Double.isFinite(result.pp()) || result.pp() <= 0 || !Double.isFinite(result.rank()) || result.rank() < 1
-                || result.updatedAt() == null || result.sampleCount() < 2
-                || (query.byPp() ? result.pp() != query.pp() : result.rank() != (double) query.rank()))
-            throw new IllegalArgumentException("Invalid estimate");
-        Instant.parse(result.updatedAt());
-    }
-
     public record Result(String mode, String status, double pp, double rank, String updatedAt,
-                         boolean stale, int sampleCount, long minRank, long maxRank, double minPp, double maxPp) {}
+                         boolean stale, int sampleCount, long minRank, long maxRank, double minPp, double maxPp) {
+    }
 }
