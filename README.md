@@ -3,8 +3,6 @@
 Seira 是一个提供 osu! 成绩查询的 QQ 机器人。
 支持生成最好成绩图、最近成绩图、排行榜等，持续更新中...
 
-Seira 依赖 [oStella](https://github.com/bptSeira/oStella) 作为上游数据服务。
-
 详细使用文档在[这里](https://docs.seira.top/)~
 
 ## 添加机器人
@@ -103,32 +101,6 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 | `/inspect`      | `/inspect`                                              | 获取当前上下文信息                                                              |
 | `/help`         | `/help`                                                 | 显示帮助信息                                                                    |
 
-部分指令会先回复“请求已加入队列，预计等待时间 X 秒”，待异步请求完成后再额外发送结果消息。
-
-`/challenge configure` 显示当前配置和 QQ 按钮，修改后使用 `/challenge start` 开始。
-群成员通过 `/challenge join` 报名，成绩自动收集，`/challenge lb` 查看排行。
-详细设置、计分方式和部署要求见 [群挑战说明](docs/group-challenges.md)。
-
-`/whatif 12345pp` 估算账号总 PP 对应的全球排名，`/whatif #12345` 或 `/whatif 12345` 估算该排名所需的总 PP。
-支持小数 PP 和大小写 `pp`，群聊、私聊均可使用，无需绑定。SeiraCore 调用 oStella `GET /whatif?pp=12345` 或 `GET /whatif?rank=12345`，只解析指令和展示结果；不再保存样本、拟合模型或启动刷新任务。超出范围时返回边界，数据超过 48 小时会提示较旧。
-模型、采样时间、缓存及自动刷新统一由 oStella 管理，`/addpp` 的排名预测也由同一后端模型返回。需先更新 oStella 再更新 SeiraCore；旧后端缺少查询接口时会明确提示失败，不使用本地旧模型回退。
-本次后端内置快照来自 `SeiraCore/whatif-osu-snapshot.json`（2026-10-09 02:38 北京时间）。如需迁移其他部署中更新的运行缓存，在首次启动前将原 SeiraCore 的 `data/whatif-osu-snapshot.json` 复制到 oStella 工作目录下同名路径；有效且不旧于内置数据的缓存会自动加载。
-
-`/addpp 123` 或 `/addpp 200*4` 估算新增成绩后的加权总 PP 和排名变化；
-`/addpp m1234567 HDDT 97.41% 13miss 18ok 1200x` 先计算谱面成绩的 PP。也可将 `m谱面ID` 换为 `rs/bp/rp[N]`，如 `/addpp peppy rp2 HD 98%`；N 默认 1、范围 1–200，仅取该玩家成绩的谱面。条件可省略、顺序不限；只传入已给条件，缺失值由 rosu-pp 处理。
-默认使用自己的绑定账号；可用 `/addpp [user] ...` 指定其他玩家，user 支持 UID、用户名或 @用户，目标放在成绩参数前；含空格的用户名用双引号包裹。完整条件与估算范围见 [addpp 说明](docs/addpp.md)，需同步更新 oStella。
-
-`/r`和`/rsc`（回放渲染）会先返回“生成请求正在等待中，队列位置：N”，随后返回请求状态，最后在渲染完成后再发送回放视频。
-
-`/snap rp1 01:23.456` 按谱面歌曲时间生成快照；`/snap obj123` 定位最近目标的第 123 个物件；
-`/snap #3 -50ms` 定位第 3 个 Miss 判定前 50ms。物件和 Miss 从 1 开始编号，Miss 与 `/ma` 的列表一致；
-偏移最多 ±60000ms。时间也可写 `83.456s` 或 `83456ms`，DT/HT 下仍使用原谱面时间。
-画面包含皮肤物件与判定、滑条进度、鼠标及轨迹、按键、判定条、歌曲进度、实时 PP 和准确率。
-只支持 osu!standard；画面采用固定 1920×1080 配置。需同时更新 oStella 后端，详情见 [回放快照说明](docs/replay-snapshot.md)。
-
-上传 osu! 服务器上不存在的 `.osr` 回放后，机器人会返回形如 `loc123456789` 的本地成绩ID；该ID可用于 `/s`、`/sa`、`/ma`、`/snap`、`/r`、
-`/rsc` 等成绩目标指令。
-
 ### 快捷查询
 
 `/s`、`/sa`、`/ma`、`/snap`（`/snapshot`）和 `/r` 支持 `[@用户] m谱面ID` 作为成绩目标，例如 `/sa @用户 m123456`、`/ma m123456 #2`、`/snap @用户 m123456 01:23.456`。玩家可用 UID、用户名或 @用户，省略时查询自己在该谱面上的成绩；各指令后续参数保持原有含义。`/sm` 保持原有语法。
@@ -157,46 +129,3 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 
 你可以在私聊中直接发送你的回放文件，Seira会将其转存。
 这样就可以对未上传到osu!服务器的回放进行分析了。
-
-## 调试命令
-
-> [!WARNING]
->
-> **警告：危险区域！**
->
-> 以下命令仅用于调试，使用不当可能会造成数据丢失、账号封禁等后果，且仅在调试模式启用且发送者为bpt管理员的情况下可用。
->
-> 这些指令可能会随时进行添加、修改或删除，且不保证向后兼容。
-
-| 命令                               | 结果                                   |
-|------------------------------------|----------------------------------------|
-| `/debug.upload <type> <cos> <url>` | 上传指定文件                           |
-| `/debug.test`                      | 发送一段测试文本                       |
-| `/debug.message <base64>`          | 将指定Base64解码并作为Markdown消息发出 |
-| `/debug.db <sql>`                  | 对后端数据库执行指定的SQL语句          |
-| `/debug.update-user-info`          | 更新数据库中所有玩家的信息             |
-| `/debug.active-message`            | 发送一条主动消息                       |
-
-## 自行部署
-
-> [!NOTE]
-> 此节仅面向想自行部署 Seira 的用户。
-> 若想直接使用，请见[使用指南](https://docs.seira.top/overview/use.html)
-
-### 1) 准备环境
-
-- JDK 25
-- Maven
-- QQ 开放平台机器人应用凭据
-- 一个可访问的 oStella API
-
-### 2) 配置 `config.yml`
-
-启动程序时，若不存在`config.yml`则会自动创建。请根据提示编辑 `config.yml`。
-默认配置参见[seira-example-config.yml](/src/main/resources/seira-example-config.yml)
-
-### 3) 启动
-
-```shell
-mvn -U clean compile exec:java
-```
