@@ -54,6 +54,22 @@ public final class Resolver {
 
         rawContent = rawContent.replace("+", " +");
 
+        // Support for other bot's style's commands
+        // /bs -> /bp 20 & /ps -> /rp 20 & /b -> /bp & /p -> /rp
+        if (rawContent.equalsIgnoreCase("bs")) {
+            rawContent = "bp 20";
+        } else if (rawContent.equalsIgnoreCase("ps")) {
+            rawContent = "rp 20";
+        } else if ((matcher = Patterns.B_P_SHORT.matcher(rawContent)).matches()) {
+            String command = switch (matcher.group(1)) {
+                case "b" -> "bp";
+                case "p" -> "rp";
+                default -> throw new IllegalArgumentException("Invalid command");
+            };
+            String target = matcher.group(2);
+            rawContent = command + (target == null ? "" : target);
+        }
+
         Matcher matcher = Patterns.COMPACT_SCORE_COMMAND_PATTERN.matcher(rawContent);
         if (matcher.find()) {
             String type = matcher.group(1).toLowerCase(Locale.ROOT);
@@ -75,22 +91,6 @@ public final class Resolver {
         if (matcher.find()) {
             String target = matcher.group(2) == null ? "" : matcher.group(2);
             rawContent = "tb #" + matcher.group(1) + " " + target;
-        }
-
-        // Support for other bot's style's commands
-        // /bs -> /bp 20 & /ps -> /rp 20 & /b -> /bp & /p -> /rp
-        if (rawContent.equalsIgnoreCase("bs")) {
-            rawContent = "bp 20";
-        } else if (rawContent.equalsIgnoreCase("ps")) {
-            rawContent = "rp 20";
-        } else if ((matcher = Patterns.B_P_SHORT.matcher(rawContent)).matches()) {
-            String command = switch (matcher.group(1)) {
-                case "b" -> "bp";
-                case "p" -> "rp";
-                default -> throw new IllegalArgumentException("Invalid command");
-            };
-            String target = matcher.group(2);
-            rawContent = command + (target == null ? "" : target);
         }
 
         // General /abc12345 -> /abc 12345
