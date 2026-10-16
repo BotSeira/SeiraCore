@@ -90,7 +90,7 @@ public final class Resolver {
                 default -> throw new IllegalArgumentException("Invalid command");
             };
             String target = matcher.group(2);
-            rawContent = command + (target == null ? "" : " " + target);
+            rawContent = command + (target == null ? "" : target);
         }
 
         // General /abc12345 -> /abc 12345
