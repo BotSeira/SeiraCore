@@ -55,8 +55,9 @@ public final class Resolver {
         rawContent = rawContent.replace("+", " +");
 
         Matcher matcher;
+
         // Support for other bot's style's commands
-        // /bs -> /bp 20 & /ps -> /rp 20 & /b -> /bp & /p -> /rp
+        // /bs -> /bp 20 & /ps -> /rp 20 & /b5 -> /bp5 & /p -> /rp
         if (rawContent.equalsIgnoreCase("bs")) {
             rawContent = "bp 20";
         } else if (rawContent.equalsIgnoreCase("ps")) {
@@ -71,8 +72,7 @@ public final class Resolver {
             rawContent = command + (target == null ? "" : target);
         }
 
-        matcher = Patterns.COMPACT_SCORE_COMMAND_PATTERN.matcher(rawContent);
-        if (matcher.find()) {
+        if ((matcher = Patterns.COMPACT_SCORE_COMMAND_PATTERN.matcher(rawContent)).find()) {
             String type = matcher.group(1).toLowerCase(Locale.ROOT);
             String start = matcher.group(2);
             String end = matcher.group(3);
@@ -88,15 +88,13 @@ public final class Resolver {
         }
 
         // /tb#30@someone -> /tb #30 @someone
-        matcher = Patterns.COMPACT_TB_COMMAND_PATTERN.matcher(rawContent);
-        if (matcher.find()) {
+        if ((matcher = Patterns.COMPACT_TB_COMMAND_PATTERN.matcher(rawContent)).find()) {
             String target = matcher.group(2) == null ? "" : matcher.group(2);
             rawContent = "tb #" + matcher.group(1) + " " + target;
         }
 
         // General /abc12345 -> /abc 12345
-        matcher = Patterns.SPACE_MISSING_COMMAND_PATTERN.matcher(rawContent);
-        if (matcher.find()) {
+        if ((matcher = Patterns.SPACE_MISSING_COMMAND_PATTERN.matcher(rawContent)).find()) {
             String command = matcher.group(1).toLowerCase(Locale.ROOT);
             String target = matcher.group(2);
             String remaining = rawContent.substring(matcher.end());
