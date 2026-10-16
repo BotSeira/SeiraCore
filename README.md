@@ -25,39 +25,27 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 
 ### 查询最好成绩！
 
-<img width="400" alt="image" src="https://github.com/user-attachments/assets/465d5ae1-e2b7-4295-ae79-5856bb9c2689" />
-
-<img width="400" alt="image" src="https://github.com/user-attachments/assets/a87afa85-bd55-4e9f-b8e3-8880f39e7bf1" />
+<img width="400" alt="a0b5d1a746b7a6871b7b36a6fe299f71" src="https://github.com/user-attachments/assets/7b66c432-5980-4fc7-924a-ca6db7b61242" />
 
 ### 查询谱面、谱面集、分数信息！
 
-<img width="400" alt="image" src="https://github.com/user-attachments/assets/ee494e4f-18e7-49fb-b7f2-98dbe36b17ef" />
+<img width="400" alt="c7f53e4ef0badac2e926c49c61c1fa39" src="https://github.com/user-attachments/assets/5c5e2f77-c646-4b3f-9da1-abcba3a6baa2" />
 
-<img width="400" alt="image" src="https://github.com/user-attachments/assets/627de8cf-30e6-4bfb-8459-733aa11f91ae" />
-
-<img width="400" alt="image" src="https://github.com/user-attachments/assets/d8d88e52-f1d3-4d1a-8752-f9845f57a993" />
+<img width="400" alt="ca3d8f97cb5328dfe915fcb9480ded71" src="https://github.com/user-attachments/assets/84e4910e-bd03-4ad6-984c-18f3499becae" />
 
 ### 分析成绩！
 
-<img width="400" alt="image" src="https://github.com/user-attachments/assets/024fe6b2-c10a-4c9e-aefc-9c784826a9b7" />
+<img width="400" alt="9a62229f5e0214e5b69c013ad67c7bee" src="https://github.com/user-attachments/assets/1c5ff0e9-a72a-425e-a791-bbf9ed89c47c" />
 
-<img width="400" alt="image" src="https://github.com/user-attachments/assets/dd9ab809-b7aa-44b2-a749-8a841781b30c" />
+<img width="400" alt="b84e318656844ce028e63b264940f2f2" src="https://github.com/user-attachments/assets/fb6ccf5a-ad21-4afb-8588-05bf4b5429c2" />
 
 ### 玩猜 Rank！
 
-<img width="400"  alt="image" src="https://github.com/user-attachments/assets/c1caf387-381c-442f-99da-5b4257657576" />
-
-### 查询群友的排行榜！
-
-<img width="400" alt="image" src="https://github.com/user-attachments/assets/cbc361a4-61e0-440d-908e-f1d52009373e" />
+<img width="400" alt="image" src="https://github.com/user-attachments/assets/85e57e04-ae75-4dff-9182-5d96a6eb8695" />
 
 ### 渲染成绩回放视频！
 
-不论是单人回放...
-
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/cb8b0a95-1e22-4bdf-aff2-ac0309534617" />
-
-还是群友的同屏回放！
 
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/e5f7cea1-d759-4a0e-a8ec-5ad0f0fcc274" />
 
