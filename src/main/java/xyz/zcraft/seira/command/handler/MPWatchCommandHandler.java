@@ -169,7 +169,7 @@ public final class MPWatchCommandHandler {
 
     private void handleStart(Context ctx, int argumentOffset) {
         int startArgumentCount = ctx.argumentCount() - argumentOffset;
-        if (startArgumentCount < 0 || startArgumentCount > 3) {
+        if (startArgumentCount < 0 || startArgumentCount > 4) {
             usage(ctx);
             return;
         }
@@ -203,9 +203,9 @@ public final class MPWatchCommandHandler {
                 version = MPVersion.STABLE;
                 index++;
             } else if (ctx.argument(index).matches("\\d+")) {
-                roomId = Long.parseLong(ctx.argument(index));
-                if (ctx.argumentCount() > index + 1) {
-                    String arg = ctx.argument(index + 1);
+                roomId = Long.parseLong(ctx.argument(index++));
+                if (ctx.argumentCount() > index) {
+                    String arg = ctx.argument(index);
                     if ("stable".equalsIgnoreCase(arg) || "stb".equalsIgnoreCase(arg)) {
                         version = MPVersion.STABLE;
                         index++;

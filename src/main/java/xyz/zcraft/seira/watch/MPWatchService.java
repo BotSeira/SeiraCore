@@ -170,7 +170,7 @@ public final class MPWatchService implements AutoCloseable {
                         .comparing(CompletedRoomPlay::playedAt, Comparator.nullsLast(String::compareTo))
                         .thenComparingLong(CompletedRoomPlay::playlistItemId))
                 .toList();
-        Map<Long, byte[]> rendered = new HashMap<>();
+        Map<RenderKey, byte[]> rendered = new HashMap<>();
 
         for (WatchRef watch : watches) {
             if (!isCurrent(watch)) {
@@ -189,7 +189,7 @@ public final class MPWatchService implements AutoCloseable {
     }
 
     private boolean sendPendingResults(
-            WatchRef watch, List<CompletedRoomPlay> completed, Map<Long, byte[]> rendered
+            WatchRef watch, List<CompletedRoomPlay> completed, Map<RenderKey, byte[]> rendered
     ) {
         for (CompletedRoomPlay play : completed) {
             if (wasSent(watch, play.playlistItemId())) {
@@ -197,8 +197,8 @@ public final class MPWatchService implements AutoCloseable {
             }
             try {
                 byte[] image = rendered.computeIfAbsent(
-                        play.playlistItemId(),
-                        itemId -> api.renderResult(watch.entry().version, watch.entry().roomId, itemId, watch.entry().customBo(), watch.entry().customWarmups())
+                        new RenderKey(play.playlistItemId(), watch.entry().customBo(), watch.entry().customWarmups()),
+                        key -> api.renderResult(watch.entry().version, watch.entry().roomId, key.playlistItemId(), key.customBo(), key.customWarmups())
                 );
                 if (!notifier.sendResult(watch.entry(), watch.groupId(), image)) {
                     LOG.warn(
@@ -294,6 +294,9 @@ public final class MPWatchService implements AutoCloseable {
         if (closed.compareAndSet(false, true)) {
             scheduler.shutdownNow();
         }
+    }
+
+    private record RenderKey(long playlistItemId, Integer customBo, Integer customWarmups) {
     }
 
     public record WatchEntry(

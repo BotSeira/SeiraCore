@@ -103,7 +103,7 @@ public final class MPWatchApi {
                         + "/playlist/" + requirePositive(playlistItemId, "playlistItemId") + "/result?version="
                         + requireVersion(version).value()
                         + (customBo == null ? "" : "&bo=" + customBo)
-                        + (customWarmups == null ? "" : "&warmup=" + customBo),
+                        + (customWarmups == null ? "" : "&warmup=" + customWarmups),
                 HttpResponse.BodyHandlers.ofByteArray()
         );
         ensureSuccessfulStatus(response.statusCode(), response.body(), "生成多人房间结果图片");
