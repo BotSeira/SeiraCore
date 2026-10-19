@@ -8,7 +8,7 @@ import java.util.Set;
 import java.util.function.Function;
 
 public interface ChatProvider {
-    int CONTEXT_SIZE = 30;
+    int CONTEXT_SIZE = 100;
 
     void recordHistory(String groupId, String username, String senderId, String message);
 
