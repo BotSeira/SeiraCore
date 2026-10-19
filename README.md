@@ -60,6 +60,7 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 | `/fall`         | `/fall`                                                 | 获取全部好友列表                                                                |
 | `/fclear`       | `/fclear`                                               | 清除好友记录                                                                    |
 | `/bp`           | `/bp [n/a-b] [uid/username/@user] [filters...]`         | 获取最多200条最好成绩或指定范围后过滤；省略数量时返回第一个匹配成绩详情         |
+| `/debp`         | `/debp [n/a-b] [uid/username/@user]`                    | 获取最多200条所有成绩，包括非Ranked成绩                                         |
 | `/rs`           | `/rs [n/a-b] [uid/username/@user] [filters...]`         | 获取最多200条最近成绩或指定范围后过滤；省略数量时返回第一个匹配成绩详情         |
 | `/rp`           | `/rp [n/a-b] [uid/username/@user] [filters...]`         | 获取最多200条最近通过成绩或指定范围后过滤；省略数量时返回第一个匹配成绩详情     |
 | `/tb`           | `/tb [#days] [uid/username/@user]`                      | 获取近N天达成的BP（默认1天），并保留完整BP排名编号                              |

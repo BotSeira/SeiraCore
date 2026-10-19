@@ -117,9 +117,9 @@ public class OstellaApi {
         );
     }
 
-    public static Response<Base64Bytes> getBestDerankedResponse(int n, int start, long uid) {
+    public static Response<Base64Bytes> getBestDerankedResponse(int end, int start, long uid) {
         return getBase64BytesResponse(
-                "/users/" + uid + "/scores/deranked-best?n=" + n + encodeScoreRangeStart(start),
+                "/users/" + uid + "/scores/deranked-best?end=" + end + encodeScoreRangeStart(start),
                 "获取最好成绩失败",
                 null
         );
