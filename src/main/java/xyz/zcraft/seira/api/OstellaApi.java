@@ -109,18 +109,17 @@ public class OstellaApi {
         }
     }
 
-    @SuppressWarnings("unused")
-    public static Response<Base64Bytes> getBoNResponse(int n, long uid) {
-        return getBoNResponse(n, uid, List.of());
-    }
-
-    public static Response<Base64Bytes> getBoNResponse(int n, long uid, List<String> filters) {
-        return getBoNResponse(n, 1, uid, filters);
-    }
-
     public static Response<Base64Bytes> getBoNResponse(int n, int start, long uid, List<String> filters) {
         return getBase64BytesResponse(
                 "/users/" + uid + "/scores/bestof?n=" + n + encodeScoreRangeStart(start) + encodeScoreFilters(filters),
+                "获取最好成绩失败",
+                null
+        );
+    }
+
+    public static Response<Base64Bytes> getBestDerankedResponse(int n, int start, long uid) {
+        return getBase64BytesResponse(
+                "/users/" + uid + "/scores/deranked-best?n=" + n + encodeScoreRangeStart(start),
                 "获取最好成绩失败",
                 null
         );
@@ -707,7 +706,7 @@ public class OstellaApi {
     }
 
     public static String lookupPlayerScore(long uid, String list, long index, List<String> filters, String mod) {
-        if (!List.of("rs", "rp", "bp").contains(list)) throw new IllegalArgumentException("Invalid score list");
+        if (!List.of("rs", "rp", "bp", "bd").contains(list)) throw new IllegalArgumentException("Invalid score list");
         return lookupScore("/scores/lookup?of=" + list + "&i=" + index + "&u=" + uid, filters, mod);
     }
 

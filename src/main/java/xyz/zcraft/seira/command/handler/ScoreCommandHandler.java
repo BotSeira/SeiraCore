@@ -141,6 +141,46 @@ public final class ScoreCommandHandler {
         }
     }
 
+    public void handleBd(Context ctx) {
+        if (ctx.args().length == 0) {
+            String player = resolver.player(null, ctx.senderUserId());
+            try (var _ = taskCoordinator.beginRequest(ctx, "Score")) {
+                long uid = OstellaApi.resolveUid(player);
+                String scoreId = OstellaApi.lookupPlayerScore(uid, "bd", 1, List.of(), null);
+                var response = OstellaApi.getScoreResponse(scoreId);
+                collectChallengeScores(ctx, response);
+                history.remember(ctx, null, null, scoreId);
+                ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.scoreMessage(ctx, response)));
+            }
+            return;
+        }
+
+        if (resolver.looksLikeMention(ctx.args()[0])) {
+            if (ctx.args().length == 1 || (ctx.args().length > 1 && ScoreFilterArguments.looksLikeFilter(ctx.args()[1]))) {
+                handleFilteredSingleScore(ctx, "bd");
+                return;
+            }
+        } else if (ScoreFilterArguments.looksLikeFilter(ctx.args()[0])) {
+            handleFilteredSingleScore(ctx, "bd");
+            return;
+        }
+
+        var request = parseScoreListRequest(ctx, CommandUsage.BD);
+        if (request == null) return;
+        var range = request.range();
+        var player = request.player();
+        try (var _ = taskCoordinator.beginRequest(ctx, "Deranked Best")) {
+            long uid = OstellaApi.resolveUid(player);
+            var response = OstellaApi.getBestDerankedResponse(
+                    range.end(),
+                    range.start(),
+                    uid
+            );
+
+            ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.bpMessage(ctx, response)));
+        }
+    }
+
     public void handleRbp(Context ctx) {
         if (ctx.argumentCount() > 1) {
             ctx.sendReply(at(ctx) + "用法：/rbp [目标]");

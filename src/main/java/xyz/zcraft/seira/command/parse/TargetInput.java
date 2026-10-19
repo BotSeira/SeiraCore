@@ -7,7 +7,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 
 public record TargetInput(Kind kind, String id, long index, String player, int consumedArgs) {
-    private static final Pattern PLAYER_SCORE = Pattern.compile("(?i)^(rs|rp|bp)(\\d+)?$");
+    private static final Pattern PLAYER_SCORE = Pattern.compile("(?i)^(rs|rp|bp|bd)(\\d+)?$");
     private static final Pattern SET = Pattern.compile("^(\\d+)#(\\d+)$");
 
     public static TargetInput memory() {
@@ -74,5 +74,5 @@ public record TargetInput(Kind kind, String id, long index, String player, int c
         return kind.name().toLowerCase(Locale.ROOT);
     }
 
-    public enum Kind {MEMORY, ID, MAP, SET, SCORE, RS, RP, BP, MP}
+    public enum Kind {MEMORY, ID, MAP, SET, SCORE, RS, RP, BP, MP, BD}
 }

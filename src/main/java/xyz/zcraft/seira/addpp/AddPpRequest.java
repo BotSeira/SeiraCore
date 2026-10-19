@@ -35,7 +35,7 @@ public record AddPpRequest(AddPpQuery query, String player, TargetInput shortcut
     }
 
     private static boolean isShortcut(String value) {
-        return value.matches("(?i)(rs|rp|bp)\\d*");
+        return value.matches("(?i)(rs|rp|bp|bd)\\d*");
     }
 
     public AddPpQuery resolveQuery(ToLongFunction<TargetInput> beatmapLookup) {

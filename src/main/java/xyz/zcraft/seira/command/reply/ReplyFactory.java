@@ -260,9 +260,8 @@ public final class ReplyFactory {
 
     public PendingMessage rsMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                at(ctx) + "最近成绩查询完成\n" +
-                        "> 玩家: " + u(response.getUserId()) + "\n" +
-                        "> 数量: " + response.getScoreIds().size(),
+                at(ctx) + "查询完成，共" + response.getScoreIds().size() + "个成绩\n" +
+                        "> 玩家: " + u(response.getUserId()),
                 buttons().rsButtons()
         );
     }
@@ -277,7 +276,7 @@ public final class ReplyFactory {
 
     public PendingMessage tbMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                at(ctx) + "近日BP查询完成\n" +
+                at(ctx) + "近日BP\n" +
                         "> 玩家: " + u(response.getUserId()) + "\n" +
                         "> 数量: " + response.getScoreIds().size(),
                 buttons().bpButtons(response.getUserId())
@@ -286,8 +285,7 @@ public final class ReplyFactory {
 
     public PendingMessage beatmapMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                at(ctx) + "谱面查询完成\n" +
-                        "> 谱面: " + m(response.getBeatmapId()) + "\n" +
+                at(ctx) + "谱面" + m(response.getBeatmapId()) + "\n" +
                         "> 谱面集: " + ms(response.getBeatmapsetId()),
                 buttons().beatmapButtons(response.getBeatmapId())
         );

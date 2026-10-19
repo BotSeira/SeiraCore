@@ -33,7 +33,7 @@ public final class TargetResolver {
                 beatmapsetId = Long.parseLong(target.id());
                 beatmapId = OstellaApi.lookupBeatmapInSet(beatmapsetId, target.index(), accessTokenProvider.apply(ctx.senderUserId()));
             }
-            case RS, RP, BP -> {
+            case RS, RP, BP, BD -> {
                 String player = resolver.player(target.player(), ctx.senderUserId());
                 long uid = OstellaApi.resolveUid(player);
                 scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
@@ -58,7 +58,7 @@ public final class TargetResolver {
             case MAP -> beatmapId = Long.parseLong(target.id());
             case SCORE -> scoreId = target.id();
             case SET -> beatmapsetId = Long.parseLong(target.id());
-            case RS, RP, BP -> {
+            case RS, RP, BP, BD -> {
                 String player = resolver.player(target.player(), ctx.senderUserId());
                 long uid = OstellaApi.resolveUid(player);
                 scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
@@ -98,7 +98,7 @@ public final class TargetResolver {
                 scoreId = OstellaApi.lookupBeatmapsetScore(beatmapsetId, target.index(), uid, filters, mod);
                 selectedPlayerScore = true;
             }
-            case RS, RP, BP -> {
+            case RS, RP, BP, BD -> {
                 String player = userOverride == null ? resolver.player(target.player(), ctx.senderUserId()) : userOverride;
                 long uid = OstellaApi.resolveUid(player);
                 scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), filters, mod);
@@ -125,7 +125,7 @@ public final class TargetResolver {
     // /lb needs only the map ID: preserve its direct shortcut lookup without fetching the score.
     public long beatmapId(Context ctx, TargetInput target) {
         if (target.kind() == TargetInput.Kind.RS || target.kind() == TargetInput.Kind.RP
-                || target.kind() == TargetInput.Kind.BP) {
+                || target.kind() == TargetInput.Kind.BP || target.kind() == TargetInput.Kind.BD) {
             long uid = OstellaApi.resolveUid(resolver.player(target.player(), ctx.senderUserId()));
             return OstellaApi.lookupPlayerScoreBeatmap(uid, target.scoreList(), target.index(),
                     accessTokenProvider.apply(ctx.senderUserId()));

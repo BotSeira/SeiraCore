@@ -4,6 +4,7 @@ public final class CommandUsage {
     public static final String ADDPP = "用法：/addpp [user] <PP或PP*条数>，或 /addpp [user] <m谱面ID或rs/bp/rp[N]> [条件]";
     public static final String WHATIF = "用法：/whatif <总PPpp 或 #排名>";
     public static final String BP = "用法：/bp <个数或范围> [玩家ID/用户名/@用户] [过滤条件 ...]";
+    public static final String BD = "用法：/bd <个数或范围> [玩家ID/用户名/@用户]";
     public static final String NO_BIND = "你还没有绑定玩家ID，请先使用 /bind 绑定喵";
     public static final String REBIND = "由于发生了一个技术问题，使用此功能需要重新绑定。请使用 `/unbind` 解除绑定，再使用 `/bind` 重新绑定~";
     public static final String RS = "用法：/rs <个数或范围> [玩家ID/用户名/@用户] [过滤条件 ...]";

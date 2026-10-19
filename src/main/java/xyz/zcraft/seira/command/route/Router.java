@@ -144,6 +144,7 @@ public class Router {
                 .register(bindingCommands::handleClearHistory, "clearhistory")
                 .register(scoreCommands::handleRbp, "rbp")
                 .register(scoreCommands::handleBp, "bp", "bs")
+                .register(scoreCommands::handleBd, "bd", "debp")
                 .register(beatmapCommands::handleDaily, "daily")
                 .register(socialCommands::handleMp, "mp")
                 .register(ctx -> scoreCommands.handleRs(ctx, true), "rs")
