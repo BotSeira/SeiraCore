@@ -109,9 +109,9 @@ public class OstellaApi {
         }
     }
 
-    public static Response<Base64Bytes> getBoNResponse(int n, int start, long uid, List<String> filters) {
+    public static Response<Base64Bytes> getBoNResponse(int end, int start, long uid, List<String> filters) {
         return getBase64BytesResponse(
-                "/users/" + uid + "/scores/bestof?n=" + n + encodeScoreRangeStart(start) + encodeScoreFilters(filters),
+                "/users/" + uid + "/scores/bestof?" + encodeScoreRange(start, end) + encodeScoreFilters(filters),
                 "获取最好成绩失败",
                 null
         );
@@ -119,7 +119,7 @@ public class OstellaApi {
 
     public static Response<Base64Bytes> getBestDerankedResponse(int end, int start, long uid) {
         return getBase64BytesResponse(
-                "/users/" + uid + "/scores/deranked-best?end=" + end + encodeScoreRangeStart(start),
+                "/users/" + uid + "/scores/deranked-best?" + encodeScoreRange(start, end),
                 "获取最好成绩失败",
                 null
         );
@@ -261,22 +261,22 @@ public class OstellaApi {
     }
 
     public static Response<Base64Bytes> getRecentResponse(
-            int n,
+            int end,
             int start,
             long uid,
             boolean includeFail,
             List<String> filters
     ) {
         return getBase64BytesResponse(
-                "/users/" + uid + "/scores/recent?n=" + n + "&fail=" + includeFail
-                        + encodeScoreRangeStart(start) + encodeScoreFilters(filters),
+                "/users/" + uid + "/scores/recent?" + encodeScoreRange(start, end) + "&fail=" + includeFail
+                        + encodeScoreFilters(filters),
                 "获取最近成绩失败",
                 null
         );
     }
 
-    private static String encodeScoreRangeStart(int start) {
-        return start > 1 ? "&start=" + start : "";
+    private static String encodeScoreRange(int start, int end) {
+        return "start=" + start + "&end=" + end;
     }
 
     private static String encodeScoreFilters(List<String> filters) {
