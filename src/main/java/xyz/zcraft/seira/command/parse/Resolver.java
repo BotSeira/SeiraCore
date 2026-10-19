@@ -200,7 +200,7 @@ public final class Resolver {
 
     private static final class Patterns {
         private static final Pattern COMPACT_SCORE_COMMAND_PATTERN = Pattern.compile(
-                "(?i)^(rs|rp|bp)(\\d+)(?:-(\\d+))?(?=\\s|$)"
+                "(?i)^(rs|rp|bp|bd)(\\d+)(?:-(\\d+))?(?=\\s|$)"
         );
         private static final Pattern COMPACT_TB_COMMAND_PATTERN = Pattern.compile(
                 "(?i)^tb#?(\\d+)(.*)"
