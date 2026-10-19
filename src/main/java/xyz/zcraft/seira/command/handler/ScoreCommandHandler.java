@@ -200,11 +200,17 @@ public final class ScoreCommandHandler {
     }
 
     public void handleRs(Context ctx, boolean includeFail) {
+        String macroType;
+        if (ctx.command().equals("ps")) {
+            macroType = "rp";
+        } else {
+            macroType = ctx.command();
+        }
         if (ctx.args().length == 0) {
             String player = resolver.player(null, ctx.senderUserId());
             try (var _ = taskCoordinator.beginRequest(ctx, "Score")) {
                 long uid = OstellaApi.resolveUid(player);
-                String scoreId = OstellaApi.lookupPlayerScore(uid, ctx.command(), 1, List.of(), null);
+                String scoreId = OstellaApi.lookupPlayerScore(uid, macroType, 1, List.of(), null);
                 var response = OstellaApi.getScoreResponse(scoreId);
                 collectChallengeScores(ctx, response);
                 history.remember(ctx, null, null, scoreId);
@@ -215,11 +221,11 @@ public final class ScoreCommandHandler {
 
         if (resolver.looksLikeMention(ctx.args()[0])) {
             if (ctx.args().length == 1 || (ctx.args().length > 1 && ScoreFilterArguments.looksLikeFilter(ctx.args()[1]))) {
-                handleFilteredSingleScore(ctx, ctx.command());
+                handleFilteredSingleScore(ctx, macroType);
                 return;
             }
         } else if (ScoreFilterArguments.looksLikeFilter(ctx.args()[0])) {
-            handleFilteredSingleScore(ctx, ctx.command());
+            handleFilteredSingleScore(ctx, macroType);
             return;
         }
 

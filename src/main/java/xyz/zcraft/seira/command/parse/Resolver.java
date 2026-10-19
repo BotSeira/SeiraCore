@@ -58,10 +58,14 @@ public final class Resolver {
 
         // Support for other bot's style's commands
         // /bs -> /bp 20 & /ps -> /rp 20 & /b5 -> /bp5 & /p -> /rp
-        if (rawContent.equalsIgnoreCase("bs")) {
-            rawContent = "bp 20";
-        } else if (rawContent.equalsIgnoreCase("ps")) {
-            rawContent = "rp 20";
+        if ((matcher = Patterns.PS_BS.matcher(rawContent)).matches()) {
+            String command = switch (matcher.group(1)) {
+                case "bs" -> "bp";
+                case "ps" -> "rp";
+                default -> matcher.group(1);
+            };
+            String target = (matcher.group(2) == null ? "" : matcher.group(2));
+            rawContent = command + " 20 " + target;
         } else if ((matcher = Patterns.B_P_SHORT.matcher(rawContent)).matches()) {
             String command = switch (matcher.group(1)) {
                 case "b" -> "bp";
@@ -213,7 +217,8 @@ public final class Resolver {
         private static final Pattern QQ_INLINE_AT_PATTERN = Pattern.compile("(<@[A-Z0-9]{32}>)");
         private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
         private static final Pattern SEARCH_PATTERN = Pattern.compile("^(?:#(\\d+) )?(.+)$");
-        private static final Pattern B_P_SHORT = Pattern.compile("^([bp])(\\d+)?$");
+        private static final Pattern B_P_SHORT = Pattern.compile("^([bp])(.*)?$");
+        private static final Pattern PS_BS = Pattern.compile("^(ps|bs)(.*)?$");
     }
 }
 
