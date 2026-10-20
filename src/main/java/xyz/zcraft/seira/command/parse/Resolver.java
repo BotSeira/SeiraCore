@@ -216,7 +216,7 @@ public final class Resolver {
         private static final Pattern QQ_INLINE_AT_PATTERN = Pattern.compile("(<@[A-Z0-9]{32}>)");
         private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
         private static final Pattern SEARCH_PATTERN = Pattern.compile("^(?:#(\\d+) )?(.+)$");
-        private static final Pattern PS_BS = Pattern.compile("^(ps|bs|debs)(?:\\s+)?(\\d+)(.*)?$");
+        private static final Pattern PS_BS = Pattern.compile("^(ps|bs|debs)(?:\\s+)?(\\d+)?( .*)?$");
     }
 }
 
