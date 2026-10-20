@@ -68,9 +68,11 @@ public final class Resolver {
             String count = (matcher.group(2) == null) ? "20" : matcher.group(2);
             String target = (matcher.group(3) == null ? "" : matcher.group(3));
             rawContent = command + " " + count + " " + target;
-        }
-
-        if ((matcher = Patterns.COMPACT_SCORE_COMMAND_PATTERN.matcher(rawContent)).find()) {
+        } else if ("p".equals(rawContent)) {
+            rawContent = "rp";
+        } else if ("b".equals(rawContent)) {
+            rawContent = "bp";
+        } else if ((matcher = Patterns.COMPACT_SCORE_COMMAND_PATTERN.matcher(rawContent)).find()) {
             String type = matcher.group(1).toLowerCase(Locale.ROOT);
             if ("b".equals(type)) {
                 type = "bp";

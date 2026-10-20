@@ -259,6 +259,7 @@ public class AiChatHandler {
     private String generateVar(Context ctx, String input) {
         JsonObject qqContext = new JsonObject();
         qqContext.addProperty("in_group", ctx.inGroup());
+        qqContext.addProperty("sender_nickname", ctx.senderNickname());
         qqContext.addProperty("sender_open_id", ctx.senderUserId());
         qqContext.addProperty("sender_osu_uid", resolver.resolveBoundUid(ctx.senderUserId()));
         qqContext.addProperty("group_id", ctx.groupId());
