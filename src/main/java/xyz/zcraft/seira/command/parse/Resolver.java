@@ -64,20 +64,18 @@ public final class Resolver {
                 case "ps" -> "rp";
                 default -> matcher.group(1);
             };
-            String target = (matcher.group(2) == null ? "" : matcher.group(2));
-            rawContent = command + " 20 " + target;
-        } else if ((matcher = Patterns.B_P_SHORT.matcher(rawContent)).matches()) {
-            String command = switch (matcher.group(1)) {
-                case "b" -> "bp";
-                case "p" -> "rp";
-                default -> throw new IllegalArgumentException("Invalid command");
-            };
-            String target = matcher.group(2);
-            rawContent = command + (target == null ? "" : target);
+            String count = (matcher.group(2) == null) ? "20" : matcher.group(2);
+            String target = (matcher.group(3) == null ? "" : matcher.group(3));
+            rawContent = command + " " + count + " " + target;
         }
 
         if ((matcher = Patterns.COMPACT_SCORE_COMMAND_PATTERN.matcher(rawContent)).find()) {
             String type = matcher.group(1).toLowerCase(Locale.ROOT);
+            if ("b".equals(type)) {
+                type = "bp";
+            } else if ("p".equals(type)) {
+                type = "rp";
+            }
             String start = matcher.group(2);
             String end = matcher.group(3);
             String remaining = rawContent.substring(matcher.end());
@@ -204,7 +202,7 @@ public final class Resolver {
 
     private static final class Patterns {
         private static final Pattern COMPACT_SCORE_COMMAND_PATTERN = Pattern.compile(
-                "(?i)^(rs|rp|bp|bd)(\\d+)(?:-(\\d+))?(?=\\s|$)"
+                "(?i)^(rs|rp|bp|bd|b|p)(\\d+)(?:-(\\d+))?(?=\\s|$)"
         );
         private static final Pattern COMPACT_TB_COMMAND_PATTERN = Pattern.compile(
                 "(?i)^tb#?(\\d+)(.*)"
@@ -217,8 +215,7 @@ public final class Resolver {
         private static final Pattern QQ_INLINE_AT_PATTERN = Pattern.compile("(<@[A-Z0-9]{32}>)");
         private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
         private static final Pattern SEARCH_PATTERN = Pattern.compile("^(?:#(\\d+) )?(.+)$");
-        private static final Pattern B_P_SHORT = Pattern.compile("^([bp])(.*)?$");
-        private static final Pattern PS_BS = Pattern.compile("^(ps|bs)(.*)?$");
+        private static final Pattern PS_BS = Pattern.compile("^(ps|bs)(?:\\s+)?(\\d+)(.*)?$");
     }
 }
 
