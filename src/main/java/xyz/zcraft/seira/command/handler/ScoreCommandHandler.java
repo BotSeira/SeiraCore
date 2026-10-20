@@ -1,5 +1,6 @@
 package xyz.zcraft.seira.command.handler;
 
+import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.MissData;
 import xyz.zcraft.seira.api.data.Response;
@@ -23,7 +24,7 @@ import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 public final class ScoreCommandHandler {
     private static final int MAX_SCORE_LIST_COUNT = 200;
     private static final Pattern SCORE_LIST_RANGE_PATTERN = Pattern.compile("^(\\d+)(?:-(\\d+))?$");
-
+    private static final Logger LOG = org.apache.logging.log4j.LogManager.getLogger(ScoreCommandHandler.class);
     private final Resolver resolver;
     private final TargetResolver targets;
     private final TargetHistory history;
@@ -94,8 +95,7 @@ public final class ScoreCommandHandler {
         try {
             challengeService.acceptQueriedScores(ctx.groupId(), ids);
         } catch (RuntimeException e) {
-            org.apache.logging.log4j.LogManager.getLogger(ScoreCommandHandler.class)
-                    .warn("Failed to update group challenge from score query", e);
+            LOG.warn("Failed to update group challenge from score query", e);
         }
     }
 
@@ -334,7 +334,7 @@ public final class ScoreCommandHandler {
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.scoreMessage(ctx, response)));
         } catch (Exception e) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + TaskCoordinator.resolveErrorMessage(e)));
-            org.apache.logging.log4j.LogManager.getLogger(ScoreCommandHandler.class)
+            LOG
                     .error("Failed to execute /{}", ctx.command(), e);
         }
     }
@@ -387,7 +387,7 @@ public final class ScoreCommandHandler {
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.scoreMessage(ctx, response)));
         } catch (Exception e) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + TaskCoordinator.resolveErrorMessage(e)));
-            org.apache.logging.log4j.LogManager.getLogger(ScoreCommandHandler.class)
+            LOG
                     .error("Failed to execute /{}", ctx.command(), e);
         }
     }
