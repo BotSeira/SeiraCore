@@ -260,6 +260,7 @@ public class AiChatHandler {
         JsonObject qqContext = new JsonObject();
         qqContext.addProperty("in_group", ctx.inGroup());
         qqContext.addProperty("sender_open_id", ctx.senderUserId());
+        qqContext.addProperty("sender_osu_uid", resolver.resolveBoundUid(ctx.senderUserId()));
         qqContext.addProperty("group_id", ctx.groupId());
 
         Map<String, JsonObject> bindings = new HashMap<>();
@@ -267,6 +268,18 @@ public class AiChatHandler {
         final Deque<String> mentionedHistory = groupMentionedHistory.computeIfAbsent(ctx.groupId(), _ -> new ArrayDeque<>(100));
 
         final Set<String> ids = resolver.extractAllMentionedIds(input);
+
+        final var bound = UserDataStore.findBoundUsersByGroup(ctx.groupId()).entrySet().iterator();
+
+        while (ids.size() < 50 && bound.hasNext()) {
+            ids.add(bound.next().getKey());
+        }
+
+        final var uids = UserDataStore.findAllGroupMembers(ctx.groupId()).iterator();
+
+        while (ids.size() < 50 && uids.hasNext()) {
+            ids.add(uids.next());
+        }
 
         for (String id : ids) {
             if (!mentionedHistory.contains(id)) {
