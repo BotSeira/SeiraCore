@@ -259,20 +259,25 @@ public final class SocialCommandHandler {
         if (ctx.args().length == 1 || ctx.args().length == 2) {
             var target = TargetInput.read(ctx.args());
             int remainingArgs = ctx.argumentCount() - target.consumedArgs();
+            boolean update = false;
             List<Long> uids = new LinkedList<>();
             if (remainingArgs == 1) {
-                String[] uidTokens = ctx.argument(target.consumedArgs()).split(",");
-                if (uidTokens.length == 0) {
-                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "玩家ID列表不能为空。"));
-                    return;
-                }
-                for (String token : uidTokens) {
-                    Long uid = Resolver.parsePositiveLong(token.trim());
-                    if (uid == null) {
-                        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "玩家ID列表包含非法值。"));
+                if ("update".equalsIgnoreCase(ctx.argument(target.consumedArgs()))) {
+                    update = true;
+                } else {
+                    String[] uidTokens = ctx.argument(target.consumedArgs()).split(",");
+                    if (uidTokens.length == 0) {
+                        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "玩家ID列表不能为空。"));
                         return;
                     }
-                    uids.add(uid);
+                    for (String token : uidTokens) {
+                        Long uid = Resolver.parsePositiveLong(token.trim());
+                        if (uid == null) {
+                            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "玩家ID列表包含非法值。"));
+                            return;
+                        }
+                        uids.add(uid);
+                    }
                 }
             } else if (remainingArgs != 0) {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
@@ -294,7 +299,7 @@ public final class SocialCommandHandler {
 
             try (var _ = taskCoordinator.beginRequest(ctx, "Map Leaderboard")) {
                 long beatmapId = targets.beatmapId(ctx, target);
-                var response = OstellaApi.getGroupLeaderboardResponse(beatmapId, uids);
+                var response = OstellaApi.getGroupLeaderboardResponse(beatmapId, uids, update);
                 ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
             }
         } else {
