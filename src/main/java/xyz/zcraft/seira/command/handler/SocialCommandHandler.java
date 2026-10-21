@@ -68,11 +68,7 @@ public final class SocialCommandHandler {
     }
 
     public void handleF(Context ctx, boolean all) {
-        final Long uid = resolver.resolveBoundUid(ctx.senderUserId());
-        if (uid == null) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.NO_BIND));
-            return;
-        }
+        resolver.requireBind(ctx);
 
         if (ctx.argumentCount() == 0) {
             handleFriendList(ctx, all);
@@ -87,7 +83,7 @@ public final class SocialCommandHandler {
     }
 
     public void handleFriendStatus(Context ctx) {
-        final Long selfId = resolver.resolveBoundUid(ctx.senderUserId());
+        final long selfId = resolver.requireBind(ctx);
 
         if (ctx.argumentCount() == 0) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/mu @someone\n> 注: 读取@需要开启权限。"));

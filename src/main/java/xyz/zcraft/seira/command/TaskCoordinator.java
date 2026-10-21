@@ -11,9 +11,11 @@ import xyz.zcraft.seira.api.data.QqUploadRequest;
 import xyz.zcraft.seira.api.data.Response;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.*;
+import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.data.SendResult;
 import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.discord.DiscordBridgeService;
+import xyz.zcraft.seira.exception.NoBindException;
 import xyz.zcraft.seira.services.ApiRequestStats;
 import xyz.zcraft.seira.services.BotStat;
 
@@ -48,6 +50,9 @@ public final class TaskCoordinator {
         Throwable cursor = exception;
         while (cursor != null) {
             switch (cursor) {
+                case NoBindException _ -> {
+                    return CommandUsage.NO_BIND;
+                }
                 case ApiRequestException e -> {
                     return ApiRequestException.getDefaultMessage(e.getErrorCode());
                 }
@@ -65,7 +70,10 @@ public final class TaskCoordinator {
             }
             cursor = cursor.getCause();
         }
-        return "请求处理失败，请稍后再试喵";
+        if (exception != null) {
+            return "请求处理失败，请稍后再试喵。\n> " + exception;
+        }
+        return "请求处理失败，请稍后再试喵。";
     }
 
     public ReplyChannel openReplyChannel(

@@ -1,25 +1,36 @@
 package xyz.zcraft.seira.command.handler;
 
 import xyz.zcraft.seira.addpp.AddPpApi;
-import xyz.zcraft.seira.addpp.AddPpRequest;
+import xyz.zcraft.seira.addpp.AddPpQuery;
 import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.command.Context;
+import xyz.zcraft.seira.command.ResolutionException;
+import xyz.zcraft.seira.command.TargetHistory;
 import xyz.zcraft.seira.command.parse.Resolver;
+import xyz.zcraft.seira.command.parse.TargetInput;
+import xyz.zcraft.seira.command.parse.TargetResolver;
 import xyz.zcraft.seira.command.reply.CommandUsage;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
-import java.util.function.Function;
+import java.util.regex.Pattern;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class AddPpCommandHandler {
+    private static final Pattern PP = Pattern.compile("([0-9]+(?:\\.[0-9]+)?)(?:pp)?(?:\\s*[*×]\\s*(\\d+))?", Pattern.CASE_INSENSITIVE);
+    private static final String MAP_TARGET = "(?i)(m\\d+|(?:rs|rp|bp|bd)\\d*)";
     private final AddPpApi api;
-    private final Function<String, Long> binding;
+    private final Resolver resolver;
+    private final TargetHistory history;
+    private final TargetResolver targetResolver;
 
-    public AddPpCommandHandler(AddPpApi api, Function<String, Long> binding) {
+    public AddPpCommandHandler(AddPpApi api, Resolver resolver, TargetResolver targetResolver, TargetHistory history) {
         this.api = api;
-        this.binding = binding;
+        this.resolver = resolver;
+        this.targetResolver = targetResolver;
+        this.history = history;
     }
 
     public static String format(AddPpApi.Result result) {
@@ -78,23 +89,70 @@ public final class AddPpCommandHandler {
 
     public void handleAddPp(Context ctx) {
         try {
-            var request = AddPpRequest.parse(ctx.args());
-            long uid = request.player() == null
-                    ? binding.apply(ctx.senderUserId())
-                    : OstellaApi.resolveUid(new Resolver(binding).player(request.player(), ctx.senderUserId()));
-            if (uid <= 0) {
-                ctx.sendReply(at(ctx) + CommandUsage.NO_BIND);
-                return;
+            String[] args = ctx.args();
+            if (args.length > 0 && (args[0].matches(MAP_TARGET)
+                    || (args.length > 1 && args[1].matches(MAP_TARGET)))) {
+                handleMapPp(ctx);
+            } else {
+                handleRawPp(ctx);
             }
-            var query = request.resolveQuery(shortcut -> {
-                String scoreId = OstellaApi.lookupPlayerScore(uid, shortcut.scoreList(), shortcut.index(), List.of(), null);
-                return OstellaApi.getScoreBeatmapId(scoreId);
-            });
-            var result = api.estimate(uid, query);
-            String target = request.player() == null ? "" : "目标玩家：" + uid + "\n";
-            ctx.sendReply(at(ctx) + target + format(result));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | ResolutionException e) {
             ctx.sendReply(at(ctx) + e.getMessage() + "\n> " + CommandUsage.ADDPP);
         }
+    }
+
+    private void handleRawPp(Context ctx) {
+        String[] args = ctx.args();
+        if (args.length == 0) throw new IllegalArgumentException("请提供单条成绩的 PP 喵。");
+        var matcher = PP.matcher(String.join(" ", args));
+        boolean hasPlayer = args.length > 1 && !matcher.matches();
+        String player = hasPlayer ? args[0] : null;
+        if (player != null && (player.isBlank() || player.equals("@")))
+            throw new IllegalArgumentException("请提供有效的目标玩家喵。");
+        if (hasPlayer) matcher = PP.matcher(String.join(" ", Arrays.copyOfRange(args, 1, args.length)));
+        if (!matcher.matches())
+            throw new IllegalArgumentException("无法解析 PP 参数。请使用 123 或 200*4 喵。");
+        double pp;
+        int count;
+        try {
+            pp = Double.parseDouble(matcher.group(1));
+            count = matcher.group(2) == null ? 1 : Integer.parseInt(matcher.group(2));
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("PP 或条数过大喵。");
+        }
+        if (!Double.isFinite(pp) || pp <= 0 || pp > 100_000_000 || count < 1 || count > 200)
+            throw new IllegalArgumentException("单条 PP 必须为 0–100000000 之间的正数，条数为 1–200喵。");
+        var query = new AddPpQuery(pp, count, null, List.of());
+        long uid = player == null ? resolver.resolveBoundUid(ctx.senderUserId())
+                : OstellaApi.resolveUid(resolver.player(player, ctx.senderUserId()));
+        if (uid <= 0) {
+            ctx.sendReply(at(ctx) + CommandUsage.NO_BIND);
+            return;
+        }
+        var result = api.estimate(uid, query);
+        ctx.sendReply(at(ctx) + (player == null ? "" : "目标玩家：" + uid + "\n") + format(result));
+    }
+
+    private void handleMapPp(Context ctx) {
+        String[] args = ctx.args();
+
+        long uid = resolver.requireBind(ctx);
+
+        TargetInput target;
+        if (resolver.looksLikeMention(args[0]) || TargetInput.looksLikeScoreRef(args[0])) {
+            target = TargetInput.read(args);
+        } else {
+            target = TargetInput.memory();
+        }
+
+        final TargetHistory.Ids ids = targetResolver.beatmap(ctx, target, history.get(ctx));
+        final Long beatmapId = ids.beatmapId();
+        if (beatmapId == null || beatmapId <= 0) throw new IllegalArgumentException("未找到谱面喵。");
+        history.remember(ctx, ids);
+
+        var query = new AddPpQuery(null, 1, beatmapId, List.of(args).subList(target.consumedArgs(), args.length));
+        var result = api.estimate(uid, query);
+
+        ctx.sendReply(at(ctx) + format(result));
     }
 }

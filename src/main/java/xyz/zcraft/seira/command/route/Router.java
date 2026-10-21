@@ -115,8 +115,7 @@ public class Router {
         WhatIfApi rankPpService = new WhatIfApi(startupConfig.ostella().endpoint(), startupConfig.ostella().token());
         WhatIfCommandHandler whatIfCommands = new WhatIfCommandHandler(rankPpService);
         AddPpCommandHandler addPpCommands = new AddPpCommandHandler(
-                new AddPpApi(startupConfig.ostella().endpoint(), startupConfig.ostella().token()),
-                UserDataStore::findBoundUid);
+                new AddPpApi(startupConfig.ostella().endpoint(), startupConfig.ostella().token()), resolver, targetResolver, history);
         this.commandParser = new CommandParser(resolver::sanitize);
         this.commandRegistry = createCommandRegistry(
                 bindingCommands, scoreCommands, beatmapCommands, socialCommands,

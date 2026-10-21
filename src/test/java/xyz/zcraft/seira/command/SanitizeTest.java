@@ -14,7 +14,8 @@ public class SanitizeTest {
             "ps @abc",
             "bs 20 @abc",
             "rp 10 @abc",
-            "bd20"
+            "bd20",
+            "p"
     );
     @Test
     public void testSanitize() {

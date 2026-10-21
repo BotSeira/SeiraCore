@@ -7,7 +7,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 
 public record TargetInput(Kind kind, String id, long index, String player, int consumedArgs) {
-    private static final Pattern PLAYER_SCORE = Pattern.compile("(?i)^(rs|rp|bp|bd)(\\d+)?$");
+    private static final Pattern PLAYER_SCORE = Pattern.compile("(?i)^(rs|rp|b|p|bp|bd)(\\d+)?$");
     private static final Pattern SET = Pattern.compile("^(\\d+)#(\\d+)$");
 
     public static TargetInput memory() {
@@ -18,6 +18,9 @@ public record TargetInput(Kind kind, String id, long index, String player, int c
         return read(args, false);
     }
 
+    public static boolean looksLikeScoreRef(String token) {
+        return PLAYER_SCORE.matcher(token).matches();
+    }
     /**
      * Score commands can select a player's score on an explicit beatmap.
      */
@@ -36,9 +39,15 @@ public record TargetInput(Kind kind, String id, long index, String player, int c
         }
         var score = PLAYER_SCORE.matcher(value);
         if (score.matches()) {
+            String type = score.group(1).toUpperCase(Locale.ROOT);
+            if (type.equals("B")) {
+                type = "BP";
+            } else if (type.equals("P")) {
+                type = "RP";
+            }
             long index = score.group(2) == null ? 1 : positive(score.group(2), "快捷指令索引无效，请输入 1-200 之间的数字。例如: rp5");
             if (index > 200) throw new ResolutionException("快捷指令索引无效，请输入 1-200 之间的数字。例如: rp5");
-            return new TargetInput(Kind.valueOf(score.group(1).toUpperCase(Locale.ROOT)), null, index, player, consumed);
+            return new TargetInput(Kind.valueOf(type), null, index, player, consumed);
         }
         var set = SET.matcher(value);
         if (set.matches()) {
