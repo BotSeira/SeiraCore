@@ -54,7 +54,7 @@ public final class TaskCoordinator {
                     return CommandUsage.NO_BIND;
                 }
                 case ApiRequestException e -> {
-                    return ApiRequestException.getDefaultMessage(e.getErrorCode());
+                    return ApiRequestException.getDefaultMessage(e.getErrorCode()) + "\n> " + e.getMessage();
                 }
                 case ClosedChannelException _ -> {
                     return "API 无法连接，请稍后再试喵\n> 这可能是因为正在进行后端更新，请稍作等待...";

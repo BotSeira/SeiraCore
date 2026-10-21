@@ -174,15 +174,7 @@ public class OstellaApi {
         return getBase64BytesResponse(
                 "/beatmaps/" + beatmapId + "/leaderboards",
                 "获取群排行失败",
-                GSON.toJsonTree(Map.of("targets", uids)).toString()
-        );
-    }
-
-    public static Response<Base64Bytes> getLeaderboardResponse(List<Long> uids) {
-        return getBase64BytesResponse(
-                "/users/leaderboards",
-                "获取排行失败",
-                GSON.toJsonTree(Map.of("targets", uids)).toString()
+                GSON.toJsonTree(Map.of("uids", uids)).toString()
         );
     }
 

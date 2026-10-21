@@ -73,7 +73,7 @@ public final class Resolver {
             String command = switch (matcher.group(1)) {
                 case "bs" -> "bp";
                 case "ps" -> "rp";
-                case "debs" -> "debp";
+                case "debs", "🉐" -> "debp";
                 default -> matcher.group(1);
             };
             String count = (matcher.group(2) == null) ? "20" : matcher.group(2);
@@ -229,7 +229,7 @@ public final class Resolver {
         private static final Pattern QQ_INLINE_AT_PATTERN = Pattern.compile("(<@[A-Z0-9]{32}>)");
         private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
         private static final Pattern SEARCH_PATTERN = Pattern.compile("^(?:#(\\d+) )?(.+)$");
-        private static final Pattern PS_BS = Pattern.compile("^(ps|bs|debs)(?:\\s+)?(\\d+)?( .*)?$");
+        private static final Pattern PS_BS = Pattern.compile("^(ps|bs|debs|🉐)(?:\\s+)?(\\d+)?( .*)?$");
     }
 }
 

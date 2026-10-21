@@ -256,31 +256,7 @@ public final class SocialCommandHandler {
     }
 
     public void handleLb(Context ctx) {
-        if (ctx.args().length == 0) {
-            if (ctx.groupId() != null && !ctx.groupId().isBlank()) {
-                List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(ctx.groupId());
-                if (groupBoundUids.isEmpty()) {
-                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "本群还没有已绑定的玩家，请先使用 /bind"));
-                    return;
-                }
-
-                try (var _ = taskCoordinator.beginRequest(ctx, "Leaderboard")) {
-                    var response = OstellaApi.getLeaderboardResponse(groupBoundUids);
-                    ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
-                }
-                return;
-            }
-            Long uid = resolver.resolveBoundUid(ctx.senderUserId());
-            if (uid == null) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.NO_BIND));
-                return;
-            }
-
-            try (var _ = taskCoordinator.beginRequest(ctx, "Leaderboard")) {
-                var response = OstellaApi.getLeaderboardResponse(List.of(uid));
-                ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
-            }
-        } else if (ctx.args().length == 1 || ctx.args().length == 2) {
+        if (ctx.args().length == 1 || ctx.args().length == 2) {
             var target = TargetInput.read(ctx.args());
             int remainingArgs = ctx.argumentCount() - target.consumedArgs();
             List<Long> uids = new LinkedList<>();
