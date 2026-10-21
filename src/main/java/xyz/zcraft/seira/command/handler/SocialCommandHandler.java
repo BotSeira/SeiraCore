@@ -261,33 +261,33 @@ public final class SocialCommandHandler {
             int remainingArgs = ctx.argumentCount() - target.consumedArgs();
             boolean update = false;
             List<Long> uids = new LinkedList<>();
-            if (remainingArgs == 1) {
-                if ("update".equalsIgnoreCase(ctx.argument(target.consumedArgs()))) {
-                    update = true;
-                } else {
-                    String[] uidTokens = ctx.argument(target.consumedArgs()).split(",");
-                    if (uidTokens.length == 0) {
-                        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "玩家ID列表不能为空。"));
+            if (remainingArgs == 1 && !"update".equalsIgnoreCase(ctx.argument(target.consumedArgs()))) {
+                String[] uidTokens = ctx.argument(target.consumedArgs()).split(",");
+                if (uidTokens.length == 0) {
+                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "玩家ID列表不能为空。"));
+                    return;
+                }
+                for (String token : uidTokens) {
+                    Long uid = Resolver.parsePositiveLong(token.trim());
+                    if (uid == null) {
+                        ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "玩家ID列表包含非法值。"));
                         return;
                     }
-                    for (String token : uidTokens) {
-                        Long uid = Resolver.parsePositiveLong(token.trim());
-                        if (uid == null) {
-                            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "玩家ID列表包含非法值。"));
-                            return;
-                        }
-                        uids.add(uid);
-                    }
+                    uids.add(uid);
                 }
-            } else if (remainingArgs != 0) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
-                return;
             } else if (ctx.inGroup()) {
+                if (remainingArgs == 1 && "update".equalsIgnoreCase(ctx.argument(target.consumedArgs()))) {
+                    update = true;
+                }
+
                 uids.addAll(UserDataStore.findBoundUidsByGroup(ctx.groupId()));
                 if (uids.isEmpty()) {
                     ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "本群还没有已绑定的玩家，请先使用 /bind"));
                     return;
                 }
+            } else if (remainingArgs != 0) {
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
+                return;
             } else {
                 Long uid = resolver.resolveBoundUid(ctx.senderUserId());
                 if (uid == null) {
