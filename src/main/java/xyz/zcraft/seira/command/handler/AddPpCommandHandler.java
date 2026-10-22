@@ -35,12 +35,12 @@ public final class AddPpCommandHandler {
 
     public static String format(AddPpApi.Result result) {
         StringBuilder text = new StringBuilder();
-        text.append(String.format(Locale.ROOT, "如果新增成绩：%.2fpp × %d", result.scorePp(), result.count()));
+        text.append(String.format(Locale.ROOT, "玩家 `%s` 如果新增成绩：%.2fpp × %d", result.username(), result.scorePp(), result.count()));
         if (result.map() != null) {
             var map = result.map();
             var hit = map.hits();
-            text.append("\n> ").append(escape(map.title())).append(" [").append(escape(map.difficulty())).append("]");
-            text.append(String.format(Locale.ROOT, "\n> +%s · %.2f★ · %.4f%% · %dx/%dx\n300/100/50/Miss：%d/%d/%d/%d",
+            text.append("\n> ").append(escape(map.title())).append("\n> [").append(escape(map.difficulty())).append("]");
+            text.append(String.format(Locale.ROOT, "\n> +%s · %.2f★ \n> %.4f%% · %dx/%dx\n300/100/50/Miss：%d/%d/%d/%d",
                     map.mods().isEmpty() ? "NM" : map.mods(), map.stars(), hit.accuracy(), hit.combo(), map.maxCombo(),
                     hit.great(), hit.ok(), hit.meh(), hit.misses()));
             if (result.replaced())
@@ -148,9 +148,22 @@ public final class AddPpCommandHandler {
         final TargetHistory.Ids ids = targetResolver.beatmap(ctx, target, history.get(ctx));
         final Long beatmapId = ids.beatmapId();
         if (beatmapId == null || beatmapId <= 0) throw new IllegalArgumentException("未找到谱面喵。");
+
+        int conditionStart = target.consumedArgs();
+        int conditionEnd;
+        if (resolver.looksLikeMention(ctx.argument(ctx.argumentCount() - 1))) {
+            conditionEnd = ctx.argumentCount() - 1;
+
+            final String player = resolver.player(ctx.argument(ctx.argumentCount() - 1), null);
+
+            uid = OstellaApi.resolveUid(player);
+        } else {
+            conditionEnd = ctx.argumentCount();
+        }
+
         history.remember(ctx, ids);
 
-        var query = new AddPpQuery(null, 1, beatmapId, List.of(args).subList(target.consumedArgs(), args.length));
+        var query = new AddPpQuery(null, 1, beatmapId, List.of(args).subList(conditionStart, conditionEnd));
         var result = api.estimate(uid, query);
 
         ctx.sendReply(at(ctx) + format(result));
