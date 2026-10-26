@@ -20,7 +20,7 @@ import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class AddPpCommandHandler {
     private static final Pattern PP = Pattern.compile("([0-9]+(?:\\.[0-9]+)?)(?:pp)?(?:\\s*[*×]\\s*(\\d+))?", Pattern.CASE_INSENSITIVE);
-    private static final String MAP_TARGET = "(?i)(m\\d+|(?:rs|rp|bp|bd)\\d*)";
+    private static final String MAP_TARGET = "(?i)(m\\d+|(?:rs|rp|bp|bd|p|b)\\d*)";
     private final AddPpApi api;
     private final Resolver resolver;
     private final TargetHistory history;

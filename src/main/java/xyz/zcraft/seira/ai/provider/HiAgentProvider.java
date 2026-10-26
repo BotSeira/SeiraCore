@@ -263,6 +263,7 @@ class HiAgentProvider implements ChatProvider {
 
         try {
             api.stopConversation(state.getRunningMessageId(), groupId);
+            state.running.set(false);
             return StopStatus.SUCCESS;
         } catch (Exception e) {
             return StopStatus.FAILED;
