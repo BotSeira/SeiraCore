@@ -13,6 +13,7 @@ import xyz.zcraft.seira.ai.data.AgentFile;
 import xyz.zcraft.seira.ai.data.AppConversationBrief;
 import xyz.zcraft.seira.ai.data.ChatQueryResponse;
 import xyz.zcraft.seira.command.Context;
+import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.config.LLMConfig;
 
 import java.io.BufferedReader;
@@ -26,24 +27,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 class HiAgentProvider implements ChatProvider {
-    // <faceType=1,faceId="86",ext="eyJ0ZXh0Ijoi5oCE54GrIn0=">
-    // <faceType=1,faceId="497",ext="eyJ0ZXh0Ijoi5LyR5YGH5LqGIn0=">
-    private static final Pattern QQ_FACE = Pattern.compile(
-            "<faceType=[1|3],faceId=\"(\\d+)\",ext=\"([^\"]+)\">", Pattern.CASE_INSENSITIVE
-    );
-    // <faceType=6,faceId="0",ext="eyJ0ZXh0IjoiIn0="> ![ECA4B87395655D69E285314BAB3A2105.jpg](https://multimedia.nt.qq.com.cn/download?appid=14....9_U&spec=0)
-    private static final Pattern QQ_MEME = Pattern.compile(
-            "<faceType=6,faceId=\"0\",ext=\"([^\"]+)\">(?: !\\[.*]\\(.*\\))?", Pattern.CASE_INSENSITIVE
-    );
-    // <faceType=4,faceId="",ext="eyJ0ZXh0IjoiW+eCueeCueeCuV0ifQ==">
-    private static final Pattern QQ_MEME_ALT = Pattern.compile(
-            "<faceType=4,faceId=\"\",ext=\"([^\"]+)\">", Pattern.CASE_INSENSITIVE
-    );
     private final Api api;
     private final Map<StateOwner, State> states = new ConcurrentHashMap<>();
     private final Map<String, Deque<String>> chatLog = new ConcurrentHashMap<>();
@@ -95,41 +81,9 @@ class HiAgentProvider implements ChatProvider {
         return input.substring(0, 150) + "... 已省略 ..." + input.substring(input.length() - 150);
     }
 
-    private static String parseQqMeme(String original) {
-        final Matcher qqFaceMatcher = QQ_FACE.matcher(original);
-
-        if (qqFaceMatcher.find()) {
-            original = qqFaceMatcher.replaceAll(r -> {
-                final String extBase64 = r.group(2);
-                final String ext = new String(Base64.getDecoder().decode(extBase64));
-                final String text = JsonParser.parseString(ext).getAsJsonObject().get("text").getAsString();
-                return "[表情:" + text + "]";
-            });
-        }
-
-        final Matcher qqMemeMatcher = QQ_MEME.matcher(original);
-
-        if (qqMemeMatcher.find()) {
-            original = qqMemeMatcher.replaceAll("[表情]");
-        }
-
-        final Matcher qqMemeAltMatcher = QQ_MEME_ALT.matcher(original);
-
-        if (qqMemeAltMatcher.find()) {
-            original = qqMemeAltMatcher.replaceAll(r -> {
-                final String extBase64 = r.group(1);
-                final String ext = new String(Base64.getDecoder().decode(extBase64));
-                final String text = JsonParser.parseString(ext).getAsJsonObject().get("text").getAsString();
-                return "[表情:" + text + "]";
-            });
-        }
-
-        return original;
-    }
-
     private static String processMessage(String original) {
         try {
-            return parseQqMeme(original);
+            return Resolver.parseQqMeme(original);
         } catch (Exception e) {
             return original;
         }

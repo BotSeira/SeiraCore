@@ -247,7 +247,7 @@ public class Router {
                     aiChatHandler.recordNickname(groupId, userId, nickname);
                 }
 
-                mcMessageService.tryForwardMessage(groupId, nickname, rawContent);
+                mcMessageService.tryForwardMessage(groupId, nickname, Resolver.parseQqMeme(rawContent));
             }
 
             rawContent = rawContent == null ? "" : rawContent.trim();
