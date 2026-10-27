@@ -14,6 +14,7 @@ import xyz.zcraft.seira.db.McServerStore;
 import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -85,8 +86,10 @@ public class McMessageService implements AutoCloseable {
         }
     }
 
-    public void tryForwardMessage() {
-
+    public void tryForwardMessage(String groupId, String username, String content) {
+        Optional.ofNullable(McServerStore.getGroupBoundId(groupId))
+                .map(connections::get)
+                .ifPresent(ws -> ws.send(GSON.toJson(WsServer.Response.message("[%s] %s".formatted(username, content)))));
     }
 
     public void onWsPayload(String message, WebSocket conn) {
@@ -266,6 +269,12 @@ class WsServer extends WebSocketServer {
             return new Response(Code.ERROR, data);
         }
 
+        public static Response message(String content) {
+            JsonObject data = new JsonObject();
+            data.addProperty("content", content);
+            return new Response(Code.MESSAGE, data);
+        }
+
         public static Response unbound() {
             return new Response(Code.UNBOUND, null);
         }
@@ -274,6 +283,7 @@ class WsServer extends WebSocketServer {
             public static final int ERROR = -1;
             public static final int READY = 0;
             public static final int UNBOUND = 1;
+            public static final int MESSAGE = 2;
         }
     }
 }

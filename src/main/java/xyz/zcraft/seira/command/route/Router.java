@@ -60,6 +60,7 @@ public class Router {
     private final Supplier<QQUser> selfSupplier;
     private final AiChatHandler aiChatHandler;
     private final InteractionHandler interactionHandler;
+    private final McMessageService mcMessageService;
 
     public Router(
             MessageSender messageSender, Supplier<AppConfig> configSupplier, AdminRegistry admins,
@@ -74,6 +75,7 @@ public class Router {
         this.commandMetric = java.util.Objects.requireNonNull(commandMetric);
         this.selfSupplier = selfSupplier;
         this.interactionHandler = interactionHandler;
+        this.mcMessageService = mcMessageService;
         AppConfig startupConfig = configSupplier.get();
         ReplyFactory replyFactory = new ReplyFactory(configSupplier, interactionHandler);
         Resolver resolver = new Resolver();
@@ -244,6 +246,8 @@ public class Router {
                 if (nickname != null && !nickname.isBlank()) {
                     aiChatHandler.recordNickname(groupId, userId, nickname);
                 }
+
+                mcMessageService.tryForwardMessage(groupId, nickname, rawContent);
             }
 
             rawContent = rawContent == null ? "" : rawContent.trim();
