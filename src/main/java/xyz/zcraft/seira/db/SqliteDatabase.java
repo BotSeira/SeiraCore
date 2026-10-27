@@ -34,6 +34,7 @@ public class SqliteDatabase {
                     UserDataStore.createTablesIfNeeded(connection);
                     RankGuessRecordStore.createTablesIfNeeded(connection);
                     NoticeTrackerStore.createTablesIfNeeded(connection);
+                    McServerStore.createTablesIfNeeded(connection);
                     connection.commit();
                 }
                 initializedDbPath = dbPath;

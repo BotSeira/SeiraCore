@@ -4,6 +4,7 @@ import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.config.Configurator;
+import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.QQBot;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.RuntimeConfig;
@@ -17,6 +18,7 @@ import xyz.zcraft.seira.util.ApplicationExecutors;
 
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Composition root and single owner of all long-lived application resources.
@@ -25,7 +27,9 @@ public final class SeiraApplication implements AutoCloseable {
     private static final Logger LOG = LogManager.getLogger(SeiraApplication.class);
 
     private final ApplicationExecutors executors;
-    private final BindingService bindingService;
+    private final WebServer webServer;
+    private final BindService bindService;
+    private final McMessageService mcMessageService;
     private final QQBot bot;
     private final JLineConsole console;
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -47,25 +51,30 @@ public final class SeiraApplication implements AutoCloseable {
         AiPermission.initialize();
 
         ApplicationExecutors createdExecutors = new ApplicationExecutors();
-        BindingService createdBindingService = new BindingService(
-                config.binding(), createdExecutors.commandTasks()
-        );
+
+        this.bindService = new BindService(createdExecutors.webserverTasks(), config.binding());
+
+        AtomicReference<MessageSender> senderRef = new AtomicReference<>();
+
+        this.mcMessageService = new McMessageService(config.mcForward(), senderRef);
+        mcMessageService.start();
+
+        WebServer createdWebServer = new WebServer(config.binding(), bindService);
+
         QQBot createdBot;
         try {
             createdBot = new QQBot(
-                    createdRuntimeConfig,
-                    createdAdmins,
-                    createdBindingService,
-                    createdExecutors
+                    createdRuntimeConfig, createdAdmins, createdWebServer, createdExecutors,
+                    bindService, senderRef, mcMessageService
             );
         } catch (RuntimeException e) {
-            createdBindingService.close();
+            createdWebServer.close();
             createdExecutors.close();
             BotStat.shutdown();
             throw e;
         }
         this.executors = createdExecutors;
-        this.bindingService = createdBindingService;
+        this.webServer = createdWebServer;
         this.bot = createdBot;
         this.console = new JLineConsole(new ConsoleCommandProcessor(
                 createdRuntimeConfig,
@@ -77,7 +86,7 @@ public final class SeiraApplication implements AutoCloseable {
     }
 
     public void run() {
-        bindingService.start();
+        webServer.start();
         console.start();
         bot.start();
     }
@@ -90,7 +99,9 @@ public final class SeiraApplication implements AutoCloseable {
         LOG.info("Shutting down Seira");
         console.close();
         bot.stop();
-        bindingService.close();
+        webServer.close();
+        bindService.close();
+        mcMessageService.close();
         executors.close();
         bot.close();
         DailyLuck.saveToFile();

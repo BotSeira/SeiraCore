@@ -27,6 +27,9 @@ public final class ApplicationExecutors implements AutoCloseable {
     private final ExecutorService commandTasks = Executors.newThreadPerTaskExecutor(
             Thread.ofVirtual().name("seira-command-task-", 0).factory()
     );
+    private final ExecutorService webserverTasks = Executors.newThreadPerTaskExecutor(
+            Thread.ofVirtual().name("seira-webserver-task-", 0).factory()
+    );
     private final ExecutorService attachmentDownloads = Executors.newFixedThreadPool(
             4,
             daemonThreadFactory("seira-attachment-")
@@ -56,14 +59,18 @@ public final class ApplicationExecutors implements AutoCloseable {
         return commandTasks;
     }
 
+    public ExecutorService webserverTasks() {
+        return webserverTasks;
+    }
+
     public ExecutorService attachmentDownloads() {
         return attachmentDownloads;
     }
 
     @Override
     public void close() {
-        List.of(attachmentDownloads, commandTasks, gatewayEvents).forEach(ExecutorService::shutdown);
-        for (ExecutorService executor : List.of(attachmentDownloads, commandTasks, gatewayEvents)) {
+        List.of(attachmentDownloads, commandTasks, gatewayEvents, webserverTasks).forEach(ExecutorService::shutdown);
+        for (ExecutorService executor : List.of(attachmentDownloads, commandTasks, gatewayEvents, webserverTasks)) {
             awaitTermination(executor);
         }
     }

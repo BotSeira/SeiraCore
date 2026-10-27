@@ -525,8 +525,7 @@ public final class ScoreCommandHandler {
         String[] args = ctx.args();
         ScoreListRange range = parseScoreListRange(args[0]);
         if (range == null) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + usage
-                    + "\n数量或范围必须在 1 到 " + MAX_SCORE_LIST_COUNT + " 之间，且范围起点不能大于终点。"));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + usage));
             return null;
         }
 

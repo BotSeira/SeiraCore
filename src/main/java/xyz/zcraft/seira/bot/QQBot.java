@@ -21,9 +21,7 @@ import xyz.zcraft.seira.console.OstellaCacheControlClient;
 import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.discord.DiscordBridgeService;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
-import xyz.zcraft.seira.services.BindingService;
-import xyz.zcraft.seira.services.BotStat;
-import xyz.zcraft.seira.services.CosService;
+import xyz.zcraft.seira.services.*;
 import xyz.zcraft.seira.util.AdminRegistry;
 import xyz.zcraft.seira.util.ApplicationExecutors;
 import xyz.zcraft.seira.util.ShutdownRequest;
@@ -71,8 +69,11 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
     public QQBot(
             RuntimeConfig runtimeConfig,
             AdminRegistry admins,
-            BindingService bindingService,
-            ApplicationExecutors executors
+            WebServer webServer,
+            ApplicationExecutors executors,
+            BindService bindService,
+            AtomicReference<MessageSender> senderRef,
+            McMessageService mcMessageService
     ) {
         LOG.info("Initializing QQBot");
         AppConfig config = runtimeConfig.current();
@@ -87,6 +88,9 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         this.cos = new CosService(config.cos());
 
         this.sender = new MessageSender(tokenManager, cos);
+
+        senderRef.set(sender);
+
         this.interruptionNotifier = new RealtimeServiceInterruptionNotifier(sender);
 
         LOG.info("Initializing Discord bridge service");
@@ -130,7 +134,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                 sender,
                 runtimeConfig::current,
                 admins,
-                bindingService,
+                webServer,
                 watchService,
                 challengeService,
                 mpWatchService,
@@ -149,7 +153,9 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                 self::get,
                 chatProvider,
                 s -> QQApi.getGroupBotState(tokenManager.getToken(), s),
-                interactionHandler
+                interactionHandler,
+                bindService,
+                mcMessageService
         );
     }
 

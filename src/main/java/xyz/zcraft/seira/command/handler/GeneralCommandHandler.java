@@ -5,7 +5,6 @@ import org.apache.logging.log4j.Logger;
 import xyz.zcraft.osu.model.Beatmapset;
 import xyz.zcraft.seira.api.AsteroidApi;
 import xyz.zcraft.seira.api.OstellaApi;
-import xyz.zcraft.seira.api.data.MinecraftServerStatus;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
@@ -24,12 +23,10 @@ import xyz.zcraft.seira.util.dice.result.DiceResult;
 
 import java.util.Objects;
 import java.util.function.Predicate;
-import java.util.regex.Pattern;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class GeneralCommandHandler {
-    private static final Pattern SERVER_PATTERN = Pattern.compile("^(?:https?://)?([a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)+)(?::[0-9]+)?$");
     private static final Logger LOG = LogManager.getLogger(GeneralCommandHandler.class);
     private final MessageSender messageSender;
     private final TargetResolver targets;
@@ -165,55 +162,6 @@ public final class GeneralCommandHandler {
                 }, () -> sb.append(at(context)).append("未找到公告#").append(noticeId));
 
         context.sendReply(PendingMessage.ofMarkdownRaw(sb.toString()));
-    }
-
-    public void handleMc(Context ctx) {
-        if (ctx.argumentCount() != 1) {
-            ctx.sendReply(at(ctx) + "用法：/mc <服务器地址>");
-            return;
-        }
-
-        try {
-            final String address = ctx.argument(0);
-
-            if (!SERVER_PATTERN.matcher(address).matches()) {
-                ctx.sendReply(at(ctx) + "服务器地址无效喵。");
-                return;
-            }
-
-            final var probe = AsteroidApi.getMinecraftServerStatus(address);
-
-            final var status = probe.status();
-            final var players = status.players();
-            final var samples = players.sample();
-
-            String playersSample = "";
-
-            if (samples != null) {
-                playersSample = String.join(", ", samples.stream().map(MinecraftServerStatus.Players.Sample::name).toList());
-            }
-
-            ctx.sendReply(at(ctx) + """
-                             `%s` 的服务器状态：
-                             - 版本: `%s`
-                             - 描述: `%s`
-                             - 延迟: `%d` ms
-                             - 在线人数: `%d` / `%d`
-                             - 在线玩家: [%s]
-                            """.formatted(
-                            address,
-                            status.version().name(),
-                            status.description(),
-                            probe.latency(),
-                            players.online(),
-                            players.max(),
-                            playersSample
-                    )
-            );
-        } catch (Exception e) {
-            ctx.sendReply(at(ctx) + "无法获取目标服务器状态喵，这可能是因为目标服务器未开启或者存在网络问题。");
-            LOG.warn("Failed to probe Minecraft server", e);
-        }
     }
 
     public void handleUx(Context ctx) {

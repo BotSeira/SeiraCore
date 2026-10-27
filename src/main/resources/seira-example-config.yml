@@ -81,3 +81,8 @@ asteroid:
   # asteroid API 的地址
   endpoint: "http://localhost:8728"
   token:
+
+# Minecraft 消息转发配置
+mcForward:
+  # WebSocket 监听端口
+  listenPort: 8738

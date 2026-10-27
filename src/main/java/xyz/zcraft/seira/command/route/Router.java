@@ -24,7 +24,9 @@ import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.discord.DiscordBridgeService;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
 import xyz.zcraft.seira.services.AiPermission;
-import xyz.zcraft.seira.services.BindingService;
+import xyz.zcraft.seira.services.BindService;
+import xyz.zcraft.seira.services.McMessageService;
+import xyz.zcraft.seira.services.WebServer;
 import xyz.zcraft.seira.util.AdminRegistry;
 import xyz.zcraft.seira.util.NoticesHelper;
 import xyz.zcraft.seira.util.OsuAuthHelper;
@@ -61,10 +63,11 @@ public class Router {
 
     public Router(
             MessageSender messageSender, Supplier<AppConfig> configSupplier, AdminRegistry admins,
-            BindingService bindingService, ScoreWatchService watchService, ChallengeService challengeService, MPWatchService mpWatchService,
+            WebServer webServer, ScoreWatchService watchService, ChallengeService challengeService, MPWatchService mpWatchService,
             DiscordBridgeService discordBridgeService, RankGuessGameService rankGuessGameService, Executor commandExecutor,
             Runnable commandMetric, Function<byte[], UploadedImage> imageUploader, Supplier<QQUser> selfSupplier,
-            ChatProvider chatProvider, Function<String, GroupBotState> botStateGetter, InteractionHandler interactionHandler
+            ChatProvider chatProvider, Function<String, GroupBotState> botStateGetter, InteractionHandler interactionHandler,
+            BindService bindService, McMessageService mcMessageService
     ) {
         this.configSupplier = java.util.Objects.requireNonNull(configSupplier);
         this.commandExecutor = commandExecutor;
@@ -80,7 +83,7 @@ public class Router {
         VideoRenderRecord videoRenderRecord = new VideoRenderRecord();
         this.taskCoordinator = new TaskCoordinator(messageSender, replayResults, discordBridgeService);
         this.authHelper = new OsuAuthHelper(startupConfig.binding());
-        BindingCommandHandler bindingCommands = new BindingCommandHandler(startupConfig, replyFactory, bindingService);
+        BindingCommandHandler bindingCommands = new BindingCommandHandler(startupConfig, replyFactory, bindService);
         ScoreCommandHandler scoreCommands = new ScoreCommandHandler(
                 resolver, targetResolver, history, taskCoordinator, replyFactory, challengeService
         );
@@ -96,6 +99,11 @@ public class Router {
         GeneralCommandHandler generalCommands = new GeneralCommandHandler(
                 messageSender, taskCoordinator, replyFactory, resolver, targetResolver, history, admins::isAdmin
         );
+
+        MinecraftCommandHandler minecraftCommands = new MinecraftCommandHandler(
+                messageSender, taskCoordinator, replyFactory, resolver, targetResolver, history, admins::isAdmin, mcMessageService
+        );
+
         this.aiChatHandler = new AiChatHandler(
                 resolver, chatProvider, admins::isAdmin, botStateGetter
         );
@@ -120,7 +128,8 @@ public class Router {
         this.commandRegistry = createCommandRegistry(
                 bindingCommands, scoreCommands, beatmapCommands, socialCommands,
                 replayCommands, generalCommands, watchCommands, specificScoreWatchCommands,
-                multiplayerRoomWatchCommands, dcsCommands, rankGuessCommands, aiChatHandler, whatIfCommands, challengeCommands, addPpCommands, ncmHandler
+                multiplayerRoomWatchCommands, dcsCommands, rankGuessCommands, aiChatHandler,
+                whatIfCommands, challengeCommands, addPpCommands, ncmHandler, minecraftCommands
         );
         this.debugRoutes = new DebugRoutes(
                 configSupplier, messageSender, replyFactory, taskCoordinator,
@@ -135,7 +144,8 @@ public class Router {
             WatchCommandHandler watchCommands, SpecificScoreWatchCommandHandler specificScoreWatchCommands,
             MPWatchCommandHandler multiplayerRoomWatchCommands, DcsCommandHandler dcsCommands,
             RankGuessCommandHandler rankGuessCommands, AiChatHandler aiChatHandler, WhatIfCommandHandler whatIfCommands,
-            ChallengeCommandHandler challengeCommands, AddPpCommandHandler addPpCommands, NcmHandler ncmHandler
+            ChallengeCommandHandler challengeCommands, AddPpCommandHandler addPpCommands, NcmHandler ncmHandler,
+            MinecraftCommandHandler minecraftCommands
     ) {
         return CommandRegistry.builder()
                 .register(bindingCommands::handleBind, "bind")
@@ -196,7 +206,8 @@ public class Router {
                 .register(rankGuessCommands::handleRankGuess, "rg")
                 .register(generalCommands::handleNotice, "notice")
                 .register(aiChatHandler::handleAi, "ai")
-                .register(generalCommands::handleMc, "mc")
+                .register(minecraftCommands::handleMc, "mc")
+                .register(minecraftCommands::handleMcBind, "mcbind")
                 .build();
     }
 

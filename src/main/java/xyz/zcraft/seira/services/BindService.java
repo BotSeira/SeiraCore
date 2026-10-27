@@ -1,6 +1,5 @@
 package xyz.zcraft.seira.services;
 
-import io.javalin.Javalin;
 import io.javalin.http.Context;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -14,52 +13,23 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 
-/**
- * Owns the OAuth callback server and its pending binding requests.
- */
-public final class BindingService implements AutoCloseable {
-    private static final Logger LOG = LogManager.getLogger(BindingService.class);
+public class BindService implements AutoCloseable{
+    private static final Logger LOG = LogManager.getLogger(BindService.class);
     private static final Duration TASK_TTL = Duration.ofMinutes(20);
-
-    private final BindingConfig config;
-    private final Executor callbackExecutor;
     private final ConcurrentHashMap<String, BindingTask> bindingTasks = new ConcurrentHashMap<>();
     private final ScheduledExecutorService taskCleaner = Executors.newSingleThreadScheduledExecutor(
             Thread.ofPlatform().daemon().name("binding-task-cleaner").factory()
     );
-    private final AtomicBoolean started = new AtomicBoolean();
-    private final AtomicBoolean closed = new AtomicBoolean();
-    private volatile Javalin server;
 
-    public BindingService(BindingConfig config, Executor callbackExecutor) {
-        this.config = Objects.requireNonNull(config, "config");
-        this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
-    }
+    private final Executor executor;
+    private final BindingConfig config;
 
-    public synchronized void start() {
-        ensureOpen();
-        if (started.get()) {
-            return;
-        }
-
-        try {
-            server = Javalin.create(javalinConfig -> javalinConfig.routes
-                            .get(config.listenPath(), this::handleCallback))
-                    .start(config.listenPort());
-            taskCleaner.scheduleAtFixedRate(this::removeExpiredTasks, 1, 1, TimeUnit.MINUTES);
-            started.set(true);
-            LOG.info("Binding callback listener started on port {}", config.listenPort());
-        } catch (RuntimeException e) {
-            Javalin currentServer = server;
-            server = null;
-            if (currentServer != null) {
-                currentServer.stop();
-            }
-            throw e;
-        }
+    public BindService(Executor executor, BindingConfig config) {
+        this.executor = executor;
+        this.config = config;
+        taskCleaner.scheduleAtFixedRate(this::removeExpiredTasks, 1, 1, TimeUnit.MINUTES);
     }
 
     public BindingTask createBindingTask(
@@ -68,7 +38,6 @@ public final class BindingService implements AutoCloseable {
             BiConsumer<User, OsuToken> onFinish
     ) {
         synchronized (this) {
-            ensureStarted();
             String taskId = UUID.randomUUID().toString();
             BindingTask task = new BindingTask(taskId, openId, messageId, onFinish);
             bindingTasks.put(taskId, task);
@@ -80,7 +49,7 @@ public final class BindingService implements AutoCloseable {
         return bindingTasks.size();
     }
 
-    private void handleCallback(Context ctx) {
+    public void handleBindingCallback(Context ctx) {
         String state = ctx.queryParam("state");
         String code = ctx.queryParam("code");
 
@@ -98,8 +67,8 @@ public final class BindingService implements AutoCloseable {
         }
 
         ctx.future(() -> CompletableFuture
-                .supplyAsync(() -> exchangeCode(code), callbackExecutor)
-                .thenApplyAsync(token -> loadUser(token, bindingTask), callbackExecutor)
+                .supplyAsync(() -> exchangeCode(code), executor)
+                .thenApplyAsync(token -> loadUser(token, bindingTask), executor)
                 .thenAccept(user -> ctx.status(200).html(
                         BindingHtmlTemplates.success(user.getUsername(), String.valueOf(user.getId()))
                 ))
@@ -140,34 +109,9 @@ public final class BindingService implements AutoCloseable {
         });
     }
 
-    private void ensureStarted() {
-        if (!started.get()) {
-            throw new IllegalStateException("Binding service has not been started");
-        }
-    }
-
-    private void ensureOpen() {
-        if (closed.get()) {
-            throw new IllegalStateException("Binding service has been closed");
-        }
-    }
-
     @Override
-    public synchronized void close() {
-        if (!closed.compareAndSet(false, true)) {
-            return;
-        }
-        started.set(false);
+    public void close() {
         taskCleaner.shutdownNow();
-        Javalin currentServer = server;
-        server = null;
-        if (currentServer != null) {
-            try {
-                currentServer.stop();
-            } catch (Exception e) {
-                LOG.warn("Error stopping server", e);
-            }
-        }
         bindingTasks.clear();
     }
 
@@ -212,3 +156,4 @@ final class BindingHtmlTemplates {
         }
     }
 }
+

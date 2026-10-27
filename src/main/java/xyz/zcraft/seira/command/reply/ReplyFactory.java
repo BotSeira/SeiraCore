@@ -19,7 +19,7 @@ import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.db.RankGuessRecordStore;
 import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.rankguess.data.*;
-import xyz.zcraft.seira.services.BindingService;
+import xyz.zcraft.seira.services.BindService;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.services.DailyLuck;
 import xyz.zcraft.seira.util.VersionInfo;
@@ -356,7 +356,7 @@ public final class ReplyFactory {
         );
     }
 
-    public PendingMessage bindMessage(Context ctx, BindingConfig config, BindingService.BindingTask task, boolean isC2C) {
+    public PendingMessage bindMessage(Context ctx, BindingConfig config, BindService.BindingTask task, boolean isC2C) {
         final String url = "https://osu.ppy.sh/oauth/authorize?client_id=%d&response_type=code&scope=public+identify+friends.read&state=%s"
                 .formatted(config.clientId(), task.taskId());
         return PendingMessage.ofMarkdownRaw(
