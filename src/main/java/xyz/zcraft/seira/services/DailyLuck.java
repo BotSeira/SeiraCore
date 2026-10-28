@@ -69,8 +69,16 @@ public class DailyLuck {
             indexes.add(r.nextInt(FORTUNE_POOL.length));
         }
 
-        final String upStr = indexes.stream().limit(up).map(i -> FORTUNE_POOL[i]).reduce((a, b) -> a + ", " + b).orElse("无");
-        final String downStr = indexes.stream().skip(up).map(i -> FORTUNE_POOL[i]).reduce((a, b) -> a + ", " + b).orElse("无");
+        final String upStr = indexes.stream()
+                .limit(up)
+                .map(i -> FORTUNE_POOL[i])
+                .reduce((a, b) -> a + ", " + b)
+                .orElse("无");
+        final String downStr = indexes.stream()
+                .skip(up)
+                .map(i -> FORTUNE_POOL[i])
+                .reduce((a, b) -> a + ", " + b)
+                .orElse("无");
 
         return new Luck(luck, upStr, downStr, ids.isEmpty() ? 0 : ids.get(r.nextInt(ids.size())));
     }

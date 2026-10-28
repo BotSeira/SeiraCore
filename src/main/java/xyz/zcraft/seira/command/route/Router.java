@@ -204,7 +204,7 @@ public class Router {
                 .register(specificScoreWatchCommands::handleWx, "wx")
                 .register(multiplayerRoomWatchCommands::handleMpWatch, "mpwatch", "mpw")
                 .register(multiplayerRoomWatchCommands::handleRomAI, "romai")
-                .register(dcsCommands::handleDcs, "dcs")
+//                .register(dcsCommands::handleDcs, "dcs")
                 .register(rankGuessCommands::handleRankGuess, "rg")
                 .register(generalCommands::handleNotice, "notice")
                 .register(aiChatHandler::handleAi, "ai")
