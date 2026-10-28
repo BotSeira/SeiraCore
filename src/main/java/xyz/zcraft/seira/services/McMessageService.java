@@ -110,13 +110,22 @@ public class McMessageService implements AutoCloseable {
             return;
         }
 
-        final String boundGroup = McServerStore.getBoundGroup(payload.serverId(), payload.secret());
-        if (boundGroup == null) return;
+        final String group = McServerStore.getBoundGroup(payload.serverId(), payload.secret());
+        if (group == null) return;
 
-        final MessageSender messageSender = senderRef.get();
-        if (messageSender == null) return;
+        final MessageSender msg = senderRef.get();
+        if (msg == null) return;
 
-        messageSender.sendGroupMarkdown(boundGroup, payload.data().get("content").getAsString());
+        final MessageData data = GSON.fromJson(payload.data(), MessageData.class);
+
+        final String username = data.username();
+        final String uuid = data.uuid();
+        switch (data.type()) {
+            case PLAYER_JOIN -> msg.sendGroupMarkdown(group, "> %s 加入了游戏".formatted(username));
+            case PLAYER_LEAVE ->  msg.sendGroupMarkdown(group, "> %s 离开了游戏".formatted(username));
+            case CHAT_MESSAGE -> msg.sendGroupMarkdown(group, "<%s> %s".formatted(username, data.content()));
+            default -> LOG.warn("Unknown message type: {}", data.type());
+        }
     }
 
     private void handleAuthenticate(WebSocket conn, Payload payload) {
@@ -210,6 +219,19 @@ public class McMessageService implements AutoCloseable {
             public static final int UNBIND = 2;
             public static final int AUTHENTICATE = 3;
             public static final int MESSAGE = 4;
+        }
+    }
+
+    public record MessageData(
+            Type type,
+            String username,
+            String uuid,
+            String content
+    ) {
+        public enum Type {
+            PLAYER_JOIN,
+            PLAYER_LEAVE,
+            CHAT_MESSAGE
         }
     }
 }
