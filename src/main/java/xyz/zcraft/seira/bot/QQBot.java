@@ -171,7 +171,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         watchService.start();
         challengeService.start();
         mpWatchService.start();
-        discordBridgeService.start();
+//        discordBridgeService.start();
         LOG.info("Starting bot connection loop...");
 
         while (running.get()) {
