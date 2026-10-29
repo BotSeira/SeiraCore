@@ -153,6 +153,7 @@ public final class UserDataStore {
     }
 
     public static Map<String, Long> findBoundUsersByGroup(String groupId) {
+        if (groupId == null) return Map.of();
         SqliteDatabase.ensureInitialized();
         String sql = """
                 SELECT gm.open_id, ub.osu_uid

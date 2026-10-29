@@ -7,6 +7,7 @@ import com.google.gson.JsonObject;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.Seira;
+import xyz.zcraft.seira.api.data.GachaCardOwn;
 import xyz.zcraft.seira.api.data.MinecraftServerStatus;
 import xyz.zcraft.seira.api.data.RawResponse;
 import xyz.zcraft.seira.api.data.ncm.MatchResult;
@@ -238,6 +239,53 @@ public class AsteroidApi {
         } catch (Exception e) {
             LOG.error("Failed to get playlist songs", e);
             throw new RuntimeException("获取歌单失败", e);
+        }
+    }
+
+    public static List<GachaCardOwn> getGachaCardOwners(long uid) {
+        try {
+            var request = requestBuilder("/gacha/players/" + uid + "/owners")
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            final RawResponse rawResponse = GSON.fromJson(response.body(), RawResponse.class);
+
+            ApiUtil.ensureApiSuccess(rawResponse, "获取卡片所有者失败");
+
+            final JsonElement rawResponseData = rawResponse.getData();
+            if (rawResponseData != null && rawResponseData.isJsonObject()) {
+                JsonObject data = rawResponseData.getAsJsonObject();
+                final JsonArray resultArr = data.getAsJsonArray("result");
+
+                List<GachaCardOwn> owns = new ArrayList<>(resultArr.size());
+
+                for (JsonElement jsonElement : resultArr) {
+                    owns.add(GSON.fromJson(jsonElement, GachaCardOwn.class));
+                }
+
+                return owns;
+            } else {
+                return List.of();
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to get card owners", e);
+            throw new RuntimeException("获取卡片所有者失败", e);
+        }
+    }
+
+    public static byte[] getGachaProfile(String username) {
+        try {
+            var request = requestBuilder("/gacha/users/" + username + "/profile")
+                    .GET()
+                    .build();
+
+            final HttpResponse<byte[]> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofByteArray());
+
+            return response.body();
+        } catch (Exception e) {
+            LOG.error("Failed to gacha user profile", e);
+            throw new RuntimeException("获取用户信息失败", e);
         }
     }
 

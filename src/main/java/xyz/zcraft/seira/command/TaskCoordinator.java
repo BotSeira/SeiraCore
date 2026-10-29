@@ -76,6 +76,14 @@ public final class TaskCoordinator {
         return "请求处理失败，请稍后再试喵。";
     }
 
+    public String escapeMd(String input) {
+        return input.replaceAll("-", "\\\\-")
+                .replaceAll("_", "\\\\_")
+                .replaceAll("\\*", "\\\\*")
+                .replaceAll("\\[", "\\\\[")
+                .replaceAll("]", "\\\\]");
+    }
+
     public ReplyChannel openReplyChannel(
             String targetId, String messageId, boolean groupMessage, boolean queueMessageInGroup, String refMsgIdx
     ) {

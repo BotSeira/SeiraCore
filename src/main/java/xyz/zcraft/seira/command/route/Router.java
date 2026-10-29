@@ -126,12 +126,14 @@ public class Router {
         WhatIfCommandHandler whatIfCommands = new WhatIfCommandHandler(rankPpService);
         AddPpCommandHandler addPpCommands = new AddPpCommandHandler(
                 new AddPpApi(startupConfig.ostella().endpoint(), startupConfig.ostella().token()), resolver, targetResolver, history);
+        GachaCommandHandler gachaCommands = new GachaCommandHandler(messageSender, taskCoordinator, replyFactory, resolver, targetResolver, history, admins::isAdmin);
         this.commandParser = new CommandParser(resolver::sanitize);
         this.commandRegistry = createCommandRegistry(
                 bindingCommands, scoreCommands, beatmapCommands, socialCommands,
                 replayCommands, generalCommands, watchCommands, specificScoreWatchCommands,
                 multiplayerRoomWatchCommands, dcsCommands, rankGuessCommands, aiChatHandler,
-                whatIfCommands, challengeCommands, addPpCommands, ncmHandler, minecraftCommands
+                whatIfCommands, challengeCommands, addPpCommands, ncmHandler, minecraftCommands,
+                gachaCommands
         );
         this.debugRoutes = new DebugRoutes(
                 configSupplier, messageSender, replyFactory, taskCoordinator,
@@ -147,7 +149,7 @@ public class Router {
             MPWatchCommandHandler multiplayerRoomWatchCommands, DcsCommandHandler dcsCommands,
             RankGuessCommandHandler rankGuessCommands, AiChatHandler aiChatHandler, WhatIfCommandHandler whatIfCommands,
             ChallengeCommandHandler challengeCommands, AddPpCommandHandler addPpCommands, NcmHandler ncmHandler,
-            MinecraftCommandHandler minecraftCommands
+            MinecraftCommandHandler minecraftCommands, GachaCommandHandler gachaCommands
     ) {
         return CommandRegistry.builder()
                 .register(bindingCommands::handleBind, "bind")
@@ -204,6 +206,7 @@ public class Router {
                 .register(specificScoreWatchCommands::handleWx, "wx")
                 .register(multiplayerRoomWatchCommands::handleMpWatch, "mpwatch", "mpw")
                 .register(multiplayerRoomWatchCommands::handleRomAI, "romai")
+                .register(gachaCommands::handleGacha, "gacha")
 //                .register(dcsCommands::handleDcs, "dcs")
                 .register(rankGuessCommands::handleRankGuess, "rg")
                 .register(generalCommands::handleNotice, "notice")
