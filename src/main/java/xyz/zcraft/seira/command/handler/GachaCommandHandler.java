@@ -130,7 +130,7 @@ public class GachaCommandHandler {
 
         for (int i = 0; i < showCount; i++) {
             GachaCardOwn owner = sorted.get(i);
-            final boolean inGroup = groupUsernames.contains(owner.username());
+            final boolean inGroup = groupUsernames.contains(owner.username().toLowerCase());
             sb.append("- ").append("%s`%s`: `%d`张 (`#%d`)".formatted(inGroup ? "※ " : "", owner.username(), owner.count(), owner.lowest())).append("\n");
         }
 
