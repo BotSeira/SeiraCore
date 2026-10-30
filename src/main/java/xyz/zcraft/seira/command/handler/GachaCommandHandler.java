@@ -98,6 +98,11 @@ public class GachaCommandHandler {
 
         final long sum = gachaCardOwners.stream().mapToLong(GachaCardOwn::count).sum();
 
+        if (gachaCardOwners.isEmpty()) {
+            ctx.sendReply(at(ctx) + "`%s` 没有现存的卡片喵。".formatted(userRaw.getUsername()));
+            return;
+        }
+
         sb.append(at(ctx)).append("`%s` 的卡片现存 `%d` 张，持有者：\n".formatted(userRaw.getUsername(), sum));
 
         final Set<String> groupUsernames = new HashSet<>();
@@ -110,7 +115,8 @@ public class GachaCommandHandler {
 
         final Comparator<GachaCardOwn> comparator = Comparator
                 .comparing((GachaCardOwn e) -> !groupUsernames.contains(e.username().toLowerCase(Locale.ROOT)))
-                .thenComparing(Comparator.comparingLong(GachaCardOwn::count).reversed());
+                .thenComparing(Comparator.comparingLong(GachaCardOwn::count).reversed())
+                .thenComparingLong(GachaCardOwn::lowest);
 
         final List<GachaCardOwn> sorted = gachaCardOwners.stream()
                 .sorted(comparator)
@@ -124,7 +130,8 @@ public class GachaCommandHandler {
 
         for (int i = 0; i < showCount; i++) {
             GachaCardOwn owner = sorted.get(i);
-            sb.append("- `%s`: `%d`张，价值 `%d`\n".formatted(owner.username(), owner.count(), owner.value()));
+            final boolean inGroup = groupUsernames.contains(owner.username());
+            sb.append("- ").append("%s`%s`: `%d`张 (`#%d`)".formatted(inGroup ? "※ " : "", owner.username(), owner.count(), owner.lowest())).append("\n");
         }
 
         final long collapsedCount = sorted.stream()
