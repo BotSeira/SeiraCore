@@ -123,7 +123,7 @@ public class McMessageService implements AutoCloseable {
         switch (data.type()) {
             case PLAYER_JOIN -> msg.sendGroupMarkdown(group, "> %s 加入了游戏".formatted(username));
             case PLAYER_LEAVE ->  msg.sendGroupMarkdown(group, "> %s 离开了游戏".formatted(username));
-            case CHAT_MESSAGE -> msg.sendGroupMarkdown(group, "<%s> %s".formatted(username, data.content()));
+            case CHAT_MESSAGE -> msg.sendGroupText(group, "<%s> %s".formatted(username, data.content()));
             default -> LOG.warn("Unknown message type: {}", data.type());
         }
     }
