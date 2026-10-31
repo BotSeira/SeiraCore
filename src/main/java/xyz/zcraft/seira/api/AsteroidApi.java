@@ -7,9 +7,10 @@ import com.google.gson.JsonObject;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.Seira;
-import xyz.zcraft.seira.api.data.GachaCardOwn;
+import xyz.zcraft.seira.api.data.gacha.GachaCardOwn;
 import xyz.zcraft.seira.api.data.MinecraftServerStatus;
 import xyz.zcraft.seira.api.data.RawResponse;
+import xyz.zcraft.seira.api.data.gacha.GachaPlayer;
 import xyz.zcraft.seira.api.data.ncm.MatchResult;
 import xyz.zcraft.seira.api.data.ncm.Playlist;
 import xyz.zcraft.seira.api.data.ncm.Song;
@@ -274,9 +275,41 @@ public class AsteroidApi {
         }
     }
 
+    public static List<GachaPlayer> searchGachaPlayer(String query) {
+        try {
+            var request = requestBuilder("/gacha/players/search?q=" + URLEncoder.encode(query, StandardCharsets.UTF_8) + "&sort=popular&limit=100&offset=0")
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            final RawResponse rawResponse = GSON.fromJson(response.body(), RawResponse.class);
+
+            ApiUtil.ensureApiSuccess(rawResponse, "获取卡片信息失败");
+
+            final JsonElement rawResponseData = rawResponse.getData();
+            if (rawResponseData != null && rawResponseData.isJsonObject()) {
+                JsonObject data = rawResponseData.getAsJsonObject();
+                final JsonArray resultArr = data.getAsJsonArray("result");
+
+                List<GachaPlayer> players = new ArrayList<>(resultArr.size());
+
+                for (JsonElement jsonElement : resultArr) {
+                    players.add(GSON.fromJson(jsonElement, GachaPlayer.class));
+                }
+
+                return players;
+            } else {
+                return List.of();
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to search player card", e);
+            throw new RuntimeException("获取卡片信息失败", e);
+        }
+    }
+
     public static byte[] getGachaProfile(String username) {
         try {
-            var request = requestBuilder("/gacha/users/" + username + "/profile")
+            var request = requestBuilder("/gacha/users/" + URLEncoder.encode(username, StandardCharsets.UTF_8) + "/profile")
                     .GET()
                     .build();
 

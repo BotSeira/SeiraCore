@@ -5,7 +5,9 @@ import org.apache.logging.log4j.Logger;
 import xyz.zcraft.osu.model.UserExtended;
 import xyz.zcraft.seira.api.AsteroidApi;
 import xyz.zcraft.seira.api.OstellaApi;
-import xyz.zcraft.seira.api.data.GachaCardOwn;
+import xyz.zcraft.seira.api.data.gacha.GachaCardOwn;
+import xyz.zcraft.seira.api.data.gacha.GachaPlayer;
+import xyz.zcraft.seira.api.data.gacha.OsuGacha;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
@@ -89,58 +91,84 @@ public class GachaCommandHandler {
             uid = OstellaApi.resolveUid(resolver.player(ctx.argument(1), null));
         }
 
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder(at(ctx));
 
         final UserExtended userRaw = OstellaApi.getUserRaw(uid);
+
+        final List<GachaPlayer> players = AsteroidApi.searchGachaPlayer(userRaw.getUsername());
+
+        final Optional<GachaPlayer> playerCardOptional = players.stream()
+                .filter(e -> e.username().equalsIgnoreCase(userRaw.getUsername()))
+                .findFirst();
+
+        if (playerCardOptional.isEmpty()) {
+            ctx.sendReply(at(ctx) + "`%s` 还没有自己的卡片喵。".formatted(userRaw.getUsername()));
+            return;
+        }
+
+        final GachaPlayer gachaPlayer = playerCardOptional.get();
 
         final List<GachaCardOwn> gachaCardOwners = AsteroidApi.getGachaCardOwners(uid);
         final Map<String, Long> boundUsers = UserDataStore.findBoundUsersByGroup(ctx.groupId());
 
         final long sum = gachaCardOwners.stream().mapToLong(GachaCardOwn::count).sum();
 
+        sb.append("""
+                `%s` 的卡片信息：
+                > 职业：`%s`，稀有度：`%.2f`（%s）
+                > 已被抽出 `%d` 张，现存 `%d` 张"""
+                .formatted(
+                        userRaw.getUsername(),
+                        OsuGacha.getClassName(gachaPlayer.cls()),
+                        gachaPlayer.popularity() / 100.0,
+                        OsuGacha.getRarityName(gachaPlayer.currentRarity()),
+                        gachaPlayer.mintedCount(),
+                        sum
+                )
+        );
+
+        sb.append("\n卡片共 `%d` 位持有者：\n".formatted(gachaCardOwners.size()));
+
         if (gachaCardOwners.isEmpty()) {
-            ctx.sendReply(at(ctx) + "`%s` 没有现存的卡片喵。".formatted(userRaw.getUsername()));
-            return;
-        }
+            sb.append("- (暂无持有者)");
+        } else {
+            final Set<String> groupUsernames = new HashSet<>();
 
-        sb.append(at(ctx)).append("`%s` 的卡片现存 `%d` 张，持有者：\n".formatted(userRaw.getUsername(), sum));
+            for (Long value : boundUsers.values()) {
+                UserDataStore.findUsername(value)
+                        .map(name -> name.toLowerCase(Locale.ROOT))
+                        .ifPresent(groupUsernames::add);
+            }
 
-        final Set<String> groupUsernames = new HashSet<>();
+            final Comparator<GachaCardOwn> comparator = Comparator
+                    .comparing((GachaCardOwn e) -> !groupUsernames.contains(e.username().toLowerCase(Locale.ROOT)))
+                    .thenComparing(Comparator.comparingLong(GachaCardOwn::count).reversed())
+                    .thenComparingLong(GachaCardOwn::lowest);
 
-        for (Long value : boundUsers.values()) {
-            UserDataStore.findUsername(value)
-                    .map(name -> name.toLowerCase(Locale.ROOT))
-                    .ifPresent(groupUsernames::add);
-        }
+            final List<GachaCardOwn> sorted = gachaCardOwners.stream()
+                    .sorted(comparator)
+                    .toList();
 
-        final Comparator<GachaCardOwn> comparator = Comparator
-                .comparing((GachaCardOwn e) -> !groupUsernames.contains(e.username().toLowerCase(Locale.ROOT)))
-                .thenComparing(Comparator.comparingLong(GachaCardOwn::count).reversed())
-                .thenComparingLong(GachaCardOwn::lowest);
+            final long groupOwnerCount = sorted.stream()
+                    .filter(e -> groupUsernames.contains(e.username().toLowerCase(Locale.ROOT)))
+                    .count();
 
-        final List<GachaCardOwn> sorted = gachaCardOwners.stream()
-                .sorted(comparator)
-                .toList();
+            final int showCount = (int) Math.clamp(10, groupOwnerCount, sorted.size());
 
-        final long groupOwnerCount = sorted.stream()
-                .filter(e -> groupUsernames.contains(e.username().toLowerCase(Locale.ROOT)))
-                .count();
+            for (int i = 0; i < showCount; i++) {
+                GachaCardOwn owner = sorted.get(i);
+                final boolean inGroup = groupUsernames.contains(owner.username().toLowerCase());
+                sb.append("- ").append("%s`%s`: `%d`张 (`#%d`)".formatted(inGroup ? "※ " : "", owner.username(), owner.count(), owner.lowest())).append("\n");
+            }
 
-        final int showCount = (int) Math.clamp(10, groupOwnerCount, sorted.size());
+            final long collapsedCount = sorted.stream()
+                    .skip(showCount)
+                    .mapToLong(GachaCardOwn::count)
+                    .sum();
 
-        for (int i = 0; i < showCount; i++) {
-            GachaCardOwn owner = sorted.get(i);
-            final boolean inGroup = groupUsernames.contains(owner.username().toLowerCase());
-            sb.append("- ").append("%s`%s`: `%d`张 (`#%d`)".formatted(inGroup ? "※ " : "", owner.username(), owner.count(), owner.lowest())).append("\n");
-        }
-
-        final long collapsedCount = sorted.stream()
-                .skip(showCount)
-                .mapToLong(GachaCardOwn::count)
-                .sum();
-
-        if (showCount < sorted.size()) {
-            sb.append("- 还有 %d 个用户的合计 %d 张".formatted(sorted.size() - showCount, collapsedCount));
+            if (showCount < sorted.size()) {
+                sb.append("- 还有 %d 个用户的合计 %d 张".formatted(sorted.size() - showCount, collapsedCount));
+            }
         }
 
         ctx.sendReply(sb.toString().trim());

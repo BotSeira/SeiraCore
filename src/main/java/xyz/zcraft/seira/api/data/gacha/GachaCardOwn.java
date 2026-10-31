@@ -1,6 +1,4 @@
-package xyz.zcraft.seira.api.data;
-
-import org.jetbrains.annotations.NotNull;
+package xyz.zcraft.seira.api.data.gacha;
 
 public record GachaCardOwn(
         String username,
