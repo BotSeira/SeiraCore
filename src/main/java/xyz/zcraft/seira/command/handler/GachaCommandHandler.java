@@ -125,7 +125,7 @@ public class GachaCommandHandler {
         }
 
         final String target = ctx.argument(1);
-        String scale = ctx.argumentCount() == 3 ? ctx.argument(2).toLowerCase(Locale.ROOT) : "1d";
+        String scale = ctx.argumentCount() == 3 ? ctx.argument(2).toLowerCase(Locale.ROOT) : "8h";
 
         final Matcher matcher = SCALE.matcher(scale);
 
