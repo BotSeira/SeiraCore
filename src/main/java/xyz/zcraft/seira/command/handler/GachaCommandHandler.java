@@ -81,7 +81,7 @@ public class GachaCommandHandler {
                             > 奖杯: %s %s %s %s
                             > 职业徽章:
                             > - 坦克: %s %s %s %s
-                            > - 输出 : %s %s %s %s
+                            > - 输出: %s %s %s %s
                             > - 支援: %s %s %s %s
                             > - 控制: %s %s %s %s
                             """
