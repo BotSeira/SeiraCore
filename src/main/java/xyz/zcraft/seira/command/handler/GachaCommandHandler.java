@@ -20,8 +20,11 @@ import xyz.zcraft.seira.db.UserDataStore;
 
 import java.util.*;
 import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
+import static xyz.zcraft.seira.command.reply.ReplyFactory.cmd;
 
 public class GachaCommandHandler {
     private static final Logger LOG = LogManager.getLogger(GachaCommandHandler.class);
@@ -56,16 +59,90 @@ public class GachaCommandHandler {
                 || (ctx.argumentCount() == 1 && resolver.looksLikeMention(ctx.argument(0)))) {
             handleUserProfile(ctx);
             return;
-        } else if (ctx.argumentCount() == 1
-                || (ctx.argumentCount() == 2 && resolver.looksLikeMention(ctx.argument(1)))) {
-            if (ctx.argument(0).equalsIgnoreCase("cards")) {
-                handlePlayerCardOwners(ctx);
-                return;
-            }
+        } else if (ctx.argumentCount() >= 1 && ctx.argumentCount() <= 3
+                && "cards".equalsIgnoreCase(ctx.argument(0))) {
+            handlePlayerCardOwners(ctx);
+            return;
+        } else if (ctx.argumentCount() >= 1 && ctx.argumentCount() <= 3
+                && "market".equalsIgnoreCase(ctx.argument(0))) {
+            handleMarket(ctx);
+            return;
         }
 
-        ctx.sendReply("用法: /gacha [cards] [用户]");
+        ctx.sendReply("用法: /gacha [cards|market] [目标]");
     }
+
+    private void handleMarket(Context ctx) {
+        if (ctx.argumentCount() == 1) {
+            String sb = at(ctx) + "选择要查看的物品：\n" +
+                    """
+                            > %s %s %s
+                            > 回放: %s %s %s
+                            > 奖杯: %s %s %s %s
+                            > 职业徽章:
+                            > - 坦克: %s %s %s %s
+                            > - 输出 : %s %s %s %s
+                            > - 支援: %s %s %s %s
+                            > - 控制: %s %s %s %s
+                            """
+                            .formatted(
+                                    cmd("/gacha market fuel", "[  燃料  ]"),
+                                    cmd("/gacha market mod_fragment", "[模组碎片]"),
+                                    cmd("/gacha market banner_key", "[卡池钥匙]"),
+
+                                    cmd("/gacha market replay_1", "[  铜  ]"),
+                                    cmd("/gacha market replay_2", "[  银  ]"),
+                                    cmd("/gacha market replay_3", "[  金  ]"),
+
+                                    cmd("/gacha market boss_trophy", "[  金  ]"),
+                                    cmd("/gacha market platinum_trophy", "[ 白金 ]"),
+                                    cmd("/gacha market diamond_trophy", "[ 钻石 ]"),
+                                    cmd("/gacha market emerald_trophy", "[ 翡翠 ]"),
+
+                                    cmd("/gacha market insignia_tank_1", "[  I  ]"),
+                                    cmd("/gacha market insignia_tank_2", "[  II  ]"),
+                                    cmd("/gacha market insignia_tank_3", "[ III ]"),
+                                    cmd("/gacha market insignia_tank_4", "[  IV  ]"),
+
+                                    cmd("/gacha market insignia_dps_1", "[  I  ]"),
+                                    cmd("/gacha market insignia_dps_2", "[  II  ]"),
+                                    cmd("/gacha market insignia_dps_3", "[ III ]"),
+                                    cmd("/gacha market insignia_dps_4", "[  IV  ]"),
+
+                                    cmd("/gacha market insignia_support_1", "[  I  ]"),
+                                    cmd("/gacha market insignia_support_2", "[  II  ]"),
+                                    cmd("/gacha market insignia_support_3", "[ III ]"),
+                                    cmd("/gacha market insignia_support_4", "[  IV  ]"),
+
+                                    cmd("/gacha market insignia_cc_1", "[  I  ]"),
+                                    cmd("/gacha market insignia_cc_2", "[  II  ]"),
+                                    cmd("/gacha market insignia_cc_3", "[ III ]"),
+                                    cmd("/gacha market insignia_cc_4", "[  IV  ]")
+                            );
+
+            ctx.sendReply(sb.trim());
+            return;
+        }
+
+        final String target = ctx.argument(1);
+        String scale = ctx.argumentCount() == 3 ? ctx.argument(2).toLowerCase(Locale.ROOT) : "1d";
+
+        final Matcher matcher = SCALE.matcher(scale);
+
+        if (!matcher.matches()) {
+            ctx.sendReply(at(ctx) + "时间格式不正确喵。");
+        }
+
+        if (matcher.group(2).equalsIgnoreCase("m")) {
+            scale = matcher.group(1) + "min";
+        }
+
+        final byte[] result = AsteroidApi.getGachaMarketTrend(target, scale);
+
+        ctx.sendReply(PendingMessage.ofImageBase64(Base64.getEncoder().encodeToString(result)));
+    }
+
+    private static final Pattern SCALE = Pattern.compile("([1-9][0-9]{0,3})(m|min|h|d|mo)");
 
     private void handleUserProfile(Context ctx) {
         String username;
