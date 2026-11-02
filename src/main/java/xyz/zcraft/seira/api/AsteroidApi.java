@@ -7,10 +7,11 @@ import com.google.gson.JsonObject;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.Seira;
-import xyz.zcraft.seira.api.data.gacha.GachaCardOwn;
 import xyz.zcraft.seira.api.data.MinecraftServerStatus;
 import xyz.zcraft.seira.api.data.RawResponse;
+import xyz.zcraft.seira.api.data.gacha.GachaCardOwn;
 import xyz.zcraft.seira.api.data.gacha.GachaPlayer;
+import xyz.zcraft.seira.api.data.gacha.Guide;
 import xyz.zcraft.seira.api.data.ncm.MatchResult;
 import xyz.zcraft.seira.api.data.ncm.Playlist;
 import xyz.zcraft.seira.api.data.ncm.Song;
@@ -334,6 +335,29 @@ public class AsteroidApi {
         } catch (Exception e) {
             LOG.error("Failed to gacha market trend", e);
             throw new RuntimeException("获取市场趋势失败", e);
+        }
+    }
+
+    public static Guide getGachaPlayerMarketGuide(String username) {
+        try {
+            var request = requestBuilder("/gacha/market/players/" + URLEncoder.encode(username, StandardCharsets.UTF_8) + "/guide")
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            final RawResponse rawResponse = GSON.fromJson(response.body(), RawResponse.class);
+
+            ApiUtil.ensureApiSuccess(rawResponse, "获取玩家市场摘要失败");
+
+            final JsonElement rawResponseData = rawResponse.getData();
+            if (rawResponseData != null && rawResponseData.isJsonObject()) {
+                return GSON.fromJson(rawResponseData, Guide.class);
+            } else {
+                return null;
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to get gacha player market guide", e);
+            throw new RuntimeException("获取玩家市场摘要失败", e);
         }
     }
 

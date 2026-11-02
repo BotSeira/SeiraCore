@@ -7,6 +7,7 @@ import xyz.zcraft.seira.api.AsteroidApi;
 import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.gacha.GachaCardOwn;
 import xyz.zcraft.seira.api.data.gacha.GachaPlayer;
+import xyz.zcraft.seira.api.data.gacha.Guide;
 import xyz.zcraft.seira.api.data.gacha.OsuGacha;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.PendingMessage;
@@ -72,6 +73,16 @@ public class GachaCommandHandler {
         ctx.sendReply("用法: /gacha [cards|market] [目标]");
     }
 
+    public static final Set<String> ITEMS = Set.of(
+            "replay_1", "replay_2", "replay_3",
+            "boss_trophy", "platinum_trophy", "diamond_trophy", "emerald_trophy",
+            "insignia_tank_1", "insignia_tank_2", "insignia_tank_3", "insignia_tank_4",
+            "insignia_dps_1", "insignia_dps_2", "insignia_dps_3", "insignia_dps_4",
+            "insignia_support_1", "insignia_support_2", "insignia_support_3", "insignia_support_4",
+            "insignia_cc_1", "insignia_cc_2", "insignia_cc_3", "insignia_cc_4",
+            "fuel", "mod_fragment", "banner_key"
+    );
+
     private void handleMarket(Context ctx) {
         if (ctx.argumentCount() == 1) {
             String sb = at(ctx) + "选择要查看的物品：\n" +
@@ -124,13 +135,55 @@ public class GachaCommandHandler {
             return;
         }
 
+        if (ctx.argument(1).startsWith("@") || resolver.looksLikeMention(ctx.argument(1))) {
+            handleMarketPlayerCard(ctx);
+        } else {
+            handleMarketItemTrend(ctx);
+        }
+    }
+
+    private void handleMarketPlayerCard(Context ctx) {
+        final String player = resolver.player(ctx.argument(1), null);
+        final long l = OstellaApi.resolveUid(player);
+        final UserExtended userRaw = OstellaApi.getUserRaw(l);
+
+        final Guide guide = AsteroidApi.getGachaPlayerMarketGuide(player);
+        AsteroidApi.searchGachaPlayer(player);
+
+        if (guide == null || guide.listed() == 0) {
+            ctx.sendReply(at(ctx) + "目前市场上没有 `%s` 的卡片喵。".formatted(userRaw.getUsername()));
+            return;
+        }
+
+        ctx.sendReply(at(ctx) + """
+                `%s` 的卡片在售 `%d` 个:
+                > 最低 / 中位 / 最高:
+                > %d / %d / %d
+                > 近 %d 天售出: %d
+                """
+                .formatted(
+                        userRaw.getUsername(),
+                        guide.listed(),
+                        guide.lowest(), guide.median(), guide.highest(),
+                        guide.days(), guide.sales()
+                ).trim()
+        );
+    }
+
+    private void handleMarketItemTrend(Context ctx) {
         final String target = ctx.argument(1);
         String scale = ctx.argumentCount() == 3 ? ctx.argument(2).toLowerCase(Locale.ROOT) : "8h";
+
+        if (!ITEMS.contains(target.toLowerCase(Locale.ROOT))) {
+            ctx.sendReply(at(ctx) + "未知的物品ID:" + target + "\n> 注：目前仅支持查询物品和玩家卡片喵。");
+            return;
+        }
 
         final Matcher matcher = SCALE.matcher(scale);
 
         if (!matcher.matches()) {
             ctx.sendReply(at(ctx) + "时间格式不正确喵。");
+            return;
         }
 
         if (matcher.group(2).equalsIgnoreCase("m")) {
