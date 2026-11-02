@@ -142,6 +142,19 @@ public class GachaCommandHandler {
         }
     }
 
+    private static final Map<String, Set<String>> ITEM_ALASES = Map.of(
+            "fuel", Set.of("燃料"),
+            "mod_fragment", Set.of("Mod碎片", "模组碎片"),
+            "banner_key", Set.of("卡池钥匙"),
+            "replay_1", Set.of("铜回放"),
+            "replay_2", Set.of("银回放"),
+            "replay_3", Set.of("金回放"),
+            "boss_trophy", Set.of("金奖杯"),
+            "platinum_trophy", Set.of("白金奖杯"),
+            "diamond_trophy", Set.of("钻石奖杯"),
+            "emerald_trophy", Set.of("翡翠奖杯")
+    );
+
     private void handleMarketPlayerCard(Context ctx) {
         final String player = resolver.player(ctx.argument(1), null);
         final long l = OstellaApi.resolveUid(player);
@@ -171,11 +184,18 @@ public class GachaCommandHandler {
     }
 
     private void handleMarketItemTrend(Context ctx) {
-        final String target = ctx.argument(1);
+        String target = ctx.argument(1).toLowerCase(Locale.ROOT);
         String scale = ctx.argumentCount() == 3 ? ctx.argument(2).toLowerCase(Locale.ROOT) : "8h";
 
-        if (!ITEMS.contains(target.toLowerCase(Locale.ROOT))) {
-            ctx.sendReply(at(ctx) + "未知的物品ID:" + target + "\n> 注：目前仅支持查询物品和玩家卡片喵。");
+        for (var entry : ITEM_ALASES.entrySet()) {
+            if (entry.getValue().contains(target)) {
+                target = entry.getKey();
+                break;
+            }
+        }
+
+        if (!ITEMS.contains(target)) {
+            ctx.sendReply(at(ctx) + "未知的物品:" + target + "\n> 注：目前仅支持查询物品和玩家卡片喵。");
             return;
         }
 
