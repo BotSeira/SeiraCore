@@ -323,9 +323,24 @@ public class AsteroidApi {
         }
     }
 
-    public static byte[] getGachaMarketTrend(String itemId, String scale) {
+    public static byte[] getGachaItemMarketTrend(String itemId, String scale) {
         try {
             var request = requestBuilder("/gacha/market/items/" + URLEncoder.encode(itemId, StandardCharsets.UTF_8) + "/trend?scale=" + scale)
+                    .GET()
+                    .build();
+
+            final HttpResponse<byte[]> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofByteArray());
+
+            return response.body();
+        } catch (Exception e) {
+            LOG.error("Failed to gacha market trend", e);
+            throw new RuntimeException("获取市场趋势失败", e);
+        }
+    }
+
+    public static byte[] getGachaPlayerMarketTrend(String player, boolean sig, String scale) {
+        try {
+            var request = requestBuilder("/gacha/market/players/" + URLEncoder.encode(player, StandardCharsets.UTF_8) + "/trend?scale=" + scale + "&sig=" + sig)
                     .GET()
                     .build();
 

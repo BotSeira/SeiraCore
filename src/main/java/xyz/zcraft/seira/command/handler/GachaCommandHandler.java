@@ -95,6 +95,8 @@ public class GachaCommandHandler {
                             > - 输出: %s %s %s %s
                             > - 支援: %s %s %s %s
                             > - 控制: %s %s %s %s
+                            >
+                            > 也可以使用 @+id 查询玩家卡片（空格用下划线替代）
                             """
                             .formatted(
                                     cmd("/gacha market fuel", "[  燃料  ]"),
@@ -157,35 +159,30 @@ public class GachaCommandHandler {
 
     private void handleMarketPlayerCard(Context ctx) {
         final String player = resolver.player(ctx.argument(1), null);
-        final long l = OstellaApi.resolveUid(player);
-        final UserExtended userRaw = OstellaApi.getUserRaw(l);
+        boolean sig = player.endsWith("*");
+        final String finalPlayer = sig ? player.substring(0, player.length() - 1) : player;
 
-        final Guide guide = AsteroidApi.getGachaPlayerMarketGuide(player);
-        AsteroidApi.searchGachaPlayer(player);
+        String scale = ctx.argumentCount() == 3 ? ctx.argument(2).toLowerCase(Locale.ROOT) : "12h";
 
-        if (guide == null || guide.listed() == 0) {
-            ctx.sendReply(at(ctx) + "目前市场上没有 `%s` 的卡片喵。".formatted(userRaw.getUsername()));
+        final Matcher matcher = SCALE.matcher(scale);
+
+        if (!matcher.matches()) {
+            ctx.sendReply(at(ctx) + "时间格式不正确喵。");
             return;
         }
 
-        ctx.sendReply(at(ctx) + """
-                `%s` 的卡片在售 `%d` 个:
-                > 最低 / 中位 / 最高:
-                > %d / %d / %d
-                > 近 %d 天售出: %d
-                """
-                .formatted(
-                        userRaw.getUsername(),
-                        guide.listed(),
-                        guide.lowest(), guide.median(), guide.highest(),
-                        guide.days(), guide.sales()
-                ).trim()
-        );
+        if (matcher.group(2).equalsIgnoreCase("m")) {
+            scale = matcher.group(1) + "min";
+        }
+
+        final byte[] result = AsteroidApi.getGachaPlayerMarketTrend(finalPlayer, sig, scale);
+
+        ctx.sendReply(PendingMessage.ofImageBase64(Base64.getEncoder().encodeToString(result)));
     }
 
     private void handleMarketItemTrend(Context ctx) {
         String target = ctx.argument(1).toLowerCase(Locale.ROOT);
-        String scale = ctx.argumentCount() == 3 ? ctx.argument(2).toLowerCase(Locale.ROOT) : "8h";
+        String scale = ctx.argumentCount() == 3 ? ctx.argument(2).toLowerCase(Locale.ROOT) : "12h";
 
         for (var entry : ITEM_ALASES.entrySet()) {
             if (entry.getValue().contains(target)) {
@@ -210,7 +207,7 @@ public class GachaCommandHandler {
             scale = matcher.group(1) + "min";
         }
 
-        final byte[] result = AsteroidApi.getGachaMarketTrend(target, scale);
+        final byte[] result = AsteroidApi.getGachaItemMarketTrend(target, scale);
 
         ctx.sendReply(PendingMessage.ofImageBase64(Base64.getEncoder().encodeToString(result)));
     }
