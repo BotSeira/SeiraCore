@@ -292,18 +292,19 @@ public final class AgentEngine implements AutoCloseable {
                     image.addProperty("image_url", attachment.url());
                     image.addProperty("detail", "auto");
                     content.add(image);
-                } else if (type.isEmpty() || type.equals("application/octet-stream")) {
-                    String url = attachment.url().trim();
-                    if (url.startsWith("//")) url = "https:" + url;
-                    URI uri = URI.create(url);
-                    if (isImageFilename(attachment.filename()) || isImageFilename(uri.getPath())) {
-                        var image = new JsonObject();
-                        image.addProperty("type", "input_image");
-                        image.addProperty("image_url", uri.toASCIIString());
-                        image.addProperty("detail", "auto");
-                        content.add(image);
-                    }
                 }
+//                else if (type.isEmpty() || type.equals("application/octet-stream")) {
+//                    String url = attachment.url().trim();
+//                    if (url.startsWith("//")) url = "https:" + url;
+//                    URI uri = URI.create(url);
+//                    if (isImageFilename(attachment.filename()) || isImageFilename(uri.getPath())) {
+//                        var image = new JsonObject();
+//                        image.addProperty("type", "input_image");
+//                        image.addProperty("image_url", uri.toASCIIString());
+//                        image.addProperty("detail", "auto");
+//                        content.add(image);
+//                    }
+//                }
             }
             item.add("content", content);
             return item;
