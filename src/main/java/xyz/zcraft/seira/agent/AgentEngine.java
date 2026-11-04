@@ -83,6 +83,7 @@ public final class AgentEngine implements AutoCloseable {
     public synchronized void accept(String conversationId, Message message) {
         if (closed) throw new IllegalStateException("Agent is closed");
 
+        LOG.info("Accepting message in conversation: {}", conversationId);
         long now = System.currentTimeMillis();
         sessions.values().removeIf(session -> !session.running && now - session.lastUsed > 86_400_000L);
 
