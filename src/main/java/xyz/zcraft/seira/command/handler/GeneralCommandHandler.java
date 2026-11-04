@@ -78,19 +78,25 @@ public final class GeneralCommandHandler {
         }
 
         try (var _ = taskCoordinator.beginRequest(ctx, "User Info")) {
-            List<UploadedImage> images = new ArrayList<>(uids.size());
-            for (Long uid : uids) {
-                var response = OstellaApi.getUserCardResponse(uid);
-                final UploadedImage uploadedImage = messageSender.uploadImageToCos(response.getContent().bytes());
-                images.add(uploadedImage);
+            if (uids.size() == 1) {
+                var response = OstellaApi.getUserCardResponse(uids.iterator().next());
+
+                ctx.sendReply(PendingMessage.ofImageBase64(response.getContent().toBase64()));
+            } else {
+                List<UploadedImage> images = new ArrayList<>(uids.size());
+                for (Long uid : uids) {
+                    var response = OstellaApi.getUserCardResponse(uid);
+                    final UploadedImage uploadedImage = messageSender.uploadImageToCos(response.getContent().bytes());
+                    images.add(uploadedImage);
+                }
+
+                final String msg = images.stream()
+                        .map(e -> e.toMarkdown(100, 120))
+                        .collect(Collectors.joining(""))
+                        .trim();
+
+                ctx.sendReply(msg);
             }
-
-            final String msg = images.stream()
-                    .map(e -> e.toMarkdown(100, 120))
-                    .collect(Collectors.joining(""))
-                    .trim();
-
-            ctx.sendReply(msg);
         }
     }
 
