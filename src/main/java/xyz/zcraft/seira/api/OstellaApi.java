@@ -133,6 +133,14 @@ public class OstellaApi {
         );
     }
 
+    public static Response<Base64Bytes> getUserCardResponse(long uid) {
+        return getBase64BytesResponse(
+                "/users/" + uid + "/card",
+                "获取玩家卡片失败",
+                null
+        );
+    }
+
     public static UserExtended getUserRaw(long uid) {
         try {
             HttpRequest request = requestBuilder()

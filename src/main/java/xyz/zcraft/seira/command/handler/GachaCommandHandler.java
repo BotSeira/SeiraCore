@@ -7,7 +7,6 @@ import xyz.zcraft.seira.api.AsteroidApi;
 import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.gacha.GachaCardOwn;
 import xyz.zcraft.seira.api.data.gacha.GachaPlayer;
-import xyz.zcraft.seira.api.data.gacha.Guide;
 import xyz.zcraft.seira.api.data.gacha.OsuGacha;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.PendingMessage;
@@ -28,7 +27,29 @@ import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.cmd;
 
 public class GachaCommandHandler {
+    public static final Set<String> ITEMS = Set.of(
+            "replay_1", "replay_2", "replay_3",
+            "boss_trophy", "platinum_trophy", "diamond_trophy", "emerald_trophy",
+            "insignia_tank_1", "insignia_tank_2", "insignia_tank_3", "insignia_tank_4",
+            "insignia_dps_1", "insignia_dps_2", "insignia_dps_3", "insignia_dps_4",
+            "insignia_support_1", "insignia_support_2", "insignia_support_3", "insignia_support_4",
+            "insignia_cc_1", "insignia_cc_2", "insignia_cc_3", "insignia_cc_4",
+            "fuel", "mod_fragment", "banner_key"
+    );
     private static final Logger LOG = LogManager.getLogger(GachaCommandHandler.class);
+    private static final Map<String, Set<String>> ITEM_ALASES = Map.of(
+            "fuel", Set.of("燃料"),
+            "mod_fragment", Set.of("Mod碎片", "模组碎片"),
+            "banner_key", Set.of("卡池钥匙"),
+            "replay_1", Set.of("铜回放"),
+            "replay_2", Set.of("银回放"),
+            "replay_3", Set.of("金回放"),
+            "boss_trophy", Set.of("金奖杯"),
+            "platinum_trophy", Set.of("白金奖杯"),
+            "diamond_trophy", Set.of("钻石奖杯"),
+            "emerald_trophy", Set.of("翡翠奖杯")
+    );
+    private static final Pattern SCALE = Pattern.compile("([1-9][0-9]{0,3})(m|min|h|d|mo)");
     private final MessageSender messageSender;
     private final TargetResolver targets;
     private final TargetHistory history;
@@ -72,16 +93,6 @@ public class GachaCommandHandler {
 
         ctx.sendReply("用法: /gacha [cards|market] [目标]");
     }
-
-    public static final Set<String> ITEMS = Set.of(
-            "replay_1", "replay_2", "replay_3",
-            "boss_trophy", "platinum_trophy", "diamond_trophy", "emerald_trophy",
-            "insignia_tank_1", "insignia_tank_2", "insignia_tank_3", "insignia_tank_4",
-            "insignia_dps_1", "insignia_dps_2", "insignia_dps_3", "insignia_dps_4",
-            "insignia_support_1", "insignia_support_2", "insignia_support_3", "insignia_support_4",
-            "insignia_cc_1", "insignia_cc_2", "insignia_cc_3", "insignia_cc_4",
-            "fuel", "mod_fragment", "banner_key"
-    );
 
     private void handleMarket(Context ctx) {
         if (ctx.argumentCount() == 1) {
@@ -144,19 +155,6 @@ public class GachaCommandHandler {
         }
     }
 
-    private static final Map<String, Set<String>> ITEM_ALASES = Map.of(
-            "fuel", Set.of("燃料"),
-            "mod_fragment", Set.of("Mod碎片", "模组碎片"),
-            "banner_key", Set.of("卡池钥匙"),
-            "replay_1", Set.of("铜回放"),
-            "replay_2", Set.of("银回放"),
-            "replay_3", Set.of("金回放"),
-            "boss_trophy", Set.of("金奖杯"),
-            "platinum_trophy", Set.of("白金奖杯"),
-            "diamond_trophy", Set.of("钻石奖杯"),
-            "emerald_trophy", Set.of("翡翠奖杯")
-    );
-
     private void handleMarketPlayerCard(Context ctx) {
         final String player = resolver.player(ctx.argument(1), null);
         boolean sig = player.endsWith("*");
@@ -211,8 +209,6 @@ public class GachaCommandHandler {
 
         ctx.sendReply(PendingMessage.ofImageBase64(Base64.getEncoder().encodeToString(result)));
     }
-
-    private static final Pattern SCALE = Pattern.compile("([1-9][0-9]{0,3})(m|min|h|d|mo)");
 
     private void handleUserProfile(Context ctx) {
         String username;

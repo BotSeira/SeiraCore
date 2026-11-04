@@ -57,7 +57,8 @@ public final class RuntimeConfig {
                 previous.bridge(),
                 previous.llm(),
                 previous.asteroid(),
-                previous.mcForward()
+                previous.mcForward(),
+                previous.agent()
         );
     }
 
@@ -85,6 +86,7 @@ public final class RuntimeConfig {
         addIfChanged(changed, "cos", previous.cos(), loaded.cos());
         addIfChanged(changed, "discord", previous.discord(), loaded.discord());
         addIfChanged(changed, "bridge", previous.bridge(), loaded.bridge());
+        addIfChanged(changed, "agent", previous.agent(), loaded.agent());
         return List.copyOf(changed);
     }
 

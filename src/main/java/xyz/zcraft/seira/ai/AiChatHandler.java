@@ -27,6 +27,7 @@ import static xyz.zcraft.seira.command.reply.ReplyFactory.ExternalUrls.PERMISSIO
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.cmd;
 
+@Deprecated
 public class AiChatHandler {
     private static final Gson GSON = new Gson();
     private static final Pattern CHAT_INLINE_FILE = Pattern.compile("%%\\[file:(.+?)]%%");

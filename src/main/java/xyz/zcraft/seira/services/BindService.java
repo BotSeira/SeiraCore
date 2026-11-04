@@ -15,7 +15,7 @@ import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.function.BiConsumer;
 
-public class BindService implements AutoCloseable{
+public class BindService implements AutoCloseable {
     private static final Logger LOG = LogManager.getLogger(BindService.class);
     private static final Duration TASK_TTL = Duration.ofMinutes(20);
     private final ConcurrentHashMap<String, BindingTask> bindingTasks = new ConcurrentHashMap<>();

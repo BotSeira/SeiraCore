@@ -3,7 +3,6 @@ package xyz.zcraft.seira.command;
 import org.junit.jupiter.api.Test;
 import xyz.zcraft.seira.command.parse.Resolver;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class SanitizeTest {
@@ -17,6 +16,7 @@ public class SanitizeTest {
             "bd20",
             "p"
     );
+
     @Test
     public void testSanitize() {
         Resolver r = new Resolver();

@@ -29,6 +29,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Deprecated
 class HiAgentProvider implements ChatProvider {
     private final Api api;
     private final Map<StateOwner, State> states = new ConcurrentHashMap<>();
@@ -411,6 +412,7 @@ class HiAgentProvider implements ChatProvider {
     }
 }
 
+@Deprecated
 class Api {
     private static final Logger LOG = LogManager.getLogger(Api.class);
     public final HttpClient CLIENT = HttpClient.newHttpClient();

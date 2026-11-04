@@ -10,7 +10,8 @@ public record AppConfig(
         BridgeConfig bridge,
         LLMConfig llm,
         AsteroidConfig asteroid,
-        McForwardConfig mcForward
+        McForwardConfig mcForward,
+        AgentConfig agent
 ) {
     public AppConfig {
         discord = discord == null ? DiscordConfig.disabled() : discord;

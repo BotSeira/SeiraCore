@@ -4,7 +4,6 @@ import com.google.gson.JsonParser;
 import xyz.zcraft.seira.api.data.SearchQuery;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.ResolutionException;
-import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.exception.NoBindException;
 
@@ -74,14 +73,6 @@ public final class Resolver {
         return original;
     }
 
-    public long requireBind(Context ctx) {
-        final Long l = resolveBoundUid(ctx.senderUserId());
-        if (l == null) {
-            throw new NoBindException();
-        }
-        return l;
-    }
-
     public static Long parsePositiveLong(String value) {
         try {
             long parsed = Long.parseLong(value);
@@ -89,6 +80,14 @@ public final class Resolver {
         } catch (NumberFormatException ignored) {
             return null;
         }
+    }
+
+    public long requireBind(Context ctx) {
+        final Long l = resolveBoundUid(ctx.senderUserId());
+        if (l == null) {
+            throw new NoBindException();
+        }
+        return l;
     }
 
     public String sanitize(String rawContent) {

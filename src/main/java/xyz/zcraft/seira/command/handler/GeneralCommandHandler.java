@@ -21,8 +21,9 @@ import xyz.zcraft.seira.util.dice.Dice;
 import xyz.zcraft.seira.util.dice.expr.DiceExpr;
 import xyz.zcraft.seira.util.dice.result.DiceResult;
 
-import java.util.Objects;
+import java.util.*;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
@@ -62,6 +63,34 @@ public final class GeneralCommandHandler {
             var response = OstellaApi.getUserInfoResponse(uid);
             var completion = replyFactory.userInfoMessage(context, response);
             context.sendReply(taskCoordinator.imageMessage(response, completion));
+        }
+    }
+
+    public void handleO(Context ctx) {
+        final Set<Long> uids = new HashSet<>();
+
+        if (ctx.argumentCount() == 0) {
+            uids.add(resolver.requireBind(ctx));
+        } else {
+            uids.addAll(Arrays.stream(ctx.args())
+                    .map(e -> resolver.player(e, null))
+                    .map(OstellaApi::resolveUid).toList());
+        }
+
+        try (var _ = taskCoordinator.beginRequest(ctx, "User Info")) {
+            List<UploadedImage> images = new ArrayList<>(uids.size());
+            for (Long uid : uids) {
+                var response = OstellaApi.getUserCardResponse(uid);
+                final UploadedImage uploadedImage = messageSender.uploadImageToCos(response.getContent().bytes());
+                images.add(uploadedImage);
+            }
+
+            final String msg = images.stream()
+                    .map(e -> e.toMarkdown(100, 120))
+                    .collect(Collectors.joining(""))
+                    .trim();
+
+            ctx.sendReply(msg);
         }
     }
 

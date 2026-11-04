@@ -21,6 +21,7 @@ public record TargetInput(Kind kind, String id, long index, String player, int c
     public static boolean looksLikeScoreRef(String token) {
         return PLAYER_SCORE.matcher(token).matches();
     }
+
     /**
      * Score commands can select a player's score on an explicit beatmap.
      */

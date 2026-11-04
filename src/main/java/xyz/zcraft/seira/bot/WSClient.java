@@ -224,6 +224,7 @@ public class WSClient extends WebSocketClient {
         String openId = author.get("member_openid").getAsString();
         String groupId = data.get("group_openid").getAsString();
         String username = author.get("username").getAsString();
+        String memberRole = author.get("member_role").getAsString(); // owner admin member
 
         String msgIdx = null;
 
@@ -259,7 +260,7 @@ public class WSClient extends WebSocketClient {
             ));
         }
 
-        router.onGroupMessageReceived(groupId, openId, msgId, content, msgIdx, attachments, msgElemList, username);
+        router.onGroupMessageReceived(groupId, openId, msgId, content, msgIdx, attachments, msgElemList, username, memberRole);
     }
 
     private Map<String, String> parseMentions(JsonObject data) {
