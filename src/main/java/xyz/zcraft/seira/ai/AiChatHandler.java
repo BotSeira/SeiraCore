@@ -154,18 +154,7 @@ public class AiChatHandler {
                 ctx.sendReply(at(ctx) + "已重置你在" + i + "个群中的AI对话状态喵。");
                 return;
             }
-        } else if (ctx.argumentCount() == 2 && ctx.argument(0).equalsIgnoreCase("parallel")) {
-            if (!adminAuthorizer.test(ctx.senderUserId())) {
-                ctx.sendReply(at(ctx) + "你无权使用该命令喵。");
-                return;
-            }
 
-            final Integer n = resolver.parsePositiveInt(ctx.argument(1));
-            if (n != null) {
-                AiPermission.setParallel(ctx.groupId(), n);
-                ctx.sendReply(at(ctx) + "已设置本群的最大并行AI对话数量为" + n + "个喵。");
-                return;
-            }
         }
 
         ctx.sendReply(at(ctx) + "用法：/ai [on|off|reset|stop]");
@@ -184,12 +173,6 @@ public class AiChatHandler {
             return;
         }
 
-        if (chatProvider.runningCount(ctx.groupId()) >= AiPermission.getParallel(ctx.groupId())) {
-            ctx.sendReply(
-                    at + "当前群聊中的同时运行对话数量已达到上限，无法开始新的对话喵，请稍作等待。"
-            );
-            return;
-        }
 
         final List<AgentFile> attachments = elems.stream()
                 .filter(e -> e.attachments() != null)

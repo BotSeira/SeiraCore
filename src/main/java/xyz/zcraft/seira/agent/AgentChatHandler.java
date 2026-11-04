@@ -1,7 +1,6 @@
 package xyz.zcraft.seira.agent;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonParser;
+import xyz.zcraft.seira.services.AiPermission;
 import xyz.zcraft.seira.bot.data.Attachment;
 import xyz.zcraft.seira.bot.data.MsgElem;
 import xyz.zcraft.seira.bot.data.PendingMessage;
@@ -12,17 +11,14 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.function.Predicate;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class AgentChatHandler implements AutoCloseable {
-    private static final Path GROUPS = Path.of("data", "agent-groups.json");
 
     private final Predicate<String> administrator;
-    private final Set<String> enabledGroups = new HashSet<>();
     private final AgentConfig settings;
     private final ToolRegistry tools;
     private final AgentEngine engine;
@@ -37,10 +33,6 @@ public final class AgentChatHandler implements AutoCloseable {
 
         try {
             settings = conf;
-            if (Files.exists(GROUPS)) {
-                JsonParser.parseString(Files.readString(GROUPS)).getAsJsonArray()
-                        .forEach(value -> enabledGroups.add(value.getAsString()));
-            }
 
             if (settings.enabled()) {
                 JavaTools.register(tools);
@@ -126,7 +118,7 @@ public final class AgentChatHandler implements AutoCloseable {
     }
 
     public synchronized boolean enabled(String groupId) {
-        return engine != null && enabledGroups.contains(groupId);
+        return engine != null && AiPermission.isActivated(groupId);
     }
 
     private void reload() throws IOException {
@@ -186,20 +178,18 @@ public final class AgentChatHandler implements AutoCloseable {
                     );
                     context.sendReply(at(context) + (accepted ? "决定已提交喵。" : "确认请求不存在、已处理或已过期喵。"));
                 }
-                case "on", "off" -> {
-                    synchronized (this) {
-                        Set<String> next = new HashSet<>(enabledGroups);
-                        if (action.equals("on")) next.add(context.groupId());
-                        else next.remove(context.groupId());
-
-                        Files.createDirectories(GROUPS.getParent());
-                        Path temporary = GROUPS.resolveSibling("agent-groups.json.tmp");
-                        Files.writeString(temporary, new Gson().toJson(next));
-                        Files.move(temporary, GROUPS, StandardCopyOption.REPLACE_EXISTING);
-
-                        enabledGroups.clear();
-                        enabledGroups.addAll(next);
+                case "grant", "revoke" -> {
+                    if (!administrator.test(context.senderUserId())) {
+                        context.sendReply(at(context) + "此操作需要机器人管理员权限喵。");
+                        return;
                     }
+                    if (action.equals("grant")) AiPermission.grant(context.groupId());
+                    else AiPermission.revoke(context.groupId());
+                    context.sendReply(at(context) + "AI 授权已更新喵。");
+                }
+                case "on", "off" -> {
+                    if (action.equals("on")) AiPermission.activate(context.groupId());
+                    else AiPermission.deactivate(context.groupId());
 
                     context.sendReply(at(context) + (action.equals("on") ? "本群 AI 聊天已开启喵。" : "本群 AI 聊天已关闭。"));
                 }
@@ -214,7 +204,7 @@ public final class AgentChatHandler implements AutoCloseable {
                     }
                 }
                 default ->
-                        context.sendReply(at(context) + "用法：/ai status|on|off|reset|reload，或 /ai confirm|deny TOKEN");
+                        context.sendReply(at(context) + "用法：/ai status|on|off|grant|revoke|reset|reload，或 /ai confirm|deny TOKEN");
             }
         } catch (Exception e) {
             org.apache.logging.log4j.LogManager.getLogger(AgentChatHandler.class).error("Agent management failed", e);
