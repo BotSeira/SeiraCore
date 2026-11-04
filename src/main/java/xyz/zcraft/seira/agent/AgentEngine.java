@@ -10,6 +10,7 @@ import xyz.zcraft.seira.db.UserDataStore;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.URI;
 import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutorService;
@@ -79,6 +80,10 @@ public final class AgentEngine implements AutoCloseable {
 
         matcher.appendTail(output);
         return output.toString();
+    }
+
+    private static boolean isImageFilename(String name) {
+        return name != null && name.toLowerCase(Locale.ROOT).matches(".*\\.(png|jpe?g|webp|gif)$");
     }
 
     public synchronized void accept(String conversationId, Message message) {
@@ -285,12 +290,19 @@ public final class AgentEngine implements AutoCloseable {
                     var image = new JsonObject();
                     image.addProperty("type", "input_image");
                     image.addProperty("image_url", attachment.url());
+                    image.addProperty("detail", "auto");
                     content.add(image);
-                } else {
-                    var file = new JsonObject();
-                    file.addProperty("type", "input_file");
-                    file.addProperty("file_url", attachment.url());
-                    content.add(file);
+                } else if (type.isEmpty() || type.equals("application/octet-stream")) {
+                    String url = attachment.url().trim();
+                    if (url.startsWith("//")) url = "https:" + url;
+                    URI uri = URI.create(url);
+                    if (isImageFilename(attachment.filename()) || isImageFilename(uri.getPath())) {
+                        var image = new JsonObject();
+                        image.addProperty("type", "input_image");
+                        image.addProperty("image_url", uri.toASCIIString());
+                        image.addProperty("detail", "auto");
+                        content.add(image);
+                    }
                 }
             }
             item.add("content", content);
