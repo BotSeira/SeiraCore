@@ -57,7 +57,7 @@ public final class OstellaChallengeApi implements ChallengeApi {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("挑战数据请求被中断。", e);
         } catch (IOException e) {
-            throw new IllegalStateException("无法连接 oStella。", e);
+            throw new IllegalStateException("无法连接 oStella，这可能是因为后端正在更新...", e);
         }
     }
 }

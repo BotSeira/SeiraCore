@@ -56,7 +56,7 @@ public final class WhatIfApi {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("排名估算请求被中断。", e);
         } catch (IOException e) {
-            throw new IllegalStateException("无法连接 oStella。", e);
+            throw new IllegalStateException("无法连接 oStella，这可能是因为后端正在更新...", e);
         } catch (IllegalArgumentException | com.google.gson.JsonParseException | UnsupportedOperationException e) {
             throw new IllegalStateException("oStella 排名估算返回数据无效。", e);
         }
