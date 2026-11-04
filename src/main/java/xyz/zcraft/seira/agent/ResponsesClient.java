@@ -9,6 +9,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.InetSocketAddress;
+import java.net.ProxySelector;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -27,15 +29,18 @@ public final class ResponsesClient {
     private final String apiKey;
     private final String model;
     private final Duration timeout;
-    private final AgentConfig settings;
+    private final AgentConfig config;
 
-    public ResponsesClient(AgentConfig settings) {
-        this.settings = settings;
-        this.endpoint = URI.create(settings.endpoint());
-        this.apiKey = settings.apiKey();
-        this.model = settings.model();
-        this.timeout = Duration.ofSeconds(settings.timeoutSeconds());
-        this.CLIENT = HttpClient.newBuilder().connectTimeout(timeout).build();
+    public ResponsesClient(AgentConfig config) {
+        this.config = config;
+        this.endpoint = URI.create(config.endpoint());
+        this.apiKey = config.apiKey();
+        this.model = config.model();
+        this.timeout = Duration.ofSeconds(config.timeoutSeconds());
+        final ProxySelector proxySelector = config.proxy().enabled()
+                ? ProxySelector.of(new InetSocketAddress(config.proxy().host(), config.proxy().port()))
+                : ProxySelector.getDefault();
+        this.CLIENT = HttpClient.newBuilder().connectTimeout(timeout).proxy(proxySelector).build();
     }
 
     private static void deliver(JsonObject item, HashSet<String> seen, Consumer<JsonObject> listener) {
@@ -58,24 +63,24 @@ public final class ResponsesClient {
             body.addProperty("previous_response_id", previousId);
         }
 
-        if (settings.temperature() != null) {
-            body.addProperty("temperature", settings.temperature());
+        if (config.settings().temperature() != null) {
+            body.addProperty("temperature", config.settings().temperature());
         }
-        if (settings.topP() != null) {
-            body.addProperty("top_p", settings.topP());
+        if (config.settings().topP() != null) {
+            body.addProperty("top_p", config.settings().topP());
         }
-        if (settings.maxOutputTokens() != null) {
-            body.addProperty("max_output_tokens", settings.maxOutputTokens());
+        if (config.settings().maxOutputTokens() != null) {
+            body.addProperty("max_output_tokens", config.settings().maxOutputTokens());
         }
 
-        if (settings.reasoningEffort() != null) {
+        if (config.settings().reasoningEffort() != null) {
             JsonObject reasoning = new JsonObject();
-            reasoning.addProperty("effort", settings.reasoningEffort());
+            reasoning.addProperty("effort", config.settings().reasoningEffort());
             body.add("reasoning", reasoning);
         }
-        if (settings.textVerbosity() != null) {
+        if (config.settings().textVerbosity() != null) {
             JsonObject text = new JsonObject();
-            text.addProperty("verbosity", settings.textVerbosity());
+            text.addProperty("verbosity", config.settings().textVerbosity());
             body.add("text", text);
         }
 
