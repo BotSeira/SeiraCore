@@ -291,7 +291,8 @@ public final class ConsoleCommandProcessor {
             }
 
             if ("on".equalsIgnoreCase(option)) {
-                if (!AiPermission.permits(target)) return ConsoleResult.failure("Group is not authorized; use ai <group-id> grant first.");
+                if (!AiPermission.permits(target))
+                    return ConsoleResult.failure("Group is not authorized; use ai <group-id> grant first.");
                 AiPermission.activate(target);
                 return ConsoleResult.success("AI chat for group " + target + " is activated.");
             } else if ("off".equalsIgnoreCase(option)) {

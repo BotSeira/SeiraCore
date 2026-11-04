@@ -1,17 +1,19 @@
 package xyz.zcraft.seira.agent;
 
-import xyz.zcraft.seira.services.AiPermission;
 import xyz.zcraft.seira.bot.data.Attachment;
 import xyz.zcraft.seira.bot.data.MsgElem;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.config.AgentConfig;
+import xyz.zcraft.seira.services.AiPermission;
 
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.function.Predicate;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
@@ -76,7 +78,7 @@ public final class AgentChatHandler implements AutoCloseable {
         }
     }
 
-    static List<String> collectImageUrls(List<Attachment> attachments, List<MsgElem> elements) {
+    static List<Attachment> collectAttachments(List<Attachment> attachments, List<MsgElem> elements) {
         var candidates = new java.util.ArrayList<Attachment>();
         if (attachments != null) candidates.addAll(attachments);
         if (elements != null) {
@@ -85,32 +87,34 @@ public final class AgentChatHandler implements AutoCloseable {
             }
         }
 
-        var urls = new LinkedHashSet<String>();
-        for (Attachment attachment : candidates) {
-            if (attachment == null || attachment.url() == null || attachment.url().isBlank()) continue;
+        return candidates;
 
-            String url = attachment.url().trim();
-            if (url.startsWith("//")) url = "https:" + url;
+//        var urls = new LinkedHashSet<String>();
+//        for (Attachment attachment : candidates) {
+//            if (attachment == null || attachment.url() == null || attachment.url().isBlank()) continue;
+//
+//            String url = attachment.url().trim();
+//            if (url.startsWith("//")) url = "https:" + url;
+//
+//            try {
+//                URI uri = URI.create(url);
+//                if (!("https".equalsIgnoreCase(uri.getScheme()) || "http".equalsIgnoreCase(uri.getScheme()))
+//                        || uri.getHost() == null || uri.getUserInfo() != null) continue;
+//
+//                String type = attachment.contentType() == null ? ""
+//                        : attachment.contentType().split(";", 2)[0].trim().toLowerCase(Locale.ROOT);
+//                boolean image = type.startsWith("image/");
+//                if (type.isEmpty() || type.equals("application/octet-stream")) {
+//                    // Some QQ attachments omit their MIME type; use the filename or URL path in that case.
+//                    image = isImageFilename(attachment.filename()) || isImageFilename(uri.getPath());
+//                }
+//                if (image) urls.add(uri.toASCIIString());
+//            } catch (IllegalArgumentException ignored) {
+//                // Ignore malformed attachment URLs without discarding the rest of the user's message.
+//            }
+//        }
 
-            try {
-                URI uri = URI.create(url);
-                if (!("https".equalsIgnoreCase(uri.getScheme()) || "http".equalsIgnoreCase(uri.getScheme()))
-                        || uri.getHost() == null || uri.getUserInfo() != null) continue;
-
-                String type = attachment.contentType() == null ? ""
-                        : attachment.contentType().split(";", 2)[0].trim().toLowerCase(Locale.ROOT);
-                boolean image = type.startsWith("image/");
-                if (type.isEmpty() || type.equals("application/octet-stream")) {
-                    // Some QQ attachments omit their MIME type; use the filename or URL path in that case.
-                    image = isImageFilename(attachment.filename()) || isImageFilename(uri.getPath());
-                }
-                if (image) urls.add(uri.toASCIIString());
-            } catch (IllegalArgumentException ignored) {
-                // Ignore malformed attachment URLs without discarding the rest of the user's message.
-            }
-        }
-
-        return List.copyOf(urls);
+//        return List.copyOf(urls);
     }
 
     private static boolean isImageFilename(String name) {
@@ -133,14 +137,34 @@ public final class AgentChatHandler implements AutoCloseable {
         if (!ctx.inGroup() || !enabled(ctx.groupId())) return;
 
         try {
-            engine.accept(ctx.groupId(), new AgentEngine.Message(ctx.messageId(), ctx.senderUserId(),
-                    ctx.senderNickname(), text, collectImageUrls(attachments, elements), System.currentTimeMillis(), message -> {
-                if (!enabled(ctx.groupId())) return;
-                sendResponse(ctx, message);
-            }));
+            engine.accept(
+                    ctx.groupId(),
+                    new AgentEngine.Message(
+                            ctx.messageId(),
+                            ctx.senderUserId(),
+                            ctx.senderNickname(),
+                            text,
+                            collectAttachments(attachments, elements),
+                            System.currentTimeMillis(),
+                            message -> {
+                                if (!enabled(ctx.groupId())) return;
+                                sendResponse(ctx, message);
+                            })
+            );
         } catch (java.util.concurrent.RejectedExecutionException e) {
             ctx.sendReply(at(ctx) + "本群待处理消息过多，请稍后重试喵。");
         }
+    }
+
+    public void recordHistory(String groupId, String messageId, String senderId, String nickname,
+                              String text, List<Attachment> attachments, List<MsgElem> elements) {
+        if (groupId == null || senderId == null || !enabled(groupId)) return;
+
+        var att = collectAttachments(attachments, elements);
+        if ((text == null || text.isBlank()) && att.isEmpty()) return;
+
+        engine.accept(groupId, new AgentEngine.Message(messageId, senderId, nickname,
+                text, att, System.currentTimeMillis(), null));
     }
 
     public void handleAi(Context context) {

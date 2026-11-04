@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.seira.bot.data.Attachment;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.db.UserDataStore;
 
@@ -101,7 +102,12 @@ public final class AgentEngine implements AutoCloseable {
         });
 
         if (message.id() != null && session.received.contains(message.id())) return;
-        if (session.inbox.size() >= 100) throw new RejectedExecutionException("Conversation inbox is full");
+        if (session.inbox.size() >= 100) {
+            var history = session.inbox.stream().filter(item -> item.reply() == null).findFirst();
+            if (history.isPresent()) session.inbox.remove(history.get());
+            else if (message.reply() == null) return;
+            else throw new RejectedExecutionException("Conversation inbox is full");
+        }
 
         if (message.id() != null) session.received.add(message.id());
         if (session.received.size() > 1000) session.received.remove(session.received.iterator().next());
@@ -109,7 +115,7 @@ public final class AgentEngine implements AutoCloseable {
         session.inbox.add(message);
         session.lastUsed = now;
 
-        if (!session.running) {
+        if (!session.running && message.reply() != null) {
             session.running = true;
             workers.execute(() -> run(conversationId, session));
         }
@@ -147,13 +153,16 @@ public final class AgentEngine implements AutoCloseable {
         try {
             while (!Thread.currentThread().isInterrupted()) {
                 synchronized (this) {
+                    // Background traffic alone must never start another model response.
+                    if (input.isEmpty() && session.inbox.stream().noneMatch(item -> item.reply() != null)) return;
+
                     Message message;
                     while ((message = session.inbox.poll()) != null) {
-                        authors.add(message.senderId());
+                        if (message.reply() != null) authors.add(message.senderId());
                         String alias = session.participants.computeIfAbsent(message.senderId(), ignored -> "u" + (session.participants.size() + 1));
 
                         input.add(message.toInput(alias));
-                        reply = message.reply();
+                        if (message.reply() != null) reply = message.reply();
                     }
 
                     if (input.isEmpty()) {
@@ -224,7 +233,7 @@ public final class AgentEngine implements AutoCloseable {
                 session.running = false;
                 session.lastUsed = System.currentTimeMillis();
 
-                if (!closed && !session.inbox.isEmpty()) {
+                if (!closed && session.inbox.stream().anyMatch(item -> item.reply() != null)) {
                     session.running = true;
                     workers.execute(() -> run(id, session));
                 }
@@ -239,10 +248,11 @@ public final class AgentEngine implements AutoCloseable {
         tools.close();
     }
 
-    public record Message(String id, String senderId, String senderName, String text, List<String> imageUrls,
-                          long timestamp, Consumer<String> reply) {
+    public record Message(
+            String id, String senderId, String senderName, String text,
+            List<Attachment> attachments, long timestamp, Consumer<String> reply) {
         public Message {
-            imageUrls = imageUrls == null ? List.of() : List.copyOf(imageUrls);
+            attachments = attachments == null ? List.of() : List.copyOf(attachments);
         }
 
         JsonObject toInput(String alias) {
@@ -252,10 +262,11 @@ public final class AgentEngine implements AutoCloseable {
             metadata.addProperty("sender_name", senderName);
             metadata.addProperty("timestamp", timestamp);
             metadata.addProperty("text", text);
+            metadata.addProperty("context_only", reply == null);
 
             var item = new JsonObject();
             item.addProperty("role", "user");
-            if (imageUrls.isEmpty()) {
+            if (attachments.isEmpty()) {
                 item.addProperty("content", metadata.toString());
                 return item;
             }
@@ -266,11 +277,21 @@ public final class AgentEngine implements AutoCloseable {
             inputText.addProperty("text", metadata.toString());
             content.add(inputText);
 
-            for (String url : imageUrls) {
-                var image = new JsonObject();
-                image.addProperty("type", "input_image");
-                image.addProperty("image_url", url);
-                content.add(image);
+            for (Attachment attachment : attachments) {
+                String type = attachment.contentType() == null
+                        ? ""
+                        : attachment.contentType().split(";", 2)[0].trim().toLowerCase(Locale.ROOT);
+                if (type.startsWith("image/")) {
+                    var image = new JsonObject();
+                    image.addProperty("type", "input_image");
+                    image.addProperty("image_url", attachment.url());
+                    content.add(image);
+                } else {
+                    var file = new JsonObject();
+                    file.addProperty("type", "input_file");
+                    file.addProperty("file_url", attachment.url());
+                    content.add(file);
+                }
             }
             item.add("content", content);
             return item;

@@ -291,6 +291,10 @@ public class Router {
 
             final boolean activatedAi = aiChatHandler.enabled(groupId);
 
+            if (group && activatedAi && !(beingAt && parseResult.status() == CommandParser.ParseResult.Status.TEXT)) {
+                aiChatHandler.recordHistory(groupId, messageId, userId, nickname, msgToRecord, attachments, msgElems);
+            }
+
             if (parseResult.status() == CommandParser.ParseResult.Status.TEXT) {
                 ReplyChannel replies = taskCoordinator.openReplyChannel(
                         targetId, messageId, groupMessage, false, msgIdx
