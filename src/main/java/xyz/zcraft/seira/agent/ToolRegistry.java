@@ -78,6 +78,14 @@ public final class ToolRegistry implements AutoCloseable {
         return error;
     }
 
+    private static JsonObject error(String code, String detail) {
+        var error = new JsonObject();
+        error.addProperty("success", false);
+        error.addProperty("error", code);
+        error.addProperty("detail", detail);
+        return error;
+    }
+
     public synchronized void registerDeferred(String category, Tool tool) {
         register(tool);
         categories.put(tool.name(), category);
@@ -165,12 +173,14 @@ public final class ToolRegistry implements AutoCloseable {
         Future<JsonElement> task = null;
 
         try {
+            agentLogger.debug("Calling tool with {}", call);
+            
             Tool tool = snapshot.get(call.get("name").getAsString());
-            if (tool == null || !permits(tool, context)) throw new IllegalArgumentException();
+            if (tool == null || !permits(tool, context)) throw new IllegalArgumentException("Tool not found, not loaded or not permitted.");
 
             JsonObject arguments = JsonParser.parseString(call.get("arguments").getAsString()).getAsJsonObject();
             ToolArguments.validate(tool.parameters(), arguments);
-            agentLogger.debug("Calling tool {} with args {}", tool.name(), arguments);
+            
             if (tool.requiresConfirmation() && !confirm(tool, arguments, context)) {
                 output.addProperty("output", error("CONFIRMATION_DENIED").toString());
                 return output;
@@ -181,7 +191,7 @@ public final class ToolRegistry implements AutoCloseable {
             task = executor.submit(() -> tool.handler().execute(arguments, context));
             result = task.get(tool.timeout().toMillis(), TimeUnit.MILLISECONDS);
             if (result == null) result = JsonNull.INSTANCE;
-            if (result.toString().length() > 100_000) result = error("OUTPUT_TOO_LARGE");
+            // if (result.toString().length() > 100_000) result = error("OUTPUT_TOO_LARGE");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             result = error("CANCELLED");
@@ -190,7 +200,7 @@ public final class ToolRegistry implements AutoCloseable {
             result = error("TIMEOUT");
             agentLogger.error("Tool call timed out", e);
         } catch (Exception e) {
-            result = error("TOOL_FAILED");
+            result = error("TOOL_FAILED", e.getMessage());
             agentLogger.error("Tool call failed", e);
         } finally {
             if (task != null && !task.isDone()) task.cancel(true);
