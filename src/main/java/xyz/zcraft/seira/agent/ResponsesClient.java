@@ -114,8 +114,11 @@ public final class ResponsesClient {
                 }
                 agentLogger.error("Responses HTTP status {}, {}", response.statusCode(), line);
                 JsonObject details;
-                try { details = JsonParser.parseString(line).getAsJsonObject(); }
-                catch (RuntimeException ignored) { details = new JsonObject(); }
+                try {
+                    details = JsonParser.parseString(line).getAsJsonObject();
+                } catch (RuntimeException ignored) {
+                    details = new JsonObject();
+                }
                 throw new ResponseException("Responses HTTP status " + response.statusCode() + ", " + line, details);
             }
 
@@ -183,7 +186,9 @@ public final class ResponsesClient {
                     ? details.get("code").getAsString() : null;
         }
 
-        boolean previousResponseMissing() { return "previous_response_not_found".equals(code); }
+        boolean previousResponseMissing() {
+            return "previous_response_not_found".equals(code);
+        }
     }
 
     static final class MessageBuffer {

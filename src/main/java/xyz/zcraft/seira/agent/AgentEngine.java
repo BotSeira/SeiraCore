@@ -277,21 +277,31 @@ public final class AgentEngine implements AutoCloseable {
                 };
                 JsonObject response;
                 JsonArray requestInput = input;
-                if (session.previousId == null && !session.history.isEmpty()) {
+                String previousId = session.localContext ? null : session.previousId;
+                if (session.localContext) {
+                    requestInput = rebuildInput(baseHistory, transcript, input);
+                } else if (previousId == null && !session.history.isEmpty()) {
                     requestInput = new JsonArray();
                     session.history.forEach(requestInput::add);
                     requestInput.addAll(input);
                 }
                 try {
-                    response = client.create(session.previousId, instructions.get(), requestInput,
-                            ToolRegistry.definitions(snapshot), listener);
+                    response = client.create(
+                            previousId,
+                            instructions.get(),
+                            requestInput,
+                            ToolRegistry.definitions(snapshot),
+                            listener
+                    );
                 } catch (IOException error) {
                     String detail = error.getMessage();
                     boolean missing = error instanceof ResponsesClient.ResponseException failure
                             && failure.previousResponseMissing();
+                    if (missing) session.localContext = true;
                     boolean expiredImage = detail != null && detail.contains("422")
                             && detail.contains("Failed to fetch media from URL") && detail.contains("image_url");
-                    if (recovered || delivered.get() || session.previousId == null || (!missing && !expiredImage)) throw error;
+                    if (recovered || delivered.get() || session.previousId == null || (!missing && !expiredImage))
+                        throw error;
                     if (!allowed.test(id) || Thread.currentThread().isInterrupted()) throw error;
                     recovered = true;
                     session.previousId = null;
@@ -451,6 +461,7 @@ public final class AgentEngine implements AutoCloseable {
         final Map<String, String> names = new HashMap<>();
         final Set<String> received = new LinkedHashSet<>();
         boolean running;
+        boolean localContext;
         long lastUsed = System.currentTimeMillis();
         String previousId;
     }
