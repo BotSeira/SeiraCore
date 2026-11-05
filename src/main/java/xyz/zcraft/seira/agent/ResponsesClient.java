@@ -89,7 +89,12 @@ public final class ResponsesClient {
                 ]
                 """));
 
-        agentLogger.debug("Sending request: {}", body);
+        final JsonObject cpy = body.deepCopy();
+        if (cpy.has("instructions") && cpy.get("instructions").isJsonPrimitive()) {
+            cpy.remove("instructions");
+            cpy.addProperty("instructions", "...");
+        }
+        agentLogger.debug("Sending request: {}", cpy);
 
         HttpRequest request = HttpRequest.newBuilder(endpoint).timeout(timeout)
                 .header("Authorization", "Bearer " + apiKey)
@@ -152,7 +157,15 @@ public final class ResponsesClient {
                         JsonObject event = JsonParser.parseString(payload).getAsJsonObject();
                         String type = event.get("type").getAsString();
 
-                        agentLogger.debug("Receiving event {}", event);
+                        final JsonObject cpyEvent = event.deepCopy();
+                        if (cpyEvent.has("response") && cpyEvent.get("response").isJsonObject()) {
+                            final JsonObject obj1 = cpy.get("response").getAsJsonObject();
+                            if (obj1.has("instructions") && obj1.get("instructions").isJsonPrimitive()) {
+                                obj1.remove("instructions");
+                                obj1.addProperty("instructions", "...");
+                            }
+                        }
+                        agentLogger.debug("Receiving event {}", cpyEvent);
 
                         switch (type) {
                             case "response.output_text.delta", "response.refusal.delta" ->
