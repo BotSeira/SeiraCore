@@ -109,11 +109,14 @@ public final class ResponsesClient {
             if (response.statusCode() / 100 != 2) {
                 String line = "";
                 try (var reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
-                    line = reader.readLine();
+                    line = reader.lines().collect(java.util.stream.Collectors.joining("\n"));
                 } catch (IOException _) {
                 }
                 agentLogger.error("Responses HTTP status {}, {}", response.statusCode(), line);
-                throw new IOException("Responses HTTP status " + response.statusCode() + ", " + line);
+                JsonObject details;
+                try { details = JsonParser.parseString(line).getAsJsonObject(); }
+                catch (RuntimeException ignored) { details = new JsonObject(); }
+                throw new ResponseException("Responses HTTP status " + response.statusCode() + ", " + line, details);
             }
 
             var deadline = CompletableFuture.delayedExecutor(timeout.toMillis(), TimeUnit.MILLISECONDS);
@@ -154,7 +157,7 @@ public final class ResponsesClient {
                                 return event.getAsJsonObject("response");
                             }
                             case "response.failed", "response.incomplete", "error" ->
-                                    throw new IOException("Responses request did not complete: " + type);
+                                    throw new ResponseException("Responses request did not complete: " + event, event);
                         }
                     }
                 }
@@ -164,6 +167,23 @@ public final class ResponsesClient {
                 finished.set(true);
             }
         }
+    }
+
+    static final class ResponseException extends IOException {
+        private final String code;
+
+        ResponseException(String message, JsonObject event) {
+            super(message);
+            JsonObject details = event;
+            if (details.has("response") && details.get("response").isJsonObject())
+                details = details.getAsJsonObject("response");
+            if (details.has("error") && details.get("error").isJsonObject())
+                details = details.getAsJsonObject("error");
+            code = details.has("code") && details.get("code").isJsonPrimitive()
+                    ? details.get("code").getAsString() : null;
+        }
+
+        boolean previousResponseMissing() { return "previous_response_not_found".equals(code); }
     }
 
     static final class MessageBuffer {

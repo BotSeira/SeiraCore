@@ -15,6 +15,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.LongFunction;
 import java.util.function.Predicate;
@@ -114,6 +115,17 @@ public final class AgentEngine implements AutoCloseable {
             users.add(user);
         }
         metadata.add("users", users);
+    }
+
+    static JsonArray rebuildInput(JsonArray history, JsonArray transcript, JsonArray pending) {
+        var rebuilt = history.deepCopy();
+        var notice = new JsonObject();
+        notice.addProperty("role", "user");
+        notice.addProperty("content", "[会话恢复：较早历史仅保留文字，旧图片可能不可用。以下当前任务的工具调用与结果已执行，请继续处理，不要重复执行已完成的操作。]");
+        rebuilt.add(notice);
+        rebuilt.addAll(transcript.deepCopy());
+        rebuilt.addAll(pending.deepCopy());
+        return rebuilt;
     }
 
     private static JsonObject textHistory(JsonObject item) {
@@ -223,6 +235,10 @@ public final class AgentEngine implements AutoCloseable {
         };
         int rounds = 0;
         boolean recovered = false;
+        var transcript = new JsonArray();
+        var baseHistory = new JsonArray();
+        session.history.forEach(baseHistory::add);
+        var executed = new HashMap<String, JsonObject>();
         Set<String> authors = new HashSet<>();
 
         agentLogger.debug("Running session with msg {} and user {}", session.inbox, session.participants);
@@ -254,9 +270,11 @@ public final class AgentEngine implements AutoCloseable {
 
                 store.clear(id);
 
-                Consumer<String> listener = text -> destination.accept(
-                        renderMentions(text, session.participants,
-                                uid -> UserDataStore.findGroupOpenIdByUid(id, uid)));
+                var delivered = new AtomicBoolean();
+                Consumer<String> listener = text -> {
+                    delivered.set(true);
+                    destination.accept(renderMentions(text, session.participants, uid -> UserDataStore.findGroupOpenIdByUid(id, uid)));
+                };
                 JsonObject response;
                 JsonArray requestInput = input;
                 if (session.previousId == null && !session.history.isEmpty()) {
@@ -269,22 +287,26 @@ public final class AgentEngine implements AutoCloseable {
                             ToolRegistry.definitions(snapshot), listener);
                 } catch (IOException error) {
                     String detail = error.getMessage();
-                    if (recovered || session.previousId == null || detail == null
-                            || !detail.contains("422") || !detail.contains("Failed to fetch media from URL")
-                            || !detail.contains("image_url")) throw error;
+                    boolean missing = error instanceof ResponsesClient.ResponseException failure
+                            && failure.previousResponseMissing();
+                    boolean expiredImage = detail != null && detail.contains("422")
+                            && detail.contains("Failed to fetch media from URL") && detail.contains("image_url");
+                    if (recovered || delivered.get() || session.previousId == null || (!missing && !expiredImage)) throw error;
+                    if (!allowed.test(id) || Thread.currentThread().isInterrupted()) throw error;
                     recovered = true;
                     session.previousId = null;
-                    var rebuilt = new JsonArray();
-                    session.history.forEach(rebuilt::add);
-                    var notice = new JsonObject();
-                    notice.addProperty("role", "user");
-                    notice.addProperty("content", "[系统恢复提示：旧图片已不可用，历史仅保留文字；请说明此限制。已执行的工具不要重复执行。]");
-                    rebuilt.add(notice);
-                    for (var value : input)
-                        rebuilt.add(value.getAsJsonObject().has("role")
-                                ? value : textHistory(value.getAsJsonObject()));
+                    var rebuilt = rebuildInput(baseHistory, transcript, input);
+                    agentLogger.warn("Rebuilding missing or expired response chain for {}", id);
                     response = client.create(null, instructions.get(), rebuilt,
                             ToolRegistry.definitions(snapshot), listener);
+                }
+                transcript.addAll(input.deepCopy());
+                for (var value : response.getAsJsonArray("output")) {
+                    var item = value.getAsJsonObject();
+                    String type = item.get("type").getAsString();
+                    if (type.equals("message") || type.equals("function_call")
+                            || (type.equals("reasoning") && item.has("encrypted_content") && !item.get("encrypted_content").isJsonNull()))
+                        transcript.add(item.deepCopy());
                 }
                 for (var value : input) session.history.add(textHistory(value.getAsJsonObject()));
                 for (var value : response.getAsJsonArray("output"))
@@ -304,13 +326,24 @@ public final class AgentEngine implements AutoCloseable {
                         if (Thread.currentThread().isInterrupted() || !allowed.test(id)) {
                             throw new CancellationException("Conversation stopped");
                         }
-                        input.add(tools.execute(call, snapshot, context));
+                        String callId = call.get("call_id").getAsString();
+                        JsonObject result = executed.get(callId);
+                        if (result == null) {
+                            result = tools.execute(call, snapshot, context);
+                            executed.put(callId, result);
+                        }
+                        input.add(result);
                     }
                 }
 
                 if (input.isEmpty()) {
                     store.save(id, session.previousId, session.participants, session.history);
                     rounds = 0;
+                    recovered = false;
+                    transcript = new JsonArray();
+                    baseHistory = new JsonArray();
+                    session.history.forEach(baseHistory::add);
+                    executed.clear();
                     authors.clear();
                 }
             }
