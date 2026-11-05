@@ -202,6 +202,8 @@ public final class AgentEngine implements AutoCloseable {
                 Consumer<String> destination = reply;
 
                 store.clear(id);
+
+                agentLogger.info("Creating agent response with input: {}", input);
                 JsonObject response = client.create(
                         session.previousId,
                         instructions.get(),
@@ -277,10 +279,6 @@ public final class AgentEngine implements AutoCloseable {
             List<Attachment> attachments, long timestamp, Consumer<String> reply) {
         public Message {
             attachments = attachments == null ? List.of() : List.copyOf(attachments);
-        }
-
-        JsonObject toInput(String alias) {
-            return toInput(alias, null, null);
         }
 
         JsonObject toInput(String alias, Map<String, String> participants, Map<String, String> names) {

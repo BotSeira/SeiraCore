@@ -16,10 +16,8 @@ import org.jline.reader.LineReader;
 import java.io.Serializable;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ArrayBlockingQueue;
 
-/**
- * Routes terminal log events through JLine so the active prompt can be redrawn safely.
- */
 final class JLineLogBridge implements AutoCloseable {
     private static final String CONSOLE_APPENDER_NAME = "CONSOLE";
     private static final String JLINE_APPENDER_NAME = "JLINE_CONSOLE";
@@ -88,10 +86,13 @@ final class JLineLogBridge implements AutoCloseable {
         jLineAppender.stop();
     }
 
-    private static final class JLineAppender extends AbstractAppender {
+    static final class JLineAppender extends AbstractAppender {
         private final LineReader reader;
+        private final ArrayBlockingQueue<String> pending = new ArrayBlockingQueue<>(1000);
+        private final AtomicBoolean running = new AtomicBoolean();
+        private Thread outputThread;
 
-        private JLineAppender(LineReader reader, Appender originalAppender) {
+        JLineAppender(LineReader reader, Appender originalAppender) {
             super(
                     JLINE_APPENDER_NAME,
                     null,
@@ -103,10 +104,43 @@ final class JLineLogBridge implements AutoCloseable {
         }
 
         @Override
+        public void start() {
+            if (!running.compareAndSet(false, true)) return;
+            super.start();
+            outputThread = Thread.ofPlatform().daemon().name("seira-console-output").start(() -> {
+                while (running.get()) {
+                    try {
+                        reader.printAbove(pending.take());
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    } catch (RuntimeException ignored) {
+                        // Never log back into this appender if the terminal cannot render a message.
+                    }
+                }
+            });
+        }
+
+        @Override
+        public void stop() {
+            running.set(false);
+            if (outputThread != null) outputThread.interrupt();
+            pending.clear();
+            super.stop();
+        }
+
+        @Override
         public void append(LogEvent event) {
+            if (!running.get()) return;
             Serializable rendered = toSerializable(event);
             if (rendered != null) {
-                reader.printAbove(rendered.toString());
+                // Logging while holding a business lock must never wait for JLine's reader lock.
+                // Keep memory bounded if terminal output stalls; file appenders retain the full log.
+                String text = rendered.toString();
+                if (!pending.offer(text)) {
+                    pending.poll();
+                    pending.offer(text);
+                }
             }
         }
     }
