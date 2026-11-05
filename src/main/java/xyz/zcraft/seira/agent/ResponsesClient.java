@@ -89,6 +89,8 @@ public final class ResponsesClient {
                 ]
                 """));
 
+        agentLogger.debug("Sending request: {}", body);
+
         HttpRequest request = HttpRequest.newBuilder(endpoint).timeout(timeout)
                 .header("Authorization", "Bearer " + apiKey)
                 .header("Content-Type", "application/json")
