@@ -4,6 +4,7 @@ import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.config.Configurator;
+import xyz.zcraft.seira.agent.AgentChatHandler;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.route.Router;
@@ -275,8 +276,12 @@ public final class ConsoleCommandProcessor {
         if (input.size() == 2) {
             final String value = input.value(1);
             if (value.equalsIgnoreCase("reload")) {
-                AiPermission.loadFromFile();
-                return ConsoleResult.success("AI permission reloaded.");
+                try {
+                    AgentChatHandler.getInstance().reload();
+                    return ConsoleResult.success("AI runtime config reloaded.");
+                } catch (IOException e) {
+                    return ConsoleResult.failure("Failed to reload AI runtime config: " + e.getMessage());
+                }
             } else if (ID_PATTERN.matcher(value).matches()) {
                 return ConsoleResult.success("AI chat for group " + value + " is: " + AiPermission.permits(value));
             } else {

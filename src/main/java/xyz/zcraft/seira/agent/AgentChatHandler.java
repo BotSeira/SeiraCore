@@ -14,18 +14,18 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class AgentChatHandler implements AutoCloseable {
-
+    public static AtomicReference<AgentChatHandler> INSTANCE = new AtomicReference<>();
     private final Predicate<String> administrator;
     private final AgentConfig settings;
     private final ToolRegistry tools;
     private final AgentEngine engine;
     private volatile String prompt;
-
     public AgentChatHandler(Predicate<String> administrator, AgentConfig conf,
                             java.util.function.Function<String, String> osuToken,
                             xyz.zcraft.seira.config.OstellaConfig ostella,
@@ -47,11 +47,19 @@ public final class AgentChatHandler implements AutoCloseable {
                         new ConversationStore(Path.of("data", "agent-conversations")),
                         this::enabled
                 );
-            } else engine = null;
+            } else {
+                engine = null;
+            }
         } catch (IOException e) {
             tools.close();
             throw new IllegalStateException("Cannot load agent configuration", e);
         }
+
+        INSTANCE.set(this);
+    }
+
+    public static AgentChatHandler getInstance() {
+        return INSTANCE.get();
     }
 
     private static void sendResponse(Context context, String message) {
@@ -137,12 +145,14 @@ public final class AgentChatHandler implements AutoCloseable {
         return engine != null && AiPermission.isActivated(groupId);
     }
 
-    private void reload() throws IOException {
+    public void reload() throws IOException {
         String nextPrompt = Files.readString(Path.of(settings.promptFile()));
         if (nextPrompt.isBlank()) throw new IllegalArgumentException("Agent prompt is empty");
 
         HttpTools.reload(Path.of(settings.toolsFile()), tools);
         prompt = nextPrompt;
+
+        AiPermission.loadFromFile();
     }
 
     public void handleChat(Context ctx, String text, List<Attachment> attachments, List<MsgElem> elements) {
