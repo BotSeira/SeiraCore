@@ -87,7 +87,19 @@ public final class AgentChatHandler implements AutoCloseable {
             }
         }
 
-        return candidates;
+        var captured = new java.util.ArrayList<Attachment>();
+        var seen = new java.util.HashSet<String>();
+        for (Attachment attachment : candidates) {
+            if (attachment == null || !seen.add(attachment.url())) continue;
+            if (attachment.contentType() == null || !attachment.contentType().startsWith("image/")) continue;
+            try {
+                captured.add(ImageCache.capture(attachment));
+            } catch (Exception e) {
+                if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                captured.add(new Attachment("image/png", attachment.filename(), 0, "unavailable:"));
+            }
+        }
+        return captured;
 
 //        var urls = new LinkedHashSet<String>();
 //        for (Attachment attachment : candidates) {

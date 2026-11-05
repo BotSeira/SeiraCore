@@ -106,6 +106,7 @@ public final class AgentEngine implements AutoCloseable {
                 var saved = store.load(id);
                 loaded.previousId = saved.responseId();
                 loaded.participants.putAll(saved.participants());
+                saved.history().forEach(item -> loaded.history.add(item.getAsJsonObject()));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -172,6 +173,7 @@ public final class AgentEngine implements AutoCloseable {
         Consumer<String> reply = ignored -> {
         };
         int rounds = 0;
+        boolean recovered = false;
         Set<String> authors = new HashSet<>();
 
         agentLogger.debug("Running session with msg {} and user {}", session.inbox, session.participants);
@@ -203,13 +205,7 @@ public final class AgentEngine implements AutoCloseable {
 
                 store.clear(id);
 
-                agentLogger.info("Creating agent response with input: {}", input);
-                JsonObject response = client.create(
-                        session.previousId,
-                        instructions.get(),
-                        input,
-                        ToolRegistry.definitions(snapshot),
-                        item -> {
+                Consumer<JsonObject> listener = item -> {
                             StringBuilder text = new StringBuilder();
                             for (var part : item.getAsJsonArray("content")) {
                                 JsonObject content = part.getAsJsonObject();
@@ -222,8 +218,38 @@ public final class AgentEngine implements AutoCloseable {
                             if (!text.isEmpty())
                                 destination.accept(renderMentions(text.toString(), session.participants,
                                         uid -> UserDataStore.findGroupOpenIdByUid(id, uid)));
-                        }
-                );
+                        };
+                JsonObject response;
+                JsonArray requestInput = input;
+                if (session.previousId == null && !session.history.isEmpty()) {
+                    requestInput = new JsonArray();
+                    session.history.forEach(requestInput::add);
+                    requestInput.addAll(input);
+                }
+                try {
+                    response = client.create(session.previousId, instructions.get(), requestInput,
+                            ToolRegistry.definitions(snapshot), listener);
+                } catch (IOException error) {
+                    String detail = error.getMessage();
+                    if (recovered || session.previousId == null || detail == null
+                            || !detail.contains("422") || !detail.contains("Failed to fetch media from URL")
+                            || !detail.contains("image_url")) throw error;
+                    recovered = true;
+                    session.previousId = null;
+                    var rebuilt = new JsonArray();
+                    session.history.forEach(rebuilt::add);
+                    var notice = new JsonObject();
+                    notice.addProperty("role", "user");
+                    notice.addProperty("content", "[系统恢复提示：旧图片已不可用，历史仅保留文字；请说明此限制。已执行的工具不要重复执行。]");
+                    rebuilt.add(notice);
+                    for (var value : input) rebuilt.add(value.getAsJsonObject().has("role")
+                            ? value : textHistory(value.getAsJsonObject()));
+                    response = client.create(null, instructions.get(), rebuilt,
+                            ToolRegistry.definitions(snapshot), listener);
+                }
+                for (var value : input) session.history.add(textHistory(value.getAsJsonObject()));
+                for (var value : response.getAsJsonArray("output")) session.history.add(textHistory(value.getAsJsonObject()));
+                while (session.history.size() > 100) session.history.removeFirst();
 
                 session.previousId = response.get("id").getAsString();
 
@@ -240,7 +266,7 @@ public final class AgentEngine implements AutoCloseable {
                 }
 
                 if (input.isEmpty()) {
-                    store.save(id, session.previousId, session.participants);
+                    store.save(id, session.previousId, session.participants, session.history);
                     rounds = 0;
                     authors.clear();
                 }
@@ -311,7 +337,15 @@ public final class AgentEngine implements AutoCloseable {
                 if (type.startsWith("image/")) {
                     var image = new JsonObject();
                     image.addProperty("type", "input_image");
-                    image.addProperty("image_url", attachment.url());
+                    String dataUrl = ImageCache.dataUrl(attachment);
+                    if (dataUrl == null) {
+                        var missing = new JsonObject();
+                        missing.addProperty("type", "input_text");
+                        missing.addProperty("text", "[图片附件已不可用，请向用户说明，不能猜测图片内容]");
+                        content.add(missing);
+                        continue;
+                    }
+                    image.addProperty("image_url", dataUrl);
                     image.addProperty("detail", "auto");
                     content.add(image);
                 }
@@ -363,7 +397,28 @@ public final class AgentEngine implements AutoCloseable {
         metadata.add("users", users);
     }
 
+    private static JsonObject textHistory(JsonObject item) {
+        var result = new JsonObject();
+        String role = item.has("role") ? item.get("role").getAsString() : "user";
+        result.addProperty("role", role.equals("assistant") ? "assistant" : "user");
+        StringBuilder text = new StringBuilder();
+        if (item.has("content")) {
+            if (item.get("content").isJsonArray()) {
+                for (var part : item.getAsJsonArray("content")) {
+                    var content = part.getAsJsonObject();
+                    if (content.has("text")) text.append(content.get("text").getAsString()).append('\n');
+                    else if (content.has("image_url")) text.append("[历史图片已省略]\n");
+                }
+            } else text.append(item.get("content").getAsString());
+        } else if (item.has("type") && item.get("type").getAsString().startsWith("function_call")) {
+            text.append("[工具执行记录，仅供上下文参考] ").append(item);
+        } else text.append("[非文本输出已省略]");
+        result.addProperty("content", text.substring(0, Math.min(text.length(), 8192)));
+        return result;
+    }
+
     private static final class Session {
+        final ArrayDeque<JsonObject> history = new ArrayDeque<>();
         final ArrayDeque<Message> inbox = new ArrayDeque<>();
         final Map<String, String> participants = new LinkedHashMap<>();
         final Map<String, String> names = new HashMap<>();

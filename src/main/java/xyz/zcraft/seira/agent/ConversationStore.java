@@ -27,22 +27,27 @@ public final class ConversationStore {
 
     public Saved load(String id) throws IOException {
         Path path = file(id);
-        if (!Files.exists(path)) return new Saved(null, Map.of());
+        if (!Files.exists(path)) return new Saved(null, Map.of(), new com.google.gson.JsonArray());
 
         JsonObject root = JsonParser.parseString(Files.readString(path)).getAsJsonObject();
         if (!id.equals(root.get("conversationId").getAsString()))
             throw new IOException("Conversation identity mismatch");
 
         // Remote stored responses have a finite lifetime. Begin a fresh chain after a day of inactivity.
-        if (System.currentTimeMillis() - root.get("updatedAt").getAsLong() > 86_400_000L)
-            return new Saved(null, Map.of());
+        boolean expired = System.currentTimeMillis() - root.get("updatedAt").getAsLong() > 86_400_000L;
 
         Map<String, String> participants = new LinkedHashMap<>();
         root.getAsJsonObject("participants").entrySet().forEach(e -> participants.put(e.getKey(), e.getValue().getAsString()));
-        return new Saved(root.get("responseId").getAsString(), participants);
+        return new Saved(expired ? null : root.get("responseId").getAsString(), participants,
+                root.has("history") ? root.getAsJsonArray("history") : new com.google.gson.JsonArray());
     }
 
     public void save(String id, String responseId, Map<String, String> participants) throws IOException {
+        save(id, responseId, participants, java.util.List.of());
+    }
+
+    public void save(String id, String responseId, Map<String, String> participants,
+                     java.util.Collection<JsonObject> history) throws IOException {
         Files.createDirectories(directory);
 
         JsonObject root = new JsonObject();
@@ -50,6 +55,7 @@ public final class ConversationStore {
         root.addProperty("responseId", responseId);
         root.addProperty("updatedAt", System.currentTimeMillis());
         root.add("participants", new Gson().toJsonTree(participants));
+        root.add("history", new Gson().toJsonTree(history));
 
         Path destination = file(id);
         Path temporary = Files.createTempFile(directory, "conversation-", ".tmp");
@@ -71,6 +77,6 @@ public final class ConversationStore {
         Files.deleteIfExists(file(id));
     }
 
-    public record Saved(String responseId, Map<String, String> participants) {
+    public record Saved(String responseId, Map<String, String> participants, com.google.gson.JsonArray history) {
     }
 }
