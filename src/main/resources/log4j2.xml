@@ -40,6 +40,9 @@
                 <SizeBasedTriggeringPolicy size="10 MB"/>
             </Policies>
         </RollingFile>
+        <File name="AGENT_FILE" fileName="logs/agent.log">
+            <PatternLayout pattern="${FILE_PATTERN}"/>
+        </File>
     </Appenders>
     <Loggers>
         <Logger name="io.javalin" level="INFO" additivity="false">
@@ -55,5 +58,9 @@
             <AppenderRef ref="FILE"/>
             <AppenderRef ref="ERROR_FILE"/>
         </Root>
+
+        <Logger name="AgentLogger" level="debug" additivity="false">
+            <AppenderRef ref="AGENT_FILE"/>
+        </Logger>
     </Loggers>
 </Configuration>

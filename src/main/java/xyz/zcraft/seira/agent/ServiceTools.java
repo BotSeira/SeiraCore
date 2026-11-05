@@ -2,6 +2,8 @@ package xyz.zcraft.seira.agent;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.config.AsteroidConfig;
 import xyz.zcraft.seira.config.OstellaConfig;
 import xyz.zcraft.seira.db.UserDataStore;
@@ -28,6 +30,8 @@ final class ServiceTools {
         for (String name : names) mapping.addProperty(name, "$" + name);
         return mapping;
     }
+
+    private static final Logger agentLogger = LogManager.getLogger("AgentLogger");
 
     void declare(String service, String category, String route, String name, String description, String method,
                  ToolSchema schema, String[] pathParameters, String[] queryParameters, boolean jsonBody,
@@ -59,6 +63,7 @@ final class ServiceTools {
 
         registry.registerDeferred(category, new ToolRegistry.Tool(http.name(), http.description(), http.parameters(),
                 http.groups(), http.timeout(), (arguments, context) -> {
+            agentLogger.debug("Executing tool {} with args {}", http.name(), arguments);
             if (browser) {
                 browsers.check(route, arguments, context.conversationId());
                 if (route.endsWith("/navigate")) {

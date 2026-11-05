@@ -3,6 +3,8 @@ package xyz.zcraft.seira.agent;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.config.AgentConfig;
 
 import java.io.BufferedReader;
@@ -48,6 +50,8 @@ public final class ResponsesClient {
             listener.accept(item);
         }
     }
+
+    private static final Logger agentLogger = LogManager.getLogger("AgentLogger");
 
     public JsonObject create(
             String previousId, String instructions, JsonArray input, JsonArray tools, Consumer<JsonObject> onMessage
@@ -102,7 +106,13 @@ public final class ResponsesClient {
 
         try (var stream = response.body()) {
             if (response.statusCode() / 100 != 2) {
-                throw new IOException("Responses HTTP status " + response.statusCode());
+                String line = "";
+                try(var reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8));) {
+                    line = reader.readLine();
+                } catch (IOException _) {
+                }
+                agentLogger.error("Responses HTTP status {}, {}", response.statusCode(), line);
+                throw new IOException("Responses HTTP status " + response.statusCode() + ", " + line);
             }
 
             var deadline = CompletableFuture.delayedExecutor(timeout.toMillis(), TimeUnit.MILLISECONDS);
@@ -124,7 +134,7 @@ public final class ResponsesClient {
                     if (line.startsWith("data:")) {
                         if (!data.isEmpty()) data.append('\n');
                         data.append(line.substring(5).stripLeading());
-                        if (data.length() > 4_000_000) throw new IOException("Responses event too large");
+//                        if (data.length() > 4_000_000) throw new IOException("Responses event too large");
                     } else if (line.isEmpty() && !data.isEmpty()) {
                         String payload = data.toString();
                         data.setLength(0);

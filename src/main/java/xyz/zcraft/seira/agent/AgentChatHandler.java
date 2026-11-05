@@ -167,6 +167,10 @@ public final class AgentChatHandler implements AutoCloseable {
                 text, att, System.currentTimeMillis(), null));
     }
 
+    public void rememberNames(String groupId, java.util.Map<String, String> names) {
+        if (enabled(groupId)) engine.rememberNames(groupId, names);
+    }
+
     public void handleAi(Context context) {
         if (!context.inGroup()) {
             context.sendReply(at(context) + "请在群聊中使用此命令喵。");

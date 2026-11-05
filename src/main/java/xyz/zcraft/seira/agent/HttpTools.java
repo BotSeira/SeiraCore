@@ -1,6 +1,8 @@
 package xyz.zcraft.seira.agent;
 
 import com.google.gson.*;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.dataformat.yaml.YAMLFactory;
 
@@ -37,6 +39,8 @@ public final class HttpTools {
 
         registry.replaceConfigured(tools);
     }
+
+    private static final Logger agentLogger = LogManager.getLogger("AgentLogger");
 
     static ToolRegistry.Tool create(JsonObject spec) {
         String pointer = spec.has("resultPointer") ? spec.get("resultPointer").getAsString() : "";
@@ -94,18 +98,22 @@ public final class HttpTools {
             request.method(method, body == null ? HttpRequest.BodyPublishers.noBody()
                     : HttpRequest.BodyPublishers.ofString(resolve(body, arguments).toString()));
 
-            // Byte-array subscriber is bounded while receiving, not after buffering the response.
-            var response = HTTP.send(request.build(), info -> new LimitedBodySubscriber(100_000));
-            if (response.statusCode() / 100 != 2) throw new IOException("HTTP tool failed");
+            var response = HTTP.send(request.build(), HttpResponse.BodyHandlers.ofString());
 
-            String text = new String(response.body(), StandardCharsets.UTF_8);
+            agentLogger.debug("Http tool returned status {}", response.statusCode());
+
+            if (response.statusCode() / 100 != 2) {
+                agentLogger.error("Http tool failed with body {}", response.body());
+                throw new IOException("HTTP tool failed");
+            }
+
+            String text = response.body();
             JsonElement result;
             try {
                 result = JsonParser.parseString(text);
             } catch (JsonParseException e) {
                 result = new JsonPrimitive(text);
             }
-
 
             if (!pointer.isEmpty()) for (String segment : pointer.substring(1).split("/", -1)) {
                 String key = segment.replace("~1", "/").replace("~0", "~");
@@ -157,50 +165,5 @@ public final class HttpTools {
         }
 
         return template.deepCopy();
-    }
-
-    private static final class LimitedBodySubscriber implements HttpResponse.BodySubscriber<byte[]> {
-        private final java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
-        private final java.util.concurrent.CompletableFuture<byte[]> result = new java.util.concurrent.CompletableFuture<>();
-        private final int limit;
-        private java.util.concurrent.Flow.Subscription subscription;
-
-        LimitedBodySubscriber(int limit) {
-            this.limit = limit;
-        }
-
-        public java.util.concurrent.CompletionStage<byte[]> getBody() {
-            return result;
-        }
-
-        public void onSubscribe(java.util.concurrent.Flow.Subscription subscription) {
-            this.subscription = subscription;
-
-            subscription.request(1);
-        }
-
-        public void onNext(List<java.nio.ByteBuffer> buffers) {
-            for (var buffer : buffers) {
-                if (buffer.remaining() > limit - output.size()) {
-                    subscription.cancel();
-                    result.completeExceptionally(new IOException("HTTP tool output too large"));
-                    return;
-                }
-
-                byte[] bytes = new byte[buffer.remaining()];
-                buffer.get(bytes);
-                output.writeBytes(bytes);
-            }
-
-            subscription.request(1);
-        }
-
-        public void onError(Throwable error) {
-            result.completeExceptionally(error);
-        }
-
-        public void onComplete() {
-            result.complete(output.toByteArray());
-        }
     }
 }

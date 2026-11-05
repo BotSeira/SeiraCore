@@ -10,13 +10,13 @@ import xyz.zcraft.seira.db.UserDataStore;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.net.URI;
 import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Consumer;
+import java.util.function.LongFunction;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -42,8 +42,7 @@ public final class AgentEngine implements AutoCloseable {
         this.allowed = Objects.requireNonNull(allowed);
     }
 
-    static String renderMentions(String text, Map<String, String> participants,
-                                 java.util.function.LongFunction<Optional<String>> findGroupMember) {
+    static String renderMentions(String text, Map<String, String> participants, LongFunction<Optional<String>> findGroupMember) {
         String safe = text.replaceAll("(?is)<qqbot-at-user\\b[^>]*>", "");
         var matcher = java.util.regex.Pattern.compile("\\[\\[(?:at:(u[0-9]+)|osuat:([0-9]+))]]").matcher(safe);
         StringBuilder output = new StringBuilder();
@@ -89,11 +88,18 @@ public final class AgentEngine implements AutoCloseable {
     public synchronized void accept(String conversationId, Message message) {
         if (closed) throw new IllegalStateException("Agent is closed");
 
-        LOG.info("Accepting message in conversation: {}", conversationId);
         long now = System.currentTimeMillis();
         sessions.values().removeIf(session -> !session.running && now - session.lastUsed > 86_400_000L);
 
-        Session session = sessions.computeIfAbsent(conversationId, id -> {
+        Session session = session(conversationId);
+
+        if (message.senderName() != null) session.names.put(message.senderId(), message.senderName());
+
+        enqueue(conversationId, message, session, now);
+    }
+
+    private Session session(String conversationId) {
+        return sessions.computeIfAbsent(conversationId, id -> {
             Session loaded = new Session();
 
             try {
@@ -106,6 +112,16 @@ public final class AgentEngine implements AutoCloseable {
             return loaded;
         });
 
+    }
+
+    public synchronized void rememberNames(String groupId, Map<String, String> names) {
+        var session = session(groupId);
+        names.forEach((id, name) -> {
+            if (id != null && name != null && !name.isBlank()) session.names.put(id, name);
+        });
+    }
+
+    private void enqueue(String conversationId, Message message, Session session, long now) {
         if (message.id() != null && session.received.contains(message.id())) return;
         if (session.inbox.size() >= 100) {
             var history = session.inbox.stream().filter(item -> item.reply() == null).findFirst();
@@ -148,26 +164,29 @@ public final class AgentEngine implements AutoCloseable {
         return true;
     }
 
+    private static final Logger agentLogger = LogManager.getLogger("AgentLogger");
+
     private void run(String id, Session session) {
+        LOG.info("Running session in conversation: {}", id);
         JsonArray input = new JsonArray();
         Consumer<String> reply = ignored -> {
         };
         int rounds = 0;
         Set<String> authors = new HashSet<>();
 
+        agentLogger.debug("Running session with msg {} and user {}", session.inbox, session.participants);
         try {
             while (!Thread.currentThread().isInterrupted()) {
                 synchronized (this) {
-                    // Background traffic alone must never start another model response.
                     if (input.isEmpty() && session.inbox.stream().noneMatch(item -> item.reply() != null)) return;
 
-                    Message message;
-                    while ((message = session.inbox.poll()) != null) {
-                        if (message.reply() != null) authors.add(message.senderId());
-                        String alias = session.participants.computeIfAbsent(message.senderId(), ignored -> "u" + (session.participants.size() + 1));
+                    Message current;
+                    while ((current = session.inbox.poll()) != null) {
+                        if (current.reply() != null) authors.add(current.senderId());
+                        String alias = session.participants.computeIfAbsent(current.senderId(), ignored -> "u" + (session.participants.size() + 1));
 
-                        input.add(message.toInput(alias));
-                        if (message.reply() != null) reply = message.reply();
+                        input.add(current.toInput(alias, session.participants, session.names));
+                        if (current.reply() != null) reply = current.reply();
                     }
 
                     if (input.isEmpty()) {
@@ -175,7 +194,7 @@ public final class AgentEngine implements AutoCloseable {
                     }
                 }
 
-                if (++rounds > 128) throw new IllegalStateException("Agent response limit reached");
+                if (++rounds > 512) throw new IllegalStateException("Agent response limit reached");
                 if (!allowed.test(id)) throw new CancellationException("Conversation disabled");
 
                 var context = new ToolRegistry.Context(id, authors, session.participants, reply);
@@ -261,6 +280,10 @@ public final class AgentEngine implements AutoCloseable {
         }
 
         JsonObject toInput(String alias) {
+            return toInput(alias, null, null);
+        }
+
+        JsonObject toInput(String alias, Map<String, String> participants, Map<String, String> names) {
             var metadata = new JsonObject();
             metadata.addProperty("message_id", id);
             metadata.addProperty("sender_id", alias);
@@ -268,6 +291,7 @@ public final class AgentEngine implements AutoCloseable {
             metadata.addProperty("timestamp", timestamp);
             metadata.addProperty("text", text);
             metadata.addProperty("context_only", reply == null);
+            if (participants != null) enrichUsers(metadata, this, participants, names);
 
             var item = new JsonObject();
             item.addProperty("role", "user");
@@ -311,9 +335,40 @@ public final class AgentEngine implements AutoCloseable {
         }
     }
 
+    private static void enrichUsers(JsonObject metadata, Message message, Map<String, String> participants,
+                                    Map<String, String> names) {
+        var related = new LinkedHashSet<String>();
+        related.add(message.senderId());
+
+        var matcher = java.util.regex.Pattern.compile("<@([A-Za-z0-9_-]+)>")
+                .matcher(message.text() == null ? "" : message.text());
+        StringBuilder normalized = new StringBuilder();
+        while (matcher.find()) {
+            String openId = matcher.group(1);
+            related.add(openId);
+            String alias = participants.computeIfAbsent(openId, ignored -> "u" + (participants.size() + 1));
+            matcher.appendReplacement(normalized, "[[at:" + alias + "]]");
+        }
+        matcher.appendTail(normalized);
+        metadata.addProperty("text", normalized.toString());
+
+        var users = new JsonArray();
+        for (String openId : related) {
+            var user = new JsonObject();
+            user.addProperty("id", participants.get(openId));
+            user.addProperty("nickname", openId.equals(message.senderId()) ? message.senderName() : names.get(openId));
+            Long uid = UserDataStore.findBoundUid(openId);
+            user.addProperty("osu_uid", uid);
+            user.addProperty("osu_username", uid == null ? null : UserDataStore.findUsername(uid).orElse(null));
+            users.add(user);
+        }
+        metadata.add("users", users);
+    }
+
     private static final class Session {
         final ArrayDeque<Message> inbox = new ArrayDeque<>();
         final Map<String, String> participants = new LinkedHashMap<>();
+        final Map<String, String> names = new HashMap<>();
         final Set<String> received = new LinkedHashSet<>();
         boolean running;
         long lastUsed = System.currentTimeMillis();

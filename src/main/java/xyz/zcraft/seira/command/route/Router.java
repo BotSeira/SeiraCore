@@ -227,6 +227,10 @@ public class Router {
         handleMessageReceived(userId, null, userId, messageId, rawContent, false, msgIdx, attachments, msgElems, null, null);
     }
 
+    public void rememberMentionNames(String groupId, java.util.Map<String, String> names) {
+        aiChatHandler.rememberNames(groupId, names);
+    }
+
     public void onGroupMessageReceived(
             String groupId, String senderUserId,
             String messageId, String rawContent,

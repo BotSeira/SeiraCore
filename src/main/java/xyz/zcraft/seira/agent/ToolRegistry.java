@@ -1,6 +1,8 @@
 package xyz.zcraft.seira.agent;
 
 import com.google.gson.*;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;
 import java.util.*;
@@ -151,6 +153,8 @@ public final class ToolRegistry implements AutoCloseable {
         return Collections.unmodifiableMap(result);
     }
 
+    private static final Logger agentLogger = LogManager.getLogger("AgentLogger");
+
     public JsonObject execute(JsonObject call, Map<String, Tool> snapshot, Context context) {
         var output = new JsonObject();
         output.addProperty("type", "function_call_output");
@@ -166,7 +170,7 @@ public final class ToolRegistry implements AutoCloseable {
 
             JsonObject arguments = JsonParser.parseString(call.get("arguments").getAsString()).getAsJsonObject();
             ToolArguments.validate(tool.parameters(), arguments);
-
+            agentLogger.debug("Calling tool {} with args {}", tool.name(), arguments);
             if (tool.requiresConfirmation() && !confirm(tool, arguments, context)) {
                 output.addProperty("output", error("CONFIRMATION_DENIED").toString());
                 return output;
@@ -181,10 +185,13 @@ public final class ToolRegistry implements AutoCloseable {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             result = error("CANCELLED");
+            agentLogger.error("Tool call cancelled", e);
         } catch (TimeoutException e) {
             result = error("TIMEOUT");
+            agentLogger.error("Tool call timed out", e);
         } catch (Exception e) {
             result = error("TOOL_FAILED");
+            agentLogger.error("Tool call failed", e);
         } finally {
             if (task != null && !task.isDone()) task.cancel(true);
         }

@@ -260,6 +260,7 @@ public class WSClient extends WebSocketClient {
             ));
         }
 
+        router.rememberMentionNames(groupId, mentions);
         router.onGroupMessageReceived(groupId, openId, msgId, content, msgIdx, attachments, msgElemList, username, memberRole);
     }
 
