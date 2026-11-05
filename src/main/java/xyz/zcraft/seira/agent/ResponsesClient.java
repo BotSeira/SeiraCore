@@ -151,6 +151,8 @@ public final class ResponsesClient {
                         JsonObject event = JsonParser.parseString(payload).getAsJsonObject();
                         String type = event.get("type").getAsString();
 
+                        agentLogger.debug("Receiving event {}", event);
+
                         switch (type) {
                             case "response.output_item.done" -> {
                                 // deliver(event.getAsJsonObject("item"), seen, onMessage);

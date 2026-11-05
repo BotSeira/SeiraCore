@@ -251,6 +251,9 @@ public final class AgentEngine implements AutoCloseable {
                 for (var value : response.getAsJsonArray("output")) session.history.add(textHistory(value.getAsJsonObject()));
                 while (session.history.size() > 100) session.history.removeFirst();
 
+                agentLogger.info("Updated response id for {} : {} -> {}",
+                        id, session.previousId, response.get("id").getAsString()
+                );
                 session.previousId = response.get("id").getAsString();
 
                 input = new JsonArray();
@@ -273,6 +276,7 @@ public final class AgentEngine implements AutoCloseable {
             }
         } catch (Exception error) {
             session.previousId = null;
+            agentLogger.error("Agent conversation failed: {}", id, error);
             LOG.warn("Agent conversation failed: {}", id, error);
 
             try {

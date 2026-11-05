@@ -100,10 +100,11 @@ public final class HttpTools {
 
             var response = HTTP.send(request.build(), HttpResponse.BodyHandlers.ofString());
 
-            agentLogger.debug("Http tool returned status {}", response.statusCode());
+            agentLogger.debug("Http tool returned status {} body {}",
+                    response.statusCode(), response.body().substring(0, Math.min(response.body().length(), 250))
+            );
 
             if (response.statusCode() / 100 != 2) {
-                agentLogger.error("Http tool failed with body {}", response.body());
                 throw new IOException("HTTP tool failed");
             }
 
