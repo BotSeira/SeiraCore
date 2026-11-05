@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 public final class ResponsesClient {
+    private static final Logger agentLogger = LogManager.getLogger("AgentLogger");
     private final HttpClient CLIENT;
     private final URI endpoint;
     private final String apiKey;
@@ -50,8 +51,6 @@ public final class ResponsesClient {
             listener.accept(item);
         }
     }
-
-    private static final Logger agentLogger = LogManager.getLogger("AgentLogger");
 
     public JsonObject create(
             String previousId, String instructions, JsonArray input, JsonArray tools, Consumer<JsonObject> onMessage
@@ -88,6 +87,15 @@ public final class ResponsesClient {
             body.add("text", text);
         }
 
+        body.add("context_management", JsonParser.parseString("""
+                [
+                  {
+                    "type": "compaction",
+                    "compact_threshold": 800000
+                  }
+                ]
+                """));
+
         HttpRequest request = HttpRequest.newBuilder(endpoint).timeout(timeout)
                 .header("Authorization", "Bearer " + apiKey)
                 .header("Content-Type", "application/json")
@@ -107,7 +115,7 @@ public final class ResponsesClient {
         try (var stream = response.body()) {
             if (response.statusCode() / 100 != 2) {
                 String line = "";
-                try(var reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8));) {
+                try (var reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
                     line = reader.readLine();
                 } catch (IOException _) {
                 }
