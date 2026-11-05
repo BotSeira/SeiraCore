@@ -159,7 +159,7 @@ public final class ResponsesClient {
 
                         final JsonObject cpyEvent = event.deepCopy();
                         if (cpyEvent.has("response") && cpyEvent.get("response").isJsonObject()) {
-                            final JsonObject obj1 = cpy.get("response").getAsJsonObject();
+                            final JsonObject obj1 = cpyEvent.get("response").getAsJsonObject();
                             if (obj1.has("instructions") && obj1.get("instructions").isJsonPrimitive()) {
                                 obj1.remove("instructions");
                                 obj1.addProperty("instructions", "...");
