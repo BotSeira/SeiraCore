@@ -22,6 +22,7 @@ import java.util.function.Supplier;
 
 public final class AgentEngine implements AutoCloseable {
     private static final Logger LOG = LogManager.getLogger(AgentEngine.class);
+    private static final Logger agentLogger = LogManager.getLogger("AgentLogger");
     private final Map<String, Session> sessions = new HashMap<>();
     private final ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor();
     private final ResponsesClient client;
@@ -83,6 +84,56 @@ public final class AgentEngine implements AutoCloseable {
 
     private static boolean isImageFilename(String name) {
         return name != null && name.toLowerCase(Locale.ROOT).matches(".*\\.(png|jpe?g|webp|gif)$");
+    }
+
+    private static void enrichUsers(JsonObject metadata, Message message, Map<String, String> participants,
+                                    Map<String, String> names) {
+        var related = new LinkedHashSet<String>();
+        related.add(message.senderId());
+
+        var matcher = java.util.regex.Pattern.compile("<@([A-Za-z0-9_-]+)>")
+                .matcher(message.text() == null ? "" : message.text());
+        StringBuilder normalized = new StringBuilder();
+        while (matcher.find()) {
+            String openId = matcher.group(1);
+            related.add(openId);
+            String alias = participants.computeIfAbsent(openId, ignored -> "u" + (participants.size() + 1));
+            matcher.appendReplacement(normalized, "[[at:" + alias + "]]");
+        }
+        matcher.appendTail(normalized);
+        metadata.addProperty("text", normalized.toString());
+
+        var users = new JsonArray();
+        for (String openId : related) {
+            var user = new JsonObject();
+            user.addProperty("id", participants.get(openId));
+            user.addProperty("nickname", openId.equals(message.senderId()) ? message.senderName() : names.get(openId));
+            Long uid = UserDataStore.findBoundUid(openId);
+            user.addProperty("osu_uid", uid);
+            user.addProperty("osu_username", uid == null ? null : UserDataStore.findUsername(uid).orElse(null));
+            users.add(user);
+        }
+        metadata.add("users", users);
+    }
+
+    private static JsonObject textHistory(JsonObject item) {
+        var result = new JsonObject();
+        String role = item.has("role") ? item.get("role").getAsString() : "user";
+        result.addProperty("role", role.equals("assistant") ? "assistant" : "user");
+        StringBuilder text = new StringBuilder();
+        if (item.has("content")) {
+            if (item.get("content").isJsonArray()) {
+                for (var part : item.getAsJsonArray("content")) {
+                    var content = part.getAsJsonObject();
+                    if (content.has("text")) text.append(content.get("text").getAsString()).append('\n');
+                    else if (content.has("image_url")) text.append("[历史图片已省略]\n");
+                }
+            } else text.append(item.get("content").getAsString());
+        } else if (item.has("type") && item.get("type").getAsString().startsWith("function_call")) {
+            text.append("[工具执行记录，仅供上下文参考] ").append(item);
+        } else text.append("[非文本输出已省略]");
+        result.addProperty("content", text.substring(0, Math.min(text.length(), 8192)));
+        return result;
     }
 
     public synchronized void accept(String conversationId, Message message) {
@@ -165,8 +216,6 @@ public final class AgentEngine implements AutoCloseable {
         return true;
     }
 
-    private static final Logger agentLogger = LogManager.getLogger("AgentLogger");
-
     private void run(String id, Session session) {
         LOG.info("Running session in conversation: {}", id);
         JsonArray input = new JsonArray();
@@ -205,20 +254,9 @@ public final class AgentEngine implements AutoCloseable {
 
                 store.clear(id);
 
-                Consumer<JsonObject> listener = item -> {
-                            StringBuilder text = new StringBuilder();
-                            for (var part : item.getAsJsonArray("content")) {
-                                JsonObject content = part.getAsJsonObject();
-                                if (content.has("text")) {
-                                    text.append(content.get("text").getAsString());
-                                } else if (content.has("refusal")) {
-                                    text.append(content.get("refusal").getAsString());
-                                }
-                            }
-                            if (!text.isEmpty())
-                                destination.accept(renderMentions(text.toString(), session.participants,
-                                        uid -> UserDataStore.findGroupOpenIdByUid(id, uid)));
-                        };
+                Consumer<String> listener = text -> destination.accept(
+                        renderMentions(text, session.participants,
+                                uid -> UserDataStore.findGroupOpenIdByUid(id, uid)));
                 JsonObject response;
                 JsonArray requestInput = input;
                 if (session.previousId == null && !session.history.isEmpty()) {
@@ -242,13 +280,15 @@ public final class AgentEngine implements AutoCloseable {
                     notice.addProperty("role", "user");
                     notice.addProperty("content", "[系统恢复提示：旧图片已不可用，历史仅保留文字；请说明此限制。已执行的工具不要重复执行。]");
                     rebuilt.add(notice);
-                    for (var value : input) rebuilt.add(value.getAsJsonObject().has("role")
-                            ? value : textHistory(value.getAsJsonObject()));
+                    for (var value : input)
+                        rebuilt.add(value.getAsJsonObject().has("role")
+                                ? value : textHistory(value.getAsJsonObject()));
                     response = client.create(null, instructions.get(), rebuilt,
                             ToolRegistry.definitions(snapshot), listener);
                 }
                 for (var value : input) session.history.add(textHistory(value.getAsJsonObject()));
-                for (var value : response.getAsJsonArray("output")) session.history.add(textHistory(value.getAsJsonObject()));
+                for (var value : response.getAsJsonArray("output"))
+                    session.history.add(textHistory(value.getAsJsonObject()));
                 while (session.history.size() > 100) session.history.removeFirst();
 
                 agentLogger.info("Updated response id for {} : {} -> {}",
@@ -369,56 +409,6 @@ public final class AgentEngine implements AutoCloseable {
             item.add("content", content);
             return item;
         }
-    }
-
-    private static void enrichUsers(JsonObject metadata, Message message, Map<String, String> participants,
-                                    Map<String, String> names) {
-        var related = new LinkedHashSet<String>();
-        related.add(message.senderId());
-
-        var matcher = java.util.regex.Pattern.compile("<@([A-Za-z0-9_-]+)>")
-                .matcher(message.text() == null ? "" : message.text());
-        StringBuilder normalized = new StringBuilder();
-        while (matcher.find()) {
-            String openId = matcher.group(1);
-            related.add(openId);
-            String alias = participants.computeIfAbsent(openId, ignored -> "u" + (participants.size() + 1));
-            matcher.appendReplacement(normalized, "[[at:" + alias + "]]");
-        }
-        matcher.appendTail(normalized);
-        metadata.addProperty("text", normalized.toString());
-
-        var users = new JsonArray();
-        for (String openId : related) {
-            var user = new JsonObject();
-            user.addProperty("id", participants.get(openId));
-            user.addProperty("nickname", openId.equals(message.senderId()) ? message.senderName() : names.get(openId));
-            Long uid = UserDataStore.findBoundUid(openId);
-            user.addProperty("osu_uid", uid);
-            user.addProperty("osu_username", uid == null ? null : UserDataStore.findUsername(uid).orElse(null));
-            users.add(user);
-        }
-        metadata.add("users", users);
-    }
-
-    private static JsonObject textHistory(JsonObject item) {
-        var result = new JsonObject();
-        String role = item.has("role") ? item.get("role").getAsString() : "user";
-        result.addProperty("role", role.equals("assistant") ? "assistant" : "user");
-        StringBuilder text = new StringBuilder();
-        if (item.has("content")) {
-            if (item.get("content").isJsonArray()) {
-                for (var part : item.getAsJsonArray("content")) {
-                    var content = part.getAsJsonObject();
-                    if (content.has("text")) text.append(content.get("text").getAsString()).append('\n');
-                    else if (content.has("image_url")) text.append("[历史图片已省略]\n");
-                }
-            } else text.append(item.get("content").getAsString());
-        } else if (item.has("type") && item.get("type").getAsString().startsWith("function_call")) {
-            text.append("[工具执行记录，仅供上下文参考] ").append(item);
-        } else text.append("[非文本输出已省略]");
-        result.addProperty("content", text.substring(0, Math.min(text.length(), 8192)));
-        return result;
     }
 
     private static final class Session {

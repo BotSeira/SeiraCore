@@ -19,7 +19,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.HashSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -46,14 +45,8 @@ public final class ResponsesClient {
         this.CLIENT = HttpClient.newBuilder().connectTimeout(timeout).proxy(proxySelector).build();
     }
 
-    private static void deliver(JsonObject item, HashSet<String> seen, Consumer<JsonObject> listener) {
-        if ("message".equals(item.get("type").getAsString()) && seen.add(item.get("id").getAsString())) {
-            listener.accept(item);
-        }
-    }
-
     public JsonObject create(
-            String previousId, String instructions, JsonArray input, JsonArray tools, Consumer<JsonObject> onMessage
+            String previousId, String instructions, JsonArray input, JsonArray tools, Consumer<String> onMessage
     ) throws Exception {
         JsonObject body = new JsonObject();
         body.addProperty("model", model);
@@ -133,7 +126,7 @@ public final class ResponsesClient {
             });
 
             try {
-                var seen = new HashSet<String>();
+                var messages = new MessageBuffer(onMessage);
                 var reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8));
                 StringBuilder data = new StringBuilder();
                 String line;
@@ -154,15 +147,11 @@ public final class ResponsesClient {
                         agentLogger.debug("Receiving event {}", event);
 
                         switch (type) {
-                            case "response.output_item.done" -> {
-                                // deliver(event.getAsJsonObject("item"), seen, onMessage);
-                            }
+                            case "response.output_text.delta", "response.refusal.delta" ->
+                                    messages.append(event.get("delta").getAsString());
                             case "response.completed" -> {
-                                JsonObject result = event.getAsJsonObject("response");
-                                for (var item : result.getAsJsonArray("output")) {
-                                    deliver(item.getAsJsonObject(), seen, onMessage);
-                                }
-                                return result;
+                                messages.finish();
+                                return event.getAsJsonObject("response");
                             }
                             case "response.failed", "response.incomplete", "error" ->
                                     throw new IOException("Responses request did not complete: " + type);
@@ -174,6 +163,31 @@ public final class ResponsesClient {
             } finally {
                 finished.set(true);
             }
+        }
+    }
+
+    static final class MessageBuffer {
+        private static final String SEPARATOR = "\n\n---\n\n";
+        private final StringBuilder pending = new StringBuilder();
+        private final Consumer<String> send;
+
+        MessageBuffer(Consumer<String> send) {
+            this.send = send;
+        }
+
+        void append(String delta) {
+            pending.append(delta);
+            int boundary;
+            while ((boundary = pending.indexOf(SEPARATOR)) >= 0) {
+                String message = pending.substring(0, boundary);
+                if (!message.isBlank()) send.accept(message);
+                pending.delete(0, boundary + SEPARATOR.length());
+            }
+        }
+
+        void finish() {
+            if (!pending.toString().isBlank()) send.accept(pending.toString());
+            pending.setLength(0);
         }
     }
 }
