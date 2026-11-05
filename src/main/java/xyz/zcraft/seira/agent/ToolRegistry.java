@@ -175,8 +175,9 @@ public final class ToolRegistry implements AutoCloseable {
         try {
             agentLogger.debug("Calling tool with {}", call);
             
-            Tool tool = snapshot.get(call.get("name").getAsString());
-            if (tool == null || !permits(tool, context)) throw new IllegalArgumentException("Tool not found, not loaded or not permitted.");
+            String name = call.get("name").getAsString();
+            Tool tool = snapshot.getOrDefault(name, tools.get(name));
+            if (tool == null || !permits(tool, context)) throw new IllegalArgumentException("Tool not found or not permitted.");
 
             JsonObject arguments = JsonParser.parseString(call.get("arguments").getAsString()).getAsJsonObject();
             ToolArguments.validate(tool.parameters(), arguments);
