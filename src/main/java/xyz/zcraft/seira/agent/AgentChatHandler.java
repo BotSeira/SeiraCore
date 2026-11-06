@@ -182,11 +182,11 @@ public final class AgentChatHandler implements AutoCloseable {
                               String text, List<Attachment> attachments, List<MsgElem> elements) {
         if (groupId == null || senderId == null || !enabled(groupId)) return;
 
-        var att = collectAttachments(attachments, elements);
-        if ((text == null || text.isBlank()) && att.isEmpty()) return;
+//        var att = collectAttachments(attachments, elements);
+        if (text == null || text.isBlank()) return;
 
         engine.accept(groupId, new AgentEngine.Message(messageId, senderId, nickname,
-                text, att, System.currentTimeMillis(), null));
+                text, List.of(), System.currentTimeMillis(), null));
     }
 
     public void rememberNames(String groupId, java.util.Map<String, String> names) {
