@@ -300,7 +300,7 @@ public final class AgentEngine implements AutoCloseable {
                             sessionUuid
                     );
                 } catch (IOException error) {
-                    agentLogger.error("Error creating response", error);
+                    agentLogger.error("Session {} error creating response", sessionUuid, error);
                     String detail = error.getMessage();
                     boolean missing = error instanceof ResponsesClient.ResponseException failure
                             && failure.previousResponseMissing();
@@ -313,7 +313,7 @@ public final class AgentEngine implements AutoCloseable {
                     recovered = true;
                     session.previousId = null;
                     var rebuilt = rebuildInput(baseHistory, transcript, input);
-                    agentLogger.warn("Rebuilding missing or expired response chain for {}", id);
+                    agentLogger.warn("Session {} rebuilding missing or expired response chain for {}", sessionUuid, id);
                     response = client.create(null, instructions.get(), rebuilt,
                             ToolRegistry.definitions(snapshot), listener, sessionUuid);
                 }
@@ -372,7 +372,7 @@ public final class AgentEngine implements AutoCloseable {
             LOG.warn("Agent conversation failed: {}", id, error);
 
             try {
-                reply.accept("本次对话出现错误未能完成，请重新发送请求喵。");
+                reply.accept("本次对话出现错误未能完成，请重新发送请求喵。\n>" + error.getMessage());
             } catch (RuntimeException ignored) {
             }
         } finally {
