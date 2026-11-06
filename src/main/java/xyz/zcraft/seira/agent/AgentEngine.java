@@ -1,5 +1,6 @@
 package xyz.zcraft.seira.agent;
 
+import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import org.apache.logging.log4j.LogManager;
@@ -23,7 +24,9 @@ import java.util.function.Supplier;
 
 public final class AgentEngine implements AutoCloseable {
     private static final Logger LOG = LogManager.getLogger(AgentEngine.class);
+    private static final Logger requestLogger = LogManager.getLogger("AgentRequestsLogger");
     private static final Logger agentLogger = LogManager.getLogger("AgentLogger");
+    private static final Gson GSON = new Gson();
     private final Map<String, Session> sessions = new HashMap<>();
     private final ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor();
     private final ResponsesClient client;
@@ -241,7 +244,9 @@ public final class AgentEngine implements AutoCloseable {
         var executed = new HashMap<String, JsonObject>();
         Set<String> authors = new HashSet<>();
 
-        agentLogger.debug("Running session with msg {} and user {}", session.inbox, session.participants);
+        final UUID sessionUuid = UUID.randomUUID();
+        agentLogger.debug("Running session with id {} {}", id, sessionUuid);
+        requestLogger.debug("SESSION {} {}", sessionUuid, GSON.toJsonTree(session));
         try {
             while (!Thread.currentThread().isInterrupted()) {
                 synchronized (this) {
@@ -291,9 +296,11 @@ public final class AgentEngine implements AutoCloseable {
                             instructions.get(),
                             requestInput,
                             ToolRegistry.definitions(snapshot),
-                            listener
+                            listener,
+                            sessionUuid
                     );
                 } catch (IOException error) {
+                    agentLogger.error("Error creating response", error);
                     String detail = error.getMessage();
                     boolean missing = error instanceof ResponsesClient.ResponseException failure
                             && failure.previousResponseMissing();
@@ -308,7 +315,7 @@ public final class AgentEngine implements AutoCloseable {
                     var rebuilt = rebuildInput(baseHistory, transcript, input);
                     agentLogger.warn("Rebuilding missing or expired response chain for {}", id);
                     response = client.create(null, instructions.get(), rebuilt,
-                            ToolRegistry.definitions(snapshot), listener);
+                            ToolRegistry.definitions(snapshot), listener, sessionUuid);
                 }
                 transcript.addAll(input.deepCopy());
                 for (var value : response.getAsJsonArray("output")) {
@@ -323,6 +330,8 @@ public final class AgentEngine implements AutoCloseable {
                     session.history.add(textHistory(value.getAsJsonObject()));
                 while (session.history.size() > 100) session.history.removeFirst();
 
+                requestLogger.debug("SESSION {} RESPONSE {}", sessionUuid, response);
+                agentLogger.info("Session {} ended for {}", sessionUuid, id);
                 agentLogger.info("Updated response id for {} : {} -> {}",
                         id, session.previousId, response.get("id").getAsString()
                 );
@@ -339,7 +348,7 @@ public final class AgentEngine implements AutoCloseable {
                         String callId = call.get("call_id").getAsString();
                         JsonObject result = executed.get(callId);
                         if (result == null) {
-                            result = tools.execute(call, snapshot, context);
+                            result = tools.execute(call, snapshot, context, sessionUuid);
                             executed.put(callId, result);
                         }
                         input.add(result);
@@ -359,7 +368,7 @@ public final class AgentEngine implements AutoCloseable {
             }
         } catch (Exception error) {
             session.previousId = null;
-            agentLogger.error("Agent conversation failed: {}", id, error);
+            agentLogger.error("Agent conversation failed: {} {}", id, sessionUuid, error);
             LOG.warn("Agent conversation failed: {}", id, error);
 
             try {

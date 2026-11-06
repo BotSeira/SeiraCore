@@ -43,6 +43,9 @@
         <File name="AGENT_FILE" fileName="logs/agent.log">
             <PatternLayout pattern="${FILE_PATTERN}"/>
         </File>
+        <File name="AGENT_REQUESTS" fileName="logs/agent-requests.log">
+            <PatternLayout pattern="${FILE_PATTERN}"/>
+        </File>
     </Appenders>
     <Loggers>
         <Logger name="io.javalin" level="INFO" additivity="false">
@@ -61,6 +64,9 @@
 
         <Logger name="AgentLogger" level="debug" additivity="false">
             <AppenderRef ref="AGENT_FILE"/>
+        </Logger>
+        <Logger name="AgentRequestsLogger" level="debug" additivity="false">
+            <AppenderRef ref="AGENT_REQUESTS"/>
         </Logger>
     </Loggers>
 </Configuration>

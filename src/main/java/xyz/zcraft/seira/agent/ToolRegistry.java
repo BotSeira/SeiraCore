@@ -11,6 +11,8 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 public final class ToolRegistry implements AutoCloseable {
+    private static final Logger requestLogger = LogManager.getLogger("AgentRequestsLogger");
+    private static final Logger agentLogger = LogManager.getLogger("AgentLogger");
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
     private final Predicate<String> administrator;
     private final Predicate<String> conversationAllowed;
@@ -161,9 +163,7 @@ public final class ToolRegistry implements AutoCloseable {
         return Collections.unmodifiableMap(result);
     }
 
-    private static final Logger agentLogger = LogManager.getLogger("AgentLogger");
-
-    public JsonObject execute(JsonObject call, Map<String, Tool> snapshot, Context context) {
+    public JsonObject execute(JsonObject call, Map<String, Tool> snapshot, Context context, UUID sessionUuid) {
         var output = new JsonObject();
         output.addProperty("type", "function_call_output");
         output.addProperty("call_id", call.get("call_id").getAsString());
@@ -172,16 +172,20 @@ public final class ToolRegistry implements AutoCloseable {
         long started = System.nanoTime();
         Future<JsonElement> task = null;
 
+        final UUID uuid = UUID.randomUUID();
+
         try {
-            agentLogger.debug("Calling tool with {}", call);
-            
+            requestLogger.debug("SESSION {} TOOL_CALL {} {}", sessionUuid, uuid, call);
+            agentLogger.debug("Session {} calling tool {}", sessionUuid, uuid);
+
             String name = call.get("name").getAsString();
             Tool tool = snapshot.getOrDefault(name, tools.get(name));
-            if (tool == null || !permits(tool, context)) throw new IllegalArgumentException("Tool not found or not permitted.");
+            if (tool == null || !permits(tool, context))
+                throw new IllegalArgumentException("Tool not found or not permitted.");
 
             JsonObject arguments = JsonParser.parseString(call.get("arguments").getAsString()).getAsJsonObject();
             ToolArguments.validate(tool.parameters(), arguments);
-            
+
             if (tool.requiresConfirmation() && !confirm(tool, arguments, context)) {
                 output.addProperty("output", error("CONFIRMATION_DENIED").toString());
                 return output;
@@ -206,6 +210,8 @@ public final class ToolRegistry implements AutoCloseable {
         } finally {
             if (task != null && !task.isDone()) task.cancel(true);
         }
+
+        requestLogger.debug("SESSION {} TOOL_CALL {} RESULT {}", sessionUuid, uuid, result);
 
         output.addProperty("output", result.toString());
         org.apache.logging.log4j.LogManager.getLogger(ToolRegistry.class).info(

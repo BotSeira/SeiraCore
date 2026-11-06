@@ -19,12 +19,14 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 public final class ResponsesClient {
+    private static final Logger requestLogger = LogManager.getLogger("AgentRequestsLogger");
     private static final Logger agentLogger = LogManager.getLogger("AgentLogger");
     private final HttpClient CLIENT;
     private final URI endpoint;
@@ -46,7 +48,7 @@ public final class ResponsesClient {
     }
 
     public JsonObject create(
-            String previousId, String instructions, JsonArray input, JsonArray tools, Consumer<String> onMessage
+            String previousId, String instructions, JsonArray input, JsonArray tools, Consumer<String> onMessage, UUID sessionUuid
     ) throws Exception {
         JsonObject body = new JsonObject();
         body.addProperty("model", model);
@@ -89,12 +91,14 @@ public final class ResponsesClient {
                 ]
                 """));
 
+        UUID requestUuid = UUID.randomUUID();
         final JsonObject cpy = body.deepCopy();
         if (cpy.has("instructions") && cpy.get("instructions").isJsonPrimitive()) {
             cpy.remove("instructions");
             cpy.addProperty("instructions", "...");
         }
-        agentLogger.debug("Sending request: {}", cpy);
+        agentLogger.debug("Session {} sending request {}", sessionUuid, requestUuid);
+        requestLogger.debug("SESSION {} REQUEST {} {}", sessionUuid, requestUuid, cpy);
 
         HttpRequest request = HttpRequest.newBuilder(endpoint).timeout(timeout)
                 .header("Authorization", "Bearer " + apiKey)
@@ -165,7 +169,9 @@ public final class ResponsesClient {
                                 obj1.addProperty("instructions", "...");
                             }
                         }
-                        agentLogger.debug("Receiving event {}", cpyEvent);
+
+                        requestLogger.debug("SESSION {} REQUEST {} EVENT {}", sessionUuid, requestUuid, cpyEvent);
+                        agentLogger.debug("Session {} receiving event {}", sessionUuid, requestUuid);
 
                         switch (type) {
                             case "response.output_text.delta", "response.refusal.delta" ->
