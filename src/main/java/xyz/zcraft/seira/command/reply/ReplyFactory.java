@@ -5,19 +5,21 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import org.jetbrains.annotations.NotNull;
 import xyz.zcraft.osu.model.*;
+import xyz.zcraft.osu.model.multiplayer.Room;
 import xyz.zcraft.seira.api.AsteroidApi;
 import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.bot.data.Button;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
+import xyz.zcraft.seira.command.InteractionHandler;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.BindingConfig;
 import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.db.RankGuessRecordStore;
 import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.rankguess.data.*;
-import xyz.zcraft.seira.services.BindingService;
+import xyz.zcraft.seira.services.BindService;
 import xyz.zcraft.seira.services.BotStat;
 import xyz.zcraft.seira.services.DailyLuck;
 import xyz.zcraft.seira.util.VersionInfo;
@@ -32,13 +34,11 @@ import static xyz.zcraft.seira.command.reply.ReplyFactory.ExternalUrls.*;
 
 public final class ReplyFactory {
     private final Supplier<AppConfig> configSupplier;
+    private final InteractionHandler interactionHandler;
 
-    public ReplyFactory(AppConfig config) {
-        this(() -> config);
-    }
-
-    public ReplyFactory(Supplier<AppConfig> configSupplier) {
+    public ReplyFactory(Supplier<AppConfig> configSupplier, InteractionHandler interactionHandler) {
         this.configSupplier = Objects.requireNonNull(configSupplier);
+        this.interactionHandler = interactionHandler;
     }
 
     public static String cmd(String command, String text) {
@@ -260,9 +260,8 @@ public final class ReplyFactory {
 
     public PendingMessage rsMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                at(ctx) + "最近成绩查询完成\n" +
-                        "> 玩家: " + u(response.getUserId()) + "\n" +
-                        "> 数量: " + response.getScoreIds().size(),
+                at(ctx) + "查询完成，共" + response.getScoreIds().size() + "个成绩\n" +
+                        "> 玩家: " + u(response.getUserId()),
                 buttons().rsButtons()
         );
     }
@@ -277,7 +276,7 @@ public final class ReplyFactory {
 
     public PendingMessage tbMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                at(ctx) + "近日BP查询完成\n" +
+                at(ctx) + "近日BP\n" +
                         "> 玩家: " + u(response.getUserId()) + "\n" +
                         "> 数量: " + response.getScoreIds().size(),
                 buttons().bpButtons(response.getUserId())
@@ -286,8 +285,7 @@ public final class ReplyFactory {
 
     public PendingMessage beatmapMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                at(ctx) + "谱面查询完成\n" +
-                        "> 谱面: " + m(response.getBeatmapId()) + "\n" +
+                at(ctx) + "谱面" + m(response.getBeatmapId()) + "\n" +
                         "> 谱面集: " + ms(response.getBeatmapsetId()),
                 buttons().beatmapButtons(response.getBeatmapId())
         );
@@ -330,7 +328,7 @@ public final class ReplyFactory {
     public PendingMessage replayStatMessage(Context ctx, String jobId, RenderStat renderStat) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.replayStatContent(ctx, renderStat, jobId),
-                buttons().replayProgressButtons(jobId, isCancelableReplayStatus(renderStat.getStatus()), ctx.senderUserId())
+                buttons().replayProgressButtons(jobId, "done".equalsIgnoreCase(renderStat.getStatus()), isCancelableReplayStatus(renderStat.getStatus()), ctx.senderUserId())
         );
     }
 
@@ -358,7 +356,7 @@ public final class ReplyFactory {
         );
     }
 
-    public PendingMessage bindMessage(Context ctx, BindingConfig config, BindingService.BindingTask task, boolean isC2C) {
+    public PendingMessage bindMessage(Context ctx, BindingConfig config, BindService.BindingTask task, boolean isC2C) {
         final String url = "https://osu.ppy.sh/oauth/authorize?client_id=%d&response_type=code&scope=public+identify+friends.read&state=%s"
                 .formatted(config.clientId(), task.taskId());
         return PendingMessage.ofMarkdownRaw(
@@ -367,7 +365,7 @@ public final class ReplyFactory {
         );
     }
 
-    public PendingMessage mpMessage(Context ctx, Response<MultiplayerRoom> response) {
+    public PendingMessage mpMessage(Context ctx, Response<Room> response) {
         return PendingMessage.ofMarkdownRaw(
                 Contents.mpContent(ctx, response.getContent()),
                 buttons().mpButtons(response.getContent())
@@ -425,6 +423,15 @@ public final class ReplyFactory {
                 Contents.scoreMissesContent(ctx, scoreMissesResponse),
                 null
         );
+    }
+
+    public PendingMessage replayClipMessage(Context ctx, String scoreId, String position) {
+        return PendingMessage.ofMarkdownRaw(at(ctx) + "\n > 回放动图：" + position + "\n> 成绩 " + s(scoreId));
+    }
+
+    public PendingMessage snapshotImageMessage(Context ctx, String scoreId, String position) {
+        return PendingMessage.ofMarkdownRaw(at(ctx) + "\n > 回放快照：" + position + "\n> 成绩 " + s(scoreId)
+                + "\n> " + cmd("/ma " + scoreId, "查看 Miss 列表"));
     }
 
     public PendingMessage statusMessage(Context ctx, OstellaApi.ServerStatus status, AsteroidApi.ServerStatus asteroid) {
@@ -699,12 +706,12 @@ public final class ReplyFactory {
             return cmd("/u " + u.getId(), "[" + (u.isOnline() ? "▶" : "") + u.getUsername() + "]");
         }
 
-        public static String mpContent(Context ctx, MultiplayerRoom content) {
+        public static String mpContent(Context ctx, Room content) {
             String sb = at(ctx) + "进行中的多人游戏" + "\n" +
                     "> 房间名: " + content.getName() + "\n" +
                     "> 人数: " + content.getParticipantCount() + "\n" +
                     "> ID: " + content.getId() + "\n";
-            final MultiplayerRoom.CurrentPlaylistItem cur = content.getCurrentPlaylistItem();
+            final Room.PlaylistItem cur = content.getCurrentPlaylistItem();
             if (cur != null) {
                 sb += "> 当前: " + "%s - %s - %s [%.2f★ %s]".formatted(
                         m(cur.getBeatmapId()),
@@ -786,7 +793,12 @@ public final class ReplyFactory {
                     > /m - 获取谱面
                     > /r - 生成成绩高光视频或指定片段
                     > /rg - 猜 Rank 游戏
+                    > /whatif - 估算总 PP 与全球排名的对应关系
+                    > /addpp - 估算新增成绩后的总 PP 与排名变化
+                    > /rep - 生成指定时刻周围的 GIF，范围最多 6 秒
+                    > /snap - 生成指定时间、物件或 Miss 的回放快照
                     > /watch - 监视群友的新成绩
+                    > /gch - 群挑战，自选难度，按水平调整成绩
                     > /mpw <MPLink> - 监视多人房间的逐图结果
                     > /f - 获取好友列表
                     
@@ -809,6 +821,13 @@ public final class ReplyFactory {
             return at(ctx) + "部分指令示例\n" +
                     "> 注意：所有指令中的@均需要开启权限才能正常读取。权限配置见 [这里]( " + PERMISSION + " )~\n" + """
                     > /rp -> 查看最近通过的一个成绩
+                    > /whatif 12345pp -> 估算总 PP 对应的全球排名
+                    > /addpp [user] 200*4 -> 估算新增4条200pp成绩后的总 PP 与排名
+                    > /addpp [user] m1234567 HDDT 98% FC -> 估算指定谱面成绩加入 BP 后的变化
+                    > /addpp [user] rp2 HD 98% -> 用第2条最近通过成绩的谱面估算 PP
+                    > /snap rp1 01:23.456 -> 最近通过成绩在指定歌曲时间的快照
+                    > /snap #3 -50ms -> 最近查询成绩的第3个Miss前50ms的快照
+                    > /whatif #12345 -> 估算全球排名所需的总 PP（纯数字也按排名解析）
                     > /rp1-20 -> 查看最近通过的1到20个成绩
                     > /bp1-20 -> 查看20个最佳成绩
                     > /bp1-20 @peppy acc>95 -> 查看指定玩家BP1-20中准确率大于95%的成绩
@@ -816,8 +835,13 @@ public final class ReplyFactory {
                     > /tb #7 @peppy -> 查看指定玩家近7天的新BP
                     > /@peppy -> 查看指定玩家的基本信息
                     > /rg group -> 开始群组猜 Rank 游戏
+                    > /gch start 12345 24 -> 开始24小时的自选难度群挑战
+                    > /gch join -> 加入本群挑战
                     > /m @peppy rp2 -> 查看指定玩家最近第2条成绩的谱面
                     > /dl mp -> 获取所在lazer多人房间当前谱面的镜像下载链接
+                    > /m mp123456 -> 查询指定lazer多人房间的当前谱面
+                    > /dl mp123456 -> 下载指定lazer多人房间当前谱面的谱面集
+                    > /s mp123456 -> 查询自己在该房间当前谱面的成绩
                     > /r rp -> 渲染最近通过的成绩的高光片段回放视频
                     > /r @peppy bp2 90- -> 渲染指定玩家BP2从1:30开始的回放视频
                     > /mpw <mplink> -> 开始多人房间监视
@@ -960,7 +984,10 @@ public final class ReplyFactory {
 
             row.addAll(List.of(prev, center, next));
 
-            return Button.keyboard(row);
+            final Button repButton = Button.command(4, "查看动图", "/rep " + scoreId + " #" + index);
+            return Button.keyboard(row, List.of(
+                    repButton
+            ));
         }
 
         List<List<Button>> beatmapsetButtons(String beatmapsetId) {
@@ -976,7 +1003,7 @@ public final class ReplyFactory {
             );
         }
 
-        List<List<Button>> mpButtons(MultiplayerRoom room) {
+        List<List<Button>> mpButtons(Room room) {
             List<List<Button>> rows = new ArrayList<>();
 
             rows.add(Button.row(
@@ -986,7 +1013,7 @@ public final class ReplyFactory {
             ));
 
             Optional.ofNullable(room.getCurrentPlaylistItem())
-                    .map(MultiplayerRoom.CurrentPlaylistItem::getBeatmap)
+                    .map(Room.PlaylistItem::getBeatmap)
                     .map(Beatmap::getBeatmapsetId)
                     .map(String::valueOf)
                     .ifPresent(id -> {
@@ -1034,7 +1061,8 @@ public final class ReplyFactory {
         }
 
         List<List<Button>> bpButtons(String userId) {
-            return Button.keyboard(
+            return null;
+            /* return Button.keyboard(
                     Button.row(
                             Button.command(1, "查询最好成绩", "/s bo1"),
                             Button.command(2, "查询最近成绩", "/s rs1")
@@ -1042,11 +1070,12 @@ public final class ReplyFactory {
                     Button.row(
                             Button.openUrl(3, "在游戏中查看", directUrl + "/u/" + userId)
                     )
-            );
+            ); */
         }
 
         List<List<Button>> userInfoButtons(String userId) {
-            return Button.keyboard(
+            return null;
+            /* return Button.keyboard(
                     Button.row(
                             Button.command(1, "查询最好成绩", "/bo 5 " + userId),
                             Button.command(2, "查询最近成绩", "/rs 5 " + userId)
@@ -1054,14 +1083,15 @@ public final class ReplyFactory {
                     Button.row(
                             Button.openUrl(3, "在游戏中查看", directUrl + "/u/" + userId)
                     )
-            );
+            ); */
         }
 
         List<List<Button>> rsButtons() {
-            return Button.keyboard(Button.row(
-                    Button.command(1, "查询最好成绩", "/s bo1"),
-                    Button.command(2, "查询最近成绩", "/s rs1")
-            ));
+            return null;
+            // return Button.keyboard(Button.row(
+            //        Button.command(1, "查询最好成绩", "/s bo1"),
+            //        Button.command(2, "查询最近成绩", "/s rs1")
+            // ));
         }
 
         List<List<Button>> sButtons(String beatmapId, String scoreId) {
@@ -1070,15 +1100,15 @@ public final class ReplyFactory {
             }
 
             return Button.keyboard(
-                    Button.row(
+                    /* Button.row(
                             Button.openUrl(1, "查看谱面", directUrl + "/b/" + beatmapId),
                             Button.command(2, "查询谱面", "/m " + beatmapId),
                             Button.command(3, "查询谱面集", "/ms m" + beatmapId)
-                    ),
+                    ), */
                     Button.row(
-                            Button.command(4, "成绩分析", "/sa " + scoreId),
-                            Button.command(5, "查询排行", "/lb " + beatmapId),
-                            Button.command(6, "渲染高光", "/r " + scoreId)
+                            Button.command(4, "成绩分析", "/sa " + scoreId)
+                            // , Button.command(5, "查询排行", "/lb " + beatmapId)
+                            , Button.command(6, "渲染高光", "/r " + scoreId)
                     )
             );
         }
@@ -1089,14 +1119,14 @@ public final class ReplyFactory {
             }
 
             return Button.keyboard(
-                    Button.row(
+                    /* Button.row(
                             Button.openUrl(1, "查看谱面", directUrl + "/b/" + beatmapId),
                             Button.command(2, "查询谱面", "/m " + beatmapId),
                             Button.command(3, "查询谱面集", "/ms m" + beatmapId)
-                    ),
+                    ), */
                     Button.row(
-                            Button.command(4, "Misses", "/ma " + scoreId),
-                            Button.command(5, "查询排行", "/lb " + beatmapId),
+                            Button.command(4, "Miss分析", "/ma " + scoreId),
+                            // Button.command(5, "查询排行", "/lb " + beatmapId),
                             Button.command(6, "渲染高光", "/r " + scoreId)
                     )
             );
@@ -1113,22 +1143,26 @@ public final class ReplyFactory {
         }
 
         List<List<Button>> replayProgressButtons(String jobId, String userId) {
-            return replayProgressButtons(jobId, true, userId);
+            return replayProgressButtons(jobId, false, true, userId);
         }
 
-        List<List<Button>> replayProgressButtons(String jobId, boolean cancelable, String userId) {
+        List<List<Button>> replayProgressButtons(String jobId, boolean gettable, boolean cancelable, String userId) {
             if (jobId == null || jobId.isBlank()) {
                 return null;
             }
 
-            return Button.keyboard(cancelable
-                    ? Button.row(
-                    Button.command(1, "查询渲染进度", "/rstat " + jobId),
-                    Button.command(2, "取消渲染", "/rcancel " + jobId)
-                            .permit(userId)
-                            .modal("确定要取消渲染吗")
-            )
-                    : Button.row(Button.command(1, "查询渲染进度", "/rstat " + jobId)));
+            if (gettable) {
+                return Button.keyboard(Button.command(1, "获取回放", "/rget " + jobId));
+            } else if (cancelable) {
+                return Button.keyboard(
+                        Button.command(1, "查询渲染进度", "/rstat " + jobId),
+                        Button.command(2, "取消渲染", "/rcancel " + jobId)
+                                .permit(userId)
+                                .modal("确定要取消渲染吗")
+                );
+            } else {
+                return Button.keyboard(Button.command(1, "查询渲染进度", "/rstat " + jobId));
+            }
         }
 
         List<List<Button>> beatmapButtons(String beatmapId) {
@@ -1138,17 +1172,19 @@ public final class ReplyFactory {
 
             return Button.keyboard(
                     Button.row(
-                            Button.command(1, "查询排行榜", "/lb " + beatmapId),
-                            Button.openUrl(2, "在游戏中查看", directUrl + "/b/" + beatmapId)
+                            // Button.command(1, "查询排行榜", "/lb " + beatmapId),
+                            Button.command(5, "预览", "/bpv " + beatmapId),
+                            Button.command(6, "分析", "/bma " + beatmapId),
+                            Button.openUrl(2, "打开游戏", directUrl + "/b/" + beatmapId)
                     ),
                     Button.row(
                             Button.command(3, "预览音频", "/ap m" + beatmapId),
-                            Button.command(4, "查询自己的分数", "/s m" + beatmapId)
-                    ),
-                    Button.row(
+                            Button.command(4, "查询分数", "/s m" + beatmapId)
+                    )
+                    /* Button.row(
                             Button.command(5, "预览谱面", "/bpv " + beatmapId),
                             Button.command(6, "分析谱面", "/bma " + beatmapId)
-                    )
+                    ) */
             );
         }
 

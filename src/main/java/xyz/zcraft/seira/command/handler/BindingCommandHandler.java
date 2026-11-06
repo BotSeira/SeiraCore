@@ -5,19 +5,19 @@ import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.db.UserDataStore;
-import xyz.zcraft.seira.services.BindingService;
+import xyz.zcraft.seira.services.BindService;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class BindingCommandHandler {
     private final AppConfig config;
     private final ReplyFactory replyFactory;
-    private final BindingService bindingService;
+    private final BindService bindService;
 
-    public BindingCommandHandler(AppConfig config, ReplyFactory replyFactory, BindingService bindingService) {
+    public BindingCommandHandler(AppConfig config, ReplyFactory replyFactory, BindService bindService) {
         this.config = config;
         this.replyFactory = replyFactory;
-        this.bindingService = bindingService;
+        this.bindService = bindService;
     }
 
     public void handleBind(Context ctx) {
@@ -36,7 +36,7 @@ public final class BindingCommandHandler {
             return;
         }
 
-        final var bindingTask = bindingService.createBindingTask(ctx.senderUserId(), ctx.messageId(), (user, token) -> {
+        final var bindingTask = bindService.createBindingTask(ctx.senderUserId(), ctx.messageId(), (user, token) -> {
             UserDataStore.bind(ctx.senderUserId(), user.getId());
             UserDataStore.storeToken(ctx.senderUserId(), token);
             UserDataStore.storeUserInfo(user.getId(), user.getUsername());

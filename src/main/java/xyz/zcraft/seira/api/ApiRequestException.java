@@ -15,7 +15,7 @@ public class ApiRequestException extends RuntimeException {
     public static String getDefaultMessage(Integer code) {
         ErrorCode errorCode = ErrorCode.fromCode(code);
         if (errorCode == null) {
-            return "发生了一个未知错误喵";
+            return "发生了一个未知错误喵。";
         }
 
         return switch (errorCode) {

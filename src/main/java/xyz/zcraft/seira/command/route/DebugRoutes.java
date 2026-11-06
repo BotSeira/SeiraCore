@@ -9,14 +9,18 @@ import xyz.zcraft.seira.api.data.FriendEntry;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.Response;
 import xyz.zcraft.seira.bot.MessageSender;
+import xyz.zcraft.seira.bot.data.Button;
 import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.CommandHandler;
 import xyz.zcraft.seira.command.Context;
+import xyz.zcraft.seira.command.InteractionHandler;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.db.UserDataStore;
+import xyz.zcraft.seira.interaction.data.ListenerResponse;
+import xyz.zcraft.seira.interaction.data.ListenerResult;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 
 import java.io.ByteArrayOutputStream;
@@ -36,16 +40,9 @@ public class DebugRoutes {
     private final OsuAuthHelper authHelper;
     private final Predicate<String> adminAuthorizer;
     private final CommandHandler unknownCommand;
+    private final InteractionHandler interactionHandler;
 
-    public DebugRoutes(
-            Supplier<AppConfig> configSupplier,
-            MessageSender messageSender,
-            ReplyFactory replyFactory,
-            TaskCoordinator taskCoordinator,
-            OsuAuthHelper authHelper,
-            Predicate<String> adminAuthorizer,
-            CommandHandler unknownCommand
-    ) {
+    public DebugRoutes(Supplier<AppConfig> configSupplier, MessageSender messageSender, ReplyFactory replyFactory, TaskCoordinator taskCoordinator, OsuAuthHelper authHelper, Predicate<String> adminAuthorizer, CommandHandler unknownCommand, InteractionHandler interactionHandler) {
         this.configSupplier = configSupplier;
         this.messageSender = messageSender;
         this.replyFactory = replyFactory;
@@ -53,6 +50,7 @@ public class DebugRoutes {
         this.authHelper = authHelper;
         this.adminAuthorizer = adminAuthorizer;
         this.unknownCommand = unknownCommand;
+        this.interactionHandler = interactionHandler;
     }
 
     public void routeDebug(Context ctx) {
@@ -75,8 +73,34 @@ public class DebugRoutes {
             case "debug.get-all-friends" -> handleGetAllFriends(ctx);
             case "debug.validate-token" -> handleValidateToken(ctx);
             case "debug.active-message" -> handleActiveMessage(ctx);
+            case "debug.interaction-test" -> handleInteractionTest(ctx);
             default -> unknownCommand.handle(ctx);
         }
+    }
+
+    private void handleInteractionTest(Context ctx) {
+        int id = 100;
+        ctx.sendReply(PendingMessage.ofMarkdownRaw("__Interactions__",
+                        Button.keyboard(
+                                List.of(interactionHandler.createButton(id++, "GET SELF", (s) -> {
+                                    ctx.sendReply(ctx.senderNickname() + "\n" + s + "\n" + at(s));
+                                    return ListenerResult.of(ListenerResponse.SUCCESS, false);
+                                })),
+                                List.of(
+                                        button(id++, "SUCCESS", ListenerResponse.SUCCESS),
+                                        button(id++, "FAILED", ListenerResponse.FAILED)
+                                ),
+                                List.of(
+                                        button(id++, "ADMIN_ONLY", ListenerResponse.ADMIN_ONLY),
+                                        button(id, "UNAUTHORIZED", ListenerResponse.UNAUTHORIZED)
+                                )
+                        )
+                )
+        );
+    }
+
+    private Button button(int id, String label, ListenerResponse response) {
+        return interactionHandler.createButton(id, label, (_) -> ListenerResult.of(response, false));
     }
 
     private void handleActiveMessage(Context ctx) {
@@ -102,9 +126,7 @@ public class DebugRoutes {
             fileInfo = messageSender.uploadPrivateMedia(ctx.senderUserId(), Integer.parseInt(typeStr), urlStr, "true".equals(cosStr));
         }
 
-        ctx.sendReply(PendingMessage.ofString(fileInfo != null
-                ? "上传成功，fileId: " + fileInfo
-                : "上传失败，请检查日志获取详情"));
+        ctx.sendReply(PendingMessage.ofString(fileInfo != null ? "上传成功，fileId: " + fileInfo : "上传失败，请检查日志获取详情"));
     }
 
     public void handleTest(Context ctx) {
@@ -161,42 +183,33 @@ public class DebugRoutes {
         try (var _ = taskCoordinator.beginRequest(ctx, "Get All Friends")) {
             try {
                 final List<OsuAuthHelper.TokenStore> allOsuTokens = UserDataStore.getAllOsuTokens();
-                allOsuTokens
-                        .stream()
-                        .map(OsuAuthHelper.TokenStore::openId)
-                        .map(authHelper::updateTokenAndGet)
-                        .map(OsuToken::accessToken)
-                        .forEach(accessToken -> {
-                            final Response<UserExtended> self = OstellaApi.getSelf(accessToken);
-                            final Response<List<FriendEntry>> response = OstellaApi.getFollowed(accessToken);
-                            final List<FriendEntry> content = response.getContent();
-                            final List<Long> ids = content.stream().map(e -> e.user().getId()).toList();
+                allOsuTokens.stream().map(OsuAuthHelper.TokenStore::openId).map(authHelper::updateTokenAndGet).map(OsuToken::accessToken).forEach(accessToken -> {
+                    final Response<UserExtended> self = OstellaApi.getSelf(accessToken);
+                    final Response<List<FriendEntry>> response = OstellaApi.getFollowed(accessToken);
+                    final List<FriendEntry> content = response.getContent();
+                    final List<Long> ids = content.stream().map(e -> e.user().getId()).toList();
 
-                            final long uid = self.getContent().getId();
+                    final long uid = self.getContent().getId();
 
-                            UserDataStore.storeUserInfo(uid, self.getContent().getUsername());
-                            response.getContent().stream()
-                                    .map(FriendEntry::user)
-                                    .forEach(u -> UserDataStore.storeUserInfo(u.getId(), u.getUsername()));
+                    UserDataStore.storeUserInfo(uid, self.getContent().getUsername());
+                    response.getContent().stream().map(FriendEntry::user).forEach(u -> UserDataStore.storeUserInfo(u.getId(), u.getUsername()));
 
-                            final List<Long> origFollower = UserDataStore.findFollower(uid);
+                    final List<Long> origFollower = UserDataStore.findFollower(uid);
 
-                            origFollower.stream()
-                                    .filter(i -> !ids.contains(i))
-                                    .forEach(i -> UserDataStore.removeFollowed(uid, i));
+                    origFollower.stream().filter(i -> !ids.contains(i)).forEach(i -> UserDataStore.removeFollowed(uid, i));
 
-                            for (FriendEntry friendEntry : content) {
-                                if (!UserDataStore.haveFollowed(uid, friendEntry.user().getId())) {
-                                    UserDataStore.storeFollowed(uid, friendEntry.user().getId());
-                                }
+                    for (FriendEntry friendEntry : content) {
+                        if (!UserDataStore.haveFollowed(uid, friendEntry.user().getId())) {
+                            UserDataStore.storeFollowed(uid, friendEntry.user().getId());
+                        }
 
-                                if (friendEntry.mutual()) {
-                                    if (!UserDataStore.haveFollowed(friendEntry.user().getId(), uid)) {
-                                        UserDataStore.storeFollowed(friendEntry.user().getId(), uid);
-                                    }
-                                }
+                        if (friendEntry.mutual()) {
+                            if (!UserDataStore.haveFollowed(friendEntry.user().getId(), uid)) {
+                                UserDataStore.storeFollowed(friendEntry.user().getId(), uid);
                             }
-                        });
+                        }
+                    }
+                });
 
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "获取完成，共获取了" + allOsuTokens.size() + "个用户的好友列表"));
             } catch (Exception e) {

@@ -7,10 +7,12 @@ import com.google.gson.JsonObject;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import xyz.zcraft.osu.model.*;
+import xyz.zcraft.osu.model.multiplayer.Room;
 import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.api.data.*;
 import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.command.ResolutionException;
+import xyz.zcraft.seira.command.parse.SnapshotSelection;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
 import java.io.IOException;
@@ -107,18 +109,17 @@ public class OstellaApi {
         }
     }
 
-    @SuppressWarnings("unused")
-    public static Response<Base64Bytes> getBoNResponse(int n, long uid) {
-        return getBoNResponse(n, uid, List.of());
-    }
-
-    public static Response<Base64Bytes> getBoNResponse(int n, long uid, List<String> filters) {
-        return getBoNResponse(n, 1, uid, filters);
-    }
-
-    public static Response<Base64Bytes> getBoNResponse(int n, int start, long uid, List<String> filters) {
+    public static Response<Base64Bytes> getBoNResponse(int end, int start, long uid, List<String> filters) {
         return getBase64BytesResponse(
-                "/users/" + uid + "/scores/bestof?n=" + n + encodeScoreRangeStart(start) + encodeScoreFilters(filters),
+                "/users/" + uid + "/scores/bestof?" + encodeScoreRange(start, end) + encodeScoreFilters(filters),
+                "获取最好成绩失败",
+                null
+        );
+    }
+
+    public static Response<Base64Bytes> getBestDerankedResponse(int end, int start, long uid) {
+        return getBase64BytesResponse(
+                "/users/" + uid + "/scores/deranked-best?" + encodeScoreRange(start, end),
                 "获取最好成绩失败",
                 null
         );
@@ -128,6 +129,14 @@ public class OstellaApi {
         return getBase64BytesResponse(
                 "/users/" + uid,
                 "获取玩家资料失败",
+                null
+        );
+    }
+
+    public static Response<Base64Bytes> getUserCardResponse(long uid) {
+        return getBase64BytesResponse(
+                "/users/" + uid + "/card",
+                "获取玩家卡片失败",
                 null
         );
     }
@@ -169,19 +178,11 @@ public class OstellaApi {
         );
     }
 
-    public static Response<Base64Bytes> getGroupLeaderboardResponse(long beatmapId, List<Long> uids) {
+    public static Response<Base64Bytes> getGroupLeaderboardResponse(long beatmapId, List<Long> uids, boolean update) {
         return getBase64BytesResponse(
-                "/beatmaps/" + beatmapId + "/leaderboards",
+                "/beatmaps/" + beatmapId + "/leaderboards?update=" + update,
                 "获取群排行失败",
-                GSON.toJsonTree(Map.of("targets", uids)).toString()
-        );
-    }
-
-    public static Response<Base64Bytes> getLeaderboardResponse(List<Long> uids) {
-        return getBase64BytesResponse(
-                "/users/leaderboards",
-                "获取排行失败",
-                GSON.toJsonTree(Map.of("targets", uids)).toString()
+                GSON.toJsonTree(Map.of("uids", uids)).toString()
         );
     }
 
@@ -225,7 +226,7 @@ public class OstellaApi {
         }
     }
 
-    public static Response<MultiplayerRoom> getMultiplayerRoom(String accessToken) {
+    public static Response<Room> getMultiplayerRoom(String accessToken) {
         try {
             HttpRequest request = withOsuAuthorization(requestBuilder(), accessToken)
                     .uri(URI.create(ENDPOINT + "/multiplayer/rooms/current"))
@@ -242,8 +243,8 @@ public class OstellaApi {
             ApiUtil.ensureApiSuccess(r, "获取多人房间失败");
             final JsonObject data = r.getData().getAsJsonObject();
 
-            return Response.<MultiplayerRoom>fromHeaders(send.headers())
-                    .content(GSON.fromJson(data, MultiplayerRoom.class))
+            return Response.<Room>fromHeaders(send.headers())
+                    .content(GSON.fromJson(data, Room.class))
                     .build();
         } catch (IOException | InterruptedException e) {
             throw requestFailure(e);
@@ -260,22 +261,22 @@ public class OstellaApi {
     }
 
     public static Response<Base64Bytes> getRecentResponse(
-            int n,
+            int end,
             int start,
             long uid,
             boolean includeFail,
             List<String> filters
     ) {
         return getBase64BytesResponse(
-                "/users/" + uid + "/scores/recent?n=" + n + "&fail=" + includeFail
-                        + encodeScoreRangeStart(start) + encodeScoreFilters(filters),
+                "/users/" + uid + "/scores/recent?" + encodeScoreRange(start, end) + "&fail=" + includeFail
+                        + encodeScoreFilters(filters),
                 "获取最近成绩失败",
                 null
         );
     }
 
-    private static String encodeScoreRangeStart(int start) {
-        return start > 1 ? "&start=" + start : "";
+    private static String encodeScoreRange(int start, int end) {
+        return "start=" + start + "&end=" + end;
     }
 
     private static String encodeScoreFilters(List<String> filters) {
@@ -342,6 +343,15 @@ public class OstellaApi {
 
     public static Response<Base64Bytes> getMissVisualizeResponse(String scoreId, int index) {
         return getBase64BytesResponse("/scores/" + scoreId + "/misses/" + index + "/visualize", "获取Miss可视化失败", null);
+    }
+
+    public static Response<Base64Bytes> getReplayClipResponse(String scoreId, SnapshotSelection selection,
+                                                              xyz.zcraft.seira.command.parse.ReplayWindow window) {
+        return getBase64BytesResponse("/scores/" + scoreId + "/clip?" + selection.queryString() + "&" + window.queryString(), "获取回放动图失败", null);
+    }
+
+    public static Response<Base64Bytes> getReplaySnapshotResponse(String scoreId, SnapshotSelection selection) {
+        return getBase64BytesResponse("/scores/" + scoreId + "/snapshot?" + selection.queryString(), "获取回放快照失败", null);
     }
 
     private static Response<Base64Bytes> getBase64BytesResponse(String query, String failMessage, @Nullable String postBody) {
@@ -427,6 +437,35 @@ public class OstellaApi {
         }
     }
 
+    public static List<BatchSearchResult> searchBeatmapSetBatch(List<BatchSearchQuery> queries) {
+        JsonObject payload = new JsonObject();
+        payload.add("queries", GSON.toJsonTree(queries));
+        try {
+            HttpRequest localRequest = requestBuilder()
+                    .uri(URI.create(ENDPOINT + "/beatmapsets/search/batch"))
+                    .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
+                    .build();
+
+            final var send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw ApiUtil.parseHttpError(send.body(), send.statusCode(), "搜索谱面集失败");
+            }
+
+            final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
+            ApiUtil.ensureApiSuccess(rawResponse, "搜索谱面集失败");
+            final JsonArray data = ApiUtil.requireResultArray(rawResponse, "搜索谱面集响应缺少结果数组");
+
+            final LinkedList<BatchSearchResult> items = new LinkedList<>();
+
+            data.forEach(item -> items.add(GSON.fromJson(item, BatchSearchResult.class)));
+
+            return items;
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
+        }
+    }
+
     @SuppressWarnings("unused")
     public static ReplayTaskInfo createObscuredReplayRenderTask(long scoreId) {
         return createObscuredReplayRenderTask(scoreId, null);
@@ -449,37 +488,11 @@ public class OstellaApi {
     }
 
     public static RandomScore getRandomScore() {
-        try {
-            HttpRequest request = requestBuilder()
-                    .uri(URI.create(ENDPOINT + "/scores/random?min_rank=500000"))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-            if (ApiUtil.codeNotOk(response.statusCode())) {
-                throw ApiUtil.parseHttpError(response.body(), response.statusCode(), "获取随机成绩失败");
-            }
-
-            RawResponse payload = GSON.fromJson(response.body(), RawResponse.class);
-            ApiUtil.ensureApiSuccess(payload, "获取随机成绩失败");
-            JsonObject data = ApiUtil.requireDataObject(payload, "随机成绩响应缺少data");
-            if (!data.has("user") || !data.get("user").isJsonObject()
-                    || !data.has("score") || !data.get("score").isJsonObject()) {
-                throw new RuntimeException("随机成绩响应缺少用户或成绩数据");
-            }
-
-            return new RandomScore(
-                    GSON.fromJson(data.getAsJsonObject("user"), UserExtended.class),
-                    GSON.fromJson(data.getAsJsonObject("score"), Score.class),
-                    data.get("best_index").getAsInt(),
-                    data.get("diff").getAsString()
-            );
-        } catch (IOException e) {
-            throw requestFailure(e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("随机成绩请求被中断", e);
-        }
+        HttpRequest request = requestBuilder()
+                .uri(URI.create(ENDPOINT + "/scores/random?min_rank=500000"))
+                .GET()
+                .build();
+        return requestRandomScore(request);
     }
 
     public static String getRandomScoreWeight(Long userId, JsonObject weights, boolean all) {
@@ -511,21 +524,25 @@ public class OstellaApi {
     }
 
     public static RandomScore getRandomScoreFromUsers(List<Long> uids, JsonObject weights) {
+        JsonObject body = new JsonObject();
+        final JsonArray uidsArray = new JsonArray();
+        for (Long uid : uids) {
+            uidsArray.add(uid);
+        }
+
+        body.add("uids", uidsArray);
+        body.add("weight_factor", weights);
+
+        HttpRequest request = requestBuilder()
+                .uri(URI.create(ENDPOINT + "/scores/random/users"))
+                .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                .build();
+
+        return requestRandomScore(request);
+    }
+
+    private static RandomScore requestRandomScore(HttpRequest request) {
         try {
-            JsonObject body = new JsonObject();
-            final JsonArray uidsArray = new JsonArray();
-            for (Long uid : uids) {
-                uidsArray.add(uid);
-            }
-
-            body.add("uids", uidsArray);
-            body.add("weight_factor", weights);
-
-            HttpRequest request = requestBuilder()
-                    .uri(URI.create(ENDPOINT + "/scores/random/users"))
-                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
-                    .build();
-
             HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             if (ApiUtil.codeNotOk(response.statusCode())) {
                 throw ApiUtil.parseHttpError(response.body(), response.statusCode(), "获取随机成绩失败");
@@ -660,7 +677,12 @@ public class OstellaApi {
     }
 
     public static long lookupMultiplayerBeatmap(String auth) {
-        return lookupTargetData("/beatmaps/lookup?of=mp", auth, "查找谱面失败").get("beatmap_id").getAsLong();
+        return lookupMultiplayerBeatmap(null, auth);
+    }
+
+    public static long lookupMultiplayerBeatmap(String roomId, String auth) {
+        return lookupTargetData("/beatmaps/lookup?of=mp" + MultiplayerRoomQuery.query(roomId), auth, "查找谱面失败")
+                .get("beatmap_id").getAsLong();
     }
 
     public static long lookupPlayerScoreBeatmap(long uid, String list, long index, String auth) {
@@ -670,7 +692,12 @@ public class OstellaApi {
     }
 
     public static long lookupMultiplayerBeatmapset(String auth) {
-        return lookupTargetData("/beatmapsets/lookup?of=mp", auth, "查找谱面集失败").get("beatmapset_id").getAsLong();
+        return lookupMultiplayerBeatmapset(null, auth);
+    }
+
+    public static long lookupMultiplayerBeatmapset(String roomId, String auth) {
+        return lookupTargetData("/beatmapsets/lookup?of=mp" + MultiplayerRoomQuery.query(roomId), auth, "查找谱面集失败")
+                .get("beatmapset_id").getAsLong();
     }
 
     public static long lookupBeatmapsetForBeatmap(long beatmapId, String auth) {
@@ -679,7 +706,7 @@ public class OstellaApi {
     }
 
     public static String lookupPlayerScore(long uid, String list, long index, List<String> filters, String mod) {
-        if (!List.of("rs", "rp", "bp").contains(list)) throw new IllegalArgumentException("Invalid score list");
+        if (!List.of("rs", "rp", "bp", "bd").contains(list)) throw new IllegalArgumentException("Invalid score list");
         return lookupScore("/scores/lookup?of=" + list + "&i=" + index + "&u=" + uid, filters, mod);
     }
 
@@ -1034,9 +1061,12 @@ public class OstellaApi {
     }
 
     public static List<User> getUsers(List<Long> u) {
+        Duration timeout = Duration.ofMinutes(5);
         try {
             HttpRequest request = requestBuilder()
                     .uri(URI.create(ENDPOINT + "/users"))
+                    .timeout(timeout)
+                    .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(GSON.toJsonTree(Map.of("ids", u)).toString()))
                     .build();
 
@@ -1096,6 +1126,19 @@ public class OstellaApi {
             Thread.currentThread().interrupt();
         }
         return new RuntimeException(exception);
+    }
+
+    public record BatchSearchQuery(String title, String artist) {
+    }
+
+    public record BatchSearchResult(String title, String artist, String status, List<Match> matches,
+                                    boolean truncated) {
+        public record Match(Metadata beatmapset, double score, String reason, boolean exact) {
+        }
+
+        public record Metadata(long id, String artist, String artistUnicode, String title,
+                               String titleUnicode, String status, long playCount, long favouriteCount) {
+        }
     }
 
     public record ServerStatus(boolean gateway, boolean oStella, String oStellaVersion,

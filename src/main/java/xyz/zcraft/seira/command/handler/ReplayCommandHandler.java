@@ -1,18 +1,19 @@
 package xyz.zcraft.seira.command.handler;
 
-import org.jline.utils.Log;
 import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.data.PendingMessage;
-import xyz.zcraft.seira.command.*;
+import xyz.zcraft.seira.command.Context;
+import xyz.zcraft.seira.command.ReplayResultStore;
+import xyz.zcraft.seira.command.TargetHistory;
+import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.parse.TargetInput;
+import xyz.zcraft.seira.command.parse.TargetResolver;
 import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
-import xyz.zcraft.seira.data.SendResult;
 import xyz.zcraft.seira.util.TimeDurationParser;
 
-import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Predicate;
@@ -20,8 +21,8 @@ import java.util.function.Predicate;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class ReplayCommandHandler {
-    private final java.util.function.Function<String, String> accessTokenProvider;
     private final Resolver resolver;
+    private final TargetResolver targets;
     private final TargetHistory history;
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
@@ -31,16 +32,16 @@ public final class ReplayCommandHandler {
 
     public ReplayCommandHandler(
             Resolver resolver,
+            TargetResolver targets,
             TargetHistory history,
             TaskCoordinator taskCoordinator,
             ReplyFactory replyFactory,
             VideoRenderRecord videoRenderRecord,
             ReplayResultStore replayResults,
-            Predicate<String> adminAuthorizer,
-            java.util.function.Function<String, String> accessTokenProvider
+            Predicate<String> adminAuthorizer
     ) {
         this.resolver = resolver;
-        this.accessTokenProvider = accessTokenProvider;
+        this.targets = targets;
         this.history = history;
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
@@ -51,7 +52,7 @@ public final class ReplayCommandHandler {
 
     public void handleR(Context ctx) {
         var target = ctx.argumentCount() == 0 || TimeDurationParser.isTimeRange(ctx.argument(0))
-                ? TargetInput.memory() : TargetInput.read(ctx.args());
+                ? TargetInput.memory() : TargetInput.readScoreTarget(ctx.args());
         var remembered = history.get(ctx);
         if ((target.kind() == TargetInput.Kind.MEMORY && remembered == null)
                 || ctx.argumentCount() - target.consumedArgs() > 1) {
@@ -72,58 +73,14 @@ public final class ReplayCommandHandler {
 
         try (var _ = taskCoordinator.beginRequest(ctx, "Score Render", false)) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "正在获取谱面以及回放文件，请稍作等待喵..."));
-            var previous = target.kind() == TargetInput.Kind.MEMORY ? remembered : null;
-            Long beatmapId = previous == null ? null : previous.beatmapId();
-            Long beatmapsetId = previous == null ? null : previous.beatmapsetId();
-            String scoreId = previous == null ? null : previous.scoreId();
-            switch (target.kind()) {
-                case ID, SCORE -> scoreId = target.id();
-                case MAP -> beatmapId = Long.parseLong(target.id());
-                case SET -> {
-                    beatmapsetId = Long.parseLong(target.id());
-                    String player = resolver.player(target.player(), ctx.senderUserId());
-                    long uid = OstellaApi.resolveUid(player);
-                    scoreId = OstellaApi.lookupBeatmapsetScore(beatmapsetId, target.index(), uid, List.of(), null);
-                }
-                case RS, RP, BP -> {
-                    String player = resolver.player(target.player(), ctx.senderUserId());
-                    long uid = OstellaApi.resolveUid(player);
-                    scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
-                }
-                case MP -> beatmapId = OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
-                case MEMORY -> {}
-            }
-            if (scoreId == null) {
-                if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
-                String player = resolver.player(target.player(), ctx.senderUserId());
-                long uid = OstellaApi.resolveUid(player);
-                scoreId = OstellaApi.lookupBeatmapScore(beatmapId, uid, List.of(), null);
-            }
+            var ids = targets.score(ctx, target, remembered);
             var upload = taskCoordinator.createVideoUploadRequest(ctx);
-            var task = OstellaApi.createReplayRenderTask(scoreId, range, upload);
-            history.remember(ctx, beatmapsetId, beatmapId, scoreId);
+            var task = OstellaApi.createReplayRenderTask(ids.scoreId(), range, upload);
+            history.remember(ctx, ids);
             videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
             ctx.sendReply(replyFactory.replayMessage(ctx, task));
 
-            OstellaApi.ReplayRenderResult result;
-
-            try {
-                result = taskCoordinator.waitForReplay(task);
-            } catch (Exception e) {
-                Log.error("Error while waiting for replay", e);
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + e.getMessage()));
-                return;
-            }
-
-            SendResult sendResult = ctx.sendReply(taskCoordinator.replayVideoMessage(result));
-
-            if (!sendResult.success()) {
-                sendResult = ctx.sendMessage(taskCoordinator.replayVideoMessage(result));
-            }
-
-            if (sendResult.success()) {
-                replayResults.remove(task.taskId());
-            }
+            taskCoordinator.finishReplay(ctx, task);
         }
     }
 
@@ -191,27 +148,7 @@ public final class ReplayCommandHandler {
 
         try (var _ = taskCoordinator.beginRequest(ctx, "Showcase Render", false)) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "正在获取谱面以及回放文件，请稍作等待喵..."));
-            var previous = target.kind() == TargetInput.Kind.MEMORY ? remembered : null;
-            Long beatmapId = previous == null ? null : previous.beatmapId();
-            Long beatmapsetId = previous == null ? null : previous.beatmapsetId();
-            String scoreId = previous == null ? null : previous.scoreId();
-            switch (target.kind()) {
-                case ID, MAP -> beatmapId = Long.parseLong(target.id());
-                case SCORE -> scoreId = target.id();
-                case SET -> {
-                    beatmapsetId = Long.parseLong(target.id());
-                    beatmapId = OstellaApi.lookupBeatmapInSet(beatmapsetId, target.index(), accessTokenProvider.apply(ctx.senderUserId()));
-                }
-                case RS, RP, BP -> {
-                    String player = resolver.player(target.player(), ctx.senderUserId());
-                    long uid = OstellaApi.resolveUid(player);
-                    scoreId = OstellaApi.lookupPlayerScore(uid, target.scoreList(), target.index(), List.of(), null);
-                }
-                case MP -> beatmapId = OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
-                case MEMORY -> {}
-            }
-            if (beatmapId == null && scoreId != null) beatmapId = OstellaApi.getScoreBeatmapId(scoreId);
-            if (beatmapId == null) throw new ResolutionException("请指定指令目标谱面喵");
+            var resolved = targets.beatmap(ctx, target, remembered);
             var upload = taskCoordinator.createVideoUploadRequest(ctx);
             String[] scoreTargets = participants.toArray(String[]::new);
             if (localScore) {
@@ -221,30 +158,12 @@ public final class ReplayCommandHandler {
                 scoreTargets = ids.toArray(String[]::new);
 
             }
-            var task = OstellaApi.createReplayShowcaseTask(beatmapId, scoreTargets, upload);
-            history.remember(ctx, beatmapsetId, beatmapId, scoreId);
+            var task = OstellaApi.createReplayShowcaseTask(resolved.beatmapId(), scoreTargets, upload);
+            history.remember(ctx, resolved);
             videoRenderRecord.updateRenderTask(ctx.senderUserId(), task.taskId());
             ctx.sendReply(replyFactory.replayMessage(ctx, task));
 
-            OstellaApi.ReplayRenderResult result;
-
-            try {
-                result = taskCoordinator.waitForReplay(task);
-            } catch (Exception e) {
-                Log.error("Error while waiting for replay", e);
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + e.getMessage()));
-                return;
-            }
-
-            SendResult sendResult = ctx.sendReply(taskCoordinator.replayVideoMessage(result));
-
-            if (!sendResult.success()) {
-                sendResult = ctx.sendMessage(taskCoordinator.replayVideoMessage(result));
-            }
-
-            if (sendResult.success()) {
-                replayResults.remove(task.taskId());
-            }
+            taskCoordinator.finishReplay(ctx, task);
         }
     }
 
@@ -266,18 +185,34 @@ public final class ReplayCommandHandler {
             jobId = ctx.args()[0];
         }
 
-        OstellaApi.ReplayRenderResult replayResult = replayResults.get(jobId);
-        if (replayResult != null) {
-            PendingMessage video = replayResult.qqFile() != null
-                    ? PendingMessage.ofUploadedVideo(replayResult.qqFile(), replayResult.videoUrl())
-                    : PendingMessage.ofVideoUrl(replayResult.videoUrl());
-            if (ctx.sendReply(video).success()) {
-                replayResults.remove(jobId);
-            }
+        ctx.sendReply(replyFactory.replayStatMessage(ctx, jobId, OstellaApi.getRenderStat(jobId)));
+    }
+
+    public void handleRget(Context ctx) {
+        if (ctx.args().length != 1 && ctx.args().length != 0) {
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/rget [任务ID]"));
             return;
         }
 
-        ctx.sendReply(replyFactory.replayStatMessage(ctx, jobId, OstellaApi.getRenderStat(jobId)));
+        String jobId;
+        if (ctx.args().length == 0) {
+            if (videoRenderRecord.hasRenderTask(ctx.senderUserId())) {
+                jobId = videoRenderRecord.getRenderTask(ctx.senderUserId());
+            } else {
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "未找到渲染请求"));
+                return;
+            }
+        } else {
+            jobId = ctx.args()[0];
+        }
+
+        OstellaApi.ReplayRenderResult replayResult = replayResults.get(jobId);
+        if (replayResult != null) {
+            PendingMessage video = taskCoordinator.replayVideoMessage(replayResult);
+            ctx.sendReply(video);
+        } else {
+            ctx.sendReply(at(ctx) + "回放渲染未完成喵。");
+        }
     }
 
     public void handleRcancel(Context ctx) {

@@ -12,24 +12,33 @@ import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.services.AiPermission;
+import xyz.zcraft.seira.util.ResourceUtil;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.ExternalUrls.CHANNEL;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.ExternalUrls.PERMISSION;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.cmd;
 
+@Deprecated
 public class AiChatHandler {
     private static final Gson GSON = new Gson();
+    private static final Pattern CHAT_INLINE_FILE = Pattern.compile("%%\\[file:(.+?)]%%");
+    private static final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Resolver resolver;
     private final Predicate<String> adminAuthorizer;
     private final ChatProvider chatProvider;
     private final Function<String, GroupBotState> botStateGetter;
     private final Map<String, Deque<String>> groupMentionedHistory = new ConcurrentHashMap<>();
+    private final Set<String> consented = new HashSet<>();
+    private final Map<String, Map<String, String>> groupNicknames = new ConcurrentHashMap<>();
 
     public AiChatHandler(
             Resolver resolver, ChatProvider chatProvider, Predicate<String> isAdmin,
@@ -39,6 +48,11 @@ public class AiChatHandler {
         this.adminAuthorizer = isAdmin;
         this.chatProvider = chatProvider;
         this.botStateGetter = botStateGetter;
+    }
+
+    public void recordNickname(String groupId, String openId, String nickname) {
+        groupNicknames.computeIfAbsent(groupId, _ -> new ConcurrentHashMap<>());
+        groupNicknames.get(groupId).put(openId, nickname);
     }
 
     public void handleAi(Context ctx) {
@@ -60,7 +74,13 @@ public class AiChatHandler {
             if ("on".equalsIgnoreCase(ctx.argument(0))) {
                 final GroupBotState apply = botStateGetter.apply(ctx.groupId());
                 if (apply.allowProactiveMsg() && apply.receiveMsgSetting() == GroupBotState.ReceiveMsgSetting.ALL) {
-                    if (AiPermission.permits(ctx.groupId())) {
+                    if (AiPermission.isActivated(ctx.groupId())) {
+                        ctx.sendReply(at(ctx) + "已启用本群AI已为启用状态喵。");
+                    } else if (!consented.contains(ctx.groupId())) {
+                        final String terms = ResourceUtil.loadString("/ai-chat-terms.md").orElse("文件加载失败了喵");
+                        ctx.sendReply("> 使用 AI 对话功能即表示群内成员同意并遵守以下条款：\n\n" + terms + "\n\n> 本消息仅展示一次，再次使用 `/ai on` 即可开启 AI 对话。");
+                        consented.add(ctx.groupId());
+                    } else if (AiPermission.permits(ctx.groupId())) {
                         AiPermission.activate(ctx.groupId());
                         ctx.sendReply(at(ctx) + "已启用本群AI对话喵。");
                     } else {
@@ -134,18 +154,7 @@ public class AiChatHandler {
                 ctx.sendReply(at(ctx) + "已重置你在" + i + "个群中的AI对话状态喵。");
                 return;
             }
-        } else if (ctx.argumentCount() == 2 && ctx.argument(0).equalsIgnoreCase("parallel")) {
-            if (!adminAuthorizer.test(ctx.senderUserId())) {
-                ctx.sendReply(at(ctx) + "你无权使用该命令喵。");
-                return;
-            }
 
-            final Integer n = resolver.parsePositiveInt(ctx.argument(1));
-            if (n != null) {
-                AiPermission.setParallel(ctx.groupId(), n);
-                ctx.sendReply(at(ctx) + "已设置本群的最大并行AI对话数量为" + n + "个喵。");
-                return;
-            }
         }
 
         ctx.sendReply(at(ctx) + "用法：/ai [on|off|reset|stop]");
@@ -164,12 +173,6 @@ public class AiChatHandler {
             return;
         }
 
-        if (chatProvider.runningCount(ctx.groupId()) >= AiPermission.getParallel(ctx.groupId())) {
-            ctx.sendReply(
-                    at + "当前群聊中的同时运行对话数量已达到上限，无法开始新的对话喵，请稍作等待。"
-            );
-            return;
-        }
 
         final List<AgentFile> attachments = elems.stream()
                 .filter(e -> e.attachments() != null)
@@ -186,12 +189,28 @@ public class AiChatHandler {
 
         chatProvider.input(
                 ctx.groupId(),
+                ctx.senderNickname(),
                 ctx.senderUserId(),
                 message,
                 input -> generateVar(ctx, input),
                 new StreamHandler() {
                     @Override
                     public void onText(String message) {
+                        CHAT_INLINE_FILE.matcher(message).results()
+                                .forEach(r -> {
+                                    if (r.group(1) == null || r.group(1).isBlank()) return;
+                                    final String fileUrl = r.group(1);
+                                    executor.submit(() -> {
+                                        if (fileUrl.endsWith(".flac") || fileUrl.endsWith(".wav")
+                                                || fileUrl.endsWith(".ogg") || fileUrl.endsWith(".mp3")) {
+                                            return ctx.send(true, PendingMessage.ofVoiceUrl(fileUrl).doUpload(false));
+                                        } else {
+                                            return ctx.send(true, PendingMessage.ofFileUrl(fileUrl).doUpload(false));
+                                        }
+                                    });
+                                });
+
+                        message = CHAT_INLINE_FILE.matcher(message).replaceAll("");
                         if (!message.trim().startsWith(at.trim())) {
                             message = at + message;
                         }
@@ -224,14 +243,28 @@ public class AiChatHandler {
     private String generateVar(Context ctx, String input) {
         JsonObject qqContext = new JsonObject();
         qqContext.addProperty("in_group", ctx.inGroup());
+        qqContext.addProperty("sender_nickname", ctx.senderNickname());
         qqContext.addProperty("sender_open_id", ctx.senderUserId());
+        qqContext.addProperty("sender_osu_uid", resolver.resolveBoundUid(ctx.senderUserId()));
         qqContext.addProperty("group_id", ctx.groupId());
 
-        Map<String, Map<String, String>> bindings = new HashMap<>();
+        Map<String, JsonObject> bindings = new HashMap<>();
 
         final Deque<String> mentionedHistory = groupMentionedHistory.computeIfAbsent(ctx.groupId(), _ -> new ArrayDeque<>(100));
 
         final Set<String> ids = resolver.extractAllMentionedIds(input);
+
+        final var bound = UserDataStore.findBoundUsersByGroup(ctx.groupId()).entrySet().iterator();
+
+        while (ids.size() < 50 && bound.hasNext()) {
+            ids.add(bound.next().getKey());
+        }
+
+        final var uids = UserDataStore.findAllGroupMembers(ctx.groupId()).iterator();
+
+        while (ids.size() < 50 && uids.hasNext()) {
+            ids.add(uids.next());
+        }
 
         for (String id : ids) {
             if (!mentionedHistory.contains(id)) {
@@ -246,11 +279,19 @@ public class AiChatHandler {
         ids.add(ctx.senderUserId());
         ids.addAll(mentionedHistory);
 
+        final Map<String, String> nicknames = groupNicknames.getOrDefault(ctx.groupId(), Map.of());
+
         for (String openId : ids) {
             final Long uid = resolver.resolveBoundUid(openId);
             if (uid != null) {
                 final String username = UserDataStore.findUsername(uid).orElse("");
-                bindings.put(openId, Map.of("uid", uid.toString(), "username", username));
+                JsonObject qqUser = new JsonObject();
+                qqUser.addProperty("uid", uid.toString());
+                qqUser.addProperty("username", username);
+                if (nicknames.containsKey(openId)) {
+                    qqUser.addProperty("qq_nickname", nicknames.get(openId));
+                }
+                bindings.put(openId, qqUser);
             }
         }
 
@@ -259,21 +300,21 @@ public class AiChatHandler {
         return qqContext.toString();
     }
 
-    public void recordHistory(String groupId, String userId, String rawContent) {
+    public void recordHistory(String groupId, String username, String userId, String rawContent) {
         if (rawContent == null || rawContent.isBlank()) {
             return;
         }
 
-        recordHistory(groupId, userId, rawContent.trim(), List.of());
+        recordHistory(groupId, username, userId, rawContent.trim(), List.of());
     }
 
-    public void recordHistory(String groupId, String userId, String rawContent, List<Attachment> attachments) {
+    public void recordHistory(String groupId, String username, String userId, String rawContent, List<Attachment> attachments) {
         StringBuilder sb = new StringBuilder(rawContent.trim());
         if (attachments != null && !attachments.isEmpty()) {
             for (Attachment attachment : attachments) {
                 sb.append("\n").append("![%s](%s)".formatted(attachment.filename(), attachment.url()));
             }
         }
-        chatProvider.recordHistory(groupId, userId, sb.toString());
+        chatProvider.recordHistory(groupId, username, userId, sb.toString());
     }
 }

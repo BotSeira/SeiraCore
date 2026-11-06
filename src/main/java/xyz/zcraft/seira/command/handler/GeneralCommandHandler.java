@@ -1,14 +1,17 @@
 package xyz.zcraft.seira.command.handler;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import xyz.zcraft.osu.model.Beatmapset;
 import xyz.zcraft.seira.api.AsteroidApi;
 import xyz.zcraft.seira.api.OstellaApi;
-import xyz.zcraft.seira.api.data.MinecraftServerStatus;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
+import xyz.zcraft.seira.command.TargetHistory;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
+import xyz.zcraft.seira.command.parse.TargetResolver;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.data.Notice;
 import xyz.zcraft.seira.data.UploadedImage;
@@ -18,14 +21,17 @@ import xyz.zcraft.seira.util.dice.Dice;
 import xyz.zcraft.seira.util.dice.expr.DiceExpr;
 import xyz.zcraft.seira.util.dice.result.DiceResult;
 
-import java.util.Objects;
+import java.util.*;
 import java.util.function.Predicate;
-import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class GeneralCommandHandler {
+    private static final Logger LOG = LogManager.getLogger(GeneralCommandHandler.class);
     private final MessageSender messageSender;
+    private final TargetResolver targets;
+    private final TargetHistory history;
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
     private final Resolver resolver;
@@ -36,12 +42,16 @@ public final class GeneralCommandHandler {
             TaskCoordinator taskCoordinator,
             ReplyFactory replyFactory,
             Resolver resolver,
+            TargetResolver targets,
+            TargetHistory history,
             Predicate<String> adminAuthorizer
     ) {
         this.messageSender = messageSender;
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
         this.resolver = resolver;
+        this.targets = targets;
+        this.history = history;
         this.adminAuthorizer = adminAuthorizer;
     }
 
@@ -56,11 +66,50 @@ public final class GeneralCommandHandler {
         }
     }
 
+    public void handleO(Context ctx) {
+        final Set<Long> uids = new HashSet<>();
+
+        if (ctx.argumentCount() == 0) {
+            uids.add(resolver.requireBind(ctx));
+        } else {
+            uids.addAll(Arrays.stream(ctx.args())
+                    .map(e -> resolver.player(e, null))
+                    .map(OstellaApi::resolveUid).toList());
+        }
+
+        try (var _ = taskCoordinator.beginRequest(ctx, "User Info")) {
+            if (uids.size() == 1) {
+                var response = OstellaApi.getUserCardResponse(uids.iterator().next());
+
+                ctx.sendReply(PendingMessage.ofImageBase64(response.getContent().toBase64()));
+            } else {
+                List<UploadedImage> images = new ArrayList<>(uids.size());
+                for (Long uid : uids) {
+                    var response = OstellaApi.getUserCardResponse(uid);
+                    final UploadedImage uploadedImage = messageSender.uploadImageToCos(response.getContent().bytes());
+                    images.add(uploadedImage);
+                }
+
+                final String msg = images.stream()
+                        .map(e -> e.toMarkdown(100, 120))
+                        .collect(Collectors.joining(""))
+                        .trim();
+
+                ctx.sendReply(msg);
+            }
+        }
+    }
+
     public void handleRoll(Context ctx) {
         DiceExpr diceExpr;
 
         if (ctx.argumentCount() == 0) {
             diceExpr = DiceExpr.HUNDRED;
+        } else if ("0d00".equals(ctx.argument(0))) {
+            ctx.sendReply(at(ctx) + "0d00 = __0721__");
+            return;
+        } else if (Resolver.parsePositiveLong(ctx.argument(0)) != null) {
+            diceExpr = DiceExpr.parse("1d" + Resolver.parsePositiveLong(ctx.argument(0)));
         } else {
             try {
                 diceExpr = DiceExpr.parse(ctx.query());
@@ -148,56 +197,6 @@ public final class GeneralCommandHandler {
                 }, () -> sb.append(at(context)).append("未找到公告#").append(noticeId));
 
         context.sendReply(PendingMessage.ofMarkdownRaw(sb.toString()));
-    }
-
-    private static final Pattern SERVER_PATTERN = Pattern.compile("^(?:https?://)?([a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)+)(?::[0-9]+)?$");
-
-    public void handleMc(Context ctx) {
-        if (ctx.argumentCount() != 1) {
-            ctx.sendReply(at(ctx) + "用法：/mc <服务器地址>");
-            return;
-        }
-
-        try {
-            final String address = ctx.argument(0);
-
-            if (!SERVER_PATTERN.matcher(address).matches()) {
-                ctx.sendReply(at(ctx) + "服务器地址无效喵。");
-                return;
-            }
-
-            final var probe = AsteroidApi.getMinecraftServerStatus(address);
-
-            final var status = probe.status();
-            final var players = status.players();
-            final var samples = players.samples();
-
-            String playersSample = "";
-
-            if (samples != null) {
-                playersSample = String.join(", ", samples.stream().map(MinecraftServerStatus.Players.Sample::name).toList());
-            }
-
-            ctx.sendReply(at(ctx) + """
-                             `%s` 的服务器状态：
-                             - 版本: `%s`
-                             - 描述: `%s`
-                             - 延迟: `%d` ms
-                             - 在线人数: `%d` / `%d`
-                             - 在线玩家: [%s]
-                            """.formatted(
-                            address,
-                            status.version().name(),
-                            status.description(),
-                            probe.latency(),
-                            players.online(),
-                            players.max(),
-                            playersSample
-                    )
-            );
-        } catch (Exception e) {
-            ctx.sendReply(at(ctx) + "无法获取目标服务器状态喵，这可能是因为目标服务器未开启或者存在网络问题。");
-        }
     }
 
     public void handleUx(Context ctx) {

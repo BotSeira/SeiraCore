@@ -1,6 +1,7 @@
 package xyz.zcraft.seira.api;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import org.apache.logging.log4j.LogManager;
@@ -8,6 +9,13 @@ import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.Seira;
 import xyz.zcraft.seira.api.data.MinecraftServerStatus;
 import xyz.zcraft.seira.api.data.RawResponse;
+import xyz.zcraft.seira.api.data.gacha.GachaCardOwn;
+import xyz.zcraft.seira.api.data.gacha.GachaPlayer;
+import xyz.zcraft.seira.api.data.gacha.Guide;
+import xyz.zcraft.seira.api.data.ncm.MatchResult;
+import xyz.zcraft.seira.api.data.ncm.Playlist;
+import xyz.zcraft.seira.api.data.ncm.Song;
+import xyz.zcraft.seira.util.Query;
 
 import java.net.URI;
 import java.net.URLEncoder;
@@ -16,12 +24,15 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 public class AsteroidApi {
     private static final String ENDPOINT;
     private static final String TOKEN;
     private static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(Duration.ofMinutes(5)).build();
     private static final Gson GSON = new Gson();
+    private static final Logger LOG = LogManager.getLogger(AsteroidApi.class);
 
     static {
         ENDPOINT = Seira.getConfig().asteroid().endpoint();
@@ -58,8 +69,6 @@ public class AsteroidApi {
         }
     }
 
-    public record ServerStatus(boolean online, String version){}
-
     public static ServerStatus getServerStatus() {
         try {
             var request = requestBuilder("/health")
@@ -88,5 +97,286 @@ public class AsteroidApi {
         return new ServerStatus(false, null);
     }
 
-    private static final Logger LOG = LogManager.getLogger(AsteroidApi.class);
+    public static List<Song> searchSong(String keywords) {
+        try {
+            var request = requestBuilder("/ncm/songs/search?q=" + URLEncoder.encode(keywords, StandardCharsets.UTF_8))
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            final RawResponse rawResponse = GSON.fromJson(response.body(), RawResponse.class);
+
+            ApiUtil.ensureApiSuccess(rawResponse, "搜索歌曲失败");
+
+            final JsonElement rawResponseData = rawResponse.getData();
+            if (rawResponseData != null && rawResponseData.isJsonObject()) {
+                JsonObject data = rawResponseData.getAsJsonObject();
+                final JsonArray resultArr = data.getAsJsonArray("result");
+
+                List<Song> songs = new ArrayList<>(resultArr.size());
+
+                for (JsonElement jsonElement : resultArr) {
+                    songs.add(GSON.fromJson(jsonElement, Song.class));
+                }
+
+                return songs;
+            } else {
+                return List.of();
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to search songs", e);
+            throw new RuntimeException("搜索歌曲失败", e);
+        }
+    }
+
+    public static String getSongUrl(long id) {
+        try {
+            var request = requestBuilder("/ncm/songs/" + id + "/url")
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            final RawResponse rawResponse = GSON.fromJson(response.body(), RawResponse.class);
+
+            ApiUtil.ensureApiSuccess(rawResponse, "获取歌曲URL失败");
+
+            final JsonElement rawResponseData = rawResponse.getData();
+            if (rawResponseData != null && rawResponseData.isJsonObject()) {
+                JsonObject data = rawResponseData.getAsJsonObject();
+                return data.get("url").getAsString();
+            } else {
+                return null;
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to get song url", e);
+            throw new RuntimeException("获取歌曲URL失败", e);
+        }
+    }
+
+    public static List<MatchResult> matchSong(long beatmapsetId) {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("url", "https://b.ppy.sh/preview/" + beatmapsetId + ".mp3");
+        payload.addProperty("startSeconds", 1);
+        payload.addProperty("duration", 3);
+        try {
+            var request = requestBuilder("/ncm/songs/match")
+                    .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            final RawResponse rawResponse = GSON.fromJson(response.body(), RawResponse.class);
+
+            ApiUtil.ensureApiSuccess(rawResponse, "识曲失败");
+
+            final JsonElement rawResponseData = rawResponse.getData();
+            if (rawResponseData != null && rawResponseData.isJsonObject()) {
+                JsonObject data = rawResponseData.getAsJsonObject();
+                final JsonArray resultArr = data.getAsJsonArray("result");
+
+                List<MatchResult> songs = new ArrayList<>(resultArr.size());
+
+                for (JsonElement jsonElement : resultArr) {
+                    songs.add(GSON.fromJson(jsonElement, MatchResult.class));
+                }
+
+                return songs;
+            } else {
+                return List.of();
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to match song", e);
+            return List.of();
+        }
+    }
+
+    public static List<Song> getPlaylistSongs(long playlistId, Integer limit, Integer offset) {
+        try {
+            var request = requestBuilder("/ncm/playlists/" + playlistId + "/songs" + Query.create().param("limit", limit).param("offset", offset).build())
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            final RawResponse rawResponse = GSON.fromJson(response.body(), RawResponse.class);
+
+            ApiUtil.ensureApiSuccess(rawResponse, "获取歌单失败");
+
+            final JsonElement rawResponseData = rawResponse.getData();
+            if (rawResponseData != null && rawResponseData.isJsonObject()) {
+                JsonObject data = rawResponseData.getAsJsonObject();
+                final JsonArray resultArr = data.getAsJsonArray("result");
+
+                List<Song> songs = new ArrayList<>(resultArr.size());
+
+                for (JsonElement jsonElement : resultArr) {
+                    songs.add(GSON.fromJson(jsonElement, Song.class));
+                }
+
+                return songs;
+            } else {
+                return List.of();
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to get playlist songs", e);
+            throw new RuntimeException("获取歌单失败", e);
+        }
+    }
+
+    public static Playlist getPlaylistDetail(long playlistId) {
+        try {
+            var request = requestBuilder("/ncm/playlists/" + playlistId)
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            final RawResponse rawResponse = GSON.fromJson(response.body(), RawResponse.class);
+
+            ApiUtil.ensureApiSuccess(rawResponse, "获取歌单失败");
+
+            final JsonElement rawResponseData = rawResponse.getData();
+            if (rawResponseData != null && rawResponseData.isJsonObject()) {
+                return GSON.fromJson(rawResponseData.getAsJsonObject(), Playlist.class);
+            } else {
+                return null;
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to get playlist songs", e);
+            throw new RuntimeException("获取歌单失败", e);
+        }
+    }
+
+    public static List<GachaCardOwn> getGachaCardOwners(long uid) {
+        try {
+            var request = requestBuilder("/gacha/players/" + uid + "/owners")
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            final RawResponse rawResponse = GSON.fromJson(response.body(), RawResponse.class);
+
+            ApiUtil.ensureApiSuccess(rawResponse, "获取卡片所有者失败");
+
+            final JsonElement rawResponseData = rawResponse.getData();
+            if (rawResponseData != null && rawResponseData.isJsonObject()) {
+                JsonObject data = rawResponseData.getAsJsonObject();
+                final JsonArray resultArr = data.getAsJsonArray("result");
+
+                List<GachaCardOwn> owns = new ArrayList<>(resultArr.size());
+
+                for (JsonElement jsonElement : resultArr) {
+                    owns.add(GSON.fromJson(jsonElement, GachaCardOwn.class));
+                }
+
+                return owns;
+            } else {
+                return List.of();
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to get card owners", e);
+            throw new RuntimeException("获取卡片所有者失败", e);
+        }
+    }
+
+    public static List<GachaPlayer> searchGachaPlayer(String query) {
+        try {
+            var request = requestBuilder("/gacha/players/search?q=" + URLEncoder.encode(query, StandardCharsets.UTF_8) + "&sort=popular&limit=100&offset=0")
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            final RawResponse rawResponse = GSON.fromJson(response.body(), RawResponse.class);
+
+            ApiUtil.ensureApiSuccess(rawResponse, "获取卡片信息失败");
+
+            final JsonElement rawResponseData = rawResponse.getData();
+            if (rawResponseData != null && rawResponseData.isJsonObject()) {
+                JsonObject data = rawResponseData.getAsJsonObject();
+                final JsonArray resultArr = data.getAsJsonArray("result");
+
+                List<GachaPlayer> players = new ArrayList<>(resultArr.size());
+
+                for (JsonElement jsonElement : resultArr) {
+                    players.add(GSON.fromJson(jsonElement, GachaPlayer.class));
+                }
+
+                return players;
+            } else {
+                return List.of();
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to search player card", e);
+            throw new RuntimeException("获取卡片信息失败", e);
+        }
+    }
+
+    @Deprecated
+    public static byte[] getGachaProfile(String username) {
+        try {
+            var request = requestBuilder("/gacha/users/" + URLEncoder.encode(username, StandardCharsets.UTF_8) + "/profile")
+                    .GET()
+                    .build();
+
+            final HttpResponse<byte[]> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofByteArray());
+
+            return response.body();
+        } catch (Exception e) {
+            LOG.error("Failed to gacha user profile", e);
+            throw new RuntimeException("获取用户信息失败", e);
+        }
+    }
+
+    public static byte[] getGachaItemMarketTrend(String itemId, String scale) {
+        try {
+            var request = requestBuilder("/gacha/market/items/" + URLEncoder.encode(itemId, StandardCharsets.UTF_8) + "/trend?scale=" + scale)
+                    .GET()
+                    .build();
+
+            final HttpResponse<byte[]> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofByteArray());
+
+            return response.body();
+        } catch (Exception e) {
+            LOG.error("Failed to gacha market trend", e);
+            throw new RuntimeException("获取市场趋势失败", e);
+        }
+    }
+
+    public static byte[] getGachaPlayerMarketTrend(String player, boolean sig, String scale) {
+        try {
+            var request = requestBuilder("/gacha/market/players/" + URLEncoder.encode(player, StandardCharsets.UTF_8) + "/trend?scale=" + scale + "&sig=" + sig)
+                    .GET()
+                    .build();
+
+            final HttpResponse<byte[]> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofByteArray());
+
+            return response.body();
+        } catch (Exception e) {
+            LOG.error("Failed to gacha market trend", e);
+            throw new RuntimeException("获取市场趋势失败", e);
+        }
+    }
+
+    public static Guide getGachaPlayerMarketGuide(String username) {
+        try {
+            var request = requestBuilder("/gacha/market/players/" + URLEncoder.encode(username, StandardCharsets.UTF_8) + "/guide")
+                    .GET()
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            final RawResponse rawResponse = GSON.fromJson(response.body(), RawResponse.class);
+
+            ApiUtil.ensureApiSuccess(rawResponse, "获取玩家市场摘要失败");
+
+            final JsonElement rawResponseData = rawResponse.getData();
+            if (rawResponseData != null && rawResponseData.isJsonObject()) {
+                return GSON.fromJson(rawResponseData, Guide.class);
+            } else {
+                return null;
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to get gacha player market guide", e);
+            throw new RuntimeException("获取玩家市场摘要失败", e);
+        }
+    }
+
+    public record ServerStatus(boolean online, String version) {
+    }
 }

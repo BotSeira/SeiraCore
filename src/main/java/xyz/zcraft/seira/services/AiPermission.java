@@ -8,11 +8,8 @@ import lombok.Getter;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class AiPermission {
     private static final Object LOCK = new Object();
@@ -22,13 +19,12 @@ public class AiPermission {
     @Getter
     private static Mode mode = Mode.WHITELIST;
     private static Set<String> activated = null;
-    private static Map<String, Integer> parallel = null;
 
-    public static void initialize() {
+    public static synchronized void initialize() {
         loadFromFile();
     }
 
-    public static void loadFromFile() {
+    public static synchronized void loadFromFile() {
         synchronized (LOCK) {
             try {
                 if (Files.exists(STORE)) {
@@ -42,7 +38,6 @@ public class AiPermission {
                         AiPermission.mode = snapshot.mode;
                         AiPermission.groups = new HashSet<>();
                         AiPermission.activated = new HashSet<>();
-                        AiPermission.parallel = new HashMap<>();
 
                         final Set<String> groups = snapshot.groups;
                         if (groups != null) {
@@ -54,10 +49,6 @@ public class AiPermission {
                             AiPermission.activated.addAll(activated);
                         }
 
-                        final Map<String, Integer> parallel = snapshot.parallel;
-                        if (parallel != null) {
-                            AiPermission.parallel.putAll(parallel);
-                        }
                     }
                 }
             } catch (Exception e) {
@@ -76,18 +67,15 @@ public class AiPermission {
                 activated = new HashSet<>();
             }
 
-            if (parallel == null) {
-                parallel = new ConcurrentHashMap<>();
-            }
         }
     }
 
-    public static void saveToFile() {
+    public static synchronized void saveToFile() {
         synchronized (LOCK) {
             try {
                 Files.createDirectories(STORE.getParent());
 
-                PermissionSnapshot snapshot = new PermissionSnapshot(mode, groups, activated, parallel);
+                PermissionSnapshot snapshot = new PermissionSnapshot(mode, groups, activated);
 
                 Files.writeString(STORE, GSON.toJson(snapshot));
             } catch (Exception e) {
@@ -96,7 +84,7 @@ public class AiPermission {
         }
     }
 
-    public static boolean permits(String groupId) {
+    public static synchronized boolean permits(String groupId) {
         if (mode == null || groups == null) return false;
 
         if (mode == Mode.WHITELIST) {
@@ -108,7 +96,7 @@ public class AiPermission {
         }
     }
 
-    public static void grant(String groupId) {
+    public static synchronized void grant(String groupId) {
         if (mode == null || groups == null) return;
 
         if (mode == Mode.WHITELIST) {
@@ -120,7 +108,7 @@ public class AiPermission {
         saveToFile();
     }
 
-    public static void revoke(String groupId) {
+    public static synchronized void revoke(String groupId) {
         if (mode == null || groups == null) return;
 
         if (mode == Mode.WHITELIST) {
@@ -136,35 +124,24 @@ public class AiPermission {
         saveToFile();
     }
 
-    public static int getParallel(String groupId) {
-        if (parallel == null) return 1;
-        return parallel.getOrDefault(groupId, 1);
-    }
-
-    public static void activate(String groupId) {
+    public static synchronized void activate(String groupId) {
+        if (!permits(groupId)) throw new IllegalStateException("AI is not authorized for this group");
         if (activated == null) return;
         activated.add(groupId);
 
         saveToFile();
     }
 
-    public static void deactivate(String groupId) {
+    public static synchronized void deactivate(String groupId) {
         if (activated == null) return;
         activated.remove(groupId);
 
         saveToFile();
     }
 
-    public static boolean isActivated(String groupId) {
+    public static synchronized boolean isActivated(String groupId) {
         if (activated == null) return false;
-        return activated.contains(groupId);
-    }
-
-    public static void setParallel(String groupId, int parallel) {
-        if (AiPermission.parallel == null) return;
-        AiPermission.parallel.put(groupId, parallel);
-
-        saveToFile();
+        return permits(groupId) && activated.contains(groupId);
     }
 
     public enum Mode {
@@ -175,8 +152,7 @@ public class AiPermission {
     public record PermissionSnapshot(
             Mode mode,
             Set<String> groups,
-            Set<String> activated,
-            Map<String, Integer> parallel
+            Set<String> activated
     ) {
     }
 }

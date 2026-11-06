@@ -20,10 +20,10 @@ public final class MPNotifier {
         return messageSender.sendGroupMarkdown(
                 groupId,
                 """
-                %s
-                > __%s__
-                > %s mp - %s
-                """.formatted(uploadedImage.toMarkdown(), watch.roomName(), watch.version().value(), watch.roomId()).trim()
+                        %s
+                        > __%s__
+                        > %s mp - %s
+                        """.formatted(uploadedImage.toMarkdown(), watch.roomName(), watch.version().value(), watch.roomId()).trim()
         ) != null;
     }
 

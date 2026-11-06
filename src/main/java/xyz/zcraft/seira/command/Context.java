@@ -7,19 +7,31 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 public record Context(
-        String senderUserId, String groupId, String messageId, String command,
-        String[] args, String query, String rawContent, ReplyChannel replies, Consumer<String> recorder
+        String senderNickname, String senderUserId, String groupId, String messageId, String command,
+        String[] args, String query, String rawContent, ReplyChannel replies, Consumer<String> recorder,
+        int permissionLevel
 ) {
     public Context(
-            String senderUserId, String groupId, String messageId, String command,
-            String[] args, String rawContent, String query
+            String senderNickname, String senderUserId, String groupId, String messageId, String command,
+            String[] args, String rawContent, String query, int permissionLevel
     ) {
-        this(senderUserId, groupId, messageId, command, args, query, rawContent, null, null);
+        this(senderNickname, senderUserId, groupId, messageId, command, args, query, rawContent, null, null, permissionLevel);
     }
 
     public Context {
         args = args == null ? new String[0] : args.clone();
         query = query == null ? "" : query;
+    }
+
+    public boolean hasAdmin() {
+        return permissionLevel >= Permission.ADMIN;
+    }
+
+    public Context withReplies(ReplyChannel replyChannel) {
+        return new Context(
+                senderNickname, senderUserId, groupId, messageId, command, args, query, rawContent,
+                Objects.requireNonNull(replyChannel, "replyChannel"), recorder, permissionLevel
+        );
     }
 
     @Override
@@ -39,23 +51,16 @@ public record Context(
         return groupId != null && !groupId.isBlank();
     }
 
-    public Context withReplies(ReplyChannel replyChannel) {
-        return new Context(
-                senderUserId, groupId, messageId, command, args, query, rawContent,
-                Objects.requireNonNull(replyChannel, "replyChannel"), recorder
-        );
-    }
-
     public Context asCommand(String nextCommand, String[] nextArgs, String nextQuery) {
         return new Context(
-                senderUserId, groupId, messageId, nextCommand, nextArgs, nextQuery, rawContent, replies, recorder
+                senderNickname, senderUserId, groupId, messageId, nextCommand, nextArgs, nextQuery, rawContent, replies, recorder, permissionLevel
         );
     }
 
     public Context withRecorder(Consumer<String> recorder) {
         return new Context(
-                senderUserId, groupId, messageId, command, args, query, rawContent,
-                replies, Objects.requireNonNull(recorder, "recorder")
+                senderNickname, senderUserId, groupId, messageId, command, args, query, rawContent,
+                replies, Objects.requireNonNull(recorder, "recorder"), permissionLevel
         );
     }
 
@@ -125,5 +130,11 @@ public record Context(
     private void record(PendingMessage message) {
         if (message == null || recorder == null) return;
         recorder.accept(message.getRealContent());
+    }
+
+    public static class Permission {
+        public static final int OWNER = 8;
+        public static final int ADMIN = 4;
+        public static final int MEMBER = 0;
     }
 }

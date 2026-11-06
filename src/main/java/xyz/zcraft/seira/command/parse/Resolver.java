@@ -1,8 +1,11 @@
 package xyz.zcraft.seira.command.parse;
 
+import com.google.gson.JsonParser;
 import xyz.zcraft.seira.api.data.SearchQuery;
+import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.db.UserDataStore;
+import xyz.zcraft.seira.exception.NoBindException;
 
 import java.util.*;
 import java.util.regex.MatchResult;
@@ -10,6 +13,24 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class Resolver {
+    private static final Map<List<String>, String> ALIASES = Map.of(
+            List.of("+", "＋"), "+",
+            List.of("~", "～"), "~",
+            List.of("=", "＝"), "="
+    );
+    // <faceType=1,faceId="86",ext="eyJ0ZXh0Ijoi5oCE54GrIn0=">
+    // <faceType=1,faceId="497",ext="eyJ0ZXh0Ijoi5LyR5YGH5LqGIn0=">
+    private static final Pattern QQ_FACE = Pattern.compile(
+            "<faceType=[1|3],faceId=\"(\\d+)\",ext=\"([^\"]+)\">", Pattern.CASE_INSENSITIVE
+    );
+    // <faceType=6,faceId="0",ext="eyJ0ZXh0IjoiIn0="> ![ECA4B87395655D69E285314BAB3A2105.jpg](https://multimedia.nt.qq.com.cn/download?appid=14....9_U&spec=0)
+    private static final Pattern QQ_MEME = Pattern.compile(
+            "<faceType=6,faceId=\"0\",ext=\"([^\"]+)\">(?: !\\[.*]\\(.*\\))?", Pattern.CASE_INSENSITIVE
+    );
+    // <faceType=4,faceId="",ext="eyJ0ZXh0IjoiW+eCueeCueeCuV0ifQ==">
+    private static final Pattern QQ_MEME_ALT = Pattern.compile(
+            "<faceType=4,faceId=\"\",ext=\"([^\"]+)\">", Pattern.CASE_INSENSITIVE
+    );
     private final java.util.function.Function<String, Long> boundUid;
 
     public Resolver() {
@@ -20,11 +41,54 @@ public final class Resolver {
         this.boundUid = Objects.requireNonNull(boundUid);
     }
 
-    private static final Map<List<String>, String> ALIASES = Map.of(
-            List.of("+", "＋"), "+",
-            List.of("~", "～"), "~",
-            List.of("=", "＝"), "="
-    );
+    public static String parseQqMeme(String original) {
+        final Matcher qqFaceMatcher = QQ_FACE.matcher(original);
+
+        if (qqFaceMatcher.find()) {
+            original = qqFaceMatcher.replaceAll(r -> {
+                final String extBase64 = r.group(2);
+                final String ext = new String(Base64.getDecoder().decode(extBase64));
+                final String text = JsonParser.parseString(ext).getAsJsonObject().get("text").getAsString();
+                return "[表情:" + text + "]";
+            });
+        }
+
+        final Matcher qqMemeMatcher = QQ_MEME.matcher(original);
+
+        if (qqMemeMatcher.find()) {
+            original = qqMemeMatcher.replaceAll("[表情]");
+        }
+
+        final Matcher qqMemeAltMatcher = QQ_MEME_ALT.matcher(original);
+
+        if (qqMemeAltMatcher.find()) {
+            original = qqMemeAltMatcher.replaceAll(r -> {
+                final String extBase64 = r.group(1);
+                final String ext = new String(Base64.getDecoder().decode(extBase64));
+                final String text = JsonParser.parseString(ext).getAsJsonObject().get("text").getAsString();
+                return "[表情:" + text + "]";
+            });
+        }
+
+        return original;
+    }
+
+    public static Long parsePositiveLong(String value) {
+        try {
+            long parsed = Long.parseLong(value);
+            return parsed > 0 ? parsed : null;
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    public long requireBind(Context ctx) {
+        final Long l = resolveBoundUid(ctx.senderUserId());
+        if (l == null) {
+            throw new NoBindException();
+        }
+        return l;
+    }
 
     public String sanitize(String rawContent) {
         for (Map.Entry<List<String>, String> entry : ALIASES.entrySet()) {
@@ -33,11 +97,12 @@ public final class Resolver {
             }
         }
 
+        // /@someone -> /ux @someone
         if (rawContent.trim().equalsIgnoreCase("@")
                 || rawContent.trim().equalsIgnoreCase("//")) {
             return "ux";
         } else if (looksLikeMention(rawContent.trim())) {
-            return "ux " + rawContent;
+            return "ux " + rawContent.replace(" ", "_");
         }
 
         // Add surrounding space to <@> before expanding compact commands so /bp5<@...> is recognized.
@@ -45,9 +110,31 @@ public final class Resolver {
 
         rawContent = rawContent.replace("+", " +");
 
-        Matcher matcher = Patterns.COMPACT_SCORE_COMMAND_PATTERN.matcher(rawContent);
-        if (matcher.find()) {
+        Matcher matcher;
+
+        // Support for other bot's style's commands
+        // /bs -> /bp 20 & /ps -> /rp 20 & /b5 -> /bp5 & /p -> /rp
+        if ((matcher = Patterns.PS_BS.matcher(rawContent)).matches()) {
+            String command = switch (matcher.group(1)) {
+                case "bs" -> "bp";
+                case "ps" -> "rp";
+                case "debs", "🉐" -> "debp";
+                default -> matcher.group(1);
+            };
+            String count = (matcher.group(2) == null) ? "20" : matcher.group(2);
+            String target = (matcher.group(3) == null ? "" : matcher.group(3));
+            rawContent = command + " " + count + " " + target;
+        } else if ("p".equals(rawContent)) {
+            rawContent = "rp";
+        } else if ("b".equals(rawContent)) {
+            rawContent = "bp";
+        } else if ((matcher = Patterns.COMPACT_SCORE_COMMAND_PATTERN.matcher(rawContent)).find()) {
             String type = matcher.group(1).toLowerCase(Locale.ROOT);
+            if ("b".equals(type)) {
+                type = "bp";
+            } else if ("p".equals(type)) {
+                type = "rp";
+            }
             String start = matcher.group(2);
             String end = matcher.group(3);
             String remaining = rawContent.substring(matcher.end());
@@ -61,8 +148,14 @@ public final class Resolver {
             }
         }
 
-        matcher = Patterns.SPACE_MISSING_COMMAND_PATTERN.matcher(rawContent);
-        if (matcher.find()) {
+        // /tb#30@someone -> /tb #30 @someone
+        if ((matcher = Patterns.COMPACT_TB_COMMAND_PATTERN.matcher(rawContent)).find()) {
+            String target = matcher.group(2) == null ? "" : matcher.group(2);
+            rawContent = "tb #" + matcher.group(1) + " " + target;
+        }
+
+        // General /abc12345 -> /abc 12345
+        if ((matcher = Patterns.SPACE_MISSING_COMMAND_PATTERN.matcher(rawContent)).find()) {
             String command = matcher.group(1).toLowerCase(Locale.ROOT);
             String target = matcher.group(2);
             String remaining = rawContent.substring(matcher.end());
@@ -162,22 +255,16 @@ public final class Resolver {
         return result;
     }
 
-    public Long parsePositiveLong(String value) {
-        try {
-            long parsed = Long.parseLong(value);
-            return parsed > 0 ? parsed : null;
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
-    }
-
     public boolean looksLikeUid(String arg) {
         return Pattern.compile("^\\d+$").matcher(arg).matches();
     }
 
     private static final class Patterns {
         private static final Pattern COMPACT_SCORE_COMMAND_PATTERN = Pattern.compile(
-                "(?i)^(rs|rp|bp)(\\d+)(?:-(\\d+))?(?=\\s|$)"
+                "(?i)^(rs|rp|bp|bd|b|p)(\\d+)(?:-(\\d+))?(?=\\s|$)"
+        );
+        private static final Pattern COMPACT_TB_COMMAND_PATTERN = Pattern.compile(
+                "(?i)^tb#?(\\d+)(.*)"
         );
         private static final Pattern SPACE_MISSING_COMMAND_PATTERN = Pattern.compile(
                 "^([a-zA-Z]+)(\\d+(?:#\\d+)?)"
@@ -187,6 +274,7 @@ public final class Resolver {
         private static final Pattern QQ_INLINE_AT_PATTERN = Pattern.compile("(<@[A-Z0-9]{32}>)");
         private static final Pattern PLAIN_AT_PATTERN = Pattern.compile("^@(\\d+)$");
         private static final Pattern SEARCH_PATTERN = Pattern.compile("^(?:#(\\d+) )?(.+)$");
+        private static final Pattern PS_BS = Pattern.compile("^(ps|bs|debs|🉐)(?:\\s+)?(\\d+)?( .*)?$");
     }
 }
 

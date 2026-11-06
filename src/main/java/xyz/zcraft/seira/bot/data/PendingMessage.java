@@ -54,10 +54,6 @@ public class PendingMessage {
         return message;
     }
 
-    public static PendingMessage ofUploadedVideo(FileInfo fileInfo) {
-        return ofUploadedVideo(fileInfo, null);
-    }
-
     public static PendingMessage ofUploadedVideo(FileInfo fileInfo, String sourceUrl) {
         if (fileInfo == null || fileInfo.getFileInfo() == null || fileInfo.getFileInfo().isBlank()) {
             throw new IllegalArgumentException("Uploaded video file info is required");

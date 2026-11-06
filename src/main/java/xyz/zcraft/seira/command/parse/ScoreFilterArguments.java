@@ -1,5 +1,7 @@
 package xyz.zcraft.seira.command.parse;
 
+import xyz.zcraft.osu.model.ModSettings;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -14,7 +16,7 @@ public final class ScoreFilterArguments {
     private static final Pattern FILTER_PATTERN = Pattern.compile(
             "(?i)^(acc(?:uracy)?|combo|pp|time|length|len|star|stars|sr|bpm|miss|misses|score|mod|mods|rank|replay"
                     + "|any|title|artist|mapper|genre|language|tag|source|nsfw|video|storyboard|fullcombo"
-                    + "|ar|od|cs|hp|t|a|cb|cmb|m|vid|sb|fc|rep|rp)"
+                    + "|ar|od|cs|hp|t|a|cb|cmb|m|vid|sb|fc|rep|rp|type|ur|v|client)"
                     + "(>=|<=|!=|!~|>|<|=|~)(.+)$"
     );
     private static final Pattern MISS_SHORTHAND_PATTERN = Pattern.compile("(?i)^(!?)(\\d+)miss(?:es)?$");
@@ -57,7 +59,7 @@ public final class ScoreFilterArguments {
 
         String field = normalizeField(matcher.group(1));
         String operator = matcher.group(2);
-        String value = matcher.group(3).trim();
+        String value = normalizeValue(field, matcher.group(3).trim());
 
         if (field.equals("mod")) {
             if (!Set.of("~", "!~", "=", "!=").contains(operator)) {
@@ -72,7 +74,15 @@ public final class ScoreFilterArguments {
             if (!RANKS.contains(value)) {
                 throw new IllegalArgumentException("rank 必须是 SSH/SS/XH/X/SH/S/A/B/C/D/F");
             }
-        } else if (Set.of("any", "title", "artist", "mapper", "genre", "language", "tag", "source").contains(field)) {
+        } else if (field.equals("client")) {
+            if (!("=".equals(operator) || "!=".equals(operator))) {
+                throw new IllegalArgumentException("client 仅支持 =、!=");
+            }
+            value = value.toUpperCase(Locale.ROOT);
+            if (!("LAZER".equals(value) || "STABLE".equals(value))) {
+                throw new IllegalArgumentException("client 必须是 LAZER 或 STABLE");
+            }
+        } else if (Set.of("any", "title", "artist", "mapper", "genre", "language", "tag", "source", "type").contains(field)) {
             if (!Set.of("~", "!~", "=", "!=").contains(operator)) {
                 throw new IllegalArgumentException(field + " 仅支持 ~、!~、=、!=");
             }
@@ -120,6 +130,17 @@ public final class ScoreFilterArguments {
         return field + operator + value;
     }
 
+    private static String normalizeValue(String field, String value) {
+        if (field.equals("client")) {
+            return switch (value.toLowerCase(Locale.ROOT)) {
+                case "l", "lzr", "lazer" -> "LAZER";
+                case "s", "stb", "stable" -> "STABLE";
+                default -> value;
+            };
+        }
+        return value;
+    }
+
     private static String normalizeField(String value) {
         return switch (value.toLowerCase(Locale.ROOT)) {
             case "acc", "accuracy" -> "acc";
@@ -130,6 +151,7 @@ public final class ScoreFilterArguments {
             case "bpm" -> "bpm";
             case "miss", "misses" -> "miss";
             case "score" -> "score";
+            case "ur" -> "ur";
             case "ar" -> "ar";
             case "od" -> "od";
             case "cs" -> "cs";
@@ -149,6 +171,8 @@ public final class ScoreFilterArguments {
             case "storyboard", "sb" -> "storyboard";
             case "fullcombo", "fc" -> "fullcombo";
             case "replay", "rep", "rp" -> "replay";
+            case "type" -> "type";
+            case "client", "v" -> "client";
             default -> throw new IllegalArgumentException("未知字段 " + value);
         };
     }
@@ -170,6 +194,9 @@ public final class ScoreFilterArguments {
             case "replay" -> "replay=true";
             case "!replay" -> "replay=false";
             case "!fc", "!fullcombo" -> "fullcombo=false";
+            case "lazer", "lzr" -> "client=lazer";
+            case "stable", "stb" -> "client=stable";
+
             default -> null;
         };
         if (booleanFilter != null) return booleanFilter;
@@ -186,11 +213,7 @@ public final class ScoreFilterArguments {
     }
 
     private static void validateMods(String value) {
-        String normalized = value.toUpperCase(Locale.ROOT).replace("+", "");
-        if (normalized.equals("NM")) return;
-        if (normalized.isEmpty() || normalized.length() % 2 != 0 || !normalized.matches("[A-Z]+")) {
-            throw new IllegalArgumentException("mod 值应为 NM 或 Mod 缩写组合，例如 HDDT");
-        }
+        ModSettings.parse(value);
     }
 
     private static double parseDuration(String value) {

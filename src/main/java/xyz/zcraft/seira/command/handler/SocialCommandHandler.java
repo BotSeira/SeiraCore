@@ -8,10 +8,10 @@ import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.Response;
 import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.Context;
-import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.command.parse.TargetInput;
+import xyz.zcraft.seira.command.parse.TargetResolver;
 import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.db.UserDataStore;
@@ -26,25 +26,25 @@ import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class SocialCommandHandler {
     private final Resolver resolver;
+    private final TargetResolver targets;
     private final OsuAuthHelper authHelper;
     private final TaskCoordinator taskCoordinator;
     private final ReplyFactory replyFactory;
-    private final Function<String, String> accessTokenProvider;
     private final Function<String, String> avatarProvider;
 
     public SocialCommandHandler(
             Resolver resolver,
+            TargetResolver targets,
             OsuAuthHelper authHelper,
             TaskCoordinator taskCoordinator,
             ReplyFactory replyFactory,
-            Function<String, String> accessTokenProvider,
             Function<String, String> avatarProvider
     ) {
         this.resolver = resolver;
+        this.targets = targets;
         this.authHelper = authHelper;
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
-        this.accessTokenProvider = accessTokenProvider;
         this.avatarProvider = avatarProvider;
     }
 
@@ -68,11 +68,7 @@ public final class SocialCommandHandler {
     }
 
     public void handleF(Context ctx, boolean all) {
-        final Long uid = resolver.resolveBoundUid(ctx.senderUserId());
-        if (uid == null) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.NO_BIND));
-            return;
-        }
+        resolver.requireBind(ctx);
 
         if (ctx.argumentCount() == 0) {
             handleFriendList(ctx, all);
@@ -87,7 +83,7 @@ public final class SocialCommandHandler {
     }
 
     public void handleFriendStatus(Context ctx) {
-        final Long selfId = resolver.resolveBoundUid(ctx.senderUserId());
+        final long selfId = resolver.requireBind(ctx);
 
         if (ctx.argumentCount() == 0) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/mu @someone\n> 注: 读取@需要开启权限。"));
@@ -260,57 +256,38 @@ public final class SocialCommandHandler {
     }
 
     public void handleLb(Context ctx) {
-        if (ctx.args().length == 0) {
-            if (ctx.groupId() != null && !ctx.groupId().isBlank()) {
-                List<Long> groupBoundUids = UserDataStore.findBoundUidsByGroup(ctx.groupId());
-                if (groupBoundUids.isEmpty()) {
-                    ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "本群还没有已绑定的玩家，请先使用 /bind"));
-                    return;
-                }
-
-                try (var _ = taskCoordinator.beginRequest(ctx, "Leaderboard")) {
-                    var response = OstellaApi.getLeaderboardResponse(groupBoundUids);
-                    ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
-                }
-                return;
-            }
-            Long uid = resolver.resolveBoundUid(ctx.senderUserId());
-            if (uid == null) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.NO_BIND));
-                return;
-            }
-
-            try (var _ = taskCoordinator.beginRequest(ctx, "Leaderboard")) {
-                var response = OstellaApi.getLeaderboardResponse(List.of(uid));
-                ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
-            }
-        } else if (ctx.args().length == 1 || ctx.args().length == 2) {
+        if (ctx.args().length == 1 || ctx.args().length == 2) {
             var target = TargetInput.read(ctx.args());
             int remainingArgs = ctx.argumentCount() - target.consumedArgs();
+            boolean update = false;
             List<Long> uids = new LinkedList<>();
-            if (remainingArgs == 1) {
+            if (remainingArgs == 1 && !"update".equalsIgnoreCase(ctx.argument(target.consumedArgs()))) {
                 String[] uidTokens = ctx.argument(target.consumedArgs()).split(",");
                 if (uidTokens.length == 0) {
                     ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "玩家ID列表不能为空。"));
                     return;
                 }
                 for (String token : uidTokens) {
-                    Long uid = resolver.parsePositiveLong(token.trim());
+                    Long uid = Resolver.parsePositiveLong(token.trim());
                     if (uid == null) {
                         ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "玩家ID列表包含非法值。"));
                         return;
                     }
                     uids.add(uid);
                 }
-            } else if (remainingArgs != 0) {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
-                return;
             } else if (ctx.inGroup()) {
+                if (remainingArgs == 1 && "update".equalsIgnoreCase(ctx.argument(target.consumedArgs()))) {
+                    update = true;
+                }
+
                 uids.addAll(UserDataStore.findBoundUidsByGroup(ctx.groupId()));
                 if (uids.isEmpty()) {
                     ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "本群还没有已绑定的玩家，请先使用 /bind"));
                     return;
                 }
+            } else if (remainingArgs != 0) {
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/lb <谱面ID或快捷查询> [玩家ID列表(逗号分隔)]"));
+                return;
             } else {
                 Long uid = resolver.resolveBoundUid(ctx.senderUserId());
                 if (uid == null) {
@@ -321,19 +298,8 @@ public final class SocialCommandHandler {
             }
 
             try (var _ = taskCoordinator.beginRequest(ctx, "Map Leaderboard")) {
-                long beatmapId = switch (target.kind()) {
-                    case ID, MAP -> Long.parseLong(target.id());
-                    case SCORE -> OstellaApi.getScoreBeatmapId(target.id());
-                    case SET -> OstellaApi.lookupBeatmapInSet(Long.parseLong(target.id()), target.index(),
-                            accessTokenProvider.apply(ctx.senderUserId()));
-                    case RS, RP, BP -> {
-                        long uid = OstellaApi.resolveUid(resolver.player(target.player(), ctx.senderUserId()));
-                        yield OstellaApi.lookupPlayerScoreBeatmap(uid, target.scoreList(), target.index(), accessTokenProvider.apply(ctx.senderUserId()));
-                    }
-                    case MP -> OstellaApi.lookupMultiplayerBeatmap(accessTokenProvider.apply(ctx.senderUserId()));
-                    case MEMORY -> throw new ResolutionException("请指定指令目标谱面喵");
-                };
-                var response = OstellaApi.getGroupLeaderboardResponse(beatmapId, uids);
+                long beatmapId = targets.beatmapId(ctx, target);
+                var response = OstellaApi.getGroupLeaderboardResponse(beatmapId, uids, update);
                 ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.lbMessage(ctx, response)));
             }
         } else {

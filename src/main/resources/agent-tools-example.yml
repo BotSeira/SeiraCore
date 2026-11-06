@@ -1,0 +1,24 @@
+# Copy to agent-tools.yml. Tools are enabled only after an explicit configuration load.
+# $name maps a model argument to a query value or JSON body value (preserving its type).
+# URLs and headers are operator controlled. A header value env:NAME reads the whole value
+# from an environment variable (including a Bearer prefix if the server requires one).
+tools: [ ]
+# Example:
+#  - name: lookup_item
+#    description: Look up an item in an operator-configured API
+#    url: "http://localhost:8080/items"
+#    method: GET
+#    parameters:
+#      type: object
+#      properties:
+#        id: {type: integer}
+#      required: [id]
+#      additionalProperties: false
+#    query: {id: "$id"}
+#    headers: {Authorization: "env:ITEM_API_AUTHORIZATION"}
+#    timeoutSeconds: 30
+#    groups: [] # empty means available to all enabled conversations
+#    enabled: true
+#    adminOnly: false
+#    requiresConfirmation: false # non-GET requests default to true
+#    resultPointer: "" # e.g. /data/items to extract a JSON response field

@@ -97,12 +97,13 @@ public final class MPWatchApi {
         return snapshot;
     }
 
-    public byte[] renderResult(MPVersion version, long roomId, long playlistItemId, Integer customBo) {
+    public byte[] renderResult(MPVersion version, long roomId, long playlistItemId, Integer customBo, Integer customWarmups) {
         HttpResponse<byte[]> response = get(
                 "/multiplayer/rooms/" + requirePositive(roomId, "roomId")
                         + "/playlist/" + requirePositive(playlistItemId, "playlistItemId") + "/result?version="
                         + requireVersion(version).value()
-                        + (customBo == null ? "" : "&bo=" + customBo),
+                        + (customBo == null ? "" : "&bo=" + customBo)
+                        + (customWarmups == null ? "" : "&warmup=" + customWarmups),
                 HttpResponse.BodyHandlers.ofByteArray()
         );
         ensureSuccessfulStatus(response.statusCode(), response.body(), "生成多人房间结果图片");
@@ -127,7 +128,7 @@ public final class MPWatchApi {
             Thread.currentThread().interrupt();
             throw new RuntimeException("oStella 请求被中断", e);
         } catch (IOException e) {
-            throw new RuntimeException("无法连接 oStella", e);
+            throw new RuntimeException("无法连接 oStella，这可能是因为后端正在更新...", e);
         }
     }
 }

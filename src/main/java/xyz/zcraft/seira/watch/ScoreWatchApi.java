@@ -132,7 +132,7 @@ public class ScoreWatchApi {
             Thread.currentThread().interrupt();
             throw new RuntimeException("oStella 请求被中断", e);
         } catch (IOException e) {
-            throw new RuntimeException("无法连接 oStella", e);
+            throw new RuntimeException("无法连接 oStella，这可能是因为后端正在更新...", e);
         }
     }
 }

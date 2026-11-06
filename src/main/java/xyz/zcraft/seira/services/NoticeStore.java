@@ -16,7 +16,7 @@ import java.util.TreeSet;
 public class NoticeStore {
     private static final Logger LOG = LogManager.getLogger(NoticeStore.class);
     private static final Path STORE = Path.of("data", "notices.json");
-    private static final Path CONTENT_STORE = Path.of("data","notices");
+    private static final Path CONTENT_STORE = Path.of("data", "notices");
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Object LOCK = new Object();
     private static TreeSet<Notice> notices = null;

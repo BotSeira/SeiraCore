@@ -4,6 +4,7 @@ import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.config.Configurator;
+import xyz.zcraft.seira.agent.AgentChatHandler;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.route.Router;
@@ -273,17 +274,21 @@ public final class ConsoleCommandProcessor {
 
     private ConsoleResult ai(ConsoleInputParser.ParsedInput input) {
         if (input.size() == 2) {
-            final String value = input.value(1).toLowerCase(Locale.ROOT);
+            final String value = input.value(1);
             if (value.equalsIgnoreCase("reload")) {
-                AiPermission.loadFromFile();
-                return ConsoleResult.success("AI permission reloaded.");
+                try {
+                    AgentChatHandler.getInstance().reload();
+                    return ConsoleResult.success("AI runtime config reloaded.");
+                } catch (IOException e) {
+                    return ConsoleResult.failure("Failed to reload AI runtime config: " + e.getMessage());
+                }
             } else if (ID_PATTERN.matcher(value).matches()) {
                 return ConsoleResult.success("AI chat for group " + value + " is: " + AiPermission.permits(value));
             } else {
                 return ConsoleResult.failure("Group id " + value + " not a valid id.");
             }
         } else if (input.size() == 3) {
-            final String target = input.value(1).toUpperCase(Locale.ROOT);
+            final String target = input.value(1);
             final String option = input.value(2).toLowerCase(Locale.ROOT);
 
             if (!ID_PATTERN.matcher(target).matches()) {
@@ -291,7 +296,8 @@ public final class ConsoleCommandProcessor {
             }
 
             if ("on".equalsIgnoreCase(option)) {
-                AiPermission.permits(target);
+                if (!AiPermission.permits(target))
+                    return ConsoleResult.failure("Group is not authorized; use ai <group-id> grant first.");
                 AiPermission.activate(target);
                 return ConsoleResult.success("AI chat for group " + target + " is activated.");
             } else if ("off".equalsIgnoreCase(option)) {
@@ -303,27 +309,10 @@ public final class ConsoleCommandProcessor {
             } else if ("revoke".equalsIgnoreCase(option)) {
                 AiPermission.revoke(target);
                 return ConsoleResult.success("AI chat for group " + target + " is revoked.");
-            } else if ("parallel".equalsIgnoreCase(option)) {
-                final int parallel = AiPermission.getParallel(target);
-                return ConsoleResult.success("Parallel count of AI chat for group " + target + " is " +  parallel + ".");
-            }
-        } else if (input.size() == 4) {
-            final String target = input.value(1).toUpperCase(Locale.ROOT);;
-            final String option = input.value(2).toLowerCase(Locale.ROOT);
-            final String value = input.value(3).toLowerCase(Locale.ROOT);
-
-            if (!ID_PATTERN.matcher(target).matches()) {
-                return ConsoleResult.failure("Group id " + target + " not a valid id.");
-            }
-
-            if (option.equalsIgnoreCase("parallel")) {
-                final int l = positiveInt(value, "parallel count");
-                AiPermission.setParallel(target, l);
-                return ConsoleResult.success("Parallel count of AI chat for group " + target + " is now set to " + l + ".");
             }
         }
 
-        return ConsoleResult.failure("Usage: ai <on|off> <group-id>");
+        return ConsoleResult.failure("Usage: ai reload | ai <group-id> [on|off|grant|revoke]");
     }
 
     private ConsoleResult help(ConsoleInputParser.ParsedInput input) {
@@ -347,7 +336,7 @@ public final class ConsoleCommandProcessor {
                                                          Manage command panels
                       cache <query|delete|get|fetch> <type> <id>
                                                          Inspect/delete cache through oStella and workers
-                      ai <on|off> <group-id>             Manage AI chat status
+                      ai <group-id> [on|off|grant|revoke] Manage AI chat permission/status
                       gateway <status|reconnect>         Inspect or reconnect the QQ gateway
                       log <show|level>                   Inspect or change the runtime log level
                       inspect                            Show the last dispatched message context
@@ -397,7 +386,7 @@ public final class ConsoleCommandProcessor {
                     query reports presence at oStella and every osuRenderer worker.
                     get includes metadata; fetch populates oStella and downstream workers; delete removes every reachable copy.""";
             case "ai" -> """
-                    ai <group-id> [on|off]
+                    ai reload | ai <group-id> [on|off|grant|revoke]
                     ai reload
                     Turn on or off AI chat function for specific group.
                     """;

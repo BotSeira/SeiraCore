@@ -191,11 +191,11 @@ public final class WatchCommandHandler {
     }
 
     private WatchTarget lookupGroupPlayer(String groupId, String argument) {
-        Long uid = resolver.parsePositiveLong(argument);
+        Long uid = Resolver.parsePositiveLong(argument);
         User user = uid == null ? OstellaApi.lookupUser(argument).getContent()
                 : OstellaApi.getUsers(List.of(uid)).stream()
-                        .filter(candidate -> candidate.getId() == uid)
-                        .findFirst().orElseThrow(() -> new ResolutionException("未找到指定的玩家。"));
+                .filter(candidate -> candidate.getId() == uid)
+                .findFirst().orElseThrow(() -> new ResolutionException("未找到指定的玩家。"));
         String openId = UserDataStore.findGroupOpenIdByUid(groupId, user.getId())
                 .orElseThrow(() -> new ResolutionException("指定的玩家不在当前群聊中，或尚未在本群完成绑定。"));
         UserDataStore.storeUserInfo(user.getId(), user.getUsername());

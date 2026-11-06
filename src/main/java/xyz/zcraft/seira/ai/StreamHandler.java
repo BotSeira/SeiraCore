@@ -1,5 +1,6 @@
 package xyz.zcraft.seira.ai;
 
+@Deprecated
 public interface StreamHandler {
     void onText(String message);
 

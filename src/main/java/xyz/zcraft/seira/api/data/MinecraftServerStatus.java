@@ -16,7 +16,8 @@ public record MinecraftServerStatus(
             String description,
             JsonElement descriptionRaw,
             String favicon
-    ){}
+    ) {
+    }
 
     public record Version(
             String name,
@@ -27,7 +28,7 @@ public record MinecraftServerStatus(
     public record Players(
             Long max,
             Long online,
-            List<Sample> samples
+            List<Sample> sample
     ) {
         public record Sample(
                 String id,

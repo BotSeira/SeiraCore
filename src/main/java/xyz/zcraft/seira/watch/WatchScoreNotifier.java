@@ -22,9 +22,9 @@ public final class WatchScoreNotifier {
         return messageSender.sendGroupMarkdown(
                 groupId,
                 """
-                %s
-                > ID %s
-                """.formatted(uploadedImage.toMarkdown(), s(score.scoreId())).trim()
+                        %s
+                        > ID %s
+                        """.formatted(uploadedImage.toMarkdown(), s(score.scoreId())).trim()
         ) != null;
     }
 }

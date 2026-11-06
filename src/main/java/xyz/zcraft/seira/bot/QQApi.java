@@ -4,6 +4,7 @@ import com.google.gson.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.bot.data.*;
+import xyz.zcraft.seira.interaction.data.InteractionResponse;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,7 +26,8 @@ import java.util.concurrent.*;
 
 public class QQApi {
     private static final String ENDPOINT = "https://api.sgroup.qq.com";
-    private static final HttpClient CLIENT = HttpClient.newBuilder().build();
+    private static final HttpClient CLIENT = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10)).build();
     private static final HttpClient MEDIA_CLIENT = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.NORMAL)
             .connectTimeout(Duration.ofSeconds(30))
@@ -91,10 +93,27 @@ public class QQApi {
         }
     }
 
+    public static void putInteractionResponse(AccessToken accessToken, String interactionId, InteractionResponse response) {
+        try {
+            final var request = newRequestBuilder(accessToken)
+                    .uri(URI.create(ENDPOINT + "/interactions/" + interactionId))
+                    .PUT(HttpRequest.BodyPublishers.ofString(GSON.toJson(Map.of("code", response.getCode()))))
+                    .build();
+
+            final HttpResponse<String> send = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            if (send.statusCode() != 200) {
+                throw new RuntimeException("Failed to put interaction response to " + interactionId + " " + send.body());
+            }
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
+        }
+    }
+
     public static SentMessage sendGroupMessage(AccessToken accessToken, String groupId, Message message) {
         try {
             final var request = newRequestBuilder(accessToken)
                     .uri(URI.create(ENDPOINT + "/v2/groups/" + groupId + "/messages"))
+                    .timeout(Duration.ofSeconds(30))
                     .POST(HttpRequest.BodyPublishers.ofString(buildMessageJson(message)))
                     .build();
 
@@ -353,6 +372,7 @@ public class QQApi {
                 if (System.nanoTime() >= deadline) {
                     break;
                 }
+                //noinspection BusyWait
                 Thread.sleep(TimeUnit.SECONDS.toMillis(prepare.retryDelaySeconds()));
             }
         } while (System.nanoTime() < deadline);

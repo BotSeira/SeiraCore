@@ -21,9 +21,9 @@ public class BotStat {
     private static final AtomicLong totalCommands = new AtomicLong();
     private static final AtomicLong totalReplays = new AtomicLong();
     private static final AtomicLong totalUptime = new AtomicLong();
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static ScheduledExecutorService scheduler;
     private static long startTime;
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     public static void initialize() {
         if (!initialized.compareAndSet(false, true)) {

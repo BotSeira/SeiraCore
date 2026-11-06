@@ -25,9 +25,9 @@ public class DailyLuck {
             "调整灵敏度", "更换皮肤", "观看比赛", "学习打法", "熬夜冲榜", "冲PP", "刷分", "赌FC",
             "打远古图", "随机谱面", "手感复健", "术曲鉴赏"
     };
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static String salt = "Ciallo～(∠・ω< )⌒★";
     private static String luckDate;
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     public static void initialize(String salt) {
         DailyLuck.salt = salt;
@@ -69,8 +69,16 @@ public class DailyLuck {
             indexes.add(r.nextInt(FORTUNE_POOL.length));
         }
 
-        final String upStr = indexes.stream().limit(up).map(i -> FORTUNE_POOL[i]).reduce((a, b) -> a + ", " + b).orElse("无");
-        final String downStr = indexes.stream().skip(up).map(i -> FORTUNE_POOL[i]).reduce((a, b) -> a + ", " + b).orElse("无");
+        final String upStr = indexes.stream()
+                .limit(up)
+                .map(i -> FORTUNE_POOL[i])
+                .reduce((a, b) -> a + ", " + b)
+                .orElse("无");
+        final String downStr = indexes.stream()
+                .skip(up)
+                .map(i -> FORTUNE_POOL[i])
+                .reduce((a, b) -> a + ", " + b)
+                .orElse("无");
 
         return new Luck(luck, upStr, downStr, ids.isEmpty() ? 0 : ids.get(r.nextInt(ids.size())));
     }

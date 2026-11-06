@@ -3,30 +3,37 @@ package xyz.zcraft.seira.command.route;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.seira.ai.provider.ChatProvider;
-import xyz.zcraft.seira.ai.AiChatHandler;
+import xyz.zcraft.seira.addpp.AddPpApi;
+import xyz.zcraft.seira.agent.AgentChatHandler;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.QQApi;
-import xyz.zcraft.seira.bot.data.*;
+import xyz.zcraft.seira.bot.data.Attachment;
+import xyz.zcraft.seira.bot.data.MsgElem;
+import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.QQUser;
+import xyz.zcraft.seira.challenge.ChallengeService;
 import xyz.zcraft.seira.command.*;
 import xyz.zcraft.seira.command.handler.*;
 import xyz.zcraft.seira.command.parse.CommandParser;
 import xyz.zcraft.seira.command.parse.Resolver;
+import xyz.zcraft.seira.command.parse.TargetResolver;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.discord.DiscordBridgeService;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
-import xyz.zcraft.seira.services.AiPermission;
-import xyz.zcraft.seira.services.BindingService;
+import xyz.zcraft.seira.services.BindService;
+import xyz.zcraft.seira.services.McMessageService;
+import xyz.zcraft.seira.services.WebServer;
 import xyz.zcraft.seira.util.AdminRegistry;
 import xyz.zcraft.seira.util.NoticesHelper;
 import xyz.zcraft.seira.util.OsuAuthHelper;
 import xyz.zcraft.seira.watch.MPWatchService;
 import xyz.zcraft.seira.watch.ScoreWatchService;
+import xyz.zcraft.seira.whatif.WhatIfApi;
 
 import java.util.List;
 import java.util.Optional;
@@ -52,47 +59,58 @@ public class Router {
     private final CommandHandler unknownCommand;
     private final Executor commandExecutor;
     private final Supplier<QQUser> selfSupplier;
-    private final AiChatHandler aiChatHandler;
+    private final AgentChatHandler aiChatHandler;
+    private final InteractionHandler interactionHandler;
+    private final McMessageService mcMessageService;
 
     public Router(
             MessageSender messageSender, Supplier<AppConfig> configSupplier, AdminRegistry admins,
-            BindingService bindingService, ScoreWatchService watchService, MPWatchService mpWatchService,
+            WebServer webServer, ScoreWatchService watchService, ChallengeService challengeService, MPWatchService mpWatchService,
             DiscordBridgeService discordBridgeService, RankGuessGameService rankGuessGameService, Executor commandExecutor,
             Runnable commandMetric, Function<byte[], UploadedImage> imageUploader, Supplier<QQUser> selfSupplier,
-            ChatProvider chatProvider, Function<String, GroupBotState> botStateGetter
+            AgentChatHandler agentHandler, InteractionHandler interactionHandler,
+            BindService bindService, McMessageService mcMessageService
     ) {
         this.configSupplier = java.util.Objects.requireNonNull(configSupplier);
         this.commandExecutor = commandExecutor;
         this.commandMetric = java.util.Objects.requireNonNull(commandMetric);
         this.selfSupplier = selfSupplier;
+        this.interactionHandler = interactionHandler;
+        this.mcMessageService = mcMessageService;
         AppConfig startupConfig = configSupplier.get();
-        ReplyFactory replyFactory = new ReplyFactory(configSupplier);
+        ReplyFactory replyFactory = new ReplyFactory(configSupplier, interactionHandler);
         Resolver resolver = new Resolver();
+        TargetResolver targetResolver = new TargetResolver(resolver, this::getAccessTokenFor);
         TargetHistory history = new TargetHistory();
         ReplayResultStore replayResults = new ReplayResultStore();
         VideoRenderRecord videoRenderRecord = new VideoRenderRecord();
         this.taskCoordinator = new TaskCoordinator(messageSender, replayResults, discordBridgeService);
         this.authHelper = new OsuAuthHelper(startupConfig.binding());
-        BindingCommandHandler bindingCommands = new BindingCommandHandler(startupConfig, replyFactory, bindingService);
+        BindingCommandHandler bindingCommands = new BindingCommandHandler(startupConfig, replyFactory, bindService);
         ScoreCommandHandler scoreCommands = new ScoreCommandHandler(
-                resolver, history, taskCoordinator, replyFactory, this::getAccessTokenFor
+                resolver, targetResolver, history, taskCoordinator, replyFactory, challengeService
         );
         BeatmapCommandHandler beatmapCommands = new BeatmapCommandHandler(
-                resolver, history, taskCoordinator, replyFactory, videoRenderRecord, this::getAccessTokenFor
+                resolver, targetResolver, history, taskCoordinator, replyFactory, videoRenderRecord, this::getAccessTokenFor
         );
         SocialCommandHandler socialCommands = new SocialCommandHandler(
-                resolver, authHelper, taskCoordinator, replyFactory, this::getAccessTokenFor, this::getAvatar
+                resolver, targetResolver, authHelper, taskCoordinator, replyFactory, this::getAvatar
         );
         ReplayCommandHandler replayCommands = new ReplayCommandHandler(
-                resolver, history, taskCoordinator, replyFactory, videoRenderRecord, replayResults, admins::isAdmin, this::getAccessTokenFor
+                resolver, targetResolver, history, taskCoordinator, replyFactory, videoRenderRecord, replayResults, admins::isAdmin
         );
         GeneralCommandHandler generalCommands = new GeneralCommandHandler(
-                messageSender, taskCoordinator, replyFactory, resolver, admins::isAdmin
+                messageSender, taskCoordinator, replyFactory, resolver, targetResolver, history, admins::isAdmin
         );
-        this.aiChatHandler = new AiChatHandler(
-                resolver, chatProvider, admins::isAdmin, botStateGetter
+
+        MinecraftCommandHandler minecraftCommands = new MinecraftCommandHandler(
+                messageSender, taskCoordinator, replyFactory, resolver, targetResolver, history, admins::isAdmin, mcMessageService
         );
+
+        this.aiChatHandler = agentHandler;
         WatchCommandHandler watchCommands = new WatchCommandHandler(resolver, taskCoordinator, watchService, admins::isAdmin);
+        ChallengeCommandHandler challengeCommands = new ChallengeCommandHandler(
+                challengeService, UserDataStore::findBoundUid, admins::isAdmin);
         SpecificScoreWatchCommandHandler specificScoreWatchCommands =
                 new SpecificScoreWatchCommandHandler(taskCoordinator, watchService);
         MPWatchCommandHandler multiplayerRoomWatchCommands =
@@ -101,16 +119,24 @@ public class Router {
         RankGuessCommandHandler rankGuessCommands = new RankGuessCommandHandler(
                 taskCoordinator, replyFactory, rankGuessGameService, resolver, admins::isAdmin, this::getAvatar, imageUploader
         );
+        NcmHandler ncmHandler = new NcmHandler(messageSender, taskCoordinator, replyFactory, resolver, targetResolver, history, admins::isAdmin);
         this.unknownCommand = generalCommands::handleUnknown;
+        WhatIfApi rankPpService = new WhatIfApi(startupConfig.ostella().endpoint(), startupConfig.ostella().token());
+        WhatIfCommandHandler whatIfCommands = new WhatIfCommandHandler(rankPpService);
+        AddPpCommandHandler addPpCommands = new AddPpCommandHandler(
+                new AddPpApi(startupConfig.ostella().endpoint(), startupConfig.ostella().token()), resolver, targetResolver, history);
+        GachaCommandHandler gachaCommands = new GachaCommandHandler(messageSender, taskCoordinator, replyFactory, resolver, targetResolver, history, admins::isAdmin);
         this.commandParser = new CommandParser(resolver::sanitize);
         this.commandRegistry = createCommandRegistry(
                 bindingCommands, scoreCommands, beatmapCommands, socialCommands,
                 replayCommands, generalCommands, watchCommands, specificScoreWatchCommands,
-                multiplayerRoomWatchCommands, dcsCommands, rankGuessCommands, aiChatHandler
+                multiplayerRoomWatchCommands, dcsCommands, rankGuessCommands, aiChatHandler,
+                whatIfCommands, challengeCommands, addPpCommands, ncmHandler, minecraftCommands,
+                gachaCommands
         );
         this.debugRoutes = new DebugRoutes(
                 configSupplier, messageSender, replyFactory, taskCoordinator,
-                authHelper, admins::isAdmin, unknownCommand
+                authHelper, admins::isAdmin, unknownCommand, interactionHandler
         );
     }
 
@@ -120,22 +146,27 @@ public class Router {
             ReplayCommandHandler replayCommands, GeneralCommandHandler generalCommands,
             WatchCommandHandler watchCommands, SpecificScoreWatchCommandHandler specificScoreWatchCommands,
             MPWatchCommandHandler multiplayerRoomWatchCommands, DcsCommandHandler dcsCommands,
-            RankGuessCommandHandler rankGuessCommands, AiChatHandler aiChatHandler
+            RankGuessCommandHandler rankGuessCommands, AgentChatHandler aiChatHandler, WhatIfCommandHandler whatIfCommands,
+            ChallengeCommandHandler challengeCommands, AddPpCommandHandler addPpCommands, NcmHandler ncmHandler,
+            MinecraftCommandHandler minecraftCommands, GachaCommandHandler gachaCommands
     ) {
         return CommandRegistry.builder()
                 .register(bindingCommands::handleBind, "bind")
                 .register(bindingCommands::handleUnbind, "unbind")
                 .register(bindingCommands::handleClearHistory, "clearhistory")
                 .register(scoreCommands::handleRbp, "rbp")
-                .register(scoreCommands::handleBp, "bp")
+                .register(scoreCommands::handleBp, "bp", "bs")
+                .register(scoreCommands::handleBd, "bd", "debp")
                 .register(beatmapCommands::handleDaily, "daily")
                 .register(socialCommands::handleMp, "mp")
                 .register(ctx -> scoreCommands.handleRs(ctx, true), "rs")
-                .register(ctx -> scoreCommands.handleRs(ctx, false), "rp")
+                .register(ctx -> scoreCommands.handleRs(ctx, false), "rp", "ps")
                 .register(scoreCommands::handleTb, "tb")
                 .register(beatmapCommands::handleM, "m")
                 .register(beatmapCommands::handleBma, "bma")
                 .register(beatmapCommands::handleAp, "ap")
+                .register(ncmHandler::handleNcm, "ncm")
+                .register(ncmHandler::handleNcmPlaylist, "ncmp")
                 .register(beatmapCommands::handleBpv, "bpv")
                 .register(beatmapCommands::handleBgp, "bgp")
                 .register(ctx -> socialCommands.handleF(ctx, !ctx.inGroup()), "f")
@@ -148,6 +179,8 @@ public class Router {
                 .register(scoreCommands::handleSm, "sm")
                 .register(scoreCommands::handleSa, "sa")
                 .register(scoreCommands::handleMa, "ma")
+                .register(scoreCommands::handleSnapshot, "snap", "snapshot")
+                .register(scoreCommands::handleReplayClip, "rep")
                 .register(replayCommands::handleR, "r")
                 .register(replayCommands::handleRsc, "rsc")
                 .register(beatmapCommands::handleMs, "ms")
@@ -156,23 +189,30 @@ public class Router {
                 .register(generalCommands::handleStat, "stat")
                 .register(generalCommands::handleU, "u")
                 .register(generalCommands::handleUx, "ux")
+                .register(generalCommands::handleO, "o")
                 .register(generalCommands::handleLuck, "luck")
+                .register(whatIfCommands::handleWhatIf, "whatif")
+                .register(addPpCommands::handleAddPp, "addpp")
                 .register(generalCommands::handleRoll, "roll")
                 .register(replayCommands::handleRstat, "rstat")
+                .register(replayCommands::handleRget, "rget")
                 .register(replayCommands::handleRcancel, "rcancel")
                 .register(generalCommands::handleInspect, "inspect")
                 .register(generalCommands::handleHelp, "help")
                 .register(generalCommands::handleUsages, "usages")
                 .register(generalCommands::handleFaq, "faq")
                 .register(watchCommands::handleWatch, "watch")
+                .register(challengeCommands::handleChallenge, "gch")
                 .register(specificScoreWatchCommands::handleWx, "wx")
                 .register(multiplayerRoomWatchCommands::handleMpWatch, "mpwatch", "mpw")
                 .register(multiplayerRoomWatchCommands::handleRomAI, "romai")
-                .register(dcsCommands::handleDcs, "dcs")
+                .register(gachaCommands::handleGacha, "gacha")
+//                .register(dcsCommands::handleDcs, "dcs")
                 .register(rankGuessCommands::handleRankGuess, "rg")
                 .register(generalCommands::handleNotice, "notice")
                 .register(aiChatHandler::handleAi, "ai")
-                .register(generalCommands::handleMc, "mc")
+                .register(minecraftCommands::handleMc, "mc")
+                .register(minecraftCommands::handleMcBind, "mcbind")
                 .build();
     }
 
@@ -182,29 +222,36 @@ public class Router {
 
     public void onPrivateMessageReceived(
             String userId, String messageId, String rawContent,
-            String msgIdx ,List<Attachment> attachments, List<MsgElem> msgElems
+            String msgIdx, List<Attachment> attachments, List<MsgElem> msgElems
     ) {
-        handleMessageReceived(userId, null, userId, messageId, rawContent, false, msgIdx, attachments, msgElems);
+        handleMessageReceived(userId, null, userId, messageId, rawContent, false, msgIdx, attachments, msgElems, null, null);
+    }
+
+    public void rememberMentionNames(String groupId, java.util.Map<String, String> names) {
+        aiChatHandler.rememberNames(groupId, names);
     }
 
     public void onGroupMessageReceived(
             String groupId, String senderUserId,
             String messageId, String rawContent,
             String msgIdx, List<Attachment> attachments,
-            List<MsgElem> msgElems
+            List<MsgElem> msgElems, String nickname, String memberRole
     ) {
-        handleMessageReceived(groupId, groupId, senderUserId, messageId, rawContent, true, msgIdx, attachments, msgElems);
+        handleMessageReceived(groupId, groupId, senderUserId, messageId, rawContent, true, msgIdx, attachments, msgElems, nickname, memberRole);
     }
 
     private void handleMessageReceived(
             String targetId, String groupId, String userId, String messageId, String rawContent,
-            boolean groupMessage, String msgIdx, List<Attachment> attachments, List<MsgElem> msgElems
+            boolean groupMessage, String msgIdx, List<Attachment> attachments, List<MsgElem> msgElems,
+            String nickname, String memberRole
     ) {
         AtomicInteger messageSeqCounter = new AtomicInteger(1);
         try {
             final boolean group = groupMessage && groupId != null && !groupId.isBlank();
             if (group && userId != null && !userId.isBlank()) {
                 UserDataStore.upsertGroupMember(groupId, userId);
+
+                mcMessageService.tryForwardMessage(groupId, nickname, Resolver.parseQqMeme(rawContent));
             }
 
             rawContent = rawContent == null ? "" : rawContent.trim();
@@ -239,25 +286,26 @@ public class Router {
             }
 
             CommandParser.ParseResult parseResult = commandParser.parse(
-                    rawContent, userId, groupId, messageId
+                    rawContent, userId, groupId, messageId, nickname, memberRole
             );
 
             if (parseResult.status() == CommandParser.ParseResult.Status.IGNORED) {
                 return;
             }
 
-            final boolean permitAi = AiPermission.permits(groupId);
-            final boolean activatedAi = AiPermission.isActivated(groupId);
+            final boolean activatedAi = aiChatHandler.enabled(groupId);
+
+            if (group && activatedAi && !(beingAt && parseResult.status() == CommandParser.ParseResult.Status.TEXT)) {
+                aiChatHandler.recordHistory(groupId, messageId, userId, nickname, msgToRecord, attachments, msgElems);
+            }
 
             if (parseResult.status() == CommandParser.ParseResult.Status.TEXT) {
                 ReplyChannel replies = taskCoordinator.openReplyChannel(
                         targetId, messageId, groupMessage, false, msgIdx
                 );
 
-                if (beingAt && permitAi && activatedAi) {
-                    aiChatHandler.handleChat(parseResult.context().withReplies(replies), msgToRecord, msgElems);
-                } else if (permitAi) {
-                    aiChatHandler.recordHistory(groupId, userId, msgToRecord, attachments);
+                if (beingAt && activatedAi) {
+                    aiChatHandler.handleChat(parseResult.context().withReplies(replies), msgToRecord, attachments, msgElems);
                 }
                 return;
             }
@@ -266,25 +314,17 @@ public class Router {
                     targetId, messageId, groupMessage, config.seira().queueMessageInGroup(), msgIdx
             );
 
-            if (parseResult.status() == CommandParser.ParseResult.Status.EMPTY_COMMAND
-                    && !group) {
-                replies.sendReply(PendingMessage.ofString("请输入指令。使用/help获取帮助。"));
+            if (parseResult.status() == CommandParser.ParseResult.Status.EMPTY_COMMAND) {
+                if (!group) {
+                    replies.sendReply(PendingMessage.ofString("请输入指令。使用/help获取帮助。"));
+                }
                 return;
             }
 
-            Context context = parseResult.context()
-                    .withReplies(replies)
-                    .withRecorder(s -> {
-                        if (permitAi) {
-                            aiChatHandler.recordHistory(groupId, "Seira(你,回复" + userId + "的消息)", s);
-                        }
-                    });
+            Context context = parseResult.context().withReplies(replies);
 
             commandExecutor.execute(() -> {
                 try {
-                    if (permitAi) {
-                        aiChatHandler.recordHistory(groupId, userId, context.rawContent());
-                    }
                     LOG.info("Routing {} message : {}", groupMessage ? "group" : "private", context.rawContent());
                     dispatch(context);
                     NoticesHelper.checkNotices(context);

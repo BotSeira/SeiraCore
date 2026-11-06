@@ -11,10 +11,12 @@ import xyz.zcraft.seira.bot.data.AccessToken;
 import xyz.zcraft.seira.bot.data.Attachment;
 import xyz.zcraft.seira.bot.data.MsgElem;
 import xyz.zcraft.seira.command.AttachmentHandler;
+import xyz.zcraft.seira.command.InteractionHandler;
 import xyz.zcraft.seira.command.route.Router;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.discord.DiscordBridgeService;
 import xyz.zcraft.seira.discord.QqIncomingMessage;
+import xyz.zcraft.seira.interaction.data.InteractionEvent;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -41,6 +43,7 @@ public class WSClient extends WebSocketClient {
     private final Router router;
     private final AttachmentHandler attachmentHandler;
     private final DiscordBridgeService discordBridgeService;
+    private final InteractionHandler interactionHandler;
     private volatile boolean heartbeatAcked = true;
     @Setter
     private Runnable onCloseCallback = null;
@@ -52,7 +55,8 @@ public class WSClient extends WebSocketClient {
             Router router,
             AttachmentHandler attachmentHandler,
             DiscordBridgeService discordBridgeService,
-            Executor eventExecutor
+            Executor eventExecutor,
+            InteractionHandler interactionHandler
     ) {
         super(serverUri);
         this.config = config;
@@ -61,6 +65,7 @@ public class WSClient extends WebSocketClient {
         this.attachmentHandler = java.util.Objects.requireNonNull(attachmentHandler);
         this.discordBridgeService = java.util.Objects.requireNonNull(discordBridgeService);
         this.eventExecutor = java.util.Objects.requireNonNull(eventExecutor);
+        this.interactionHandler = interactionHandler;
 
         LOG.info("QQ Gateway WebSocket Client created");
     }
@@ -140,14 +145,23 @@ public class WSClient extends WebSocketClient {
             }
         } else if ("GROUP_AT_MESSAGE_CREATE".equals(eventType) || "GROUP_MESSAGE_CREATE".equals(eventType)) {
             onGroupMsg(payload);
+        } else if ("INTERACTION_CREATE".equals(eventType)) {
+            onInteraction(payload);
         }
+    }
+
+    private void onInteraction(JsonObject payload) {
+        JsonObject data = payload.get("d").getAsJsonObject();
+        final var event = gson.fromJson(data, InteractionEvent.class);
+        interactionHandler.onInteraction(event);
     }
 
     private void onC2CMsg(JsonObject payload) {
         JsonObject data = payload.get("d").getAsJsonObject();
         String content = data.get("content").getAsString();
         String msgId = data.get("id").getAsString();
-        String openId = data.get("author").getAsJsonObject().get("user_openid").getAsString();
+        final JsonObject author = data.get("author").getAsJsonObject();
+        String openId = author.get("user_openid").getAsString();
 
         final JsonArray attachments = data.getAsJsonArray("attachments");
         List<Attachment> attachmentList = new ArrayList<>();
@@ -209,6 +223,8 @@ public class WSClient extends WebSocketClient {
         JsonObject author = data.get("author").getAsJsonObject();
         String openId = author.get("member_openid").getAsString();
         String groupId = data.get("group_openid").getAsString();
+        String username = author.get("username").getAsString();
+        String memberRole = author.get("member_role").getAsString(); // owner admin member
 
         String msgIdx = null;
 
@@ -244,7 +260,8 @@ public class WSClient extends WebSocketClient {
             ));
         }
 
-        router.onGroupMessageReceived(groupId, openId, msgId, content, msgIdx, attachments, msgElemList);
+        router.rememberMentionNames(groupId, mentions);
+        router.onGroupMessageReceived(groupId, openId, msgId, content, msgIdx, attachments, msgElemList, username, memberRole);
     }
 
     private Map<String, String> parseMentions(JsonObject data) {

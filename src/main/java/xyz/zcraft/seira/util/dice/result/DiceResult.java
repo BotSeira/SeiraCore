@@ -33,7 +33,7 @@ public class DiceResult {
     public String toString() {
         final StringBuilder sb = new StringBuilder();
         for (int i = 0; i < parts.size(); i++) {
-            if(i == 0) {
+            if (i == 0) {
                 if (parts.get(i).size() < 2) {
                     sb.append(parts.get(i).getFirst());
                     continue;
@@ -41,7 +41,7 @@ public class DiceResult {
             } else {
                 if (parts.get(i).size() >= 2) sb.append("+");
                 else {
-                    if(parts.get(i).getFirst() >= 0) {
+                    if (parts.get(i).getFirst() >= 0) {
                         sb.append("+");
                     }
                     sb.append(parts.get(i).getFirst());

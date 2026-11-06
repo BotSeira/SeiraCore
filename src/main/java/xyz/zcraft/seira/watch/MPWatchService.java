@@ -67,7 +67,7 @@ public final class MPWatchService implements AutoCloseable {
         );
     }
 
-    public RoomWatchView watch(String groupId, String userId, MPVersion version, long roomId, Integer customBo) {
+    public RoomWatchView watch(String groupId, String userId, MPVersion version, long roomId, Integer customBo, Integer customWarmups) {
         requireIdentifier(groupId, "groupId");
         requireIdentifier(userId, "userId");
 
@@ -100,7 +100,7 @@ public final class MPWatchService implements AutoCloseable {
 
         Set<Long> baseline = new LinkedHashSet<>();
         snapshot.completedPlays().forEach(play -> baseline.add(play.playlistItemId()));
-        WatchEntry entry = new WatchEntry(version, snapshot.roomId(), snapshot.roomName(), baseline, customBo);
+        WatchEntry entry = new WatchEntry(version, snapshot.roomId(), snapshot.roomName(), baseline, customBo, customWarmups);
         synchronized (lock) {
             ensureRoomAvailable(groupId, userId, room);
             watchesByGroup.computeIfAbsent(groupId, ignored -> new LinkedHashMap<>())
@@ -170,7 +170,7 @@ public final class MPWatchService implements AutoCloseable {
                         .comparing(CompletedRoomPlay::playedAt, Comparator.nullsLast(String::compareTo))
                         .thenComparingLong(CompletedRoomPlay::playlistItemId))
                 .toList();
-        Map<Long, byte[]> rendered = new HashMap<>();
+        Map<RenderKey, byte[]> rendered = new HashMap<>();
 
         for (WatchRef watch : watches) {
             if (!isCurrent(watch)) {
@@ -189,7 +189,7 @@ public final class MPWatchService implements AutoCloseable {
     }
 
     private boolean sendPendingResults(
-            WatchRef watch, List<CompletedRoomPlay> completed, Map<Long, byte[]> rendered
+            WatchRef watch, List<CompletedRoomPlay> completed, Map<RenderKey, byte[]> rendered
     ) {
         for (CompletedRoomPlay play : completed) {
             if (wasSent(watch, play.playlistItemId())) {
@@ -197,8 +197,8 @@ public final class MPWatchService implements AutoCloseable {
             }
             try {
                 byte[] image = rendered.computeIfAbsent(
-                        play.playlistItemId(),
-                        itemId -> api.renderResult(watch.entry().version, watch.entry().roomId, itemId, watch.entry().customBo())
+                        new RenderKey(play.playlistItemId(), watch.entry().customBo(), watch.entry().customWarmups()),
+                        key -> api.renderResult(watch.entry().version, watch.entry().roomId, key.playlistItemId(), key.customBo(), key.customWarmups())
                 );
                 if (!notifier.sendResult(watch.entry(), watch.groupId(), image)) {
                     LOG.warn(
@@ -296,17 +296,22 @@ public final class MPWatchService implements AutoCloseable {
         }
     }
 
+    private record RenderKey(long playlistItemId, Integer customBo, Integer customWarmups) {
+    }
+
     public record WatchEntry(
-            MPVersion version, long roomId, String roomName, Set<Long> sentPlaylistItemIds, Integer customBo
+            MPVersion version, long roomId, String roomName, Set<Long> sentPlaylistItemIds, Integer customBo,
+            Integer customWarmups
     ) {
         public WatchEntry(
-                MPVersion version, long roomId, String roomName, Set<Long> sentPlaylistItemIds, Integer customBo
+                MPVersion version, long roomId, String roomName, Set<Long> sentPlaylistItemIds, Integer customBo, Integer customWarmups
         ) {
             this.version = version;
             this.roomId = roomId;
             this.roomName = roomName;
             this.sentPlaylistItemIds = new LinkedHashSet<>(sentPlaylistItemIds);
             this.customBo = customBo;
+            this.customWarmups = customWarmups;
         }
     }
 

@@ -4,23 +4,26 @@ import com.google.gson.Gson;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.seira.ai.provider.ChatProvider;
-import xyz.zcraft.seira.ai.provider.ChatProviders;
+import xyz.zcraft.seira.agent.AgentChatHandler;
 import xyz.zcraft.seira.bot.data.*;
+import xyz.zcraft.seira.challenge.ChallengeService;
+import xyz.zcraft.seira.challenge.OstellaChallengeApi;
+import xyz.zcraft.seira.challenge.SqliteChallengeStore;
 import xyz.zcraft.seira.command.AttachmentHandler;
+import xyz.zcraft.seira.command.InteractionHandler;
 import xyz.zcraft.seira.command.route.Router;
 import xyz.zcraft.seira.config.AppConfig;
 import xyz.zcraft.seira.config.RuntimeConfig;
 import xyz.zcraft.seira.console.ConsoleCommandProcessor;
 import xyz.zcraft.seira.console.ConsoleRuntimeControl;
 import xyz.zcraft.seira.console.OstellaCacheControlClient;
+import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.discord.DiscordBridgeService;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
-import xyz.zcraft.seira.services.BindingService;
-import xyz.zcraft.seira.services.BotStat;
-import xyz.zcraft.seira.services.CosService;
+import xyz.zcraft.seira.services.*;
 import xyz.zcraft.seira.util.AdminRegistry;
 import xyz.zcraft.seira.util.ApplicationExecutors;
+import xyz.zcraft.seira.util.ShutdownRequest;
 import xyz.zcraft.seira.util.TokenManager;
 import xyz.zcraft.seira.watch.*;
 
@@ -44,9 +47,10 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
     @Getter
     private final MessageSender sender;
     private final ScoreWatchService watchService;
+    private final ChallengeService challengeService;
     private final MPWatchService mpWatchService;
     private final RankGuessGameService rankGuessGameService;
-    private final ChatProvider chatProvider;
+    private final AgentChatHandler agentHandler;
     private final RealtimeServiceInterruptionNotifier interruptionNotifier;
     private final DiscordBridgeService discordBridgeService;
     private final AppConfig startupConfig;
@@ -57,13 +61,18 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
     private final AtomicBoolean running = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicReference<WSClient> activeClient = new AtomicReference<>();
+    private final ShutdownRequest shutdownRequest = new ShutdownRequest(this::prepareStop, this::stop, Duration.ofSeconds(10));
+    private final InteractionHandler interactionHandler;
     private volatile Thread runnerThread;
 
     public QQBot(
             RuntimeConfig runtimeConfig,
             AdminRegistry admins,
-            BindingService bindingService,
-            ApplicationExecutors executors
+            WebServer webServer,
+            ApplicationExecutors executors,
+            BindService bindService,
+            AtomicReference<MessageSender> senderRef,
+            McMessageService mcMessageService
     ) {
         LOG.info("Initializing QQBot");
         AppConfig config = runtimeConfig.current();
@@ -78,19 +87,29 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         this.cos = new CosService(config.cos());
 
         this.sender = new MessageSender(tokenManager, cos);
+
+        senderRef.set(sender);
+
         this.interruptionNotifier = new RealtimeServiceInterruptionNotifier(sender);
 
         LOG.info("Initializing Discord bridge service");
         this.discordBridgeService = new DiscordBridgeService(config.discord(), config.bridge(), sender);
 
         LOG.info("Initializing score watch service");
+        ScoreWatchApi scoreWatchApi = new ScoreWatchApi(config.ostella().endpoint(), config.ostella().token());
         this.watchService = new ScoreWatchService(
-                new ScoreWatchApi(config.ostella().endpoint(), config.ostella().token()),
+                scoreWatchApi,
                 new WatchScoreNotifier(sender),
                 new SpecificScoreNotifier(sender),
                 new SqliteSpecificScoreWatchStore(),
                 Duration.ofMinutes(config.seira().effectiveWatchIntervalMinutes())
         );
+        this.challengeService = new ChallengeService(
+                new OstellaChallengeApi(config.ostella().endpoint(), config.ostella().token()),
+                new SqliteChallengeStore(),
+                (group, openId, uid) -> UserDataStore.isGroupMember(group, openId)
+                        && java.util.Objects.equals(UserDataStore.findBoundUid(openId), uid),
+                (group, message) -> sender.sendGroupMarkdown(group, message) != null);
 
         LOG.info("Initializing multiplayer room watch service");
         this.mpWatchService = new MPWatchService(
@@ -104,15 +123,23 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         this.rankGuessGameService = new RankGuessGameService();
 
         LOG.info("Initializing agents service");
-        this.chatProvider = ChatProviders.newHiAgentChatProvider(config.llm());
+        var agentAuth = new xyz.zcraft.seira.util.OsuAuthHelper(config.binding());
+        this.agentHandler = new AgentChatHandler(admins::isAdmin, config.agent(), openId -> {
+            var token = agentAuth.updateTokenAndGet(openId);
+            return token == null ? null : token.accessToken();
+        }, config.ostella(), config.asteroid());
 
         this.attachmentHandler = new AttachmentHandler(executors.attachmentDownloads());
+
+        this.interactionHandler = new InteractionHandler(tokenManager);
+
         this.router = new Router(
                 sender,
                 runtimeConfig::current,
                 admins,
-                bindingService,
+                webServer,
                 watchService,
+                challengeService,
                 mpWatchService,
                 discordBridgeService,
                 rankGuessGameService,
@@ -127,9 +154,10 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                     }
                 },
                 self::get,
-                chatProvider,
-                s -> QQApi.getGroupBotState(tokenManager.getToken(), s)
-
+                agentHandler,
+                interactionHandler,
+                bindService,
+                mcMessageService
         );
     }
 
@@ -143,8 +171,9 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         runnerThread = Thread.currentThread();
         tokenManager.start();
         watchService.start();
+        challengeService.start();
         mpWatchService.start();
-        discordBridgeService.start();
+//        discordBridgeService.start();
         LOG.info("Starting bot connection loop...");
 
         while (running.get()) {
@@ -169,7 +198,8 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                         router,
                         attachmentHandler,
                         discordBridgeService,
-                        executors.gatewayEvents()
+                        executors.gatewayEvents(),
+                        interactionHandler
                 );
                 activeClient.set(client);
 
@@ -239,7 +269,9 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         if (thread != null && thread != Thread.currentThread()) {
             thread.interrupt();
         }
+        agentHandler.close();
         watchService.close();
+        challengeService.close();
         mpWatchService.close();
         discordBridgeService.close();
         tokenManager.close();
@@ -308,13 +340,19 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
 
     @Override
     public void requestStop() {
+        shutdownRequest.run();
+    }
+
+    private void prepareStop() {
+        // Snapshot before stopAll removes the active games.
+        var rankGuessGroups = rankGuessGameService.activeGroupIds();
         rankGuessGameService.stopAll();
 
         RealtimeServiceInterruptionNotifier.NotificationResult result = interruptionNotifier.notifyGroups(
                 watchService.activeTransientGroupIds(),
-                rankGuessGameService.activeGroupIds(),
+                rankGuessGroups,
                 mpWatchService.activeGroupIds(),
-                chatProvider.activeGroupIds()
+                agentHandler.activeGroupIds()
         );
         if (result.failedGroups() == 0) {
             LOG.info("Sent restart interruption notices to {} affected groups", result.sentGroups());
@@ -324,7 +362,6 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                     result.sentGroups(), result.targetGroups()
             );
         }
-        stop();
     }
 
     @Override
