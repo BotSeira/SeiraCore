@@ -308,6 +308,7 @@ public class AsteroidApi {
         }
     }
 
+    @Deprecated
     public static byte[] getGachaProfile(String username) {
         try {
             var request = requestBuilder("/gacha/users/" + URLEncoder.encode(username, StandardCharsets.UTF_8) + "/profile")

@@ -18,6 +18,8 @@ import xyz.zcraft.seira.command.parse.TargetResolver;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.db.UserDataStore;
 
+import java.io.InputStream;
+import java.net.URI;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
@@ -220,9 +222,14 @@ public class GachaCommandHandler {
             username = resolver.player(ctx.argument(0), null);
         }
 
-        final byte[] gachaProfile = AsteroidApi.getGachaProfile(username);
-
-        ctx.sendReply(PendingMessage.ofImageBase64(Base64.getEncoder().encodeToString(gachaProfile)));
+        try(var is = URI.create("https://osugacha.com/api/embed/image/badge/%s.png".formatted(username))
+                .toURL()
+                .openStream()) {
+            final byte[] bytes = is.readAllBytes();
+            ctx.sendReply(PendingMessage.ofImageBase64(Base64.getEncoder().encodeToString(bytes)));
+        } catch (Exception e) {
+            ctx.sendReply(at(ctx) + "获取卡片失败，请稍后再试喵。");
+        }
     }
 
     private void handlePlayerCardOwners(Context ctx) {
