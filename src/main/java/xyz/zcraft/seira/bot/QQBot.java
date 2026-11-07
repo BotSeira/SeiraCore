@@ -127,7 +127,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
         this.agentHandler = new AgentChatHandler(admins::isAdmin, config.agent(), openId -> {
             var token = agentAuth.updateTokenAndGet(openId);
             return token == null ? null : token.accessToken();
-        }, config.ostella(), config.asteroid());
+        }, config.ostella(), config.asteroid(), group -> QQApi.getGroupBotState(tokenManager.getToken(), group));;
 
         this.attachmentHandler = new AttachmentHandler(executors.attachmentDownloads());
 
