@@ -20,6 +20,7 @@ import xyz.zcraft.seira.db.UserDataStore;
 
 import java.io.InputStream;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
@@ -222,7 +223,7 @@ public class GachaCommandHandler {
             username = resolver.player(ctx.argument(0), null);
         }
 
-        try(var is = URI.create("https://osugacha.com/api/embed/image/badge/%s.png".formatted(username))
+        try(var is = URI.create("https://osugacha.com/api/embed/image/badge/%s.png".formatted(URLEncoder.encode(username, StandardCharsets.UTF_8)))
                 .toURL()
                 .openStream()) {
             final byte[] bytes = is.readAllBytes();
