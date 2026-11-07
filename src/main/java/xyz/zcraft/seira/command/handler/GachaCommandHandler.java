@@ -21,6 +21,7 @@ import xyz.zcraft.seira.db.UserDataStore;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
