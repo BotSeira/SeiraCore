@@ -14,8 +14,8 @@ public final class CommandUsage {
     public static final String M = "用法：/m <谱面ID 或 快捷查询> [Mod]";
     public static final String BMA = "用法：/bma <谱面ID 或 快捷查询> [Mod]";
     public static final String AP = "用法：/ap <谱面ID 或 快捷查询>";
-    public static final String BPV = "用法：/bpv [谱面ID 或 快捷查询] [Mod]";
-    public static final String BGP = "用法：/bgp <谱面ID 或 快捷查询>";
+    public static final String MV = "用法：/mv [谱面ID 或 快捷查询] [Mod]";
+    public static final String MBG = "用法：/mbg <谱面ID 或 快捷查询>";
     public static final String DL = "用法：/dl <谱面集ID 或 快捷查询>";
     public static final String S = "用法：/s [成绩ID、[@用户] m谱面ID 或 快捷查询] [用户] [+Mod]";
     public static final String SM = "用法：/sm [谱面ID 或 快捷查询] [@玩家] [+Mod]";

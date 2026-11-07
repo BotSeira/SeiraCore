@@ -66,7 +66,7 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 | `/tb`           | `/tb [#days] [uid/username/@user]`                      | 获取近N天达成的BP（默认1天），并保留完整BP排名编号                              |
 | `/m`            | `/m <id/rsN/bpN> [Mod]`                                 | 获取指定谱面信息                                                                |
 | `/ap`           | `/ap <id/rsN/bpN>`                                      | 获取指定谱面音频预览                                                            |
-| `/bgp`          | `/bgp <id/rsN/bpN>`                                     | 获取指定谱面背景预览                                                            |
+| `/mbg`          | `/mbg <id/rsN/bpN>`                                     | 获取指定谱面背景预览                                                            |
 | `/s`            | `/s <id/locId/rsN/bpN>`                                 | 获取指定的在线或本地成绩图                                                      |
 | `/sa`           | `/sa <id/locId/rsN/bpN>`                                | 获取指定成绩分析图                                                              |
 | `/ma`           | `/ma [id/locId/rsN/bpN] [n/#n]`                         | 获取指定或最近目标成绩的Miss分析；省略目标时用`#n`指定Miss                      |

@@ -105,13 +105,13 @@ public final class BeatmapCommandHandler {
         }
     }
 
-    public void handleBpv(Context ctx) {
+    public void handleMv(Context ctx) {
         var target = ctx.argumentCount() == 0 || ctx.argument(0).startsWith("+") || TimeDurationParser.isTimeRange(ctx.argument(0))
                 ? TargetInput.memory() : TargetInput.read(ctx.args());
         var remembered = history.get(ctx);
         if ((target.kind() == TargetInput.Kind.MEMORY && remembered == null)
                 || ctx.argumentCount() - target.consumedArgs() > 2) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.BPV));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.MV));
             return;
         }
 
@@ -129,7 +129,7 @@ public final class BeatmapCommandHandler {
             } else if (mods == null && !TimeDurationParser.isTimeRange(option)) {
                 mods = option;
             } else {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.BPV));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.MV));
                 return;
             }
         }
@@ -147,19 +147,19 @@ public final class BeatmapCommandHandler {
         }
     }
 
-    public void handleBgp(Context ctx) {
+    public void handleMbg(Context ctx) {
         var target = ctx.argumentCount() == 0
                 ? TargetInput.memory() : TargetInput.read(ctx.args());
         var remembered = history.get(ctx);
         if (target.kind() == TargetInput.Kind.MEMORY && remembered == null) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.BGP));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.MBG));
             return;
         }
         try (var _ = taskCoordinator.beginRequest(ctx, "Background Preview")) {
             var ids = targets.beatmap(ctx, target, remembered);
             var response = OstellaApi.getBeatmapBgResponse(ids.beatmapId());
             history.remember(ctx, ids);
-            ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.bgpMessage(ctx, response)));
+            ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.mbgMessage(ctx, response)));
         }
     }
 
