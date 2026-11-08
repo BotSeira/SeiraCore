@@ -73,8 +73,8 @@ public final class AgentChatHandler implements AutoCloseable {
         return INSTANCE.get();
     }
 
-    private static void sendResponse(Context context, String message) {
-        var matcher = java.util.regex.Pattern.compile("%%\\[file:([^\\r\\n]+?)]%%").matcher(message);
+    private static void sendResponse(Context context, PendingMessage message) {
+        var matcher = java.util.regex.Pattern.compile("%%\\[file:([^\\r\\n]+?)]%%").matcher(message.getContent());
         var files = new java.util.LinkedHashSet<String>();
         StringBuilder markdown = new StringBuilder();
         while (matcher.find()) {
@@ -88,8 +88,9 @@ public final class AgentChatHandler implements AutoCloseable {
         matcher.appendTail(markdown);
         if (files.size() > 3) throw new IllegalArgumentException("Too many files in one message");
 
+        message.setContent(markdown.toString());
         if (!markdown.toString().isBlank()
-                && !context.send(true, PendingMessage.ofMarkdownRaw(markdown.toString())).success())
+                && !context.send(true, message).success())
             throw new IllegalStateException("Agent message delivery failed");
         for (String url : files) {
             if (!context.send(true, PendingMessage.ofFileUrl(url)).success())

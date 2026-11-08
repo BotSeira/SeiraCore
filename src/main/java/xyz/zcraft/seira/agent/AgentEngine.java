@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.bot.data.Attachment;
+import xyz.zcraft.seira.bot.data.PendingMessage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.db.UserDataStore;
 
@@ -234,7 +235,7 @@ public final class AgentEngine implements AutoCloseable {
     private void run(String id, Session session) {
         LOG.info("Running session in conversation: {}", id);
         JsonArray input = new JsonArray();
-        Consumer<String> reply = ignored -> {
+        Consumer<PendingMessage> reply = ignored -> {
         };
         int rounds = 0;
         boolean recovered = false;
@@ -271,14 +272,14 @@ public final class AgentEngine implements AutoCloseable {
 
                 var context = new ToolRegistry.Context(id, authors, session.participants, reply);
                 var snapshot = tools.snapshot(context);
-                Consumer<String> destination = reply;
+                Consumer<PendingMessage> destination = reply;
 
                 store.clear(id);
 
                 var delivered = new AtomicBoolean();
                 Consumer<String> listener = text -> {
                     delivered.set(true);
-                    destination.accept(renderMentions(text, session.participants, uid -> UserDataStore.findGroupOpenIdByUid(id, uid)));
+                    destination.accept(PendingMessage.ofMarkdownRaw(renderMentions(text, session.participants, uid -> UserDataStore.findGroupOpenIdByUid(id, uid))));
                 };
                 JsonObject response;
                 JsonArray requestInput = input;
@@ -372,7 +373,7 @@ public final class AgentEngine implements AutoCloseable {
             LOG.warn("Agent conversation failed: {}", id, error);
 
             try {
-                reply.accept("本次对话出现错误未能完成，请重新发送请求喵。\n>" + error.getMessage());
+                reply.accept(PendingMessage.ofMarkdownRaw("本次对话出现错误未能完成，请重新发送请求喵。\n>" + error.getMessage()));
             } catch (RuntimeException ignored) {
             }
         } finally {
@@ -398,7 +399,7 @@ public final class AgentEngine implements AutoCloseable {
 
     public record Message(
             String id, String senderId, String senderName, String text,
-            List<Attachment> attachments, long timestamp, Consumer<String> reply) {
+            List<Attachment> attachments, long timestamp, Consumer<PendingMessage> reply) {
         public Message {
             attachments = attachments == null ? List.of() : List.copyOf(attachments);
         }

@@ -453,7 +453,7 @@ final class ServiceToolDefinitions {
                                 .required("expr"))
                         .required("browserUuid", "pageUuid", "body")
                         .additionalProperties(false),
-                new String[]{"browserUuid", "pageUuid"}, new String[]{}, true, true, true);
+                new String[]{"browserUuid", "pageUuid"}, new String[]{}, true, true, false);
 
         service.declare("asteroid", "asteroid_browsers", "/browsers/{browserUuid}/pages/{pageUuid}/get",
                 "asteroid_get_browser_page_get",

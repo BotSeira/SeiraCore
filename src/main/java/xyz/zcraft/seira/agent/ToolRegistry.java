@@ -3,6 +3,8 @@ package xyz.zcraft.seira.agent;
 import com.google.gson.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.seira.bot.data.Button;
+import xyz.zcraft.seira.bot.data.PendingMessage;
 
 import java.time.Duration;
 import java.util.*;
@@ -120,8 +122,13 @@ public final class ToolRegistry implements AutoCloseable {
             String preview = arguments.toString().replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
             if (preview.length() > 3000) throw new IllegalArgumentException("Confirmation preview too large");
 
-            context.notice().accept("工具 " + tool.name() + " 请求执行，参数：\n" + preview
-                    + "\n根据配置，此操作需要管理员批准喵。\n请管理员在两分钟内发送 /ai confirm " + token + " 或 /ai deny " + token);
+            final PendingMessage t = PendingMessage.ofMarkdownRaw("工具 " + tool.name() + " 请求执行，参数：\n```\n" + preview
+                            + "\n```\n根据配置，此操作需要管理员批准喵。\n请管理员在两分钟内进行授权",
+                    Button.keyboard(
+                            Button.command(1, "拒绝", "/ai deny " + token),
+                            Button.command(2, "批准", "/ai confirm " + token)
+                    ));
+            context.notice().accept(t);
 
             return approval.decision().get(120, TimeUnit.SECONDS);
         } finally {
@@ -237,7 +244,7 @@ public final class ToolRegistry implements AutoCloseable {
             String conversationId,
             Set<String> participants,
             Map<String, String> aliases,
-            Consumer<String> notice
+            Consumer<PendingMessage> notice
     ) {
         public Context(String conversationId, Set<String> participants) {
             this(conversationId, participants, Map.of(), ignored -> {
