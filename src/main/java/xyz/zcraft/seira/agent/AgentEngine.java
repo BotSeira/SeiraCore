@@ -13,6 +13,7 @@ import xyz.zcraft.seira.db.UserDataStore;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CancellationException;
@@ -417,7 +418,10 @@ public final class AgentEngine implements AutoCloseable {
 //            metadata.addProperty("message_id", id);
             metadata.addProperty("id", alias);
             metadata.addProperty("name", senderName);
-            metadata.addProperty("time", DateTimeFormatter.ISO_TIME.format(Instant.ofEpochMilli(timestamp)));
+            String time = Instant.ofEpochMilli(System.currentTimeMillis())
+                                 .atZone(ZoneId.systemDefault())
+                                 .format(DateTimeFormatter.ofPattern("HH:mm"));
+            metadata.addProperty("time", time);
             metadata.addProperty("text", text);
 //            metadata.addProperty("context_only", reply == null);
 //            if (participants != null) enrichUsers(metadata, this, participants, names);
