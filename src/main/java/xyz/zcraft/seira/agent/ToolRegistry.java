@@ -182,7 +182,7 @@ public final class ToolRegistry implements AutoCloseable {
         final UUID uuid = UUID.randomUUID();
 
         try {
-            requestLogger.debug("SESSION {} TOOL_CALL {} {}", sessionUuid, uuid, call);
+            requestLogger.debug("SESSION {} TOOL_CALL {} BODY {}", sessionUuid, uuid, call);
             agentLogger.debug("Session {} calling tool {}", sessionUuid, uuid);
 
             String name = call.get("name").getAsString();

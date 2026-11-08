@@ -98,7 +98,7 @@ public final class ResponsesClient {
             cpy.addProperty("instructions", "...");
         }
         agentLogger.debug("Session {} sending request {}", sessionUuid, requestUuid);
-        requestLogger.debug("SESSION {} REQUEST {} {}", sessionUuid, requestUuid, cpy);
+        requestLogger.debug("SESSION {} REQUEST {} BODY {}", sessionUuid, requestUuid, cpy);
 
         HttpRequest request = HttpRequest.newBuilder(endpoint).timeout(timeout)
                 .header("Authorization", "Bearer " + apiKey)

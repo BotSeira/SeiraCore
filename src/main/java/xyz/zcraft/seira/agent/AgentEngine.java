@@ -12,6 +12,8 @@ import xyz.zcraft.seira.db.UserDataStore;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutorService;
@@ -247,7 +249,7 @@ public final class AgentEngine implements AutoCloseable {
 
         final UUID sessionUuid = UUID.randomUUID();
         agentLogger.debug("Running session with id {} {}", id, sessionUuid);
-        requestLogger.debug("SESSION {} {}", sessionUuid, GSON.toJsonTree(session));
+        requestLogger.debug("SESSION {} BODY {}", sessionUuid, GSON.toJsonTree(session));
         try {
             while (!Thread.currentThread().isInterrupted()) {
                 synchronized (this) {
@@ -329,7 +331,7 @@ public final class AgentEngine implements AutoCloseable {
                 for (var value : input) session.history.add(textHistory(value.getAsJsonObject()));
                 for (var value : response.getAsJsonArray("output"))
                     session.history.add(textHistory(value.getAsJsonObject()));
-                while (session.history.size() > 100) session.history.removeFirst();
+                while (session.history.size() > 32) session.history.removeFirst();
 
                 requestLogger.debug("SESSION {} RESPONSE {}", sessionUuid, response);
                 agentLogger.info("Session {} ended for {}", sessionUuid, id);
@@ -406,13 +408,13 @@ public final class AgentEngine implements AutoCloseable {
 
         JsonObject toInput(String alias, Map<String, String> participants, Map<String, String> names) {
             var metadata = new JsonObject();
-            metadata.addProperty("message_id", id);
-            metadata.addProperty("sender_id", alias);
-            metadata.addProperty("sender_name", senderName);
-            metadata.addProperty("timestamp", timestamp);
+//            metadata.addProperty("message_id", id);
+            metadata.addProperty("id", alias);
+            metadata.addProperty("name", senderName);
+            metadata.addProperty("time", DateTimeFormatter.ISO_TIME.format(Instant.ofEpochMilli(timestamp)));
             metadata.addProperty("text", text);
-            metadata.addProperty("context_only", reply == null);
-            if (participants != null) enrichUsers(metadata, this, participants, names);
+//            metadata.addProperty("context_only", reply == null);
+//            if (participants != null) enrichUsers(metadata, this, participants, names);
 
             var item = new JsonObject();
             item.addProperty("role", "user");
