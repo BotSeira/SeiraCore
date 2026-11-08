@@ -1,9 +1,6 @@
 package xyz.zcraft.seira.agent;
 
-import xyz.zcraft.seira.bot.data.Attachment;
-import xyz.zcraft.seira.bot.data.GroupBotState;
-import xyz.zcraft.seira.bot.data.MsgElem;
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.*;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.config.AgentConfig;
 import xyz.zcraft.seira.config.AsteroidConfig;
@@ -74,7 +71,16 @@ public final class AgentChatHandler implements AutoCloseable {
     }
 
     private static void sendResponse(Context context, PendingMessage message) {
-        var matcher = java.util.regex.Pattern.compile("%%\\[file:([^\\r\\n]+?)]%%").matcher(message.getContent());
+        String messageText;
+        List<List<Button>> messageButtons;
+        if (message instanceof MDMessage md) {
+            messageText = md.getMarkdown();
+            messageButtons = md.getButtons();
+        } else {
+            messageText = message.getContent();
+            messageButtons = List.of();
+        }
+        var matcher = java.util.regex.Pattern.compile("%%\\[file:([^\\r\\n]+?)]%%").matcher(messageText);
         var files = new java.util.LinkedHashSet<String>();
         StringBuilder markdown = new StringBuilder();
         while (matcher.find()) {
@@ -88,10 +94,11 @@ public final class AgentChatHandler implements AutoCloseable {
         matcher.appendTail(markdown);
         if (files.size() > 3) throw new IllegalArgumentException("Too many files in one message");
 
-        message.setContent(markdown.toString());
+        final PendingMessage finalMessage = PendingMessage.ofMarkdownRaw(markdown.toString(), messageButtons);
         if (!markdown.toString().isBlank()
-                && !context.send(true, message).success())
+                && !context.send(true, finalMessage).success()) {
             throw new IllegalStateException("Agent message delivery failed");
+        }
         for (String url : files) {
             if (!context.send(true, PendingMessage.ofFileUrl(url)).success())
                 throw new IllegalStateException("Agent file delivery failed");
