@@ -167,6 +167,8 @@ public final class AgentEngine implements AutoCloseable {
         enqueue(conversationId, message, session, now);
     }
 
+    private static final int MAX_HISTORY = 32;
+
     private Session session(String conversationId) {
         return sessions.computeIfAbsent(conversationId, id -> {
             Session loaded = new Session();
@@ -176,6 +178,10 @@ public final class AgentEngine implements AutoCloseable {
                 loaded.previousId = saved.responseId();
                 loaded.participants.putAll(saved.participants());
                 saved.history().forEach(item -> loaded.history.add(item.getAsJsonObject()));
+
+                while (loaded.history.size() > MAX_HISTORY) {
+                    loaded.history.removeFirst();
+                }
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -331,7 +337,7 @@ public final class AgentEngine implements AutoCloseable {
                 for (var value : input) session.history.add(textHistory(value.getAsJsonObject()));
                 for (var value : response.getAsJsonArray("output"))
                     session.history.add(textHistory(value.getAsJsonObject()));
-                while (session.history.size() > 32) session.history.removeFirst();
+                while (session.history.size() > MAX_HISTORY) session.history.removeFirst();
 
                 requestLogger.debug("SESSION {} RESPONSE {}", sessionUuid, response);
                 agentLogger.info("Session {} ended for {}", sessionUuid, id);
