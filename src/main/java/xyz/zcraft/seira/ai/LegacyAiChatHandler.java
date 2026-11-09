@@ -206,8 +206,8 @@ public class LegacyAiChatHandler {
                                 .forEach(r -> {
                                     if (r.group(1) == null || r.group(1).isBlank()) return;
                                     final String fileUrl = r.group(1);
+                                    filesToUpload.getAndIncrement();
                                     executor.submit(() -> {
-                                        filesToUpload.getAndIncrement();
                                         var fileInfo = ctx.inGroup()
                                                 ? messageSender.uploadGroupMediaByParts(ctx.groupId(), fileUrl)
                                                 : messageSender.uploadPrivateMediaByParts(ctx.senderUserId(), fileUrl);
