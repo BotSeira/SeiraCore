@@ -154,9 +154,13 @@ public final class AgentEngine implements AutoCloseable {
                     else if (content.has("image_url")) text.append("[历史图片已省略]\n");
                 }
             } else text.append(item.get("content").getAsString());
-        } else if (item.has("type") && item.get("type").getAsString().startsWith("function_call")) {
-            text.append("[工具执行记录，仅供上下文参考] ").append(item);
-        } else text.append("[非文本输出已省略]");
+//        } else if (item.has("type") && item.get("type").getAsString().startsWith("function_call")) {
+            // ignoring
+//            text.append("[工具执行记录，仅供上下文参考] ").append(item);
+//        } else {
+            // ignoring
+//            text.append("[非文本输出已省略]");
+        }
         result.addProperty("content", text.substring(0, Math.min(text.length(), 8192)));
         return result;
     }
