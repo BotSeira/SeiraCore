@@ -27,8 +27,9 @@ import static xyz.zcraft.seira.command.reply.ReplyFactory.ExternalUrls.PERMISSIO
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.cmd;
 
+@SuppressWarnings("DeprecatedIsStillUsed")
 @Deprecated
-public class AiChatHandler {
+public class LegacyAiChatHandler {
     private static final Gson GSON = new Gson();
     private static final Pattern CHAT_INLINE_FILE = Pattern.compile("%%\\[file:(.+?)]%%");
     private static final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -40,7 +41,7 @@ public class AiChatHandler {
     private final Set<String> consented = new HashSet<>();
     private final Map<String, Map<String, String>> groupNicknames = new ConcurrentHashMap<>();
 
-    public AiChatHandler(
+    public LegacyAiChatHandler(
             Resolver resolver, ChatProvider chatProvider, Predicate<String> isAdmin,
             Function<String, GroupBotState> botStateGetter
     ) {

@@ -1,5 +1,6 @@
 package xyz.zcraft.seira.agent;
 
+import lombok.Getter;
 import xyz.zcraft.seira.bot.data.*;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.config.AgentConfig;
@@ -16,6 +17,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -33,6 +35,8 @@ public final class AgentChatHandler implements AutoCloseable {
     private final Function<String, GroupBotState> botStateGetter;
     private final Set<String> consented = new HashSet<>();
     private volatile String prompt;
+    @Getter
+    private final AtomicBoolean useLegacy = new AtomicBoolean(false);
 
     public AgentChatHandler(
             Predicate<String> administrator, AgentConfig conf, Function<String, String> osuToken,
@@ -105,7 +109,7 @@ public final class AgentChatHandler implements AutoCloseable {
         }
     }
 
-    static List<Attachment> collectAttachments(List<Attachment> attachments, List<MsgElem> elements) {
+    public static List<Attachment> collectAttachments(List<Attachment> attachments, List<MsgElem> elements) {
         var candidates = new java.util.ArrayList<Attachment>();
         if (attachments != null) candidates.addAll(attachments);
         if (elements != null) {
@@ -308,6 +312,14 @@ public final class AgentChatHandler implements AutoCloseable {
                         reload();
                         ctx.sendReply(at(ctx) + "AI 聊天已重新加载喵。");
                     }
+                }
+                case "legacy" -> {
+                    if (!administrator.test(ctx.senderUserId())) {
+                        ctx.sendReply(at(ctx) + "此操作需要机器人管理员权限喵。");
+                        return;
+                    }
+                    useLegacy.set(!useLegacy.get());
+                    ctx.sendReply(at(ctx) + "已切换到" + (useLegacy.get() ? "旧版" : "新版") + "AI聊天模式喵。");
                 }
                 default ->
                         ctx.sendReply(at(ctx) + "用法：/ai status|on|off|grant|revoke|reset|reload，或 /ai confirm|deny TOKEN");

@@ -5,14 +5,13 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.addpp.AddPpApi;
 import xyz.zcraft.seira.agent.AgentChatHandler;
+import xyz.zcraft.seira.ai.LegacyAiChatHandler;
+import xyz.zcraft.seira.ai.provider.ChatProviders;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.QQApi;
-import xyz.zcraft.seira.bot.data.Attachment;
-import xyz.zcraft.seira.bot.data.MsgElem;
-import xyz.zcraft.seira.bot.data.PendingMessage;
-import xyz.zcraft.seira.bot.data.QQUser;
+import xyz.zcraft.seira.bot.data.*;
 import xyz.zcraft.seira.challenge.ChallengeService;
 import xyz.zcraft.seira.command.*;
 import xyz.zcraft.seira.command.handler.*;
@@ -60,6 +59,7 @@ public class Router {
     private final Executor commandExecutor;
     private final Supplier<QQUser> selfSupplier;
     private final AgentChatHandler aiChatHandler;
+    private final LegacyAiChatHandler legacyAiChatHandler;
     private final InteractionHandler interactionHandler;
     private final McMessageService mcMessageService;
 
@@ -69,7 +69,7 @@ public class Router {
             DiscordBridgeService discordBridgeService, RankGuessGameService rankGuessGameService, Executor commandExecutor,
             Runnable commandMetric, Function<byte[], UploadedImage> imageUploader, Supplier<QQUser> selfSupplier,
             AgentChatHandler agentHandler, InteractionHandler interactionHandler,
-            BindService bindService, McMessageService mcMessageService
+            BindService bindService, McMessageService mcMessageService, Function<String, GroupBotState> botStateGetter
     ) {
         this.configSupplier = java.util.Objects.requireNonNull(configSupplier);
         this.commandExecutor = commandExecutor;
@@ -137,6 +137,15 @@ public class Router {
         this.debugRoutes = new DebugRoutes(
                 configSupplier, messageSender, replyFactory, taskCoordinator,
                 authHelper, admins::isAdmin, unknownCommand, interactionHandler
+        );
+
+
+        //noinspection deprecation
+        this.legacyAiChatHandler = new LegacyAiChatHandler(
+                resolver,
+                ChatProviders.newHiAgentChatProvider(configSupplier.get().llm()),
+                admins::isAdmin,
+                botStateGetter
         );
     }
 
@@ -251,7 +260,6 @@ public class Router {
             final boolean group = groupMessage && groupId != null && !groupId.isBlank();
             if (group && userId != null && !userId.isBlank()) {
                 UserDataStore.upsertGroupMember(groupId, userId);
-
                 mcMessageService.tryForwardMessage(groupId, nickname, Resolver.parseQqMeme(rawContent));
             }
 
@@ -298,6 +306,7 @@ public class Router {
 
             if (group && activatedAi && !(beingAt && parseResult.status() == CommandParser.ParseResult.Status.TEXT)) {
                 aiChatHandler.recordHistory(groupId, messageId, userId, nickname, msgToRecord, attachments, msgElems);
+                legacyAiChatHandler.recordHistory(groupId, nickname, userId, msgToRecord);
             }
 
             if (parseResult.status() == CommandParser.ParseResult.Status.TEXT) {
@@ -306,7 +315,11 @@ public class Router {
                 );
 
                 if (beingAt && activatedAi) {
-                    aiChatHandler.handleChat(parseResult.context().withReplies(replies), msgToRecord, attachments, msgElems);
+                    if (!aiChatHandler.getUseLegacy().get()) {
+                        aiChatHandler.handleChat(parseResult.context().withReplies(replies), msgToRecord, attachments, msgElems);
+                    } else {
+                        legacyAiChatHandler.handleChat(parseResult.context().withReplies(replies), msgToRecord, msgElems);
+                    }
                 }
                 return;
             }

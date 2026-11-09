@@ -5,6 +5,7 @@ import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.agent.AgentChatHandler;
+import xyz.zcraft.seira.ai.LegacyAiChatHandler;
 import xyz.zcraft.seira.bot.data.*;
 import xyz.zcraft.seira.challenge.ChallengeService;
 import xyz.zcraft.seira.challenge.OstellaChallengeApi;
@@ -157,7 +158,8 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                 agentHandler,
                 interactionHandler,
                 bindService,
-                mcMessageService
+                mcMessageService,
+                group -> QQApi.getGroupBotState(tokenManager.getToken(), group)
         );
     }
 
