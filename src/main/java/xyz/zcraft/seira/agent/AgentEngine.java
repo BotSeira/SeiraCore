@@ -112,17 +112,17 @@ public final class AgentEngine implements AutoCloseable {
         matcher.appendTail(normalized);
         metadata.addProperty("text", normalized.toString());
 
-        var users = new JsonArray();
-        for (String openId : related) {
-            var user = new JsonObject();
-            user.addProperty("id", participants.get(openId));
-            user.addProperty("nickname", openId.equals(message.senderId()) ? message.senderName() : names.get(openId));
-            Long uid = UserDataStore.findBoundUid(openId);
-            user.addProperty("osu_uid", uid);
-            user.addProperty("osu_username", uid == null ? null : UserDataStore.findUsername(uid).orElse(null));
-            users.add(user);
-        }
-        metadata.add("users", users);
+//        var users = new JsonArray();
+//        for (String openId : related) {
+//            var user = new JsonObject();
+//            user.addProperty("id", participants.get(openId));
+//            user.addProperty("nickname", openId.equals(message.senderId()) ? message.senderName() : names.get(openId));
+//            Long uid = UserDataStore.findBoundUid(openId);
+//            user.addProperty("osu_uid", uid);
+//            user.addProperty("osu_username", uid == null ? null : UserDataStore.findUsername(uid).orElse(null));
+//            users.add(user);
+//        }
+//        metadata.add("users", users);
     }
 
     static JsonArray rebuildInput(JsonArray history, JsonArray transcript, JsonArray pending) {
@@ -138,6 +138,11 @@ public final class AgentEngine implements AutoCloseable {
 
     private static JsonObject textHistory(JsonObject item) {
         var result = new JsonObject();
+        String type = item.get("type").getAsString();
+        if ("reasoning".equals(type)) {
+            // Skipping reasoning.
+            return null;
+        }
         String role = item.has("role") ? item.get("role").getAsString() : "user";
         result.addProperty("role", role.equals("assistant") ? "assistant" : "user");
         StringBuilder text = new StringBuilder();
@@ -206,7 +211,7 @@ public final class AgentEngine implements AutoCloseable {
         }
 
         if (message.id() != null) session.received.add(message.id());
-        if (session.received.size() > 1000) session.received.remove(session.received.iterator().next());
+        if (session.received.size() > 100) session.received.remove(session.received.iterator().next());
 
         session.inbox.add(message);
         session.lastUsed = now;
@@ -333,9 +338,16 @@ public final class AgentEngine implements AutoCloseable {
                             || (type.equals("reasoning") && item.has("encrypted_content") && !item.get("encrypted_content").isJsonNull()))
                         transcript.add(item.deepCopy());
                 }
-                for (var value : input) session.history.add(textHistory(value.getAsJsonObject()));
-                for (var value : response.getAsJsonArray("output"))
-                    session.history.add(textHistory(value.getAsJsonObject()));
+                for (var value : input) {
+                    final JsonObject e = textHistory(value.getAsJsonObject());
+                    if (e == null) continue;
+                    session.history.add(e);
+                }
+                for (var value : response.getAsJsonArray("output")) {
+                    final JsonObject e = textHistory(value.getAsJsonObject());
+                    if (e == null) continue;
+                    session.history.add(e);
+                }
                 while (session.history.size() > MAX_HISTORY) session.history.removeFirst();
 
                 requestLogger.debug("SESSION {} RESPONSE {}", sessionUuid, response);
@@ -422,7 +434,7 @@ public final class AgentEngine implements AutoCloseable {
             metadata.addProperty("time", time);
             metadata.addProperty("text", text);
 //            metadata.addProperty("context_only", reply == null);
-//            if (participants != null) enrichUsers(metadata, this, participants, names);
+            if (participants != null) enrichUsers(metadata, this, participants, names);
 
             var item = new JsonObject();
             item.addProperty("role", "user");
