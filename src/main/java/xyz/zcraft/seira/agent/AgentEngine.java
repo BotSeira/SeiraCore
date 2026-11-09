@@ -112,17 +112,17 @@ public final class AgentEngine implements AutoCloseable {
         matcher.appendTail(normalized);
         metadata.addProperty("text", normalized.toString());
 
-//        var users = new JsonArray();
-//        for (String openId : related) {
-//            var user = new JsonObject();
-//            user.addProperty("id", participants.get(openId));
-//            user.addProperty("nickname", openId.equals(message.senderId()) ? message.senderName() : names.get(openId));
-//            Long uid = UserDataStore.findBoundUid(openId);
-//            user.addProperty("osu_uid", uid);
-//            user.addProperty("osu_username", uid == null ? null : UserDataStore.findUsername(uid).orElse(null));
-//            users.add(user);
-//        }
-//        metadata.add("users", users);
+        var users = new JsonArray();
+        for (String openId : related) {
+            var user = new JsonObject();
+            user.addProperty("id", participants.get(openId));
+            user.addProperty("nickname", openId.equals(message.senderId()) ? message.senderName() : names.get(openId));
+            Long uid = UserDataStore.findBoundUid(openId);
+            user.addProperty("osu_uid", uid);
+            user.addProperty("osu_username", uid == null ? null : UserDataStore.findUsername(uid).orElse(null));
+            users.add(user);
+        }
+        metadata.add("users", users);
     }
 
     static JsonArray rebuildInput(JsonArray history, JsonArray transcript, JsonArray pending) {
@@ -286,7 +286,7 @@ public final class AgentEngine implements AutoCloseable {
                 if (++rounds > 512) throw new IllegalStateException("Agent response limit reached");
                 if (!allowed.test(id)) throw new CancellationException("Conversation disabled");
 
-                var context = new ToolRegistry.Context(id, authors, session.participants, reply);
+                var context = new ToolRegistry.Context(id, authors, session.participants, session.names, reply);
                 var snapshot = tools.snapshot(context);
                 Consumer<PendingMessage> destination = reply;
 
@@ -493,7 +493,13 @@ public final class AgentEngine implements AutoCloseable {
     private static final class Session {
         final ArrayDeque<JsonObject> history = new ArrayDeque<>();
         final ArrayDeque<Message> inbox = new ArrayDeque<>();
+        /**
+         * Map of participant's open id and alias.
+         */
         final Map<String, String> participants = new LinkedHashMap<>();
+        /**
+         * Map of participant's open id and username.
+         */
         final Map<String, String> names = new HashMap<>();
         final Set<String> received = new LinkedHashSet<>();
         boolean running;

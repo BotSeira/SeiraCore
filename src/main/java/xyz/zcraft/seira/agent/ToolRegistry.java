@@ -244,16 +244,13 @@ public final class ToolRegistry implements AutoCloseable {
             String conversationId,
             Set<String> participants,
             Map<String, String> aliases,
+            Map<String, String> names,
             Consumer<PendingMessage> notice
     ) {
-        public Context(String conversationId, Set<String> participants) {
-            this(conversationId, participants, Map.of(), ignored -> {
-            });
-        }
-
         public Context {
             participants = Set.copyOf(participants);
             aliases = Map.copyOf(aliases);
+            names = Map.copyOf(names);
         }
     }
 
