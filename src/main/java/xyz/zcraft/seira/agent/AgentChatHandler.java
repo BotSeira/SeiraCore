@@ -175,7 +175,10 @@ public final class AgentChatHandler implements AutoCloseable {
 
         final PendingMessage finalMessage = PendingMessage.ofMarkdownRaw((markdown + append).trim(), messageButtons);
         if (!markdown.toString().isBlank() && !context.send(true, finalMessage).success()) {
-            for (String url : files) {
+            throw new IllegalStateException("Agent message delivery failed");
+        }
+
+        for (String url : files) {
                 fileUploadExecutor.submit(() -> {
                     var fileInfo = context.inGroup()
                             ? groupFileUploader.apply(context.groupId(), url)
@@ -184,8 +187,6 @@ public final class AgentChatHandler implements AutoCloseable {
                         throw new IllegalStateException("Agent file delivery failed");
                     }
                 });
-            }
-            throw new IllegalStateException("Agent message delivery failed");
         }
     }
 
