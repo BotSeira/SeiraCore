@@ -138,8 +138,8 @@ public final class AgentEngine implements AutoCloseable {
 
     private static JsonObject textHistory(JsonObject item) {
         var result = new JsonObject();
-        String type = item.get("type").getAsString();
-        if ("reasoning".equals(type)) {
+        if (item.has("type") && item.get("type").isJsonPrimitive()
+                && "reasoning".equals(item.get("type").getAsString())) {
             // Skipping reasoning.
             return null;
         }
