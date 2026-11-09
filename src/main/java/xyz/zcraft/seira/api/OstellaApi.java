@@ -466,6 +466,29 @@ public class OstellaApi {
         }
     }
 
+    public static int enqueueMetaUpdate(List<BatchSearchQuery> queries) {
+        JsonObject payload = new JsonObject();
+        payload.add("queries", GSON.toJsonTree(queries));
+        try {
+            HttpRequest localRequest = requestBuilder()
+                    .uri(URI.create(ENDPOINT + "/beatmapsets/search/update"))
+                    .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
+                    .build();
+
+            final var send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw ApiUtil.parseHttpError(send.body(), send.statusCode(), "搜索谱面集失败");
+            }
+
+            final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
+            ApiUtil.ensureApiSuccess(rawResponse, "搜索谱面集失败");
+            return rawResponse.getData().getAsJsonObject().get("count").getAsInt();
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
+        }
+    }
+
     @SuppressWarnings("unused")
     public static ReplayTaskInfo createObscuredReplayRenderTask(long scoreId) {
         return createObscuredReplayRenderTask(scoreId, null);

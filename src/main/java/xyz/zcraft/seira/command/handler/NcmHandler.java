@@ -28,8 +28,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
-import static xyz.zcraft.seira.command.reply.ReplyFactory.ms;
+import static xyz.zcraft.seira.command.reply.ReplyFactory.*;
 
 public class NcmHandler {
     private static final Logger LOG = LogManager.getLogger(NcmHandler.class);
@@ -228,11 +227,86 @@ public class NcmHandler {
                     .filter(r -> r.status().equalsIgnoreCase("no_match"))
                     .count();
 
-            sb.append("\n> %d 首匹配, %d 首未在缓存找到".formatted(results.size() - noMatch, noMatch));
+            sb.append("\n> %d / %d 首匹配 | %s"
+                    .formatted(
+                            results.size() - noMatch,
+                            results.size(),
+                            cmd("/ncmu %d %d-%d".formatted(playlistId, offset + 1, offset + limit), "更新缓存")
+                    )
+            );
 
             ctx.sendReply(sb.toString().trim());
         } else {
             ctx.sendReply(at(ctx) + "用法: /ncmp <歌单ID> [Start-End]");
+        }
+    }
+
+    public void handleNcmUpdate(Context ctx) {
+        if (ctx.argumentCount() == 0) {
+            ctx.sendReply(at(ctx) + "用法: /ncmu <歌单ID> [Start-End]");
+            return;
+        }
+
+        if (ctx.argument(0).matches("\\d+")) {
+            long playlistId = Long.parseLong(ctx.argument(0));
+            int limit = 50;
+            int offset = 0;
+            boolean providedRange = false;
+
+            if (ctx.argumentCount() > 1) {
+                String[] range = ctx.argument(1).split("-");
+                if (range.length == 2) {
+                    try {
+                        offset = Integer.parseInt(range[0]) - 1;
+                        limit = Integer.parseInt(range[1]) - offset;
+                        providedRange = true;
+                        if (offset < 0 || limit <= 0) {
+                            throw new IllegalArgumentException();
+                        }
+                    } catch (Exception e) {
+                        ctx.sendReply(at(ctx) + "用法: /ncmu <歌单ID> [Start-End]");
+                        return;
+                    }
+                } else {
+                    ctx.sendReply(at(ctx) + "用法: /ncmu <歌单ID> [Start-End]");
+                    return;
+                }
+            }
+
+            final Playlist playlistDetail = AsteroidApi.getPlaylistDetail(playlistId);
+
+            if (playlistDetail == null) {
+                ctx.sendReply(at(ctx) + "获取歌单详情失败喵。");
+                return;
+            }
+
+            if (offset + limit > playlistDetail.trackCount() && providedRange) {
+                ctx.sendReply(at(ctx) + "给定的范围 `%d-%d` 超出歌单范围(%d)了喵。".formatted(offset + 1, offset + limit, playlistDetail.trackCount()));
+                return;
+            }
+
+            limit = Math.toIntExact(Math.min(limit, playlistDetail.trackCount() - offset));
+
+            ctx.sendReply(at(ctx) + "正在获取歌单 `%s` 的第 `%d-%d` 首歌曲...".formatted(playlistDetail.name(), offset + 1, offset + limit));
+
+            List<Song> songs = AsteroidApi.getPlaylistSongs(playlistId, limit, offset);
+
+            if (songs.isEmpty()) {
+                ctx.sendReply(at(ctx) + "歌单为空或获取失败喵。");
+                return;
+            }
+
+            final List<OstellaApi.BatchSearchQuery> queries = songs.stream()
+                    .map(s -> new OstellaApi.BatchSearchQuery(
+                            s.name(),
+                            s.artists().stream().map(Artist::name).collect(Collectors.joining(", ")))
+                    ).toList();
+
+            final int i = OstellaApi.enqueueMetaUpdate(queries);
+
+            ctx.sendReply(at(ctx) + "已提交 %d 个缓存更新任务喵。".formatted(i));
+        } else {
+            ctx.sendReply(at(ctx) + "用法: /ncmu <歌单ID> [Start-End]");
         }
     }
 }

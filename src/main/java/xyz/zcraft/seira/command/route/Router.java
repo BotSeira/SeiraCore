@@ -167,6 +167,7 @@ public class Router {
                 .register(beatmapCommands::handleAp, "ap")
                 .register(ncmHandler::handleNcm, "ncm")
                 .register(ncmHandler::handleNcmPlaylist, "ncmp")
+                .register(ncmHandler::handleNcmUpdate, "ncmu")
                 .register(beatmapCommands::handleMv, "bpv", "mv")
                 .register(beatmapCommands::handleMbg, "bgp", "mbg")
                 .register(ctx -> socialCommands.handleF(ctx, !ctx.inGroup()), "f")

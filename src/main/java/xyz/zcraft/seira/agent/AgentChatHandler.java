@@ -277,6 +277,8 @@ public final class AgentChatHandler implements AutoCloseable {
                                 ctx.sendReply(at(ctx) + "已启用本群AI对话喵。");
                             } else {
                                 if (administrator.test(ctx.senderUserId())) {
+                                    AiPermission.permits(ctx.groupId());
+                                    AiPermission.activate(ctx.groupId());
                                     ctx.sendReply(at(ctx) + "已授权并启用本群AI对话喵。");
                                 } else {
                                     ctx.sendReply(at(ctx) + "本群无此功能权限，请 [联系 Bot 管理员](%s) 喵。".formatted(CHANNEL));
@@ -289,7 +291,12 @@ public final class AgentChatHandler implements AutoCloseable {
                             );
                         }
                     } else {
-                        AiPermission.deactivate(ctx.groupId());
+                        if (AiPermission.isActivated(ctx.groupId())) {
+                            AiPermission.deactivate(ctx.groupId());
+                            ctx.sendReply(at(ctx) + "已禁用本群AI对话喵。");
+                        } else {
+                            ctx.sendReply(at(ctx) + "本群AI对话未启用喵。");
+                        }
                     }
                 }
                 case "reset" ->
