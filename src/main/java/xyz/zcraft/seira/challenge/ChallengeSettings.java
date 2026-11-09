@@ -1,7 +1,6 @@
 package xyz.zcraft.seira.challenge;
 
 import xyz.zcraft.osu.model.ModSettings;
-
 import xyz.zcraft.seira.challenge.ChallengeModels.MapChoice;
 import xyz.zcraft.seira.challenge.ChallengeModels.ScoreData;
 import xyz.zcraft.seira.challenge.ChallengeModels.SetData;

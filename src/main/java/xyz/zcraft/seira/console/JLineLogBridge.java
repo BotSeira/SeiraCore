@@ -15,8 +15,8 @@ import org.jline.reader.LineReader;
 
 import java.io.Serializable;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 final class JLineLogBridge implements AutoCloseable {
     private static final String CONSOLE_APPENDER_NAME = "CONSOLE";

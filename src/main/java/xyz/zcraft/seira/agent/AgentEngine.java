@@ -31,6 +31,7 @@ public final class AgentEngine implements AutoCloseable {
     private static final Logger requestLogger = LogManager.getLogger("AgentRequestsLogger");
     private static final Logger agentLogger = LogManager.getLogger("AgentLogger");
     private static final Gson GSON = new Gson();
+    private static final int MAX_HISTORY = 32;
     private final Map<String, Session> sessions = new HashMap<>();
     private final ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor();
     private final ResponsesClient client;
@@ -168,8 +169,6 @@ public final class AgentEngine implements AutoCloseable {
         enqueue(conversationId, message, session, now);
     }
 
-    private static final int MAX_HISTORY = 32;
-
     private Session session(String conversationId) {
         return sessions.computeIfAbsent(conversationId, id -> {
             Session loaded = new Session();
@@ -188,7 +187,6 @@ public final class AgentEngine implements AutoCloseable {
             }
             return loaded;
         });
-
     }
 
     public synchronized void rememberNames(String groupId, Map<String, String> names) {
@@ -419,8 +417,8 @@ public final class AgentEngine implements AutoCloseable {
             metadata.addProperty("id", alias);
             metadata.addProperty("name", senderName);
             String time = Instant.ofEpochMilli(System.currentTimeMillis())
-                                 .atZone(ZoneId.systemDefault())
-                                 .format(DateTimeFormatter.ofPattern("HH:mm"));
+                    .atZone(ZoneId.systemDefault())
+                    .format(DateTimeFormatter.ofPattern("HH:mm"));
             metadata.addProperty("time", time);
             metadata.addProperty("text", text);
 //            metadata.addProperty("context_only", reply == null);

@@ -12,6 +12,7 @@ import java.net.URI;
 import java.util.function.Function;
 
 final class ServiceTools {
+    private static final Logger agentLogger = LogManager.getLogger("AgentLogger");
     private final ToolRegistry registry;
     private final OstellaConfig ostella;
     private final AsteroidConfig asteroid;
@@ -30,8 +31,6 @@ final class ServiceTools {
         for (String name : names) mapping.addProperty(name, "$" + name);
         return mapping;
     }
-
-    private static final Logger agentLogger = LogManager.getLogger("AgentLogger");
 
     void declare(String service, String category, String route, String name, String description, String method,
                  ToolSchema schema, String[] pathParameters, String[] queryParameters, boolean jsonBody,
