@@ -3,8 +3,8 @@ package xyz.zcraft.seira.agent;
 import com.google.gson.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.seira.bot.data.Button;
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.msg.Button;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 
 import java.time.Duration;
 import java.util.*;

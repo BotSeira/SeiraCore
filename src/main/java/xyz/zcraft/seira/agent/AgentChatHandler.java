@@ -1,7 +1,13 @@
 package xyz.zcraft.seira.agent;
 
 import lombok.Getter;
-import xyz.zcraft.seira.bot.data.*;
+import xyz.zcraft.seira.bot.data.Attachment;
+import xyz.zcraft.seira.bot.data.FileInfo;
+import xyz.zcraft.seira.bot.data.GroupBotState;
+import xyz.zcraft.seira.bot.data.MsgElem;
+import xyz.zcraft.seira.bot.data.msg.Button;
+import xyz.zcraft.seira.bot.data.msg.MDMessage;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.config.AgentConfig;
 import xyz.zcraft.seira.config.AsteroidConfig;
@@ -17,8 +23,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -33,17 +42,23 @@ public final class AgentChatHandler implements AutoCloseable {
     private final ToolRegistry tools;
     private final AgentEngine engine;
     private final Function<String, GroupBotState> botStateGetter;
+    private final BiFunction<String, String, FileInfo> privateFileUploader;
+    private final BiFunction<String, String, FileInfo> groupFileUploader;
     private final Set<String> consented = new HashSet<>();
-    private volatile String prompt;
     @Getter
     private final AtomicBoolean useLegacy = new AtomicBoolean(false);
+    private final ExecutorService fileUploadExecutor = Executors.newSingleThreadExecutor();
+    private volatile String prompt;
 
     public AgentChatHandler(
             Predicate<String> administrator, AgentConfig conf, Function<String, String> osuToken,
-            OstellaConfig ostella, AsteroidConfig asteroid, Function<String, GroupBotState> botStateGetter) {
+            OstellaConfig ostella, AsteroidConfig asteroid, Function<String, GroupBotState> botStateGetter,
+            BiFunction<String, String, FileInfo> privateFileUploader, BiFunction<String, String, FileInfo> groupFileUploader) {
         this.administrator = administrator;
         tools = new ToolRegistry(administrator, this::enabled);
         this.botStateGetter = botStateGetter;
+        this.privateFileUploader = privateFileUploader;
+        this.groupFileUploader = groupFileUploader;
 
         try {
             settings = conf;
@@ -72,41 +87,6 @@ public final class AgentChatHandler implements AutoCloseable {
 
     public static AgentChatHandler getInstance() {
         return INSTANCE.get();
-    }
-
-    private static void sendResponse(Context context, PendingMessage message) {
-        String messageText;
-        List<List<Button>> messageButtons;
-        if (message instanceof MDMessage md) {
-            messageText = md.getMarkdown();
-            messageButtons = md.getButtons();
-        } else {
-            messageText = message.getContent();
-            messageButtons = List.of();
-        }
-        var matcher = java.util.regex.Pattern.compile("%%\\[file:([^\\r\\n]+?)]%%").matcher(messageText);
-        var files = new java.util.LinkedHashSet<String>();
-        StringBuilder markdown = new StringBuilder();
-        while (matcher.find()) {
-            URI uri = URI.create(matcher.group(1).trim());
-            if (!("https".equals(uri.getScheme()) || "http".equals(uri.getScheme()))
-                    || uri.getHost() == null || uri.getUserInfo() != null)
-                throw new IllegalArgumentException("Invalid file URL");
-            files.add(uri.toString());
-            matcher.appendReplacement(markdown, "");
-        }
-        matcher.appendTail(markdown);
-        if (files.size() > 3) throw new IllegalArgumentException("Too many files in one message");
-
-        final PendingMessage finalMessage = PendingMessage.ofMarkdownRaw(markdown.toString(), messageButtons);
-        if (!markdown.toString().isBlank()
-                && !context.send(true, finalMessage).success()) {
-            throw new IllegalStateException("Agent message delivery failed");
-        }
-        for (String url : files) {
-            if (!context.send(true, PendingMessage.ofFileUrl(url)).success())
-                throw new IllegalStateException("Agent file delivery failed");
-        }
     }
 
     public static List<Attachment> collectAttachments(List<Attachment> attachments, List<MsgElem> elements) {
@@ -162,6 +142,51 @@ public final class AgentChatHandler implements AutoCloseable {
 
     private static boolean isImageFilename(String name) {
         return name != null && name.toLowerCase(Locale.ROOT).matches(".*\\.(png|jpe?g|webp|gif)$");
+    }
+
+    private void sendResponse(Context context, PendingMessage message) {
+        String messageText;
+        List<List<Button>> messageButtons;
+        if (message instanceof MDMessage md) {
+            messageText = md.getMarkdown();
+            messageButtons = md.getButtons();
+        } else {
+            messageText = message.getContent();
+            messageButtons = List.of();
+        }
+        var matcher = java.util.regex.Pattern.compile("%%\\[file:([^\\r\\n]+?)]%%").matcher(messageText);
+        var files = new java.util.LinkedHashSet<String>();
+        StringBuilder markdown = new StringBuilder();
+        while (matcher.find()) {
+            URI uri = URI.create(matcher.group(1).trim());
+            if (!("https".equals(uri.getScheme()) || "http".equals(uri.getScheme()))
+                    || uri.getHost() == null || uri.getUserInfo() != null)
+                throw new IllegalArgumentException("Invalid file URL");
+            files.add(uri.toString());
+            matcher.appendReplacement(markdown, "");
+        }
+        matcher.appendTail(markdown);
+        if (files.size() > 8) throw new IllegalArgumentException("Too many files in one message");
+
+        String append = "";
+        if (!files.isEmpty()) {
+            append = "\n\n> " + files.size() + " 个附件上传中...";
+        }
+
+        final PendingMessage finalMessage = PendingMessage.ofMarkdownRaw((markdown + append).trim(), messageButtons);
+        if (!markdown.toString().isBlank() && !context.send(true, finalMessage).success()) {
+            for (String url : files) {
+                fileUploadExecutor.submit(() -> {
+                    var fileInfo = context.inGroup()
+                            ? groupFileUploader.apply(context.groupId(), url)
+                            : privateFileUploader.apply(context.senderUserId(), url);
+                    if (!context.send(true, PendingMessage.ofUploadedFile(fileInfo, url)).success()) {
+                        throw new IllegalStateException("Agent file delivery failed");
+                    }
+                });
+            }
+            throw new IllegalStateException("Agent message delivery failed");
+        }
     }
 
     public synchronized boolean enabled(String groupId) {

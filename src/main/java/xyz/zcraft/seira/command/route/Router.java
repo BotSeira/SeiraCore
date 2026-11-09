@@ -11,7 +11,11 @@ import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.QQApi;
-import xyz.zcraft.seira.bot.data.*;
+import xyz.zcraft.seira.bot.data.Attachment;
+import xyz.zcraft.seira.bot.data.GroupBotState;
+import xyz.zcraft.seira.bot.data.MsgElem;
+import xyz.zcraft.seira.bot.data.QQUser;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.challenge.ChallengeService;
 import xyz.zcraft.seira.command.*;
 import xyz.zcraft.seira.command.handler.*;
@@ -145,7 +149,8 @@ public class Router {
                 resolver,
                 ChatProviders.newHiAgentChatProvider(configSupplier.get().llm()),
                 admins::isAdmin,
-                botStateGetter
+                botStateGetter,
+                messageSender
         );
     }
 
@@ -318,7 +323,13 @@ public class Router {
                     if (!aiChatHandler.getUseLegacy().get()) {
                         aiChatHandler.handleChat(parseResult.context().withReplies(replies), msgToRecord, attachments, msgElems);
                     } else {
-                        legacyAiChatHandler.handleChat(parseResult.context().withReplies(replies), msgToRecord, msgElems);
+                        legacyAiChatHandler.handleChat(
+                                parseResult.context()
+                                        .withReplies(replies)
+                                        .withRecorder(s -> legacyAiChatHandler.recordHistory(groupId, "Seira(你)", "", s)),
+                                msgToRecord,
+                                msgElems
+                        );
                     }
                 }
                 return;

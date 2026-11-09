@@ -10,7 +10,7 @@ import com.qcloud.cos.region.Region;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.config.CosConfig;
 import xyz.zcraft.seira.data.UploadedImage;
 
@@ -51,6 +51,35 @@ public class CosService implements AutoCloseable {
         ClientConfig clientConfig = new ClientConfig(new Region(config.region()));
         client = new COSClient(credentials, clientConfig);
 
+    }
+
+    public static String extensionFromUrl(String sourceUrl) {
+        int queryIdx = sourceUrl.indexOf('?');
+        String path = queryIdx >= 0 ? sourceUrl.substring(0, queryIdx) : sourceUrl;
+        int slash = path.lastIndexOf('/');
+        String filename = slash >= 0 ? path.substring(slash + 1) : path;
+        int dot = filename.lastIndexOf('.');
+        if (dot <= 0 || dot == filename.length() - 1) {
+            return null;
+        }
+
+        String ext = filename.substring(dot).toLowerCase(Locale.ROOT);
+        if (ext.length() > 8) {
+            return null;
+        }
+        return ext;
+    }
+
+    public static String filenameFromUrl(String value) {
+        try {
+            String path = URI.create(value).getPath();
+            if (path != null && path.lastIndexOf('/') < path.length() - 1) {
+                return path.substring(path.lastIndexOf('/') + 1);
+            }
+        } catch (IllegalArgumentException ignored) {
+            // The downloader will report malformed URLs if one reaches it.
+        }
+        return "file";
     }
 
     public String uploadFromUrl(String sourceUrl, int fileType) {
@@ -242,23 +271,6 @@ public class CosService implements AutoCloseable {
             return "image/webp";
         }
         return fileType == PendingMessage.FILE_TYPE_IMAGE ? "image/png" : "application/octet-stream";
-    }
-
-    private String extensionFromUrl(String sourceUrl) {
-        int queryIdx = sourceUrl.indexOf('?');
-        String path = queryIdx >= 0 ? sourceUrl.substring(0, queryIdx) : sourceUrl;
-        int slash = path.lastIndexOf('/');
-        String filename = slash >= 0 ? path.substring(slash + 1) : path;
-        int dot = filename.lastIndexOf('.');
-        if (dot <= 0 || dot == filename.length() - 1) {
-            return null;
-        }
-
-        String ext = filename.substring(dot).toLowerCase(Locale.ROOT);
-        if (ext.length() > 8) {
-            return null;
-        }
-        return ext;
     }
 
     private String normalizePrefix(String keyPrefix) {

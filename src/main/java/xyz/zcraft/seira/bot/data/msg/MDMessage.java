@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.bot.data;
+package xyz.zcraft.seira.bot.data.msg;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;

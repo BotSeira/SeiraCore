@@ -10,7 +10,8 @@ import xyz.zcraft.seira.api.data.Base64Bytes;
 import xyz.zcraft.seira.api.data.QqUploadRequest;
 import xyz.zcraft.seira.api.data.Response;
 import xyz.zcraft.seira.bot.MessageSender;
-import xyz.zcraft.seira.bot.data.*;
+import xyz.zcraft.seira.bot.data.FileInfo;
+import xyz.zcraft.seira.bot.data.msg.*;
 import xyz.zcraft.seira.command.reply.CommandUsage;
 import xyz.zcraft.seira.data.SendResult;
 import xyz.zcraft.seira.data.UploadedImage;
@@ -150,7 +151,7 @@ public final class TaskCoordinator {
             return PendingMessage.ofString("回放视频生成失败，请稍后重试。");
         }
         return result.qqFile() != null
-                ? PendingMessage.ofUploadedVideo(result.qqFile(), result.videoUrl())
+                ? PendingMessage.ofUploadedFile(result.qqFile(), result.videoUrl())
                 : PendingMessage.ofVideoUrl(result.videoUrl());
     }
 
@@ -209,8 +210,9 @@ public final class TaskCoordinator {
             if (md.hasKeyboard()) {
                 message.setKeyboard(md.getKeyboard());
             }
-        } else if (pendingMsg.getMsgType() == PendingMessage.MSG_TYPE_MARKDOWN) {
-            message.setMarkdown(Message.MessageMarkdown.of(pendingMsg.getContent()));
+        } else if (pendingMsg instanceof CardMessage card) {
+            message.setMsgType(PendingMessage.MSG_TYPE_CARD);
+            message.setCard(card.toCardJson());
         } else {
             message.setContent(pendingMsg.getContent());
         }

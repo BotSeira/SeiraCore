@@ -11,7 +11,7 @@ import xyz.zcraft.seira.api.data.ncm.MatchResult;
 import xyz.zcraft.seira.api.data.ncm.Playlist;
 import xyz.zcraft.seira.api.data.ncm.Song;
 import xyz.zcraft.seira.bot.MessageSender;
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.TargetHistory;
 import xyz.zcraft.seira.command.TaskCoordinator;

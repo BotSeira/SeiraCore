@@ -4,10 +4,11 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import xyz.zcraft.seira.ai.data.AgentFile;
 import xyz.zcraft.seira.ai.provider.ChatProvider;
+import xyz.zcraft.seira.bot.MessageSender;
 import xyz.zcraft.seira.bot.data.Attachment;
 import xyz.zcraft.seira.bot.data.GroupBotState;
 import xyz.zcraft.seira.bot.data.MsgElem;
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.parse.Resolver;
 import xyz.zcraft.seira.db.UserDataStore;
@@ -18,6 +19,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
@@ -40,15 +42,17 @@ public class LegacyAiChatHandler {
     private final Map<String, Deque<String>> groupMentionedHistory = new ConcurrentHashMap<>();
     private final Set<String> consented = new HashSet<>();
     private final Map<String, Map<String, String>> groupNicknames = new ConcurrentHashMap<>();
+    private final MessageSender messageSender;
 
     public LegacyAiChatHandler(
             Resolver resolver, ChatProvider chatProvider, Predicate<String> isAdmin,
-            Function<String, GroupBotState> botStateGetter
+            Function<String, GroupBotState> botStateGetter, MessageSender messageSender
     ) {
         this.resolver = resolver;
         this.adminAuthorizer = isAdmin;
         this.chatProvider = chatProvider;
         this.botStateGetter = botStateGetter;
+        this.messageSender = messageSender;
     }
 
     public void recordNickname(String groupId, String openId, String nickname) {
@@ -197,17 +201,17 @@ public class LegacyAiChatHandler {
                 new StreamHandler() {
                     @Override
                     public void onText(String message) {
+                        AtomicInteger filesToUpload = new AtomicInteger();
                         CHAT_INLINE_FILE.matcher(message).results()
                                 .forEach(r -> {
                                     if (r.group(1) == null || r.group(1).isBlank()) return;
                                     final String fileUrl = r.group(1);
                                     executor.submit(() -> {
-                                        if (fileUrl.endsWith(".flac") || fileUrl.endsWith(".wav")
-                                                || fileUrl.endsWith(".ogg") || fileUrl.endsWith(".mp3")) {
-                                            return ctx.send(true, PendingMessage.ofVoiceUrl(fileUrl).doUpload(false));
-                                        } else {
-                                            return ctx.send(true, PendingMessage.ofFileUrl(fileUrl).doUpload(false));
-                                        }
+                                        filesToUpload.getAndIncrement();
+                                        var fileInfo = ctx.inGroup()
+                                                ? messageSender.uploadGroupMediaByParts(ctx.groupId(), fileUrl)
+                                                : messageSender.uploadPrivateMediaByParts(ctx.senderUserId(), fileUrl);
+                                        ctx.send(true, PendingMessage.ofUploadedFile(fileInfo, fileUrl));
                                     });
                                 });
 
@@ -215,7 +219,12 @@ public class LegacyAiChatHandler {
                         if (!message.trim().startsWith(at.trim())) {
                             message = at + message;
                         }
-                        ctx.send(true, PendingMessage.ofMarkdownRaw(message), true);
+
+                        if (filesToUpload.get() > 0) {
+                            message += "\n\n> " + filesToUpload.get() + " 个附件上传中...";
+                        }
+
+                        ctx.send(true, PendingMessage.ofMarkdownRaw(message.trim()), true);
                     }
 
                     @Override

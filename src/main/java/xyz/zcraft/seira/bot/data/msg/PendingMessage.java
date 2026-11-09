@@ -1,6 +1,7 @@
-package xyz.zcraft.seira.bot.data;
+package xyz.zcraft.seira.bot.data.msg;
 
 import lombok.Data;
+import xyz.zcraft.seira.bot.data.FileInfo;
 
 import java.util.List;
 
@@ -9,6 +10,7 @@ public class PendingMessage {
     public static final int MSG_TYPE_TEXT = 0;
     public static final int MSG_TYPE_MEDIA = 7;
     public static final int MSG_TYPE_MARKDOWN = 2;
+    public static final int MSG_TYPE_CARD = 8;
     public static final int FILE_TYPE_IMAGE = 1;
     public static final int FILE_TYPE_VIDEO = 2;
     public static final int FILE_TYPE_VOICE = 3;
@@ -54,9 +56,9 @@ public class PendingMessage {
         return message;
     }
 
-    public static PendingMessage ofUploadedVideo(FileInfo fileInfo, String sourceUrl) {
+    public static PendingMessage ofUploadedFile(FileInfo fileInfo, String sourceUrl) {
         if (fileInfo == null || fileInfo.getFileInfo() == null || fileInfo.getFileInfo().isBlank()) {
-            throw new IllegalArgumentException("Uploaded video file info is required");
+            throw new IllegalArgumentException("Uploaded file's file info is required");
         }
         final PendingMessage message = new PendingMessage();
         message.fileType = FILE_TYPE_VIDEO;

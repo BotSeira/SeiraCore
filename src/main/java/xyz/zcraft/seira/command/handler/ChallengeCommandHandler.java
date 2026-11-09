@@ -1,7 +1,7 @@
 package xyz.zcraft.seira.command.handler;
 
-import xyz.zcraft.seira.bot.data.Button;
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.msg.Button;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.challenge.ChallengeMessages;
 import xyz.zcraft.seira.challenge.ChallengeService;
 import xyz.zcraft.seira.challenge.ChallengeSetupMessages;

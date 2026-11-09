@@ -1,6 +1,6 @@
 package xyz.zcraft.seira.command.handler;
 
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.discord.DcsTarget;
 import xyz.zcraft.seira.discord.DiscordBridgeService;

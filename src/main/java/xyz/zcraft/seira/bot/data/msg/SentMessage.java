@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.bot.data;
+package xyz.zcraft.seira.bot.data.msg;
 
 import com.google.gson.annotations.SerializedName;
 

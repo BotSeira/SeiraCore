@@ -4,7 +4,10 @@ import com.google.gson.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.bot.data.*;
+import xyz.zcraft.seira.bot.data.msg.Message;
+import xyz.zcraft.seira.bot.data.msg.SentMessage;
 import xyz.zcraft.seira.interaction.data.InteractionResponse;
+import xyz.zcraft.seira.services.CosService;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -23,6 +26,9 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
+
+import static xyz.zcraft.seira.bot.data.msg.PendingMessage.FILE_TYPE_FILE;
+import static xyz.zcraft.seira.bot.data.msg.PendingMessage.FILE_TYPE_VIDEO;
 
 public class QQApi {
     private static final String ENDPOINT = "https://api.sgroup.qq.com";
@@ -182,46 +188,48 @@ public class QQApi {
         }
     }
 
-    public static FileInfo uploadPrivateVideoByParts(AccessToken accessToken, String openId, String sourceUrl) {
-        return uploadVideoByParts(accessToken, "users", openId, sourceUrl);
+    public static FileInfo uploadPrivateFileByParts(AccessToken accessToken, String openId, String sourceUrl) {
+        return uploadFileByParts(accessToken, "users", openId, sourceUrl);
     }
 
-    public static FileInfo uploadGroupVideoByParts(AccessToken accessToken, String openId, String sourceUrl) {
-        return uploadVideoByParts(accessToken, "groups", openId, sourceUrl);
+    public static FileInfo uploadGroupFileByParts(AccessToken accessToken, String openId, String sourceUrl) {
+        return uploadFileByParts(accessToken, "groups", openId, sourceUrl);
     }
 
-    private static FileInfo uploadVideoByParts(AccessToken accessToken, String targetType, String openId, String sourceUrl) {
-        Path video = null;
+    private static FileInfo uploadFileByParts(AccessToken accessToken, String targetType, String openId, String sourceUrl) {
+        Path filePath = null;
         try {
-            video = downloadVideo(sourceUrl);
-            long fileSize = Files.size(video);
+            filePath = downloadFile(sourceUrl);
+            long fileSize = Files.size(filePath);
             if (fileSize == 0 || fileSize > MAX_MEDIA_SIZE) {
-                throw new IllegalArgumentException("Video size must be between 1 byte and 200 MB: " + fileSize);
+                throw new IllegalArgumentException("File size must be between 1 byte and 200 MB: " + fileSize);
             }
 
-            String fileName = videoFileName(sourceUrl);
-            MediaDigests digests = calculateDigests(video);
-            UploadPrepare prepare = prepareUpload(accessToken, targetType, openId, fileName, fileSize, digests);
-            uploadParts(accessToken, targetType, openId, video, prepare);
+//            String fileName = videoFileName(sourceUrl);
+            String fileName = CosService.filenameFromUrl(sourceUrl);
+            MediaDigests digests = calculateDigests(filePath);
+            int fileType = (fileName.endsWith(".mp4") ? FILE_TYPE_VIDEO : FILE_TYPE_FILE);
+            UploadPrepare prepare = prepareUpload(accessToken, targetType, openId, fileName, fileSize, fileType, digests);
+            uploadParts(accessToken, targetType, openId, filePath, prepare);
             return completeUpload(accessToken, targetType, openId, fileName, prepare.uploadId());
         } catch (IOException | InterruptedException e) {
             if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
-            throw new RuntimeException("Failed to upload video directly to QQ", e);
+            throw new RuntimeException("Failed to upload file directly to QQ", e);
         } finally {
-            if (video != null) {
+            if (filePath != null) {
                 try {
-                    Files.deleteIfExists(video);
+                    Files.deleteIfExists(filePath);
                 } catch (IOException e) {
-                    LOG.warn("Failed to delete temporary video {}", video, e);
+                    LOG.warn("Failed to delete temporary file {}", filePath, e);
                 }
             }
         }
     }
 
-    private static Path downloadVideo(String sourceUrl) throws IOException, InterruptedException {
-        Path target = Files.createTempFile("seira-qq-video-", ".mp4");
+    private static Path downloadFile(String sourceUrl) throws IOException, InterruptedException {
+        Path target = Files.createTempFile("seira-temp-file-", CosService.extensionFromUrl(sourceUrl));
         boolean success = false;
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -231,7 +239,7 @@ public class QQApi {
                     .build();
             HttpResponse<Path> response = MEDIA_CLIENT.send(request, HttpResponse.BodyHandlers.ofFile(target));
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new IOException("Failed to download video: status=" + response.statusCode());
+                throw new IOException("Failed to download file: status=" + response.statusCode());
             }
             success = true;
             return target;
@@ -280,11 +288,12 @@ public class QQApi {
         }
     }
 
+
     private static UploadPrepare prepareUpload(AccessToken accessToken, String targetType, String openId,
-                                               String fileName, long fileSize, MediaDigests digests)
+                                               String fileName, long fileSize, int fileType, MediaDigests digests)
             throws IOException, InterruptedException {
         JsonObject payload = new JsonObject();
-        payload.addProperty("file_type", 2);
+        payload.addProperty("file_type", fileType);
         payload.addProperty("file_size", Long.toString(fileSize));
         payload.addProperty("file_name", fileName);
         payload.addProperty("md5", digests.md5());
@@ -296,8 +305,8 @@ public class QQApi {
                 "/v2/" + targetType + "/" + openId + "/upload_prepare",
                 payload
         );
-        JsonObject data = parseResponseData(response, "prepare video upload");
-        String uploadId = requiredString(data, "upload_id", "prepare video upload");
+        JsonObject data = parseResponseData(response, "prepare file upload");
+        String uploadId = requiredString(data, "upload_id", "prepare file upload");
         long blockSize = data.has("block_size") ? data.get("block_size").getAsLong() : 5L * 1024 * 1024;
 
         List<UploadPart> parts = new ArrayList<>();
@@ -306,7 +315,7 @@ public class QQApi {
                 JsonObject part = element.getAsJsonObject();
                 parts.add(new UploadPart(
                         part.get("index").getAsInt(),
-                        requiredString(part, "presigned_url", "prepare video upload"),
+                        requiredString(part, "presigned_url", "prepare file upload"),
                         part.has("block_size") ? part.get("block_size").getAsLong() : blockSize
                 ));
             });
@@ -342,7 +351,7 @@ public class QQApi {
                 try {
                     future.get();
                 } catch (ExecutionException e) {
-                    throw new IOException("Failed to upload a video part", e.getCause());
+                    throw new IOException("Failed to upload a file part", e.getCause());
                 }
             }
         }
@@ -376,7 +385,7 @@ public class QQApi {
                 Thread.sleep(TimeUnit.SECONDS.toMillis(prepare.retryDelaySeconds()));
             }
         } while (System.nanoTime() < deadline);
-        throw new IOException("Video part upload retry timeout: index=" + part.index(), lastFailure);
+        throw new IOException("File part upload retry timeout: index=" + part.index(), lastFailure);
     }
 
     private static byte[] readPart(Path file, long defaultBlockSize, UploadPart part) throws IOException {
@@ -385,7 +394,7 @@ public class QQApi {
         long requestedSize = part.blockSize() > 0 ? part.blockSize() : defaultBlockSize;
         int size = Math.toIntExact(Math.min(requestedSize, fileSize - offset));
         if (size <= 0) {
-            throw new IOException("Invalid video part range: index=" + part.index());
+            throw new IOException("Invalid file part range: index=" + part.index());
         }
 
         ByteBuffer buffer = ByteBuffer.allocate(size);
@@ -393,7 +402,7 @@ public class QQApi {
             while (buffer.hasRemaining()) {
                 int read = channel.read(buffer, offset + buffer.position());
                 if (read < 0) {
-                    throw new IOException("Unexpected end of video while reading part " + part.index());
+                    throw new IOException("Unexpected end of file while reading part " + part.index());
                 }
             }
         }
@@ -413,7 +422,7 @@ public class QQApi {
                 "/v2/" + targetType + "/" + openId + "/upload_part_finish",
                 payload
         );
-        parseResponseData(response, "finish video part " + partIndex);
+        parseResponseData(response, "finish file part " + partIndex);
     }
 
     private static FileInfo completeUpload(AccessToken accessToken, String targetType, String openId,
@@ -429,7 +438,7 @@ public class QQApi {
                 "/v2/" + targetType + "/" + openId + "/files",
                 payload
         );
-        return parseUploadedFileInfo(response, "complete video upload");
+        return parseUploadedFileInfo(response, "complete file upload");
     }
 
     private static HttpResponse<String> sendJson(AccessToken accessToken, String path, JsonObject payload)

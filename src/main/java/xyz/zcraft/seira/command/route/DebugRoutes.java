@@ -9,9 +9,10 @@ import xyz.zcraft.seira.api.data.FriendEntry;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.Response;
 import xyz.zcraft.seira.bot.MessageSender;
-import xyz.zcraft.seira.bot.data.Button;
 import xyz.zcraft.seira.bot.data.FileInfo;
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.msg.Button;
+import xyz.zcraft.seira.bot.data.msg.CardMessage;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.command.CommandHandler;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.InteractionHandler;
@@ -74,8 +75,18 @@ public class DebugRoutes {
             case "debug.validate-token" -> handleValidateToken(ctx);
             case "debug.active-message" -> handleActiveMessage(ctx);
             case "debug.interaction-test" -> handleInteractionTest(ctx);
+            case "debug.card-test" -> handleCardTest(ctx);
             default -> unknownCommand.handle(ctx);
         }
+    }
+
+    private void handleCardTest(Context ctx) {
+        ctx.sendReply(CardMessage.ofCard(
+                "アクマバライ (feat. 雨衣 & 初音ミク)",
+                "うちのボカロは様子がおかしい / 雨衣 / 初音ミク",
+                "https://music.163.com/#/song?id=3414309357",
+                "http://p2.music.126.net/WNQJpgrrsKHkx3GB3Rx9Ow==/109951173669845833.jpg")
+        );
     }
 
     private void handleInteractionTest(Context ctx) {

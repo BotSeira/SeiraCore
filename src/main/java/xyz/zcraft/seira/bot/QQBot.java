@@ -5,7 +5,6 @@ import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.agent.AgentChatHandler;
-import xyz.zcraft.seira.ai.LegacyAiChatHandler;
 import xyz.zcraft.seira.bot.data.*;
 import xyz.zcraft.seira.challenge.ChallengeService;
 import xyz.zcraft.seira.challenge.OstellaChallengeApi;
@@ -125,10 +124,19 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
 
         LOG.info("Initializing agents service");
         var agentAuth = new xyz.zcraft.seira.util.OsuAuthHelper(config.binding());
-        this.agentHandler = new AgentChatHandler(admins::isAdmin, config.agent(), openId -> {
-            var token = agentAuth.updateTokenAndGet(openId);
-            return token == null ? null : token.accessToken();
-        }, config.ostella(), config.asteroid(), group -> QQApi.getGroupBotState(tokenManager.getToken(), group));
+        this.agentHandler = new AgentChatHandler(
+                admins::isAdmin,
+                config.agent(),
+                openId -> {
+                    var token = agentAuth.updateTokenAndGet(openId);
+                    return token == null ? null : token.accessToken();
+                },
+                config.ostella(),
+                config.asteroid(),
+                group -> QQApi.getGroupBotState(tokenManager.getToken(), group),
+                (openId, url) -> QQApi.uploadPrivateFileByParts(tokenManager.getToken(), openId, url),
+                (groupId, url) -> QQApi.uploadGroupFileByParts(tokenManager.getToken(), groupId, url)
+        );
 
         this.attachmentHandler = new AttachmentHandler(executors.attachmentDownloads());
 

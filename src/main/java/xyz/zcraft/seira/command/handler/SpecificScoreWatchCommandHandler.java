@@ -1,6 +1,6 @@
 package xyz.zcraft.seira.command.handler;
 
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.TaskCoordinator;
 import xyz.zcraft.seira.watch.ScoreWatchService;

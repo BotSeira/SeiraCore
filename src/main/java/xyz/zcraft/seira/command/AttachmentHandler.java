@@ -5,7 +5,7 @@ import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.ReplayUploadInfo;
 import xyz.zcraft.seira.bot.data.Attachment;
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 
 import java.net.URI;

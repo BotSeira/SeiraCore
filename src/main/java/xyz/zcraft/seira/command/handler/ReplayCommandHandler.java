@@ -2,7 +2,7 @@ package xyz.zcraft.seira.command.handler;
 
 import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.ReplayResultStore;
 import xyz.zcraft.seira.command.TargetHistory;

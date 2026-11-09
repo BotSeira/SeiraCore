@@ -1,7 +1,7 @@
 package xyz.zcraft.seira.challenge;
 
-import xyz.zcraft.seira.bot.data.Button;
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.msg.Button;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 
 import java.time.Instant;
 import java.time.ZoneId;

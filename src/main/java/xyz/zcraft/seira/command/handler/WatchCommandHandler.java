@@ -2,7 +2,7 @@ package xyz.zcraft.seira.command.handler;
 
 import xyz.zcraft.osu.model.User;
 import xyz.zcraft.seira.api.OstellaApi;
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.command.TaskCoordinator;

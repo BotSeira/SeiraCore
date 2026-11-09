@@ -8,7 +8,7 @@ import xyz.zcraft.seira.api.RomAIApi;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.Response;
 import xyz.zcraft.seira.api.data.RomAIMatch;
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.ResolutionException;
 import xyz.zcraft.seira.command.TaskCoordinator;
