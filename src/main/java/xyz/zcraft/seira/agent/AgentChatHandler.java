@@ -13,6 +13,7 @@ import xyz.zcraft.seira.config.AsteroidConfig;
 import xyz.zcraft.seira.config.OstellaConfig;
 import xyz.zcraft.seira.services.AiPermission;
 import xyz.zcraft.seira.util.ResourceUtil;
+import xyz.zcraft.seira.util.TokenManager;
 
 import java.io.IOException;
 import java.net.URI;
@@ -46,9 +47,10 @@ public final class AgentChatHandler implements AutoCloseable {
     public AgentChatHandler(
             Predicate<String> administrator, AgentConfig conf, Function<String, String> osuToken,
             OstellaConfig ostella, AsteroidConfig asteroid, Function<String, GroupBotState> botStateGetter,
-            BiFunction<String, String, FileInfo> privateFileUploader, BiFunction<String, String, FileInfo> groupFileUploader) {
+            BiFunction<String, String, FileInfo> privateFileUploader, BiFunction<String, String, FileInfo> groupFileUploader,
+            TokenManager tokenManager) {
         this.administrator = administrator;
-        tools = new ToolRegistry(administrator, this::enabled);
+        tools = new ToolRegistry(administrator, this::enabled, tokenManager);
         this.botStateGetter = botStateGetter;
         this.privateFileUploader = privateFileUploader;
         this.groupFileUploader = groupFileUploader;

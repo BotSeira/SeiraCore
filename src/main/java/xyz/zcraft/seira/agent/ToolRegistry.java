@@ -1,10 +1,12 @@
 package xyz.zcraft.seira.agent;
 
 import com.google.gson.*;
+import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.bot.data.msg.Button;
 import xyz.zcraft.seira.bot.data.msg.PendingMessage;
+import xyz.zcraft.seira.util.TokenManager;
 
 import java.time.Duration;
 import java.util.*;
@@ -21,10 +23,13 @@ public final class ToolRegistry implements AutoCloseable {
     private final ConcurrentHashMap<String, Approval> approvals = new ConcurrentHashMap<>();
     private volatile Map<String, Tool> tools = Map.of();
     private Set<String> configuredNames = Set.of();
+    @Getter
+    private final TokenManager tokenManager;
 
-    public ToolRegistry(Predicate<String> administrator, Predicate<String> conversationAllowed) {
+    public ToolRegistry(Predicate<String> administrator, Predicate<String> conversationAllowed, TokenManager tokenManager) {
         this.administrator = administrator;
         this.conversationAllowed = conversationAllowed;
+        this.tokenManager = tokenManager;
     }
 
     public static JsonArray definitions(Map<String, Tool> snapshot) {

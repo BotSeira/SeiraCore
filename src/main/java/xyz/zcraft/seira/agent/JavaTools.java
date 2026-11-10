@@ -1,7 +1,9 @@
 package xyz.zcraft.seira.agent;
 
+import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import xyz.zcraft.seira.bot.QQApi;
 import xyz.zcraft.seira.db.UserDataStore;
 
 import java.time.Duration;
@@ -11,6 +13,7 @@ import java.util.Optional;
 import java.util.Set;
 
 class JavaTools {
+    private static final Gson GSON = new Gson();
     static void register(ToolRegistry registry) {
         registry.register(new ToolRegistry.Tool(
                         "get_osu_binding",
@@ -83,6 +86,24 @@ class JavaTools {
                     result.add("osu_uids", uids);
                     result.addProperty("count", uids.size());
                     return result;
+                })
+        );
+
+        registry.register(new ToolRegistry.Tool(
+                "get_group_info",
+                "获取当前群组的基本信息，包括群名称，描述，成员人数等。",
+                ToolSchema.object()
+                        .additionalProperties(false)
+                        .toJson(),
+                Set.of(),
+                Duration.ofSeconds(5),
+                (arguments, context) -> {
+                    String groupId = context.conversationId();
+                    if (groupId == null || groupId.isBlank()) {
+                        throw new IllegalArgumentException("Group context is required");
+                    }
+
+                    return GSON.toJsonTree(QQApi.getGroupInfo(registry.getTokenManager().getToken(), groupId));
                 })
         );
     }
