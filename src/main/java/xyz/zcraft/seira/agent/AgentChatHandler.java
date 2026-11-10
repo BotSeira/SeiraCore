@@ -288,6 +288,7 @@ public final class AgentChatHandler implements AutoCloseable {
                             )
                     );
                     ctx.sendReply(at(ctx) + (accepted ? "决定已提交喵。" : "确认请求不存在、已处理或已过期喵。"));
+                    return;
                 }
                 case "grant", "revoke" -> {
                     if (!administrator.test(ctx.senderUserId())) {
@@ -297,6 +298,7 @@ public final class AgentChatHandler implements AutoCloseable {
                     if (action.equals("grant")) AiPermission.grant(ctx.groupId());
                     else AiPermission.revoke(ctx.groupId());
                     ctx.sendReply(at(ctx) + "AI 授权已更新喵。");
+                    return;
                 }
                 case "on", "off" -> {
                     if (action.equals("on")) {
@@ -334,9 +336,21 @@ public final class AgentChatHandler implements AutoCloseable {
                             ctx.sendReply(at(ctx) + "本群AI对话未启用喵。");
                         }
                     }
+                    return;
                 }
-                case "reset" ->
+                case "reset" -> {
+                    if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
+                        if (administrator.test(ctx.senderUserId())) {
+                            ctx.sendReply(at(ctx) + (engine.resetAll() ? "已清除全部上下文喵" : "全部上下文清除失败喵。"));
+                        } else {
+                            ctx.sendReply(at(ctx) + "此操作需要机器人管理员权限喵。");
+                        }
+                        return;
+                    } else if (ctx.argumentCount() == 1) {
                         ctx.sendReply(at(ctx) + (engine.reset(ctx.groupId()) ? "已清除本群上下文喵" : "请等待本群当前任务结束后再清除喵。"));
+                        return;
+                    }
+                }
                 case "reload" -> {
                     if (!administrator.test(ctx.senderUserId())) {
                         ctx.sendReply(at(ctx) + "此操作需要机器人管理员权限喵。");
@@ -344,6 +358,7 @@ public final class AgentChatHandler implements AutoCloseable {
                         reload();
                         ctx.sendReply(at(ctx) + "AI 聊天已重新加载喵。");
                     }
+                    return;
                 }
                 case "legacy" -> {
                     if (!administrator.test(ctx.senderUserId())) {
@@ -352,10 +367,11 @@ public final class AgentChatHandler implements AutoCloseable {
                     }
                     AiPermission.setUseLegacy(!AiPermission.doUseLegacy());
                     ctx.sendReply(at(ctx) + "已切换到" + (AiPermission.doUseLegacy() ? "旧版" : "新版") + "AI聊天模式喵。");
+                    return;
                 }
-                default ->
-                        ctx.sendReply(at(ctx) + "用法：/ai status|on|off|grant|revoke|reset|reload，或 /ai confirm|deny TOKEN");
             }
+
+            ctx.sendReply(at(ctx) + "用法：/ai status|on|off|grant|revoke|reset|reload，或 /ai confirm|deny TOKEN");
         } catch (Exception e) {
             org.apache.logging.log4j.LogManager.getLogger(AgentChatHandler.class).error("Agent management failed", e);
             ctx.sendReply(at(ctx) + "指令处理失败了喵。\n> " + e.getMessage());

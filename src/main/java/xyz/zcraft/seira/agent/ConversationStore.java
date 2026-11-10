@@ -5,6 +5,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
@@ -75,6 +76,20 @@ public final class ConversationStore {
 
     public void clear(String id) throws IOException {
         Files.deleteIfExists(file(id));
+    }
+
+    public void clearAll() throws IOException {
+        try (var stream = Files.list(directory)) {
+            stream.filter(Files::isRegularFile)
+                    .filter(f -> f.endsWith(".json"))
+                    .forEach(f -> {
+                        try {
+                            Files.deleteIfExists(f);
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    });
+        }
     }
 
     public record Saved(String responseId, Map<String, String> participants, com.google.gson.JsonArray history) {

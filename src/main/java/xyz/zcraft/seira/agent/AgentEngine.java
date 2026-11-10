@@ -248,6 +248,17 @@ public final class AgentEngine implements AutoCloseable {
         return true;
     }
 
+    public synchronized boolean resetAll() {
+        try {
+            store.clearAll();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+
+        sessions.clear();
+        return true;
+    }
+
     private void run(String id, Session session) {
         LOG.info("Running session in conversation: {}", id);
         JsonArray input = new JsonArray();
