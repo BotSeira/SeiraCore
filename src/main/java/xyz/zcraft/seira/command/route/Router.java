@@ -28,6 +28,7 @@ import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.discord.DiscordBridgeService;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
+import xyz.zcraft.seira.services.AiPermission;
 import xyz.zcraft.seira.services.BindService;
 import xyz.zcraft.seira.services.McMessageService;
 import xyz.zcraft.seira.services.WebServer;
@@ -63,6 +64,7 @@ public class Router {
     private final Executor commandExecutor;
     private final Supplier<QQUser> selfSupplier;
     private final AgentChatHandler aiChatHandler;
+    @SuppressWarnings("deprecation")
     private final LegacyAiChatHandler legacyAiChatHandler;
     private final InteractionHandler interactionHandler;
     private final McMessageService mcMessageService;
@@ -320,7 +322,7 @@ public class Router {
                 );
 
                 if (beingAt && activatedAi) {
-                    if (!aiChatHandler.getUseLegacy().get()) {
+                    if (!AiPermission.doUseLegacy()) {
                         aiChatHandler.handleChat(parseResult.context().withReplies(replies), msgToRecord, attachments, msgElems);
                     } else {
                         legacyAiChatHandler.handleChat(

@@ -19,6 +19,7 @@ public class AiPermission {
     @Getter
     private static Mode mode = Mode.WHITELIST;
     private static Set<String> activated = null;
+    private static boolean useLegacy = false;
 
     public static synchronized void initialize() {
         loadFromFile();
@@ -35,6 +36,7 @@ public class AiPermission {
 
                         final PermissionSnapshot snapshot = GSON.fromJson(obj, PermissionSnapshot.class);
 
+                        AiPermission.useLegacy = snapshot.useLegacy;
                         AiPermission.mode = snapshot.mode;
                         AiPermission.groups = new HashSet<>();
                         AiPermission.activated = new HashSet<>();
@@ -75,7 +77,7 @@ public class AiPermission {
             try {
                 Files.createDirectories(STORE.getParent());
 
-                PermissionSnapshot snapshot = new PermissionSnapshot(mode, groups, activated);
+                PermissionSnapshot snapshot = new PermissionSnapshot(useLegacy, mode, groups, activated);
 
                 Files.writeString(STORE, GSON.toJson(snapshot));
             } catch (Exception e) {
@@ -144,12 +146,22 @@ public class AiPermission {
         return permits(groupId) && activated.contains(groupId);
     }
 
+    public static synchronized boolean doUseLegacy() {
+        return useLegacy;
+    }
+
+    public static synchronized void setUseLegacy(boolean value) {
+        useLegacy = value;
+        saveToFile();
+    }
+
     public enum Mode {
         WHITELIST,
         BLACKLIST
     }
 
     public record PermissionSnapshot(
+            boolean useLegacy,
             Mode mode,
             Set<String> groups,
             Set<String> activated

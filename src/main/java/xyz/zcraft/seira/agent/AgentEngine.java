@@ -421,7 +421,7 @@ public final class AgentEngine implements AutoCloseable {
     }
 
     public record Message(
-            String id, String senderId, String senderName, String text,
+            String id, String senderId, String senderName, String text, String ref,
             List<Attachment> attachments, long timestamp, Consumer<PendingMessage> reply) {
         public Message {
             attachments = attachments == null ? List.of() : List.copyOf(attachments);
@@ -436,6 +436,7 @@ public final class AgentEngine implements AutoCloseable {
                     .atZone(ZoneId.systemDefault())
                     .format(DateTimeFormatter.ofPattern("HH:mm"));
             metadata.addProperty("time", time);
+            metadata.addProperty("quote", ref);
             metadata.addProperty("text", text);
 //            metadata.addProperty("context_only", reply == null);
             if (participants != null) enrichUsers(metadata, this, participants, names);

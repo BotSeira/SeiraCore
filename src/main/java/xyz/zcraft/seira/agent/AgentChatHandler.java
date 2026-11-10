@@ -1,6 +1,5 @@
 package xyz.zcraft.seira.agent;
 
-import lombok.Getter;
 import xyz.zcraft.seira.bot.data.Attachment;
 import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.bot.data.GroupBotState;
@@ -25,7 +24,6 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -45,8 +43,6 @@ public final class AgentChatHandler implements AutoCloseable {
     private final BiFunction<String, String, FileInfo> privateFileUploader;
     private final BiFunction<String, String, FileInfo> groupFileUploader;
     private final Set<String> consented = new HashSet<>();
-    @Getter
-    private final AtomicBoolean useLegacy = new AtomicBoolean(false);
     private final ExecutorService fileUploadExecutor = Executors.newSingleThreadExecutor();
     private volatile String prompt;
 
@@ -140,6 +136,15 @@ public final class AgentChatHandler implements AutoCloseable {
 //        return List.copyOf(urls);
     }
 
+    public static String getRefContent(List<MsgElem> elements) {
+        return elements.stream()
+                .filter(e -> e.messageType() == 103)
+                .filter(e -> e.content() != null && !e.content().isBlank())
+                .findFirst()
+                .map(MsgElem::content)
+                .orElse(null);
+    }
+
     private static boolean isImageFilename(String name) {
         return name != null && name.toLowerCase(Locale.ROOT).matches(".*\\.(png|jpe?g|webp|gif)$");
     }
@@ -179,14 +184,14 @@ public final class AgentChatHandler implements AutoCloseable {
         }
 
         for (String url : files) {
-                fileUploadExecutor.submit(() -> {
-                    var fileInfo = context.inGroup()
-                            ? groupFileUploader.apply(context.groupId(), url)
-                            : privateFileUploader.apply(context.senderUserId(), url);
-                    if (!context.send(true, PendingMessage.ofUploadedFile(fileInfo, url)).success()) {
-                        throw new IllegalStateException("Agent file delivery failed");
-                    }
-                });
+            fileUploadExecutor.submit(() -> {
+                var fileInfo = context.inGroup()
+                        ? groupFileUploader.apply(context.groupId(), url)
+                        : privateFileUploader.apply(context.senderUserId(), url);
+                if (!context.send(true, PendingMessage.ofUploadedFile(fileInfo, url)).success()) {
+                    throw new IllegalStateException("Agent file delivery failed");
+                }
+            });
         }
     }
 
@@ -215,6 +220,7 @@ public final class AgentChatHandler implements AutoCloseable {
                             ctx.senderUserId(),
                             ctx.senderNickname(),
                             text,
+                            getRefContent(elements),
                             collectAttachments(attachments, elements),
                             System.currentTimeMillis(),
                             message -> {
@@ -235,7 +241,7 @@ public final class AgentChatHandler implements AutoCloseable {
         if (text == null || text.isBlank()) return;
 
         engine.accept(groupId, new AgentEngine.Message(messageId, senderId, nickname,
-                text, List.of(), System.currentTimeMillis(), null));
+                text, getRefContent(elements), List.of(), System.currentTimeMillis(), null));
     }
 
     public void rememberNames(String groupId, java.util.Map<String, String> names) {
@@ -344,8 +350,8 @@ public final class AgentChatHandler implements AutoCloseable {
                         ctx.sendReply(at(ctx) + "此操作需要机器人管理员权限喵。");
                         return;
                     }
-                    useLegacy.set(!useLegacy.get());
-                    ctx.sendReply(at(ctx) + "已切换到" + (useLegacy.get() ? "旧版" : "新版") + "AI聊天模式喵。");
+                    AiPermission.setUseLegacy(!AiPermission.doUseLegacy());
+                    ctx.sendReply(at(ctx) + "已切换到" + (AiPermission.doUseLegacy() ? "旧版" : "新版") + "AI聊天模式喵。");
                 }
                 default ->
                         ctx.sendReply(at(ctx) + "用法：/ai status|on|off|grant|revoke|reset|reload，或 /ai confirm|deny TOKEN");
