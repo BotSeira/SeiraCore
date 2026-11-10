@@ -18,10 +18,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
@@ -138,7 +135,7 @@ public final class AgentChatHandler implements AutoCloseable {
 
     public static String getRefContent(List<MsgElem> elements) {
         return elements.stream()
-                .filter(e -> e.messageType() == 103)
+                .filter(Objects::nonNull)
                 .filter(e -> e.content() != null && !e.content().isBlank())
                 .findFirst()
                 .map(MsgElem::content)
