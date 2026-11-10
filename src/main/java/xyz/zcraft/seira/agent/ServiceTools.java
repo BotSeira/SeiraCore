@@ -32,7 +32,7 @@ final class ServiceTools {
         return mapping;
     }
 
-    void declare(String service, String category, String route, String name, String description, String method,
+    void declare(String service, String route, String name, String description, String method,
                  ToolSchema schema, String[] pathParameters, String[] queryParameters, boolean jsonBody,
                  boolean adminOnly, boolean requiresConfirmation) {
         JsonObject spec = new JsonObject();
@@ -60,7 +60,7 @@ final class ServiceTools {
         boolean browser = service.equals("asteroid") && route.startsWith("/browsers/");
         boolean oauth = service.equals("ostella") && (route.equals("/beatmaps/lookup") || route.equals("/beatmapsets/lookup"));
 
-        registry.registerDeferred(category, new ToolRegistry.Tool(http.name(), http.description(), http.parameters(),
+        registry.register( new ToolRegistry.Tool(http.name(), http.description(), http.parameters(),
                 http.groups(), http.timeout(), (arguments, context) -> {
             agentLogger.debug("Executing tool {} with args {}", http.name(), arguments);
             if (browser) {

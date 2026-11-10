@@ -401,7 +401,6 @@ public final class AgentEngine implements AutoCloseable {
             }
         } finally {
             synchronized (this) {
-                tools.clearLoaded(id);
                 session.running = false;
                 session.lastUsed = System.currentTimeMillis();
 

@@ -19,44 +19,12 @@ public final class ToolRegistry implements AutoCloseable {
     private final Predicate<String> administrator;
     private final Predicate<String> conversationAllowed;
     private final ConcurrentHashMap<String, Approval> approvals = new ConcurrentHashMap<>();
-    private final Map<String, String> categories = new ConcurrentHashMap<>();
-    private final Map<String, Set<String>> loadedCategories = new ConcurrentHashMap<>();
     private volatile Map<String, Tool> tools = Map.of();
     private Set<String> configuredNames = Set.of();
-
-    public ToolRegistry() {
-        this(ignored -> false, ignored -> true);
-    }
 
     public ToolRegistry(Predicate<String> administrator, Predicate<String> conversationAllowed) {
         this.administrator = administrator;
         this.conversationAllowed = conversationAllowed;
-        register(new Tool("list_tool_categories", "列出可按需加载的工具分类及可用数量。", ToolSchema.object().additionalProperties(false).toJson(),
-                Set.of(), Duration.ofSeconds(5), (args, context) -> {
-            JsonObject result = new JsonObject();
-            tools.forEach((name, tool) -> {
-                String category = categories.get(name);
-                if (category != null && permits(tool, context)) result.addProperty(category,
-                        result.has(category) ? result.get(category).getAsInt() + 1 : 1);
-            });
-            return result;
-        }));
-        register(new Tool("load_tool_category", "按分类加载完整工具定义，下一次模型请求即可调用。先用 list_tool_categories 获取分类。",
-                ToolSchema.object()
-                        .property("category", ToolSchema.string())
-                        .required("category")
-                        .additionalProperties(false).toJson(),
-                Set.of(), Duration.ofSeconds(5), (args, context) -> {
-            String category = args.get("category").getAsString();
-            JsonObject available = new JsonObject();
-            tools.forEach((name, tool) -> {
-                if (category.equals(categories.get(name)) && permits(tool, context))
-                    available.addProperty(name, tool.description());
-            });
-            if (available.isEmpty()) throw new IllegalArgumentException("Unknown or unavailable category");
-            loadedCategories.computeIfAbsent(context.conversationId(), ignored -> ConcurrentHashMap.newKeySet()).add(category);
-            return available;
-        }));
     }
 
     public static JsonArray definitions(Map<String, Tool> snapshot) {
@@ -88,15 +56,6 @@ public final class ToolRegistry implements AutoCloseable {
         error.addProperty("error", code);
         error.addProperty("detail", detail);
         return error;
-    }
-
-    public synchronized void registerDeferred(String category, Tool tool) {
-        register(tool);
-        categories.put(tool.name(), category);
-    }
-
-    public void clearLoaded(String conversationId) {
-        loadedCategories.remove(conversationId);
     }
 
     private boolean permits(Tool tool, Context context) {
@@ -162,8 +121,7 @@ public final class ToolRegistry implements AutoCloseable {
     public Map<String, Tool> snapshot(Context context) {
         var result = new LinkedHashMap<String, Tool>();
         tools.forEach((name, tool) -> {
-            if (permits(tool, context) && (!categories.containsKey(name)
-                    || loadedCategories.getOrDefault(context.conversationId(), Set.of()).contains(categories.get(name)))) {
+            if (permits(tool, context)) {
                 result.put(name, tool);
             }
         });
