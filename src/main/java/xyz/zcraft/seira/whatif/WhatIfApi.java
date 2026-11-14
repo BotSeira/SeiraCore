@@ -12,9 +12,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Set;
 
-/**
- * Query-only client. oStella owns samples, interpolation, persistence and refresh.
- */
 public final class WhatIfApi {
     private static final Gson GSON = new Gson();
     private final String endpoint;

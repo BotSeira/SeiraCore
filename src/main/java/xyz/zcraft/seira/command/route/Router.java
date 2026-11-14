@@ -39,7 +39,10 @@ import xyz.zcraft.seira.watch.MPWatchService;
 import xyz.zcraft.seira.watch.ScoreWatchService;
 import xyz.zcraft.seira.whatif.WhatIfApi;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
@@ -68,6 +71,7 @@ public class Router {
     private final LegacyAiChatHandler legacyAiChatHandler;
     private final InteractionHandler interactionHandler;
     private final McMessageService mcMessageService;
+    private final MessageSender messageSender;
 
     public Router(
             MessageSender messageSender, Supplier<AppConfig> configSupplier, AdminRegistry admins,
@@ -77,21 +81,25 @@ public class Router {
             AgentChatHandler agentHandler, InteractionHandler interactionHandler,
             BindService bindService, McMessageService mcMessageService, Function<String, GroupBotState> botStateGetter
     ) {
+        AppConfig startupConfig = configSupplier.get();
+        ReplayResultStore replayResults = new ReplayResultStore();
+        this.messageSender = messageSender;
         this.configSupplier = java.util.Objects.requireNonNull(configSupplier);
         this.commandExecutor = commandExecutor;
         this.commandMetric = java.util.Objects.requireNonNull(commandMetric);
         this.selfSupplier = selfSupplier;
         this.interactionHandler = interactionHandler;
         this.mcMessageService = mcMessageService;
-        AppConfig startupConfig = configSupplier.get();
+        this.aiChatHandler = agentHandler;
+        this.authHelper = new OsuAuthHelper(startupConfig.binding());
+        this.taskCoordinator = new TaskCoordinator(messageSender, replayResults, discordBridgeService, this::reportException);
         ReplyFactory replyFactory = new ReplyFactory(configSupplier, interactionHandler);
         Resolver resolver = new Resolver();
         TargetResolver targetResolver = new TargetResolver(resolver, this::getAccessTokenFor);
         TargetHistory history = new TargetHistory();
-        ReplayResultStore replayResults = new ReplayResultStore();
         VideoRenderRecord videoRenderRecord = new VideoRenderRecord();
-        this.taskCoordinator = new TaskCoordinator(messageSender, replayResults, discordBridgeService);
-        this.authHelper = new OsuAuthHelper(startupConfig.binding());
+        WhatIfApi rankPpService = new WhatIfApi(startupConfig.ostella().endpoint(), startupConfig.ostella().token());
+
         BindingCommandHandler bindingCommands = new BindingCommandHandler(startupConfig, replyFactory, bindService);
         ScoreCommandHandler scoreCommands = new ScoreCommandHandler(
                 resolver, targetResolver, history, taskCoordinator, replyFactory, challengeService
@@ -113,26 +121,46 @@ public class Router {
                 messageSender, taskCoordinator, replyFactory, resolver, targetResolver, history, admins::isAdmin, mcMessageService
         );
 
-        this.aiChatHandler = agentHandler;
-        WatchCommandHandler watchCommands = new WatchCommandHandler(resolver, taskCoordinator, watchService, admins::isAdmin);
-        ChallengeCommandHandler challengeCommands = new ChallengeCommandHandler(
-                challengeService, UserDataStore::findBoundUid, admins::isAdmin);
-        SpecificScoreWatchCommandHandler specificScoreWatchCommands =
-                new SpecificScoreWatchCommandHandler(taskCoordinator, watchService);
-        MPWatchCommandHandler multiplayerRoomWatchCommands =
-                new MPWatchCommandHandler(taskCoordinator, resolver, mpWatchService);
-        DcsCommandHandler dcsCommands = new DcsCommandHandler(discordBridgeService);
-        RankGuessCommandHandler rankGuessCommands = new RankGuessCommandHandler(
-                taskCoordinator, replyFactory, rankGuessGameService, resolver, admins::isAdmin, this::getAvatar, imageUploader
+        WatchCommandHandler watchCommands = new WatchCommandHandler(
+                resolver, taskCoordinator, watchService, admins::isAdmin
         );
-        NcmHandler ncmHandler = new NcmHandler(messageSender, taskCoordinator, replyFactory, resolver, targetResolver, history, admins::isAdmin);
+
+        ChallengeCommandHandler challengeCommands = new ChallengeCommandHandler(
+                challengeService, UserDataStore::findBoundUid, admins::isAdmin
+        );
+
+        SpecificScoreWatchCommandHandler specificScoreWatchCommands = new SpecificScoreWatchCommandHandler(
+                taskCoordinator, watchService
+        );
+
+        MPWatchCommandHandler multiplayerRoomWatchCommands = new MPWatchCommandHandler(
+                taskCoordinator, resolver, mpWatchService
+        );
+
+        DcsCommandHandler dcsCommands = new DcsCommandHandler(discordBridgeService);
+
+        RankGuessCommandHandler rankGuessCommands = new RankGuessCommandHandler(
+                taskCoordinator, replyFactory, rankGuessGameService, resolver, admins::isAdmin, this::getAvatar, imageUploader, rankPpService
+        );
+
+        NcmHandler ncmHandler = new NcmHandler(
+                messageSender, taskCoordinator, replyFactory, resolver, targetResolver, history, admins::isAdmin
+        );
+
         this.unknownCommand = generalCommands::handleUnknown;
-        WhatIfApi rankPpService = new WhatIfApi(startupConfig.ostella().endpoint(), startupConfig.ostella().token());
+
         WhatIfCommandHandler whatIfCommands = new WhatIfCommandHandler(rankPpService);
+
         AddPpCommandHandler addPpCommands = new AddPpCommandHandler(
-                new AddPpApi(startupConfig.ostella().endpoint(), startupConfig.ostella().token()), resolver, targetResolver, history);
-        GachaCommandHandler gachaCommands = new GachaCommandHandler(messageSender, taskCoordinator, replyFactory, resolver, targetResolver, history, admins::isAdmin);
+                new AddPpApi(startupConfig.ostella().endpoint(), startupConfig.ostella().token()), resolver, targetResolver, history
+        );
+
+        GachaCommandHandler gachaCommands = new GachaCommandHandler(
+                messageSender, taskCoordinator, replyFactory, resolver, targetResolver, history, admins::isAdmin
+        );
+
         this.commandParser = new CommandParser(resolver::sanitize);
+
         this.commandRegistry = createCommandRegistry(
                 bindingCommands, scoreCommands, beatmapCommands, socialCommands,
                 replayCommands, generalCommands, watchCommands, specificScoreWatchCommands,
@@ -140,11 +168,11 @@ public class Router {
                 whatIfCommands, challengeCommands, addPpCommands, ncmHandler, minecraftCommands,
                 gachaCommands
         );
+
         this.debugRoutes = new DebugRoutes(
                 configSupplier, messageSender, replyFactory, taskCoordinator,
                 authHelper, admins::isAdmin, unknownCommand, interactionHandler
         );
-
 
         //noinspection deprecation
         this.legacyAiChatHandler = new LegacyAiChatHandler(
@@ -219,7 +247,7 @@ public class Router {
                 .register(generalCommands::handleUsages, "usages")
                 .register(generalCommands::handleFaq, "faq")
                 .register(watchCommands::handleWatch, "watch")
-                .register(challengeCommands::handleChallenge, "gch")
+//                .register(challengeCommands::handleChallenge, "gch")
                 .register(specificScoreWatchCommands::handleWx, "wx")
                 .register(multiplayerRoomWatchCommands::handleMpWatch, "mpwatch", "mpw")
                 .register(multiplayerRoomWatchCommands::handleRomAI, "romai")
@@ -231,6 +259,34 @@ public class Router {
                 .register(minecraftCommands::handleMc, "mc")
                 .register(minecraftCommands::handleMcBind, "mcbind")
                 .build();
+    }
+
+    private void reportException(Context ctx, Exception ex) {
+        for (String s : configSupplier.get().seira().exceptionReports()) {
+            s = s.toUpperCase(Locale.ROOT);
+            StringWriter sw = new StringWriter();
+            ex.printStackTrace(new PrintWriter(sw));
+            String stackTrace = sw.toString();
+            String message = """
+                    处理指令时发生错误：
+                    目标：`%s`
+                    指令：
+                    ```text
+                    %s
+                    ```
+                    错误：
+                    ```text
+                    %s
+                    ```
+                    """.formatted(ctx.senderUserId() + "@" + ctx.groupId(), ctx.rawContent(), stackTrace);
+            if (s.startsWith("GROUP:")) {
+                messageSender.sendGroupMarkdown(s.substring("GROUP:".length()), message);
+            } else if (s.startsWith("PRIVATE:")) {
+                messageSender.sendPrivateMarkdown(s.substring("PRIVATE:".length()), message);
+            } else {
+                LOG.warn("Unknown exception report destination {}", s);
+            }
+        }
     }
 
     private String getAvatar(String openId) {
@@ -356,7 +412,7 @@ public class Router {
                     dispatch(context);
                     NoticesHelper.checkNotices(context);
                 } catch (Exception e) {
-                    context.sendReply(PendingMessage.ofMarkdownRaw(at(context) + TaskCoordinator.resolveErrorMessage(e)));
+                    context.sendReply(PendingMessage.ofMarkdownRaw(at(context) + taskCoordinator.resolveErrorMessage(context, e)));
                     LOG.error("Failed to process inbound message {}", messageId, e);
                 }
             });

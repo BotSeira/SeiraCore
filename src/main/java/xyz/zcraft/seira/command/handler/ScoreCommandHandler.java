@@ -329,13 +329,9 @@ public final class ScoreCommandHandler {
         try (var _ = taskCoordinator.beginRequest(ctx, "Score")) {
             var ids = targets.score(ctx, target, remembered, userOverride, filters, mod);
             var response = OstellaApi.getScoreResponse(ids.scoreId());
-            collectChallengeScores(ctx, response);
+//            collectChallengeScores(ctx, response);
             history.remember(ctx, ids);
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.scoreMessage(ctx, response)));
-        } catch (Exception e) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + TaskCoordinator.resolveErrorMessage(e)));
-            LOG
-                    .error("Failed to execute /{}", ctx.command(), e);
         }
     }
 
@@ -385,10 +381,6 @@ public final class ScoreCommandHandler {
             collectChallengeScores(ctx, response);
             history.remember(ctx, beatmapsetId, beatmapId, scoreId);
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.scoreMessage(ctx, response)));
-        } catch (Exception e) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + TaskCoordinator.resolveErrorMessage(e)));
-            LOG
-                    .error("Failed to execute /{}", ctx.command(), e);
         }
     }
 

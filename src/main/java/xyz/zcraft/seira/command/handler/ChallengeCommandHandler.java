@@ -185,9 +185,6 @@ public final class ChallengeCommandHandler {
             }
         } catch (IllegalArgumentException e) {
             ctx.sendReply(at(ctx) + e.getMessage());
-        } catch (Exception e) {
-            org.apache.logging.log4j.LogManager.getLogger(ChallengeCommandHandler.class).error("Failed to handle challenge command", e);
-            ctx.sendReply(at(ctx) + TaskCoordinator.resolveErrorMessage(e));
         }
     }
 

@@ -19,6 +19,8 @@ import xyz.zcraft.seira.rankguess.RankGuessGame;
 import xyz.zcraft.seira.rankguess.RankGuessGameService;
 import xyz.zcraft.seira.rankguess.data.*;
 import xyz.zcraft.seira.util.RandomReply;
+import xyz.zcraft.seira.whatif.WhatIfApi;
+import xyz.zcraft.seira.whatif.WhatIfQuery;
 
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -46,7 +48,8 @@ public final class RankGuessCommandHandler {
     private final Predicate<String> adminAuthorizer;
     private final Function<String, String> avatarUrlGetter;
     private final Function<byte[], UploadedImage> imageUploader;
-    private final Pattern BP_PATTERN = Pattern.compile("^bp(\\d+)$");
+    private final Pattern BP_PATTERN = Pattern.compile("^(b[pd])(\\d+)$");
+    private final WhatIfApi whatIfApi;
 
     public RankGuessCommandHandler(
             TaskCoordinator taskCoordinator,
@@ -55,7 +58,8 @@ public final class RankGuessCommandHandler {
             Resolver resolver,
             Predicate<String> adminAuthorizer,
             Function<String, String> avatarUrlGetter,
-            Function<byte[], UploadedImage> imageUploader
+            Function<byte[], UploadedImage> imageUploader,
+            WhatIfApi whatIfApi
     ) {
         this.taskCoordinator = taskCoordinator;
         this.replyFactory = replyFactory;
@@ -64,6 +68,7 @@ public final class RankGuessCommandHandler {
         this.adminAuthorizer = adminAuthorizer;
         this.avatarUrlGetter = avatarUrlGetter;
         this.imageUploader = imageUploader;
+        this.whatIfApi = whatIfApi;
     }
 
     private static Long parseRank(String argument) {
@@ -230,9 +235,10 @@ public final class RankGuessCommandHandler {
                         return;
                     }
 
+                    final String bpType = matcher.group(1);
                     final int i;
                     try {
-                        i = Integer.parseInt(matcher.group(1));
+                        i = Integer.parseInt(matcher.group(2));
                     } catch (NumberFormatException _) {
                         usage(ctx);
                         return;
@@ -243,7 +249,7 @@ public final class RankGuessCommandHandler {
                         return;
                     }
 
-                    wishScore(ctx, i);
+                    wishScore(ctx, bpType, i);
                 } else {
                     usage(ctx);
                 }
@@ -270,6 +276,10 @@ public final class RankGuessCommandHandler {
             String player = resolver.player(argument, ctx.senderUserId());
             long uid = OstellaApi.resolveUid(player);
             rank = OstellaApi.getUserRank(uid);
+        } else if (argument.matches("^(\\d+)pp$")) {
+            long pp = Long.parseLong(argument.replaceAll("^(\\d+)pp$", "$1"));
+            final WhatIfApi.Result estimate = whatIfApi.estimate(new WhatIfQuery(true, pp, 0));
+            rank = (long) estimate.rank();
         } else {
             rank = parseRank(argument);
             if (rank == null) {
@@ -395,7 +405,7 @@ public final class RankGuessCommandHandler {
         }));
     }
 
-    private void wishScore(Context ctx, int index) {
+    private void wishScore(Context ctx, String bpType, int index) {
         final Long boundUid = UserDataStore.findBoundUid(ctx.senderUserId());
 
         if (boundUid == null) {
@@ -406,8 +416,9 @@ public final class RankGuessCommandHandler {
         Long scoreId = null;
 
         try {
+            final String s = OstellaApi.lookupPlayerScore(boundUid, bpType, index, List.of(), null);
             scoreId = Long.parseLong(
-                    OstellaApi.lookupPlayerScore(boundUid, "bp", index, List.of(), null)
+                   s.startsWith("loc") ? "-" +s.substring(3) : s
             );
         } catch (Exception e) {
             LOG.error("Failed to lookup score id", e);

@@ -7,6 +7,7 @@ import xyz.zcraft.seira.api.ApiRequestException;
 import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.ReplayRenderException;
 import xyz.zcraft.seira.api.data.Base64Bytes;
+import xyz.zcraft.seira.api.data.ErrorCode;
 import xyz.zcraft.seira.api.data.QqUploadRequest;
 import xyz.zcraft.seira.api.data.Response;
 import xyz.zcraft.seira.bot.MessageSender;
@@ -26,6 +27,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
@@ -36,18 +39,21 @@ public final class TaskCoordinator {
     private final DiscordBridgeService discordBridgeService;
     private final ApiRequestStats apiRequestStats = new ApiRequestStats();
     private final ReplayResultStore replayResults;
+    private final BiConsumer<Context, Exception> reporter;
 
     public TaskCoordinator(
             MessageSender messageSender,
             ReplayResultStore replayResults,
-            DiscordBridgeService discordBridgeService
+            DiscordBridgeService discordBridgeService,
+            BiConsumer<Context, Exception> reporter
     ) {
         this.messageSender = messageSender;
         this.replayResults = replayResults;
         this.discordBridgeService = java.util.Objects.requireNonNull(discordBridgeService);
+        this.reporter = reporter;
     }
 
-    public static String resolveErrorMessage(Exception exception) {
+    public String resolveErrorMessage(Context ctx, Exception exception) {
         Throwable cursor = exception;
         while (cursor != null) {
             switch (cursor) {
@@ -55,7 +61,12 @@ public final class TaskCoordinator {
                     return CommandUsage.NO_BIND;
                 }
                 case ApiRequestException e -> {
-                    return ApiRequestException.getDefaultMessage(e.getErrorCode()) + "\n> " + e.getMessage();
+                    final String s = ApiRequestException.getDefaultMessage(e.getErrorCode()) + "\n> " + e.getMessage();
+                    if (e.getErrorCode() / 1000 != 1
+                            && e.getErrorCode() != ErrorCode.REPLAY_UNAVAILABLE.getCode()) {
+                        reporter.accept(ctx, exception);
+                    }
+                    return s;
                 }
                 case ClosedChannelException _ -> {
                     return "API 无法连接，请稍后再试喵\n> 这可能是因为正在进行后端更新，请稍作等待...";
@@ -64,6 +75,7 @@ public final class TaskCoordinator {
                     return e.getMessage();
                 }
                 case ReplayRenderException e -> {
+                    reporter.accept(ctx, exception);
                     return e.getMessage();
                 }
                 default -> {
@@ -71,6 +83,7 @@ public final class TaskCoordinator {
             }
             cursor = cursor.getCause();
         }
+        reporter.accept(ctx, exception);
         if (exception != null) {
             return "请求处理失败，请稍后再试喵。\n> " + exception;
         }
