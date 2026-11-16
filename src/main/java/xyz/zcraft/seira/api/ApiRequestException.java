@@ -6,10 +6,12 @@ import xyz.zcraft.seira.api.data.ErrorCode;
 @Getter
 public class ApiRequestException extends RuntimeException {
     private final Integer errorCode;
+    private final String bodyRaw;
 
-    public ApiRequestException(Integer errorCode, String message) {
+    public ApiRequestException(Integer errorCode, String message, String bodyRaw) {
         super(message);
         this.errorCode = errorCode;
+        this.bodyRaw = bodyRaw;
     }
 
     public static String getDefaultMessage(Integer code) {

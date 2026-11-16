@@ -7,6 +7,7 @@ import xyz.zcraft.seira.addpp.AddPpApi;
 import xyz.zcraft.seira.agent.AgentChatHandler;
 import xyz.zcraft.seira.ai.LegacyAiChatHandler;
 import xyz.zcraft.seira.ai.provider.ChatProviders;
+import xyz.zcraft.seira.api.ApiRequestException;
 import xyz.zcraft.seira.api.data.OsuToken;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
 import xyz.zcraft.seira.bot.MessageSender;
@@ -267,6 +268,10 @@ public class Router {
             StringWriter sw = new StringWriter();
             ex.printStackTrace(new PrintWriter(sw));
             String stackTrace = sw.toString();
+            String detail = "";
+            if (ex instanceof ApiRequestException apiEx) {
+                detail = "\n详细信息：\n```json\n" + apiEx.getBodyRaw() + "\n```";
+            }
             String message = """
                     处理指令时发生错误：
                     目标：`%s`
@@ -278,7 +283,8 @@ public class Router {
                     ```text
                     %s
                     ```
-                    """.formatted(ctx.senderUserId() + "@" + ctx.groupId(), ctx.rawContent(), stackTrace);
+                    %s
+                    """.formatted(ctx.senderUserId() + "@" + ctx.groupId(), ctx.rawContent(), stackTrace, detail).trim();
             if (s.startsWith("GROUP:")) {
                 messageSender.sendGroupMarkdown(s.substring("GROUP:".length()), message);
             } else if (s.startsWith("PRIVATE:")) {

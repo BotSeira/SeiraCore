@@ -73,7 +73,7 @@ class JavaTools {
                         .toJson(),
                 Set.of(),
                 Duration.ofSeconds(5),
-                (arguments, context) -> {
+                (_, context) -> {
                     String groupId = context.conversationId();
                     if (groupId == null || groupId.isBlank()) {
                         throw new IllegalArgumentException("Group context is required");
@@ -97,7 +97,7 @@ class JavaTools {
                         .toJson(),
                 Set.of(),
                 Duration.ofSeconds(5),
-                (arguments, context) -> {
+                (_, context) -> {
                     String groupId = context.conversationId();
                     if (groupId == null || groupId.isBlank()) {
                         throw new IllegalArgumentException("Group context is required");

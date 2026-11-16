@@ -136,7 +136,7 @@ public final class ScoreCommandHandler {
                     uid,
                     filters.filters()
             );
-            collectChallengeScores(ctx, response);
+//            collectChallengeScores(ctx, response);
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.bpMessage(ctx, response)));
         }
     }

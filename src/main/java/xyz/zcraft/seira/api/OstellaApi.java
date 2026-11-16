@@ -1132,7 +1132,7 @@ public class OstellaApi {
             if (send.statusCode() == 404) {
                 final Integer errCode = ApiUtil.extractErrorCode(r);
                 if (errCode != null && errCode == ErrorCode.NO_SCORE_FOUND.getCode()) {
-                    throw new ApiRequestException(ErrorCode.NO_SCORE_FOUND.getCode(), "回放上传失败：无法获取对应的成绩");
+                    throw new ApiRequestException(ErrorCode.NO_SCORE_FOUND.getCode(), "回放上传失败：无法获取对应的成绩", "");
                 }
             }
 

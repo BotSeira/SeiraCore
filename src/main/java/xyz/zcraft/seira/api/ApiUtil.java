@@ -32,7 +32,7 @@ public class ApiUtil {
             message += "(" + (errorCode == null ? "未知错误码" : errorCode) + " / HTTP " + statusCode + " / 发生了一个内部错误)";
         }
 
-        return new ApiRequestException(errorCode, message);
+        return new ApiRequestException(errorCode, message, responseBody);
     }
 
     static Integer readCodeFromJsonObject(JsonObject object) {
@@ -53,7 +53,7 @@ public class ApiUtil {
         if (!payload.isSuccess()) {
             Integer errorCode = extractErrorCode(payload);
             String message = payload.getMessage() != null ? payload.getMessage() : fallbackMessage;
-            throw new ApiRequestException(errorCode, message);
+            throw new ApiRequestException(errorCode, message, payload.getData().toString());
         }
     }
 
