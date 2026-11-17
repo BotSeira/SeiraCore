@@ -91,9 +91,14 @@ mcForward:
 
 agent:
   enabled: false
-  endpoint: "https://api.openai.com/v1/responses"
+  endpoint: "https://api.openai.com/v1"
   apiKey: "${SEIRA_AGENT_API_KEY:-}"
-  model: "your-responses-model"
+  models:
+    chat:
+    vision:
+    image:
+    edit:
+    embedding:
   promptFile: "agent-prompt.md"
   toolsFile: "agent-tools.yml"
   timeoutSeconds: 120

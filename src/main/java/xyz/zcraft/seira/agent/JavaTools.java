@@ -1,26 +1,94 @@
 package xyz.zcraft.seira.agent;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
+import com.google.gson.*;
 import xyz.zcraft.seira.bot.QQApi;
+import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.bot.data.SetMemberMuteState;
+import xyz.zcraft.seira.bot.data.msg.CardMessage;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
+import xyz.zcraft.seira.config.AgentConfig;
 import xyz.zcraft.seira.db.UserDataStore;
 
+import java.net.InetSocketAddress;
+import java.net.ProxySelector;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.*;
 
 class JavaTools {
     private static final Gson GSON = new Gson();
-    static void register(ToolRegistry registry) {
+
+    static void register(ToolRegistry registry, AgentConfig config) {
+        registry.register(new ToolRegistry.Tool(
+                "generate_image",
+                "根据提示词生成一张图片并发送到当前会话。",
+                ToolSchema.object()
+                        .property("prompt", ToolSchema.string().description("要生成的图片的详细描述"))
+                        .required("prompt")
+                        .additionalProperties(false)
+                        .toJson(),
+                Set.of(),
+                Duration.ofSeconds(config.timeoutSeconds()).plusSeconds(5),
+                (args, context) -> {
+                    if (config.models().image() == null) {
+                        return GSON.toJsonTree(Map.of("error", "Image model is not configured"));
+                    }
+
+                    String prompt = args.get("prompt").getAsString();
+                    if (prompt.isBlank()) throw new IllegalArgumentException("Prompt is required");
+                    String model = config.models().image();
+                    if (model == null || model.isBlank()) {
+                        throw new IllegalStateException("Image model is not configured");
+                    }
+                    JsonObject body = new JsonObject();
+                    body.addProperty("model", model);
+                    body.addProperty("prompt", prompt);
+                    body.addProperty("n", 1);
+                    Duration timeout = Duration.ofSeconds(config.timeoutSeconds());
+                    ProxySelector proxy = config.proxy().enabled()
+                            ? ProxySelector.of(new InetSocketAddress(config.proxy().host(), config.proxy().port()))
+                            : ProxySelector.getDefault();
+                    URI endpoint = URI.create(config.endpoint().replaceAll("/+$", "") + "/images/generations");
+                    HttpRequest request = HttpRequest.newBuilder(endpoint).timeout(timeout)
+                            .header("Authorization", "Bearer " + config.apiKey())
+                            .header("Content-Type", "application/json")
+                            .POST(HttpRequest.BodyPublishers.ofString(body.toString())).build();
+                    try (HttpClient client = HttpClient.newBuilder().connectTimeout(timeout).proxy(proxy).build()) {
+                        var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                        if (response.statusCode() / 100 != 2) {
+                            throw new IllegalStateException("Image generation HTTP status " + response.statusCode());
+                        }
+                        JsonArray data = JsonParser.parseString(response.body()).getAsJsonObject().getAsJsonArray("data");
+                        if (data == null || data.isEmpty()) {
+                            throw new IllegalStateException("Image generation returned no image");
+                        }
+                        JsonObject image = data.get(0).getAsJsonObject();
+                        PendingMessage message;
+                        if (image.has("b64_json") && !image.get("b64_json").isJsonNull()
+                                && !image.get("b64_json").getAsString().isBlank()) {
+                            message = PendingMessage.ofImageBase64(image.get("b64_json").getAsString());
+                        } else if (image.has("url") && !image.get("url").isJsonNull()
+                                && !image.get("url").getAsString().isBlank()) {
+                            message = PendingMessage.ofFileUrl(image.get("url").getAsString());
+                            message.setFileType(PendingMessage.FILE_TYPE_IMAGE);
+                        } else {
+                            throw new IllegalStateException("Image generation returned no image data or URL");
+                        }
+                        context.notice().accept(message);
+                        return GSON.toJsonTree(Map.of("sent", true));
+                    }
+                })
+        );
+
         registry.register(new ToolRegistry.Tool(
                         "get_osu_binding",
                         "查询本群会话参与者绑定的 osu! UID；未绑定时返回 null。",
                         ToolSchema.object()
                                 .property("user", ToolSchema.string().description("群内发送者标识，例如 u1"))
                                 .property("users", ToolSchema.array(ToolSchema.string()).description("群内发送者标识列表，例如 [u3, u4, u8]"))
-//                        .required("participant")
                                 .additionalProperties(false)
                                 .toJson(),
                         Set.of(),
@@ -169,6 +237,104 @@ class JavaTools {
                     var result = QQApi.removeGroupMember(registry.getTokenManager().getToken(), groupId, openIds);
 
                     return GSON.toJsonTree(Map.of("remove_members_result", result));
+                })
+        );
+
+        registry.register(new ToolRegistry.Tool(
+                "upload_attachment",
+                "异步从文件URL上传附件到当前对话中。",
+                ToolSchema.object()
+                        .property("url", ToolSchema.string().description("指向附件文件的URL。"))
+                        .property("filename", ToolSchema.string().description("附件文件的名称。若为空则会尝试从URL推断。"))
+                        .required("url")
+                        .additionalProperties(false)
+                        .toJson(),
+                Set.of(),
+                Duration.ofSeconds(5),
+                (args, context) -> {
+                    String groupId = context.conversationId();
+                    if (groupId == null || groupId.isBlank()) {
+                        throw new IllegalArgumentException("Group context is required");
+                    }
+
+                    final String url = args.get("url").getAsString();
+                    final String filename = args.get("filename").getAsString();
+
+                    registry.getExecutor().submit(() -> {
+                        context.notice().accept(PendingMessage.ofMarkdownRaw("> 正在上传附件..."));
+                        final FileInfo uploadedFile = registry.getFileUploader().upload(context.conversationId(), url, filename);
+                        context.notice().accept(PendingMessage.ofUploadedFile(uploadedFile, url));
+                    });
+
+                    return GSON.toJsonTree(Map.of("enqueued", true));
+                })
+        );
+
+        registry.register(new ToolRegistry.Tool(
+                "upload_attachment_multi",
+                "异步从多个文件URL上传附件到当前对话中。",
+                ToolSchema.object()
+                        .property("files", ToolSchema.array(ToolSchema.object().description("要上传的文件列表。")
+                                .property("url", ToolSchema.string().description("指向附件文件的URL。"))
+                                .property("filename", ToolSchema.string().description("附件文件的名称。若为空则会尝试从URL推断。"))
+                                .required("url")
+                                .additionalProperties(false))
+                        )
+                        .required("files")
+                        .additionalProperties(false)
+                        .toJson(),
+                Set.of(),
+                Duration.ofSeconds(5),
+                (args, context) -> {
+                    String groupId = context.conversationId();
+                    if (groupId == null || groupId.isBlank()) {
+                        throw new IllegalArgumentException("Group context is required");
+                    }
+                    final JsonArray files = args.get("files").getAsJsonArray();
+
+                    context.notice().accept(PendingMessage.ofMarkdownRaw("> 正在上传 %d 个附件...".formatted(files.size())));
+
+                    registry.getExecutor().submit(() -> {
+                        for (JsonElement file : files) {
+                            final JsonObject fileObj = file.getAsJsonObject();
+                            final String url = fileObj.get("url").getAsString();
+                            final String filename = fileObj.get("filename").getAsString();
+                            final FileInfo uploadedFile = registry.getFileUploader().upload(context.conversationId(), url, filename);
+                            context.notice().accept(PendingMessage.ofUploadedFile(uploadedFile, url));
+                        }
+                    });
+
+                    return GSON.toJsonTree(Map.of("enqueued", true));
+                })
+        );
+
+        registry.register(new ToolRegistry.Tool(
+                "send_card_message",
+                "发送卡片消息到当前对话中。客户端会显示结构化卡片，点击可以打开指定URL。",
+                ToolSchema.object()
+                        .property("title", ToolSchema.string().description("卡片标题"))
+                        .property("description", ToolSchema.string().description("卡片小文字描述"))
+                        .property("url", ToolSchema.string().description("点击打开的URL"))
+                        .property("picUrl", ToolSchema.string().description("卡片配图的图片URL"))
+                        .required("title", "description", "url", "picUrl")
+                        .additionalProperties(false)
+                        .toJson(),
+                Set.of(),
+                Duration.ofSeconds(5),
+                (args, context) -> {
+                    String groupId = context.conversationId();
+                    if (groupId == null || groupId.isBlank()) {
+                        throw new IllegalArgumentException("Group context is required");
+                    }
+
+                    final String title = args.get("title").getAsString();
+                    final String description = args.get("description").getAsString();
+                    final String url = args.get("url").getAsString();
+                    final String picUrl = args.get("picUrl").getAsString();
+
+                    context.notice().accept(CardMessage.ofCard(title, description, url, picUrl));
+
+                    return GSON.toJsonTree(Map.of("sent", true));
                 })
         );
     }

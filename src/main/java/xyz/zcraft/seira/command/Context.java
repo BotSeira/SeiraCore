@@ -1,5 +1,6 @@
 package xyz.zcraft.seira.command;
 
+import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.data.SendResult;
 

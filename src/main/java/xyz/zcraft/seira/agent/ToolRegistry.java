@@ -4,6 +4,8 @@ import com.google.gson.*;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.seira.bot.data.FileInfo;
+import xyz.zcraft.seira.bot.data.FileUploader;
 import xyz.zcraft.seira.bot.data.msg.Button;
 import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.util.TokenManager;
@@ -11,12 +13,14 @@ import xyz.zcraft.seira.util.TokenManager;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 public final class ToolRegistry implements AutoCloseable {
     private static final Logger requestLogger = LogManager.getLogger("AgentRequestsLogger");
     private static final Logger agentLogger = LogManager.getLogger("AgentLogger");
+    @Getter
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
     private final Predicate<String> administrator;
     private final Predicate<String> conversationAllowed;
@@ -25,11 +29,15 @@ public final class ToolRegistry implements AutoCloseable {
     private Set<String> configuredNames = Set.of();
     @Getter
     private final TokenManager tokenManager;
+    @Getter
+    private final FileUploader fileUploader;
 
-    public ToolRegistry(Predicate<String> administrator, Predicate<String> conversationAllowed, TokenManager tokenManager) {
+    public ToolRegistry(Predicate<String> administrator, Predicate<String> conversationAllowed,
+                        TokenManager tokenManager, FileUploader fileUploader) {
         this.administrator = administrator;
         this.conversationAllowed = conversationAllowed;
         this.tokenManager = tokenManager;
+        this.fileUploader = fileUploader;
     }
 
     public static JsonArray definitions(Map<String, Tool> snapshot) {
@@ -63,10 +71,10 @@ public final class ToolRegistry implements AutoCloseable {
         return error;
     }
 
-    private boolean permits(Tool tool, Context context) {
-        return conversationAllowed.test(context.conversationId())
-                && tool.permits(context)
-                && (!tool.adminOnly() || !context.participants().isEmpty() && context.participants().stream().allMatch(administrator));
+    private boolean permits(Tool tool, ToolContext toolContext) {
+        return conversationAllowed.test(toolContext.conversationId())
+                && tool.permits(toolContext)
+                && (!tool.adminOnly() || !toolContext.participants().isEmpty() && toolContext.participants().stream().allMatch(administrator));
     }
 
     public boolean decide(String token, String group, String user, boolean accept) {
@@ -77,9 +85,9 @@ public final class ToolRegistry implements AutoCloseable {
                 && approval.decision().complete(accept);
     }
 
-    private boolean confirm(Tool tool, JsonObject arguments, Context context) throws Exception {
+    private boolean confirm(Tool tool, JsonObject arguments, ToolContext toolContext) throws Exception {
         String token = UUID.randomUUID().toString();
-        Approval approval = new Approval(context.conversationId(), new CompletableFuture<>());
+        Approval approval = new Approval(toolContext.conversationId(), new CompletableFuture<>());
         approvals.put(token, approval);
 
         try {
@@ -92,7 +100,7 @@ public final class ToolRegistry implements AutoCloseable {
                             Button.command(1, "拒绝", "/ai deny " + token),
                             Button.command(2, "批准", "/ai confirm " + token)
                     ));
-            context.notice().accept(t);
+            toolContext.notice().accept(t);
 
             return approval.decision().get(120, TimeUnit.SECONDS);
         } finally {
@@ -123,17 +131,17 @@ public final class ToolRegistry implements AutoCloseable {
         tools = Collections.unmodifiableMap(next);
     }
 
-    public Map<String, Tool> snapshot(Context context) {
+    public Map<String, Tool> snapshot(ToolContext toolContext) {
         var result = new LinkedHashMap<String, Tool>();
         tools.forEach((name, tool) -> {
-            if (permits(tool, context)) {
+            if (permits(tool, toolContext)) {
                 result.put(name, tool);
             }
         });
         return Collections.unmodifiableMap(result);
     }
 
-    public JsonObject execute(JsonObject call, Map<String, Tool> snapshot, Context context, UUID sessionUuid) {
+    public JsonObject execute(JsonObject call, Map<String, Tool> snapshot, ToolContext toolContext, UUID sessionUuid) {
         var output = new JsonObject();
         output.addProperty("type", "function_call_output");
         output.addProperty("call_id", call.get("call_id").getAsString());
@@ -150,20 +158,20 @@ public final class ToolRegistry implements AutoCloseable {
 
             String name = call.get("name").getAsString();
             Tool tool = snapshot.getOrDefault(name, tools.get(name));
-            if (tool == null || !permits(tool, context))
+            if (tool == null || !permits(tool, toolContext))
                 throw new IllegalArgumentException("Tool not found or not permitted.");
 
             JsonObject arguments = JsonParser.parseString(call.get("arguments").getAsString()).getAsJsonObject();
             ToolArguments.validate(tool.parameters(), arguments);
 
-            if (tool.requiresConfirmation() && !confirm(tool, arguments, context)) {
+            if (tool.requiresConfirmation() && !confirm(tool, arguments, toolContext)) {
                 output.addProperty("output", error("CONFIRMATION_DENIED").toString());
                 return output;
             }
 
-            if (!permits(tool, context)) throw new IllegalArgumentException();
+            if (!permits(tool, toolContext)) throw new IllegalArgumentException();
 
-            task = executor.submit(() -> tool.handler().execute(arguments, context));
+            task = executor.submit(() -> tool.handler().execute(arguments, toolContext));
             result = task.get(tool.timeout().toMillis(), TimeUnit.MILLISECONDS);
             if (result == null) result = JsonNull.INSTANCE;
             // if (result.toString().length() > 100_000) result = error("OUTPUT_TOO_LARGE");
@@ -186,7 +194,7 @@ public final class ToolRegistry implements AutoCloseable {
         output.addProperty("output", result.toString());
         org.apache.logging.log4j.LogManager.getLogger(ToolRegistry.class).info(
                 "Agent tool={} conversation={} participants={} durationMs={} error={}",
-                call.get("name").getAsString(), context.conversationId(), context.participants().size(),
+                call.get("name").getAsString(), toolContext.conversationId(), toolContext.participants().size(),
                 TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started),
                 result.isJsonObject() && result.getAsJsonObject().has("error"));
         return output;
@@ -200,17 +208,17 @@ public final class ToolRegistry implements AutoCloseable {
 
     @FunctionalInterface
     public interface Handler {
-        JsonElement execute(JsonObject arguments, Context context) throws Exception;
+        JsonElement execute(JsonObject arguments, ToolContext toolContext) throws Exception;
     }
 
-    public record Context(
+    public record ToolContext(
             String conversationId,
             Set<String> participants,
             Map<String, String> aliases,
             Map<String, String> names,
             Consumer<PendingMessage> notice
     ) {
-        public Context {
+        public ToolContext {
             participants = Set.copyOf(participants);
             aliases = Map.copyOf(aliases);
             names = Map.copyOf(names);
@@ -253,8 +261,8 @@ public final class ToolRegistry implements AutoCloseable {
             return parameters.deepCopy();
         }
 
-        boolean permits(Context context) {
-            return groups.isEmpty() || groups.contains(context.conversationId());
+        boolean permits(ToolContext toolContext) {
+            return groups.isEmpty() || groups.contains(toolContext.conversationId());
         }
     }
 

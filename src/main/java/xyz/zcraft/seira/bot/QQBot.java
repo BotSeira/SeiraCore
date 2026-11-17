@@ -134,8 +134,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                 config.ostella(),
                 config.asteroid(),
                 group -> QQApi.getGroupBotState(tokenManager.getToken(), group),
-                (openId, url) -> QQApi.uploadPrivateFileByParts(tokenManager.getToken(), openId, url),
-                (groupId, url) -> QQApi.uploadGroupFileByParts(tokenManager.getToken(), groupId, url),
+                (groupId, url, fileName) -> QQApi.uploadGroupFileByParts(tokenManager.getToken(), groupId, url, fileName),
                 tokenManager
         );
 

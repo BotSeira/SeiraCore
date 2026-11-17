@@ -189,14 +189,18 @@ public class QQApi {
     }
 
     public static FileInfo uploadPrivateFileByParts(AccessToken accessToken, String openId, String sourceUrl) {
-        return uploadFileByParts(accessToken, "users", openId, sourceUrl);
+        return uploadFileByParts(accessToken, "users", openId, sourceUrl, null);
     }
 
     public static FileInfo uploadGroupFileByParts(AccessToken accessToken, String openId, String sourceUrl) {
-        return uploadFileByParts(accessToken, "groups", openId, sourceUrl);
+        return uploadFileByParts(accessToken, "groups", openId, sourceUrl, null);
     }
 
-    private static FileInfo uploadFileByParts(AccessToken accessToken, String targetType, String openId, String sourceUrl) {
+    public static FileInfo uploadGroupFileByParts(AccessToken accessToken, String openId, String sourceUrl, String fileName) {
+        return uploadFileByParts(accessToken, "groups", openId, sourceUrl, fileName);
+    }
+
+    private static FileInfo uploadFileByParts(AccessToken accessToken, String targetType, String openId, String sourceUrl, String fileName) {
         Path filePath = null;
         try {
             filePath = downloadFile(sourceUrl);
@@ -206,7 +210,8 @@ public class QQApi {
             }
 
 //            String fileName = videoFileName(sourceUrl);
-            String fileName = CosService.filenameFromUrl(sourceUrl);
+            if (fileName == null)
+                fileName = CosService.filenameFromUrl(sourceUrl);
             MediaDigests digests = calculateDigests(filePath);
             int fileType = (fileName.endsWith(".mp4") ? FILE_TYPE_VIDEO : FILE_TYPE_FILE);
             UploadPrepare prepare = prepareUpload(accessToken, targetType, openId, fileName, fileSize, fileType, digests);

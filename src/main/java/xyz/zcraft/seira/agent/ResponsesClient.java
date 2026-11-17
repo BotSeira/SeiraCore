@@ -31,15 +31,15 @@ public final class ResponsesClient {
     private final HttpClient CLIENT;
     private final URI endpoint;
     private final String apiKey;
-    private final String model;
+    private final AgentConfig.Models models;
     private final Duration timeout;
     private final AgentConfig config;
 
     public ResponsesClient(AgentConfig config) {
         this.config = config;
-        this.endpoint = URI.create(config.endpoint());
+        this.endpoint = URI.create(config.endpoint().replaceAll("/+$", "") + "/responses");
         this.apiKey = config.apiKey();
-        this.model = config.model();
+        this.models = config.models();
         this.timeout = Duration.ofSeconds(config.timeoutSeconds());
         final ProxySelector proxySelector = config.proxy().enabled()
                 ? ProxySelector.of(new InetSocketAddress(config.proxy().host(), config.proxy().port()))
@@ -51,7 +51,7 @@ public final class ResponsesClient {
             String previousId, String instructions, JsonArray input, JsonArray tools, Consumer<String> onMessage, UUID sessionUuid
     ) throws Exception {
         JsonObject body = new JsonObject();
-        body.addProperty("model", model);
+        body.addProperty("model", models.chat());
         body.addProperty("instructions", instructions);
         body.addProperty("stream", true);
         body.addProperty("store", true);

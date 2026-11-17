@@ -1,11 +1,6 @@
 package xyz.zcraft.seira.agent;
 
-import xyz.zcraft.seira.bot.data.Attachment;
-import xyz.zcraft.seira.bot.data.FileInfo;
-import xyz.zcraft.seira.bot.data.GroupBotState;
-import xyz.zcraft.seira.bot.data.MsgElem;
-import xyz.zcraft.seira.bot.data.msg.Button;
-import xyz.zcraft.seira.bot.data.msg.MDMessage;
+import xyz.zcraft.seira.bot.data.*;
 import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.config.AgentConfig;
@@ -16,12 +11,9 @@ import xyz.zcraft.seira.util.ResourceUtil;
 import xyz.zcraft.seira.util.TokenManager;
 
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -38,28 +30,23 @@ public final class AgentChatHandler implements AutoCloseable {
     private final ToolRegistry tools;
     private final AgentEngine engine;
     private final Function<String, GroupBotState> botStateGetter;
-    private final BiFunction<String, String, FileInfo> privateFileUploader;
-    private final BiFunction<String, String, FileInfo> groupFileUploader;
     private final Set<String> consented = new HashSet<>();
-    private final ExecutorService fileUploadExecutor = Executors.newSingleThreadExecutor();
     private volatile String prompt;
 
     public AgentChatHandler(
             Predicate<String> administrator, AgentConfig conf, Function<String, String> osuToken,
             OstellaConfig ostella, AsteroidConfig asteroid, Function<String, GroupBotState> botStateGetter,
-            BiFunction<String, String, FileInfo> privateFileUploader, BiFunction<String, String, FileInfo> groupFileUploader,
+            FileUploader groupFileUploader,
             TokenManager tokenManager) {
         this.administrator = administrator;
-        tools = new ToolRegistry(administrator, this::enabled, tokenManager);
+        tools = new ToolRegistry(administrator, this::enabled, tokenManager, groupFileUploader);
         this.botStateGetter = botStateGetter;
-        this.privateFileUploader = privateFileUploader;
-        this.groupFileUploader = groupFileUploader;
 
         try {
             settings = conf;
 
             if (settings.enabled()) {
-                JavaTools.register(tools);
+                JavaTools.register(tools, settings);
                 ServiceToolDefinitions.register(new ServiceTools(tools, ostella, asteroid, osuToken));
                 reload();
                 engine = new AgentEngine(
@@ -148,52 +135,6 @@ public final class AgentChatHandler implements AutoCloseable {
         return name != null && name.toLowerCase(Locale.ROOT).matches(".*\\.(png|jpe?g|webp|gif)$");
     }
 
-    private void sendResponse(Context context, PendingMessage message) {
-        String messageText;
-        List<List<Button>> messageButtons;
-        if (message instanceof MDMessage md) {
-            messageText = md.getMarkdown();
-            messageButtons = md.getButtons();
-        } else {
-            messageText = message.getContent();
-            messageButtons = List.of();
-        }
-        var matcher = java.util.regex.Pattern.compile("%%\\[file:([^\\r\\n]+?)]%%").matcher(messageText);
-        var files = new java.util.LinkedHashSet<String>();
-        StringBuilder markdown = new StringBuilder();
-        while (matcher.find()) {
-            URI uri = URI.create(matcher.group(1).trim());
-            if (!("https".equals(uri.getScheme()) || "http".equals(uri.getScheme()))
-                    || uri.getHost() == null || uri.getUserInfo() != null)
-                throw new IllegalArgumentException("Invalid file URL");
-            files.add(uri.toString());
-            matcher.appendReplacement(markdown, "");
-        }
-        matcher.appendTail(markdown);
-        if (files.size() > 8) throw new IllegalArgumentException("Too many files in one message");
-
-        String append = "";
-        if (!files.isEmpty()) {
-            append = "\n\n> " + files.size() + " 个附件上传中...";
-        }
-
-        final PendingMessage finalMessage = PendingMessage.ofMarkdownRaw((markdown + append).trim(), messageButtons);
-        if (!markdown.toString().isBlank() && !context.send(true, finalMessage).success()) {
-            throw new IllegalStateException("Agent message delivery failed");
-        }
-
-        for (String url : files) {
-            fileUploadExecutor.submit(() -> {
-                var fileInfo = context.inGroup()
-                        ? groupFileUploader.apply(context.groupId(), url)
-                        : privateFileUploader.apply(context.senderUserId(), url);
-                if (!context.send(true, PendingMessage.ofUploadedFile(fileInfo, url)).success()) {
-                    throw new IllegalStateException("Agent file delivery failed");
-                }
-            });
-        }
-    }
-
     public synchronized boolean enabled(String groupId) {
         return engine != null && AiPermission.isActivated(groupId);
     }
@@ -224,7 +165,7 @@ public final class AgentChatHandler implements AutoCloseable {
                             System.currentTimeMillis(),
                             message -> {
                                 if (!enabled(ctx.groupId())) return;
-                                sendResponse(ctx, message);
+                                ctx.send(true, message);
                             })
             );
         } catch (java.util.concurrent.RejectedExecutionException e) {
