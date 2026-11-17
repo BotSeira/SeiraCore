@@ -109,9 +109,9 @@ class JavaTools {
                 "restrict_group_member_chat_setting",
                 "设置群成员禁言。需要管理员权限。",
                 ToolSchema.object()
-                        .property("op", ToolSchema.string().description("操作类型：add 增加禁言，update 更新禁言到期时间，del 解除禁言"))
+                        .property("op", ToolSchema.string().description("操作类型：`add` 增加禁言，`update` 更新禁言到期时间，`del` 解除禁言"))
                         .property("user", ToolSchema.string().description("群内发送者标识，例如 u1"))
-                        .property("mute_expire_at", ToolSchema.string().description("禁言到期时间（RFC3339 格式）；op=del 时可传空串表示立即解除禁言"))
+                        .property("mute_expire_at", ToolSchema.string().description("禁言到期时间（RFC3339 格式，例如 `2026-11-17T01:40:00Z` ）；op=del 时可传空串表示立即解除禁言"))
                         .required("op", "user")
                         .additionalProperties(false)
                         .toJson(),
