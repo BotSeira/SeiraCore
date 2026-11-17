@@ -6,7 +6,6 @@ import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.bot.data.*;
 import xyz.zcraft.seira.bot.data.msg.Message;
 import xyz.zcraft.seira.bot.data.msg.SentMessage;
-import xyz.zcraft.seira.bot.data.SetMemberMuteState;
 import xyz.zcraft.seira.interaction.data.InteractionResponse;
 import xyz.zcraft.seira.services.CosService;
 
@@ -711,6 +710,26 @@ public class QQApi {
                 LOG.error("Failed to set group mute, status code: {} body={}", response.statusCode(), response.body());
                 throw new RuntimeException("Failed to set group mute, status code: " + response.statusCode() + " body=" + response.body());
             }
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
+        }
+    }
+
+    public static String removeGroupMember(AccessToken accessToken, String groupId, List<String> memberOpenIds) {
+        try {
+            final var request = newRequestBuilder(accessToken)
+                    .uri(URI.create(ENDPOINT + "/v2/groups/" + groupId + "/batch_remove_members"))
+                    .POST(HttpRequest.BodyPublishers.ofString(gson.toJsonTree(Map.of("member_openids", memberOpenIds)).toString()))
+                    .build();
+
+            final HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                LOG.error("Failed to remove group member, status code: {} body={}", response.statusCode(), response.body());
+                throw new RuntimeException("Failed to remove group member, status code: " + response.statusCode() + " body=" + response.body());
+            }
+
+            return JsonParser.parseString(response.body()).getAsJsonObject().get("remove_members_result").getAsString();
         } catch (IOException | InterruptedException e) {
             throw requestFailure(e);
         }

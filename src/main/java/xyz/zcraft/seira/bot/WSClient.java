@@ -32,7 +32,7 @@ import java.util.function.Supplier;
 
 public class WSClient extends WebSocketClient {
     private static final Logger LOG = LogManager.getLogger(WSClient.class);
-    private final Gson gson = new Gson();
+    private final Gson GSON = new Gson();
     @Getter
     private final AppConfig config;
     private final Supplier<AccessToken> tokenSupplier;
@@ -88,7 +88,7 @@ public class WSClient extends WebSocketClient {
     }
 
     private void processMessage(String message) {
-        JsonObject payload = gson.fromJson(message, JsonObject.class);
+        JsonObject payload = GSON.fromJson(message, JsonObject.class);
         updateSequence(payload.get("s"));
 
         int op = payload.get("op").getAsInt();
@@ -163,7 +163,7 @@ public class WSClient extends WebSocketClient {
 
     private void onInteraction(JsonObject payload) {
         JsonObject data = payload.get("d").getAsJsonObject();
-        final var event = gson.fromJson(data, InteractionEvent.class);
+        final var event = GSON.fromJson(data, InteractionEvent.class);
         interactionHandler.onInteraction(event);
     }
 
@@ -180,7 +180,7 @@ public class WSClient extends WebSocketClient {
         if (attachments != null && !attachments.isJsonNull()) {
             for (JsonElement attachmentElem : attachments) {
                 JsonObject attachmentObj = attachmentElem.getAsJsonObject();
-                Attachment attachment = gson.fromJson(attachmentObj, Attachment.class);
+                Attachment attachment = GSON.fromJson(attachmentObj, Attachment.class);
                 attachmentList.add(attachment);
             }
         }
@@ -201,7 +201,7 @@ public class WSClient extends WebSocketClient {
 
         if (data.has("msg_elements")) {
             data.get("msg_elements").getAsJsonArray()
-                    .forEach(elem -> msgElemList.add(gson.fromJson(elem, MsgElem.class)));
+                    .forEach(elem -> msgElemList.add(GSON.fromJson(elem, MsgElem.class)));
         }
 
         router.onPrivateMessageReceived(openId, msgId, content, msgIdx, attachmentList, msgElemList);
@@ -215,7 +215,7 @@ public class WSClient extends WebSocketClient {
         List<Attachment> attachmentList = new ArrayList<>(attachments.size());
         for (JsonElement attachmentElem : attachments) {
             JsonObject attachmentObj = attachmentElem.getAsJsonObject();
-            Attachment attachment = gson.fromJson(attachmentObj, Attachment.class);
+            Attachment attachment = GSON.fromJson(attachmentObj, Attachment.class);
             attachmentList.add(attachment);
         }
 
@@ -253,7 +253,7 @@ public class WSClient extends WebSocketClient {
 
         if (data.has("msg_elements")) {
             data.get("msg_elements").getAsJsonArray()
-                    .forEach(elem -> msgElemList.add(gson.fromJson(elem, MsgElem.class)));
+                    .forEach(elem -> msgElemList.add(GSON.fromJson(elem, MsgElem.class)));
         }
 
         List<Attachment> attachments = parseAttachments(data);
@@ -318,7 +318,7 @@ public class WSClient extends WebSocketClient {
         JsonArray attachments = data.getAsJsonArray("attachments");
         List<Attachment> result = new ArrayList<>(attachments.size());
         for (JsonElement element : attachments) {
-            result.add(gson.fromJson(element, Attachment.class));
+            result.add(GSON.fromJson(element, Attachment.class));
         }
         return List.copyOf(result);
     }
@@ -373,7 +373,7 @@ public class WSClient extends WebSocketClient {
     private void sendHeartbeat() {
         JsonObject payload = new JsonObject();
         payload.addProperty("op", 1);
-        JsonElement seq = sequence.get() < 0 ? JsonNull.INSTANCE : gson.toJsonTree(sequence.get());
+        JsonElement seq = sequence.get() < 0 ? JsonNull.INSTANCE : GSON.toJsonTree(sequence.get());
         payload.add("d", seq);
         send(payload.toString());
     }

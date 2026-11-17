@@ -2,6 +2,7 @@ package xyz.zcraft.seira.agent;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import xyz.zcraft.seira.bot.QQApi;
 import xyz.zcraft.seira.bot.data.SetMemberMuteState;
@@ -135,6 +136,39 @@ class JavaTools {
                     QQApi.setGroupMute(registry.getTokenManager().getToken(), groupId, List.of(new SetMemberMuteState(op, openId, muteExpireAt)));
 
                     return GSON.toJsonTree(Map.of("success", true));
+                })
+        );
+
+        registry.register(new ToolRegistry.Tool(
+                "remove_group_member",
+                "移除群成员。需要群主为机器人开启该操作权限。",
+                ToolSchema.object()
+                        .property("users", ToolSchema.array(ToolSchema.string()).description("群内发送者标识列表，例如 [u3, u4, u8]"))
+                        .required("users")
+                        .additionalProperties(false)
+                        .toJson(),
+                Set.of(),
+                Duration.ofSeconds(5),
+                (args, context) -> {
+                    String groupId = context.conversationId();
+                    if (groupId == null || groupId.isBlank()) {
+                        throw new IllegalArgumentException("Group context is required");
+                    }
+
+                    List<String> openIds = new LinkedList<>();
+                    final JsonArray users = args.get("users").getAsJsonArray();
+                    for (JsonElement user : users) {
+                        String openId = context.aliases().entrySet().stream()
+                                .filter(e -> e.getValue().equals(user.getAsString()))
+                                .map(Map.Entry::getKey)
+                                .findFirst()
+                                .orElseThrow(IllegalArgumentException::new);
+                        openIds.add(openId);
+                    }
+
+                    var result = QQApi.removeGroupMember(registry.getTokenManager().getToken(), groupId, openIds);
+
+                    return GSON.toJsonTree(Map.of("remove_members_result", result));
                 })
         );
     }
