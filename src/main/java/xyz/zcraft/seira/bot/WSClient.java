@@ -71,16 +71,6 @@ public class WSClient extends WebSocketClient {
         LOG.info("QQ Gateway WebSocket Client created");
     }
 
-    private static String firstText(JsonObject object, String... names) {
-        for (String name : names) {
-            if (object.has(name) && !object.get(name).isJsonNull()) {
-                String value = object.get(name).getAsString();
-                if (!value.isBlank()) return value;
-            }
-        }
-        return "QQ用户";
-    }
-
     @Override
     public void onOpen(ServerHandshake handshake) {
         LOG.info("Gateway connected");
@@ -270,10 +260,22 @@ public class WSClient extends WebSocketClient {
         Map<String, String> mentions = parseMentions(data);
 
         if (!openId.equals(config.qq().selfId())) {
+            String resultName;
+            for (String name : List.of("nickname", "username", "member_name", "member_openid")) {
+                if (author.has(name) && !author.get(name).isJsonNull()) {
+                    String value = author.get(name).getAsString();
+                    if (!value.isBlank()) {
+                        resultName = value;
+                        break;
+                    }
+                }
+            }
+            resultName = "QQ用户";
+
             discordBridgeService.acceptQqMessage(new QqIncomingMessage(
                     groupId,
                     openId,
-                    firstText(author, "nickname", "username", "member_name", "member_openid"),
+                    resultName,
                     msgId,
                     stripSelfMention(content),
                     attachments,
