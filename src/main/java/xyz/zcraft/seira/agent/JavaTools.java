@@ -125,10 +125,14 @@ class JavaTools {
 
                     final String op = args.get("op").getAsString();
                     final String user = args.get("user").getAsString();
-                    final String memberOpenId = context.aliases().get(user);
+                    String openId = context.aliases().entrySet().stream()
+                            .filter(e -> e.getValue().equals(user))
+                            .map(Map.Entry::getKey)
+                            .findFirst()
+                            .orElseThrow(IllegalArgumentException::new);
                     final String muteExpireAt = args.get("mute_expire_at").getAsString();
 
-                    QQApi.setGroupMute(registry.getTokenManager().getToken(), groupId, List.of(new SetMemberMuteState(op, memberOpenId, muteExpireAt)));
+                    QQApi.setGroupMute(registry.getTokenManager().getToken(), groupId, List.of(new SetMemberMuteState(op, openId, muteExpireAt)));
 
                     return GSON.toJsonTree(Map.of("success", true));
                 })
