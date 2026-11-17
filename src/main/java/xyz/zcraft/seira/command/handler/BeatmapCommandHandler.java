@@ -55,7 +55,7 @@ public final class BeatmapCommandHandler {
         }
     }
 
-    public void handleM(Context ctx) {
+    public void handleBeatmap(Context ctx) {
         var target = ctx.argumentCount() == 0
                 ? TargetInput.memory() : TargetInput.read(ctx.args());
         var remembered = history.get(ctx);
@@ -105,7 +105,7 @@ public final class BeatmapCommandHandler {
         }
     }
 
-    public void handleMv(Context ctx) {
+    public void handleBeatmapPreview(Context ctx) {
         var target = ctx.argumentCount() == 0 || ctx.argument(0).startsWith("+") || TimeDurationParser.isTimeRange(ctx.argument(0))
                 ? TargetInput.memory() : TargetInput.read(ctx.args());
         var remembered = history.get(ctx);
@@ -147,7 +147,7 @@ public final class BeatmapCommandHandler {
         }
     }
 
-    public void handleMbg(Context ctx) {
+    public void handleBeatmapBg(Context ctx) {
         var target = ctx.argumentCount() == 0
                 ? TargetInput.memory() : TargetInput.read(ctx.args());
         var remembered = history.get(ctx);
@@ -163,7 +163,7 @@ public final class BeatmapCommandHandler {
         }
     }
 
-    public void handleDl(Context ctx) {
+    public void handleDownloadSet(Context ctx) {
         var target = ctx.argumentCount() == 0
                 ? TargetInput.memory() : TargetInput.read(ctx.args());
         var remembered = history.get(ctx);
@@ -180,7 +180,7 @@ public final class BeatmapCommandHandler {
         }
     }
 
-    public void handleMs(Context ctx) {
+    public void handleBeatmapset(Context ctx) {
         var target = ctx.argumentCount() == 0
                 ? TargetInput.memory() : TargetInput.read(ctx.args());
         var remembered = history.get(ctx);
@@ -197,7 +197,7 @@ public final class BeatmapCommandHandler {
         }
     }
 
-    public void handleSms(Context ctx) {
+    public void handleSearchSet(Context ctx) {
         final SearchQuery searchQuery = resolver.resolveSearchQuery(ctx.query());
         if (searchQuery == null) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/sms [#页数] <搜索关键字>"));

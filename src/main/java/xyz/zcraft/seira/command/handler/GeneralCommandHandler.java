@@ -55,7 +55,7 @@ public final class GeneralCommandHandler {
         this.adminAuthorizer = adminAuthorizer;
     }
 
-    public void handleU(Context context) {
+    public void handleUserInfo(Context context) {
         String player = resolver.player(context.argumentCount() == 0 ? null : context.argument(0), context.senderUserId());
 
         try (var _ = taskCoordinator.beginRequest(context, "User Info")) {
@@ -66,7 +66,7 @@ public final class GeneralCommandHandler {
         }
     }
 
-    public void handleO(Context ctx) {
+    public void handleUserAvatar(Context ctx) {
         final Set<Long> uids = new HashSet<>();
 
         if (ctx.argumentCount() == 0) {
@@ -199,7 +199,7 @@ public final class GeneralCommandHandler {
         context.sendReply(PendingMessage.ofMarkdownRaw(sb.toString()));
     }
 
-    public void handleUx(Context ctx) {
+    public void handleUserStat(Context ctx) {
         String player = resolver.player(ctx.argumentCount() == 0 ? null : ctx.argument(0), ctx.senderUserId());
 
         try (var _ = taskCoordinator.beginRequest(ctx, "User Info Short")) {

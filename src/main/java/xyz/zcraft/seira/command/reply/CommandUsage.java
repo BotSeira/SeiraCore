@@ -28,6 +28,7 @@ public final class CommandUsage {
     public static final String F = "用法：/f [@用户]";
     public static final String RCANCEL = "用法：/rcancel <渲染任务ID>";
     public static final String SUP = "用法：/sup [@用户]";
+    public static final String SS = "用法：/ss [谱面ID 或 快捷查询] [用户]";
 
     private CommandUsage() {
     }

@@ -285,7 +285,7 @@ public final class ReplyFactory {
 
     public PendingMessage beatmapMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                at(ctx) + "谱面" + m(response.getBeatmapId()) + "\n" +
+                at(ctx) + "谱面 " + m(response.getBeatmapId()) + "\n" +
                         "> 谱面集: " + ms(response.getBeatmapsetId()),
                 buttons().beatmapButtons(response.getBeatmapId())
         );

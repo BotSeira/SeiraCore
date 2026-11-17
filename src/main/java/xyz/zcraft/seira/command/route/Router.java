@@ -47,6 +47,7 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -66,6 +67,7 @@ public class Router {
     private final Runnable commandMetric;
     private final CommandHandler unknownCommand;
     private final Executor commandExecutor;
+    private final Executor reportExecutor;
     private final Supplier<QQUser> selfSupplier;
     private final AgentChatHandler aiChatHandler;
     @SuppressWarnings("deprecation")
@@ -87,6 +89,7 @@ public class Router {
         this.messageSender = messageSender;
         this.configSupplier = java.util.Objects.requireNonNull(configSupplier);
         this.commandExecutor = commandExecutor;
+        this.reportExecutor = Executors.newSingleThreadScheduledExecutor();
         this.commandMetric = java.util.Objects.requireNonNull(commandMetric);
         this.selfSupplier = selfSupplier;
         this.interactionHandler = interactionHandler;
@@ -126,9 +129,10 @@ public class Router {
                 resolver, taskCoordinator, watchService, admins::isAdmin
         );
 
-        ChallengeCommandHandler challengeCommands = new ChallengeCommandHandler(
-                challengeService, UserDataStore::findBoundUid, admins::isAdmin
-        );
+
+//        ChallengeCommandHandler challengeCommands = new ChallengeCommandHandler(
+//                challengeService, UserDataStore::findBoundUid, admins::isAdmin
+//        );
 
         SpecificScoreWatchCommandHandler specificScoreWatchCommands = new SpecificScoreWatchCommandHandler(
                 taskCoordinator, watchService
@@ -166,7 +170,7 @@ public class Router {
                 bindingCommands, scoreCommands, beatmapCommands, socialCommands,
                 replayCommands, generalCommands, watchCommands, specificScoreWatchCommands,
                 multiplayerRoomWatchCommands, dcsCommands, rankGuessCommands, aiChatHandler,
-                whatIfCommands, challengeCommands, addPpCommands, ncmHandler, minecraftCommands,
+                whatIfCommands, addPpCommands, ncmHandler, minecraftCommands,
                 gachaCommands
         );
 
@@ -192,57 +196,58 @@ public class Router {
             WatchCommandHandler watchCommands, SpecificScoreWatchCommandHandler specificScoreWatchCommands,
             MPWatchCommandHandler multiplayerRoomWatchCommands, DcsCommandHandler dcsCommands,
             RankGuessCommandHandler rankGuessCommands, AgentChatHandler aiChatHandler, WhatIfCommandHandler whatIfCommands,
-            ChallengeCommandHandler challengeCommands, AddPpCommandHandler addPpCommands, NcmHandler ncmHandler,
+            AddPpCommandHandler addPpCommands, NcmHandler ncmHandler,
             MinecraftCommandHandler minecraftCommands, GachaCommandHandler gachaCommands
     ) {
         return CommandRegistry.builder()
                 .register(bindingCommands::handleBind, "bind")
                 .register(bindingCommands::handleUnbind, "unbind")
                 .register(bindingCommands::handleClearHistory, "clearhistory")
-                .register(scoreCommands::handleRbp, "rbp")
-                .register(scoreCommands::handleBp, "bp", "bs")
-                .register(scoreCommands::handleBd, "bd", "debp")
+                .register(scoreCommands::handleRandomBest, "rbp")
+                .register(scoreCommands::handleBests, "bp", "bs")
+                .register(scoreCommands::handleDerankedBests, "bd", "debp")
                 .register(beatmapCommands::handleDaily, "daily")
-                .register(socialCommands::handleMp, "mp")
-                .register(ctx -> scoreCommands.handleRs(ctx, true), "rs")
-                .register(ctx -> scoreCommands.handleRs(ctx, false), "rp", "ps")
-                .register(scoreCommands::handleTb, "tb")
-                .register(beatmapCommands::handleM, "m")
+                .register(socialCommands::handleMultiplayer, "mp")
+                .register(ctx -> scoreCommands.handleRecentScores(ctx, true), "rs")
+                .register(ctx -> scoreCommands.handleRecentScores(ctx, false), "rp", "ps")
+                .register(scoreCommands::handleTodayBest, "tb")
+                .register(beatmapCommands::handleBeatmap, "m")
                 .register(beatmapCommands::handleBma, "bma")
                 .register(beatmapCommands::handleAp, "ap")
                 .register(ncmHandler::handleNcm, "ncm")
                 .register(ncmHandler::handleNcmPlaylist, "ncmp")
                 .register(ncmHandler::handleNcmUpdate, "ncmu")
-                .register(beatmapCommands::handleMv, "bpv", "mv")
-                .register(beatmapCommands::handleMbg, "bgp", "mbg")
+                .register(beatmapCommands::handleBeatmapPreview, "bpv", "mv")
+                .register(beatmapCommands::handleBeatmapBg, "bgp", "mbg")
                 .register(ctx -> socialCommands.handleF(ctx, !ctx.inGroup()), "f")
                 .register(socialCommands::handleFriendStatus, "mu")
                 .register(ctx -> socialCommands.handleF(ctx, true), "fall")
-                .register(socialCommands::handleSup, "sup")
+                .register(socialCommands::handleSupporterStatus, "sup")
                 .register(socialCommands::handleFclear, "fclear")
-                .register(beatmapCommands::handleDl, "dl")
-                .register(scoreCommands::handleS, "s")
-                .register(scoreCommands::handleSm, "sm")
-                .register(scoreCommands::handleSa, "sa")
-                .register(scoreCommands::handleMa, "ma")
+                .register(beatmapCommands::handleDownloadSet, "dl")
+                .register(scoreCommands::handleSingleScore, "s")
+                .register(scoreCommands::handleBeatmapScores, "ss")
+                .register(scoreCommands::handleBeatmapScore, "sm")
+                .register(scoreCommands::handleScoreAnalysis, "sa")
+                .register(scoreCommands::handleMissAnalysis, "ma")
                 .register(scoreCommands::handleSnapshot, "snap", "snapshot")
                 .register(scoreCommands::handleReplayClip, "rep")
-                .register(replayCommands::handleR, "r")
-                .register(replayCommands::handleRsc, "rsc")
-                .register(beatmapCommands::handleMs, "ms")
-                .register(beatmapCommands::handleSms, "sms")
-                .register(socialCommands::handleLb, "lb")
+                .register(replayCommands::handleReplayRender, "r")
+                .register(replayCommands::handleShowcaseRender, "rsc")
+                .register(beatmapCommands::handleBeatmapset, "ms")
+                .register(beatmapCommands::handleSearchSet, "sms")
+                .register(socialCommands::handleLeaderboard, "lb")
                 .register(generalCommands::handleStat, "stat")
-                .register(generalCommands::handleU, "u")
-                .register(generalCommands::handleUx, "ux")
-                .register(generalCommands::handleO, "o")
+                .register(generalCommands::handleUserInfo, "u")
+                .register(generalCommands::handleUserStat, "ux")
+                .register(generalCommands::handleUserAvatar, "o")
                 .register(generalCommands::handleLuck, "luck")
                 .register(whatIfCommands::handleWhatIf, "whatif")
                 .register(addPpCommands::handleAddPp, "addpp")
                 .register(generalCommands::handleRoll, "roll")
-                .register(replayCommands::handleRstat, "rstat")
-                .register(replayCommands::handleRget, "rget")
-                .register(replayCommands::handleRcancel, "rcancel")
+                .register(replayCommands::handleRenderStat, "rstat")
+                .register(replayCommands::handleRenderGet, "rget")
+                .register(replayCommands::handleRenderCancel, "rcancel")
                 .register(generalCommands::handleInspect, "inspect")
                 .register(generalCommands::handleHelp, "help")
                 .register(generalCommands::handleUsages, "usages")
@@ -263,16 +268,17 @@ public class Router {
     }
 
     private void reportException(Context ctx, Exception ex) {
-        for (String s : configSupplier.get().seira().exceptionReports()) {
-            s = s.toUpperCase(Locale.ROOT);
-            StringWriter sw = new StringWriter();
-            ex.printStackTrace(new PrintWriter(sw));
-            String stackTrace = sw.toString();
-            String detail = "";
-            if (ex instanceof ApiRequestException apiEx) {
-                detail = "\n详细信息：\n```json\n" + apiEx.getBodyRaw() + "\n```";
-            }
-            String message = """
+        reportExecutor.execute(() -> {
+            for (String s : configSupplier.get().seira().exceptionReports()) {
+                s = s.toUpperCase(Locale.ROOT);
+                StringWriter sw = new StringWriter();
+                ex.printStackTrace(new PrintWriter(sw));
+                String stackTrace = sw.toString();
+                String detail = "";
+                if (ex instanceof ApiRequestException apiEx) {
+                    detail = "\n详细信息：\n```json\n" + apiEx.getBodyRaw() + "\n```";
+                }
+                String message = """
                     处理指令时发生错误：
                     目标：`%s`
                     指令：
@@ -285,14 +291,15 @@ public class Router {
                     ```
                     %s
                     """.formatted(ctx.senderUserId() + "@" + ctx.groupId(), ctx.rawContent(), stackTrace, detail).trim();
-            if (s.startsWith("GROUP:")) {
-                messageSender.sendGroupMarkdown(s.substring("GROUP:".length()), message);
-            } else if (s.startsWith("PRIVATE:")) {
-                messageSender.sendPrivateMarkdown(s.substring("PRIVATE:".length()), message);
-            } else {
-                LOG.warn("Unknown exception report destination {}", s);
+                if (s.startsWith("GROUP:")) {
+                    messageSender.sendGroupMarkdown(s.substring("GROUP:".length()), message);
+                } else if (s.startsWith("PRIVATE:")) {
+                    messageSender.sendPrivateMarkdown(s.substring("PRIVATE:".length()), message);
+                } else {
+                    LOG.warn("Unknown exception report destination {}", s);
+                }
             }
-        }
+        });
     }
 
     private String getAvatar(String openId) {

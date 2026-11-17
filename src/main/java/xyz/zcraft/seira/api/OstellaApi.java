@@ -290,6 +290,10 @@ public class OstellaApi {
         return getBase64BytesResponse("/beatmaps/" + beatmapId + (mod != null ? "?mod=" + mod : ""), "获取谱面失败", null);
     }
 
+    public static Response<Base64Bytes> getBeatmapUserScores(long beatmapId, long userId) {
+        return getBase64BytesResponse("/users/%d/scores/beatmaps/%d/all".formatted(userId, beatmapId), "获取谱面成绩失败", null);
+    }
+
     public static Response<Base64Bytes> getBeatmapAnalysisResponse(long beatmapId, String mod) {
         String query = "/beatmaps/" + beatmapId + "/analysis";
         if (mod != null && !mod.isBlank()) {

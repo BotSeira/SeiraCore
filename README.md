@@ -68,6 +68,7 @@ Seira正在活跃开发中，在使用的过程中可能会有一些Bug，也会
 | `/ap`           | `/ap <id/rsN/bpN>`                                      | 获取指定谱面音频预览                                                            |
 | `/mbg`          | `/mbg <id/rsN/bpN>`                                     | 获取指定谱面背景预览                                                            |
 | `/s`            | `/s <id/locId/rsN/bpN>`                                 | 获取指定的在线或本地成绩图                                                      |
+| `/ss`            | `/ss <id> <uid/username/@user>`                                 | 获取指定的用户在特定谱面的成绩列表                                                      |
 | `/sa`           | `/sa <id/locId/rsN/bpN>`                                | 获取指定成绩分析图                                                              |
 | `/ma`           | `/ma [id/locId/rsN/bpN] [n/#n]`                         | 获取指定或最近目标成绩的Miss分析；省略目标时用`#n`指定Miss                      |
 | `/snap`         | `/snap [成绩目标] <mm:ss.fff/秒数s/objN/#N> [±偏移ms]`  | 生成指定时间、物件或 Miss 的完整回放快照；别名 `/snapshot`                      |

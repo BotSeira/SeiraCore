@@ -48,7 +48,7 @@ public final class SocialCommandHandler {
         this.avatarProvider = avatarProvider;
     }
 
-    public void handleMp(Context ctx) {
+    public void handleMultiplayer(Context ctx) {
         if (resolver.resolveBoundUid(ctx.senderUserId()) == null) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.NO_BIND));
             return;
@@ -255,7 +255,7 @@ public final class SocialCommandHandler {
         ));
     }
 
-    public void handleLb(Context ctx) {
+    public void handleLeaderboard(Context ctx) {
         if (ctx.args().length == 1 || ctx.args().length == 2) {
             var target = TargetInput.read(ctx.args());
             int remainingArgs = ctx.argumentCount() - target.consumedArgs();
@@ -307,7 +307,7 @@ public final class SocialCommandHandler {
         }
     }
 
-    public void handleSup(Context ctx) {
+    public void handleSupporterStatus(Context ctx) {
         if (ctx.argumentCount() > 1) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.SUP));
             return;
