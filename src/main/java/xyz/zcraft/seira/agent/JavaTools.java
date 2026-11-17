@@ -4,13 +4,11 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import xyz.zcraft.seira.bot.QQApi;
+import xyz.zcraft.seira.bot.data.SetMemberMuteState;
 import xyz.zcraft.seira.db.UserDataStore;
 
 import java.time.Duration;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 class JavaTools {
     private static final Gson GSON = new Gson();
@@ -104,6 +102,35 @@ class JavaTools {
                     }
 
                     return GSON.toJsonTree(QQApi.getGroupInfo(registry.getTokenManager().getToken(), groupId));
+                })
+        );
+
+        registry.register(new ToolRegistry.Tool(
+                "restrict_group_member_chat_setting",
+                "设置群成员禁言。需要管理员权限。",
+                ToolSchema.object()
+                        .property("op", ToolSchema.string().description("操作类型：add 增加禁言，update 更新禁言到期时间，del 解除禁言"))
+                        .property("member_id", ToolSchema.string().description("目标成员ID"))
+                        .property("mute_expire_at", ToolSchema.string().description("禁言到期时间（RFC3339 格式）；op=del 时可传空串表示立即解除禁言"))
+                        .required("op", "member_id")
+                        .additionalProperties(false)
+                        .toJson(),
+                Set.of(),
+                Duration.ofSeconds(5),
+                (args, context) -> {
+                    String groupId = context.conversationId();
+                    if (groupId == null || groupId.isBlank()) {
+                        throw new IllegalArgumentException("Group context is required");
+                    }
+
+                    final String op = args.get("op").getAsString();
+                    final String memberId = args.get("member_id").getAsString();
+                    final String memberOpenId = context.aliases().get(memberId);
+                    final String muteExpireAt = args.get("mute_expire_at").getAsString();
+
+                    QQApi.setGroupMute(registry.getTokenManager().getToken(), groupId, List.of(new SetMemberMuteState(op, memberOpenId, muteExpireAt)));
+
+                    return GSON.toJsonTree(Map.of("success", true));
                 })
         );
     }

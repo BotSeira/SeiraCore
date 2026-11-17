@@ -365,6 +365,16 @@ final class ServiceToolDefinitions {
                         .additionalProperties(false),
                 new String[]{"userId"}, new String[]{"n", "start", "fail", "filters"}, false, false, false);
 
+        service.declare("ostella", "/users/{userId}/scores/beatmaps/{beatmapId}/all",
+                "ostella_get_users_beatmap_scores",
+                "获取玩家谱面成绩列表\n获取指定玩家在知指定谱面上的成绩", "GET",
+                ToolSchema.object()
+                        .property("userId", ToolSchema.integer().description("osu! 用户 ID"))
+                        .property("beatmapId", ToolSchema.integer().description("谱面ID"))
+                        .required("userId", "beatmapId")
+                        .additionalProperties(false),
+                new String[]{"userId", "beatmapId"}, new String[]{}, false, false, false);
+
         service.declare("ostella", "/users/{userId}/scores/today-best",
                 "ostella_get_users_by_userId_scores_today_best",
                 "获取最近若干天内达成的最佳成绩\n获取指定用户在一段时间范围内达成的最佳成绩（BP）。默认查询最近 1 天。", "GET",
