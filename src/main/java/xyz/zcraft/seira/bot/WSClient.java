@@ -14,6 +14,7 @@ import xyz.zcraft.seira.command.AttachmentHandler;
 import xyz.zcraft.seira.command.InteractionHandler;
 import xyz.zcraft.seira.command.route.Router;
 import xyz.zcraft.seira.config.AppConfig;
+import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.discord.DiscordBridgeService;
 import xyz.zcraft.seira.discord.QqIncomingMessage;
 import xyz.zcraft.seira.interaction.data.InteractionEvent;
@@ -147,7 +148,27 @@ public class WSClient extends WebSocketClient {
             onGroupMsg(payload);
         } else if ("INTERACTION_CREATE".equals(eventType)) {
             onInteraction(payload);
+        } else if ("GROUP_MEMBER_REMOVE".equals(eventType)) {
+            onGroupMemberRemove(payload);
+        } else if ("GROUP_MEMBER_ADD".equals(eventType)) {
+            onGroupMemberAdd(payload);
         }
+    }
+
+    private void onGroupMemberAdd(JsonObject payload) {
+        final JsonObject data = payload.get("d").getAsJsonObject();
+        final String groupOpenid = data.get("group_openid").getAsString();
+        final String memberOpenid = data.get("member_openid").getAsString();
+
+        UserDataStore.upsertGroupMember(groupOpenid, memberOpenid);
+    }
+
+    private void onGroupMemberRemove(JsonObject payload) {
+        final JsonObject data = payload.get("d").getAsJsonObject();
+        final String groupOpenid = data.get("group_openid").getAsString();
+        final String memberOpenid = data.get("member_openid").getAsString();
+
+        UserDataStore.upsertGroupMember(groupOpenid, memberOpenid);
     }
 
     private void onInteraction(JsonObject payload) {
@@ -325,7 +346,7 @@ public class WSClient extends WebSocketClient {
             AUDIO_ACTION (1 << 29)
             PUBLIC_GUILD_MESSAGES (1 << 30) // 消息事件，此为公域的消息事件
          */
-        data.addProperty("intents", 1 << 25 | 1 << 26 | 1 << 28 | 1 << 30);
+        data.addProperty("intents", 1 << 25 | 1 << 26 | 1 << 28 | 1 << 30 | 1 << 24);
 
         JsonObject payload = new JsonObject();
         payload.addProperty("op", 2);
