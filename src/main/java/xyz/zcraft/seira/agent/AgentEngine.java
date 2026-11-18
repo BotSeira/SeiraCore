@@ -8,6 +8,7 @@ import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.bot.data.Attachment;
 import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
+import xyz.zcraft.seira.config.AgentConfig;
 import xyz.zcraft.seira.db.UserDataStore;
 
 import java.io.IOException;
@@ -40,9 +41,10 @@ public final class AgentEngine implements AutoCloseable {
     private final ConversationStore store;
     private final Predicate<String> allowed;
     private boolean closed;
+    private final AgentConfig config;
 
     public AgentEngine(
-            ResponsesClient client, ToolRegistry tools,
+            AgentConfig config, ResponsesClient client, ToolRegistry tools,
             Supplier<String> instructions, ConversationStore store, Predicate<String> allowed
     ) {
         this.client = Objects.requireNonNull(client);
@@ -50,6 +52,7 @@ public final class AgentEngine implements AutoCloseable {
         this.instructions = Objects.requireNonNull(instructions);
         this.store = Objects.requireNonNull(store);
         this.allowed = Objects.requireNonNull(allowed);
+        this.config = Objects.requireNonNull(config);
     }
 
     static String renderMentions(String text, Map<String, String> participants, LongFunction<Optional<String>> findGroupMember) {
@@ -310,7 +313,7 @@ public final class AgentEngine implements AutoCloseable {
                 };
                 JsonObject response;
                 JsonArray requestInput = input;
-                String previousId = session.localContext ? null : session.previousId;
+                String previousId = (session.localContext || !config.usePreviousResponseId()) ? null : session.previousId;
                 if (session.localContext) {
                     requestInput = rebuildInput(baseHistory, transcript, input);
                 } else if (previousId == null && !session.history.isEmpty()) {

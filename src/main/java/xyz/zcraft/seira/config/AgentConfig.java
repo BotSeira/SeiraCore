@@ -8,6 +8,7 @@ public record AgentConfig(
         String promptFile,
         String toolsFile,
         int timeoutSeconds,
+        boolean usePreviousResponseId,
         AgentProxyConfig proxy,
         LLMSettings settings
 ) {

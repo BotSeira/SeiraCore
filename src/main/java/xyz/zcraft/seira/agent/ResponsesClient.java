@@ -130,7 +130,7 @@ public final class ResponsesClient {
                 } catch (RuntimeException ignored) {
                     details = new JsonObject();
                 }
-                throw new ResponseException("Responses HTTP status " + response.statusCode() + ", " + line, details);
+                throw new ResponseException("Responses HTTP status " + response.statusCode() + ", " + line, response.statusCode(), details);
             }
 
             var deadline = CompletableFuture.delayedExecutor(timeout.toMillis(), TimeUnit.MILLISECONDS);
@@ -181,7 +181,7 @@ public final class ResponsesClient {
                                 return event.getAsJsonObject("response");
                             }
                             case "response.failed", "response.incomplete", "error" ->
-                                    throw new ResponseException("Responses request did not complete: " + event, event);
+                                    throw new ResponseException("Responses request did not complete: " + event, response.statusCode(), event);
                         }
                     }
                 }
@@ -195,9 +195,13 @@ public final class ResponsesClient {
 
     static final class ResponseException extends IOException {
         private final String code;
+        private final int statusCode;
+        private final String detail;
 
-        ResponseException(String message, JsonObject event) {
+        ResponseException(String message, int statusCode, JsonObject event) {
             super(message);
+            this.statusCode = statusCode;
+            this.detail = event.toString();
             JsonObject details = event;
             if (details.has("response") && details.get("response").isJsonObject())
                 details = details.getAsJsonObject("response");
@@ -208,7 +212,8 @@ public final class ResponsesClient {
         }
 
         boolean previousResponseMissing() {
-            return "previous_response_not_found".equals(code);
+            return "previous_response_not_found".equals(code)
+                    || (statusCode == 404 && detail.contains("previous_response_id"));
         }
     }
 

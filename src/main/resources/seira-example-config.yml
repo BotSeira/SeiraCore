@@ -102,6 +102,7 @@ agent:
   promptFile: "agent-prompt.md"
   toolsFile: "agent-tools.yml"
   timeoutSeconds: 120
+  usePreviousResponseId: true
   proxy:
     enabled: false
     host: "127.0.0.1"

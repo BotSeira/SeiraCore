@@ -50,6 +50,7 @@ public final class AgentChatHandler implements AutoCloseable {
                 ServiceToolDefinitions.register(new ServiceTools(tools, ostella, asteroid, osuToken));
                 reload();
                 engine = new AgentEngine(
+                        settings,
                         new ResponsesClient(settings),
                         tools,
                         () -> prompt,
