@@ -264,6 +264,7 @@ public class Router {
                 .register(aiChatHandler::handleAi, "ai")
                 .register(minecraftCommands::handleMc, "mc")
                 .register(minecraftCommands::handleMcBind, "mcbind")
+                .register(generalCommands::handleBurningText, "burning")
                 .build();
     }
 

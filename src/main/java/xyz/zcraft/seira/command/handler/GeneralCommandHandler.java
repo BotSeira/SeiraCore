@@ -208,4 +208,16 @@ public final class GeneralCommandHandler {
             ctx.sendReply(replyFactory.userInfoShortMessage(ctx, user));
         }
     }
+
+    public void handleBurningText(Context ctx) {
+        if (ctx.argumentCount() == 0) {
+            ctx.sendReply(at(ctx) + "用法：/burning <文字>");
+            return;
+        }
+
+        try (var _ = taskCoordinator.beginRequest(ctx, "Burning Text")) {
+            final byte[] burningText = AsteroidApi.getBurningText(ctx.query());
+            ctx.sendReply(PendingMessage.ofImageBase64(Base64.getEncoder().encodeToString(burningText)));
+        }
+    }
 }
