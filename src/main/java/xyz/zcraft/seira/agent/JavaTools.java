@@ -84,6 +84,78 @@ class JavaTools {
         );
 
         registry.register(new ToolRegistry.Tool(
+                "edit_image",
+                "根据提示词修改指定 URL 的图片并发送到当前会话。",
+                ToolSchema.object()
+                        .property("prompt", ToolSchema.string().description("图片修改要求"))
+                        .property("image_url", ToolSchema.string().description("待修改图片的 HTTP(S) URL"))
+                        .required("prompt", "image_url")
+                        .additionalProperties(false)
+                        .toJson(),
+                Set.of(),
+                Duration.ofSeconds(config.timeoutSeconds()).plusSeconds(5),
+                (args, context) -> {
+                    if (config.models().edit() == null) {
+                        return GSON.toJsonTree(Map.of("error", "Image edit model is not configured"));
+                    }
+
+                    String prompt = args.get("prompt").getAsString();
+                    if (prompt.isBlank()) throw new IllegalArgumentException("Prompt is required");
+                    String model = config.models().edit();
+                    if (model == null || model.isBlank()) {
+                        throw new IllegalStateException("Image edit model is not configured");
+                    }
+                    JsonObject body = new JsonObject();
+                    body.addProperty("model", model);
+                    body.addProperty("prompt", prompt);
+                    body.addProperty("n", 1);
+                    String imageUrl = args.get("image_url").getAsString();
+                    URI imageUri = URI.create(imageUrl);
+                    if (!"http".equalsIgnoreCase(imageUri.getScheme()) && !"https".equalsIgnoreCase(imageUri.getScheme())) {
+                        throw new IllegalArgumentException("Image URL must use HTTP(S)");
+                    }
+                    JsonObject inputImage = new JsonObject();
+                    inputImage.addProperty("image_url", imageUrl);
+                    JsonArray images = new JsonArray();
+                    images.add(inputImage);
+                    body.add("images", images);
+                    Duration timeout = Duration.ofSeconds(config.timeoutSeconds());
+                    ProxySelector proxy = config.proxy().enabled()
+                            ? ProxySelector.of(new InetSocketAddress(config.proxy().host(), config.proxy().port()))
+                            : ProxySelector.getDefault();
+                    URI endpoint = URI.create(config.endpoint().replaceAll("/+$", "") + "/images/edits");
+                    HttpRequest request = HttpRequest.newBuilder(endpoint).timeout(timeout)
+                            .header("Authorization", "Bearer " + config.apiKey())
+                            .header("Content-Type", "application/json")
+                            .POST(HttpRequest.BodyPublishers.ofString(body.toString())).build();
+                    try (HttpClient client = HttpClient.newBuilder().connectTimeout(timeout).proxy(proxy).build()) {
+                        var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                        if (response.statusCode() / 100 != 2) {
+                            throw new IllegalStateException("Image edit HTTP status " + response.statusCode());
+                        }
+                        JsonArray data = JsonParser.parseString(response.body()).getAsJsonObject().getAsJsonArray("data");
+                        if (data == null || data.isEmpty()) {
+                            throw new IllegalStateException("Image edit returned no image");
+                        }
+                        JsonObject image = data.get(0).getAsJsonObject();
+                        PendingMessage message;
+                        if (image.has("b64_json") && !image.get("b64_json").isJsonNull()
+                                && !image.get("b64_json").getAsString().isBlank()) {
+                            message = PendingMessage.ofImageBase64(image.get("b64_json").getAsString());
+                        } else if (image.has("url") && !image.get("url").isJsonNull()
+                                && !image.get("url").getAsString().isBlank()) {
+                            message = PendingMessage.ofFileUrl(image.get("url").getAsString());
+                            message.setFileType(PendingMessage.FILE_TYPE_IMAGE);
+                        } else {
+                            throw new IllegalStateException("Image edit returned no image data or URL");
+                        }
+                        context.notice().accept(message);
+                        return GSON.toJsonTree(Map.of("sent", true));
+                    }
+                })
+        );
+
+        registry.register(new ToolRegistry.Tool(
                         "get_osu_binding",
                         "查询本群会话参与者绑定的 osu! UID；未绑定时返回 null。",
                         ToolSchema.object()

@@ -454,6 +454,8 @@ public final class AgentEngine implements AutoCloseable {
 //            metadata.addProperty("context_only", reply == null);
             if (participants != null) enrichUsers(metadata, this, participants, names);
 
+            metadata.add("attachments", GSON.toJsonTree(attachments));
+
             var item = new JsonObject();
             item.addProperty("role", "user");
             if (attachments.isEmpty()) {
@@ -474,7 +476,8 @@ public final class AgentEngine implements AutoCloseable {
                 if (type.startsWith("image/")) {
                     var image = new JsonObject();
                     image.addProperty("type", "input_image");
-                    String dataUrl = ImageCache.dataUrl(attachment);
+//                    String dataUrl = ImageCache.dataUrl(attachment);
+                    String dataUrl = attachment.url();
                     if (dataUrl == null) {
                         var missing = new JsonObject();
                         missing.addProperty("type", "input_text");
