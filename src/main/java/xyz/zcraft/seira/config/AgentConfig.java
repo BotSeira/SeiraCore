@@ -10,7 +10,8 @@ public record AgentConfig(
         int timeoutSeconds,
         boolean usePreviousResponseId,
         AgentProxyConfig proxy,
-        LLMSettings settings
+        LLMSettings settings,
+        Usages usages
 ) {
     public record Models (
             String chat,
@@ -19,4 +20,13 @@ public record AgentConfig(
             String edit,
             String embedding
     ){}
+
+    public record Usages(
+            boolean enabled,
+            String endpoint,
+            String path,
+            double rate,
+            String unit
+    ) {
+    }
 }

@@ -107,6 +107,13 @@ agent:
     enabled: false
     host: "127.0.0.1"
     port: 7890
+  # 是否提供余额查询功能
+  usages:
+    enabled: true
+    endpoint: "/api/usage/token"
+    path: "data.user_quota.total_available"
+    rate: 500000
+    unit: "积分"
   settings:
     # 以下参数省略或设为 null 时不发送；修改后需重启，/ai reload 仅重载提示词和工具。
     # 参数支持情况取决于模型和供应商；不支持时保持 null。
