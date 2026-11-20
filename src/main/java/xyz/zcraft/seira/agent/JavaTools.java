@@ -473,10 +473,10 @@ class JavaTools {
                         final double unitValue = value / config.usages().rate();
 
                         return GSON.toJsonTree(Map.of(
-                                "value", value,
-                                "unitRate", config.usages().rate(),
-                                "unitValue", unitValue,
-                                "unit", config.usages().unit()
+                                "units", unitValue,
+                                "unitName", config.usages().unit(),
+                                "tokensPerUnit", config.usages().rate(),
+                                "tokens", value
                         ));
                     }
                 })
