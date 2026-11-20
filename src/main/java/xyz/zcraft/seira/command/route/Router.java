@@ -358,6 +358,8 @@ public class Router {
                 rawContent = rawContent.substring(selfAt.length()).trim();
             }
 
+            msgToRecord = Resolver.parseQqMeme(msgToRecord);
+
             final QQUser qqUser = selfSupplier.get();
             if (qqUser != null) {
                 final String selfLiteralAt = "@" + qqUser.username();

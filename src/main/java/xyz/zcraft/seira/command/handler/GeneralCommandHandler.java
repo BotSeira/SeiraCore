@@ -216,7 +216,7 @@ public final class GeneralCommandHandler {
         }
 
         try (var _ = taskCoordinator.beginRequest(ctx, "Burning Text")) {
-            final byte[] burningText = AsteroidApi.getBurningText(ctx.query());
+            final byte[] burningText = AsteroidApi.getBurningText(Resolver.parseQqMeme(ctx.query()));
             ctx.sendReply(PendingMessage.ofImageBase64(Base64.getEncoder().encodeToString(burningText)));
         }
     }
