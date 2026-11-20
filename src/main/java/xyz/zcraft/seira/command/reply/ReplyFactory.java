@@ -252,7 +252,7 @@ public final class ReplyFactory {
 
     public PendingMessage bpMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                at(ctx) + "查询完成，共" + response.getScoreIds().size() + "个成绩\n" +
+                at(ctx) + "共" + response.getScoreIds().size() + "个成绩\n" +
                         "> 玩家: " + u(response.getUserId()),
                 buttons().bpButtons(response.getUserId())
         );
@@ -260,7 +260,7 @@ public final class ReplyFactory {
 
     public PendingMessage rsMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                at(ctx) + "查询完成，共" + response.getScoreIds().size() + "个成绩\n" +
+                at(ctx) + "共" + response.getScoreIds().size() + "个成绩\n" +
                         "> 玩家: " + u(response.getUserId()),
                 buttons().rsButtons()
         );
@@ -268,7 +268,7 @@ public final class ReplyFactory {
 
     public PendingMessage userInfoMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                at(ctx) + "玩家资料查询完成\n" +
+                at(ctx) + "玩家资料\n" +
                         "> 玩家: " + u(response.getUserId()),
                 buttons().userInfoButtons(response.getUserId())
         );
@@ -285,8 +285,8 @@ public final class ReplyFactory {
 
     public PendingMessage beatmapMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                at(ctx) + "谱面 " + m(response.getBeatmapId()) + "\n" +
-                        "> 谱面集: " + ms(response.getBeatmapsetId()),
+                at(ctx) + "Map " + m(response.getBeatmapId()) +
+                        " - Set " + ms(response.getBeatmapsetId()),
                 buttons().beatmapButtons(response.getBeatmapId())
         );
 
@@ -294,18 +294,14 @@ public final class ReplyFactory {
 
     public PendingMessage scoreMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                at(ctx) + "成绩查询完成\n" +
-                        "> 谱面: " + m(response.getBeatmapId()) + "\n" +
-                        "> 成绩: " + s(response.getScoreId()),
+                at(ctx) + "成绩 " + s(response.getScoreId()) + " @ " + m(response.getBeatmapId()),
                 buttons().sButtons(response.getBeatmapId(), response.getScoreId())
         );
     }
 
     public PendingMessage scoreAnalyzeMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                at(ctx) + "成绩分析完成\n" +
-                        "> 谱面: " + m(response.getBeatmapId()) + "\n" +
-                        "> 成绩: " + s(response.getScoreId()),
+                at(ctx) + "成绩分析(" + s(response.getScoreId()) +  ")",
                 buttons().saButtons(response.getBeatmapId(), response.getScoreId())
         );
     }

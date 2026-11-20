@@ -58,14 +58,15 @@ public final class GeneralCommandHandler {
         this.adminAuthorizer = adminAuthorizer;
     }
 
-    public void handleUserInfo(Context context) {
-        String player = resolver.player(context.argumentCount() == 0 ? null : context.argument(0), context.senderUserId());
+    public void handleUserInfo(Context ctx) {
+        String player = resolver.player(ctx.argumentCount() == 0 ? null : ctx.argument(0), ctx.senderUserId());
 
-        try (var _ = taskCoordinator.beginRequest(context, "User Info")) {
+        try (var _ = taskCoordinator.beginRequest(ctx, "User Info")) {
             long uid = OstellaApi.resolveUid(player);
             var response = OstellaApi.getUserInfoResponse(uid);
-            var completion = replyFactory.userInfoMessage(context, response);
-            context.sendReply(taskCoordinator.imageMessage(response, completion));
+            ctx.sendReply(PendingMessage.ofImageBase64(response.getContent().toBase64()));
+//            var completion = replyFactory.userInfoMessage(context, response);
+//            context.sendReply(taskCoordinator.imageMessage(response, completion));
         }
     }
 

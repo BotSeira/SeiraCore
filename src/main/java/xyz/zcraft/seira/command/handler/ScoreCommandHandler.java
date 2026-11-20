@@ -138,7 +138,8 @@ public final class ScoreCommandHandler {
                     filters.filters()
             );
 //            collectChallengeScores(ctx, response);
-            ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.bpMessage(ctx, response)));
+            ctx.sendReply(PendingMessage.ofImageBase64(response.getContent().toBase64()));
+//            ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.bpMessage(ctx, response)));
         }
     }
 
@@ -178,7 +179,8 @@ public final class ScoreCommandHandler {
                     uid
             );
 
-            ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.bpMessage(ctx, response)));
+            ctx.sendReply(PendingMessage.ofImageBase64(response.getContent().toBase64()));
+//            ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.bpMessage(ctx, response)));
         }
     }
 
@@ -245,7 +247,8 @@ public final class ScoreCommandHandler {
                     filters.filters()
             );
 //            collectChallengeScores(ctx, response);
-            ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.rsMessage(ctx, response)));
+            ctx.sendReply(PendingMessage.ofImageBase64(response.getContent().toBase64()));
+//            ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.rsMessage(ctx, response)));
         }
     }
 
@@ -261,7 +264,8 @@ public final class ScoreCommandHandler {
             long uid = OstellaApi.resolveUid(player);
             var response = OstellaApi.getTodayBestResponse(uid, request.days());
 //            collectChallengeScores(ctx, response);
-            ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.tbMessage(ctx, response)));
+//            ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.tbMessage(ctx, response)));
+            ctx.sendReply(PendingMessage.ofImageBase64(response.getContent().toBase64()));
         }
     }
 
