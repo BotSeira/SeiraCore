@@ -31,15 +31,15 @@ public final class ResponsesClient {
     private final HttpClient CLIENT;
     private final URI endpoint;
     private final String apiKey;
-    private final String model;
+    private final AgentConfig.Models models;
     private final Duration timeout;
     private final AgentConfig config;
 
     public ResponsesClient(AgentConfig config) {
         this.config = config;
-        this.endpoint = URI.create(config.endpoint());
+        this.endpoint = URI.create(config.endpoint().replaceAll("/+$", "") + "/responses");
         this.apiKey = config.apiKey();
-        this.model = config.model();
+        this.models = config.models();
         this.timeout = Duration.ofSeconds(config.timeoutSeconds());
         final ProxySelector proxySelector = config.proxy().enabled()
                 ? ProxySelector.of(new InetSocketAddress(config.proxy().host(), config.proxy().port()))
@@ -51,7 +51,7 @@ public final class ResponsesClient {
             String previousId, String instructions, JsonArray input, JsonArray tools, Consumer<String> onMessage, UUID sessionUuid
     ) throws Exception {
         JsonObject body = new JsonObject();
-        body.addProperty("model", model);
+        body.addProperty("model", models.chat());
         body.addProperty("instructions", instructions);
         body.addProperty("stream", true);
         body.addProperty("store", true);
@@ -98,7 +98,7 @@ public final class ResponsesClient {
             cpy.addProperty("instructions", "...");
         }
         agentLogger.debug("Session {} sending request {}", sessionUuid, requestUuid);
-        requestLogger.debug("SESSION {} REQUEST {} {}", sessionUuid, requestUuid, cpy);
+        requestLogger.debug("SESSION {} REQUEST {} BODY {}", sessionUuid, requestUuid, cpy);
 
         HttpRequest request = HttpRequest.newBuilder(endpoint).timeout(timeout)
                 .header("Authorization", "Bearer " + apiKey)
@@ -130,7 +130,7 @@ public final class ResponsesClient {
                 } catch (RuntimeException ignored) {
                     details = new JsonObject();
                 }
-                throw new ResponseException("Responses HTTP status " + response.statusCode() + ", " + line, details);
+                throw new ResponseException("Responses HTTP status " + response.statusCode() + ", " + line, response.statusCode(), details);
             }
 
             var deadline = CompletableFuture.delayedExecutor(timeout.toMillis(), TimeUnit.MILLISECONDS);
@@ -181,7 +181,7 @@ public final class ResponsesClient {
                                 return event.getAsJsonObject("response");
                             }
                             case "response.failed", "response.incomplete", "error" ->
-                                    throw new ResponseException("Responses request did not complete: " + event, event);
+                                    throw new ResponseException("Responses request did not complete: " + event, response.statusCode(), event);
                         }
                     }
                 }
@@ -195,9 +195,13 @@ public final class ResponsesClient {
 
     static final class ResponseException extends IOException {
         private final String code;
+        private final int statusCode;
+        private final String detail;
 
-        ResponseException(String message, JsonObject event) {
+        ResponseException(String message, int statusCode, JsonObject event) {
             super(message);
+            this.statusCode = statusCode;
+            this.detail = event.toString();
             JsonObject details = event;
             if (details.has("response") && details.get("response").isJsonObject())
                 details = details.getAsJsonObject("response");
@@ -208,7 +212,8 @@ public final class ResponsesClient {
         }
 
         boolean previousResponseMissing() {
-            return "previous_response_not_found".equals(code);
+            return "previous_response_not_found".equals(code)
+                    || (statusCode == 404 && detail.contains("previous_response_id"));
         }
     }
 

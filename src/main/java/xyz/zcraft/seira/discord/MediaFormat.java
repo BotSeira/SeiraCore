@@ -4,9 +4,6 @@ import java.util.Locale;
 import java.util.Optional;
 
 final class MediaFormat {
-    private MediaFormat() {
-    }
-
     static Optional<String> detectContentType(byte[] data) {
         if (startsWith(data, "GIF87a") || startsWith(data, "GIF89a")) return Optional.of("image/gif");
         if (data.length >= 8

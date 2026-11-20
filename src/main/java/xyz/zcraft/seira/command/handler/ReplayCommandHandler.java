@@ -2,7 +2,7 @@ package xyz.zcraft.seira.command.handler;
 
 import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.ReplayResultStore;
 import xyz.zcraft.seira.command.TargetHistory;
@@ -50,7 +50,7 @@ public final class ReplayCommandHandler {
         this.adminAuthorizer = adminAuthorizer;
     }
 
-    public void handleR(Context ctx) {
+    public void handleReplayRender(Context ctx) {
         var target = ctx.argumentCount() == 0 || TimeDurationParser.isTimeRange(ctx.argument(0))
                 ? TargetInput.memory() : TargetInput.readScoreTarget(ctx.args());
         var remembered = history.get(ctx);
@@ -84,7 +84,7 @@ public final class ReplayCommandHandler {
         }
     }
 
-    public void handleRsc(Context ctx) {
+    public void handleShowcaseRender(Context ctx) {
         if (ctx.groupId() == null || ctx.groupId().isBlank()) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "/rsc 仅支持群聊使用。"));
             return;
@@ -167,7 +167,7 @@ public final class ReplayCommandHandler {
         }
     }
 
-    public void handleRstat(Context ctx) {
+    public void handleRenderStat(Context ctx) {
         if (ctx.args().length != 1 && ctx.args().length != 0) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/rstat [任务ID]"));
             return;
@@ -188,7 +188,7 @@ public final class ReplayCommandHandler {
         ctx.sendReply(replyFactory.replayStatMessage(ctx, jobId, OstellaApi.getRenderStat(jobId)));
     }
 
-    public void handleRget(Context ctx) {
+    public void handleRenderGet(Context ctx) {
         if (ctx.args().length != 1 && ctx.args().length != 0) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/rget [任务ID]"));
             return;
@@ -215,7 +215,7 @@ public final class ReplayCommandHandler {
         }
     }
 
-    public void handleRcancel(Context ctx) {
+    public void handleRenderCancel(Context ctx) {
         if (ctx.args().length != 1) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.RCANCEL));
             return;

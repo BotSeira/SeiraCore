@@ -45,7 +45,8 @@ public final class RuntimeConfig {
                 oldSeira.watchIntervalMinutes(),
                 oldSeira.multiplayerWatchIntervalSeconds(),
                 newSeira.debugMode(),
-                newSeira.adminIds() == null ? List.of() : List.copyOf(newSeira.adminIds())
+                newSeira.adminIds() == null ? List.of() : List.copyOf(newSeira.adminIds()),
+                newSeira.exceptionReports()
         );
         return new AppConfig(
                 effectiveSeira,

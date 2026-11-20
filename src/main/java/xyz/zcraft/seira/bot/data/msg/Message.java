@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.bot.data;
+package xyz.zcraft.seira.bot.data.msg;
 
 import com.google.gson.JsonObject;
 import com.google.gson.annotations.SerializedName;
@@ -6,6 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import xyz.zcraft.seira.bot.data.FileInfo;
 
 @Data
 @Builder
@@ -18,6 +19,7 @@ public class Message {
     private int msgType;
 
     private MessageMarkdown markdown;
+    private JsonObject card;
 
     private JsonObject keyboard;
 

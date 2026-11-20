@@ -1,11 +1,17 @@
 package xyz.zcraft.seira.agent;
 
 import xyz.zcraft.seira.bot.data.Attachment;
+
 import java.net.URI;
-import java.net.http.*;
-import java.nio.file.*;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
-import java.util.*;
+import java.util.Base64;
+import java.util.Comparator;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -23,11 +29,15 @@ final class ImageCache {
         var response = HTTP.send(request, HttpResponse.BodyHandlers.ofInputStream());
         try (var body = response.body()) {
             CompletableFuture.delayedExecutor(20, TimeUnit.SECONDS).execute(() -> {
-                try { body.close(); } catch (Exception ignored) { }
+                try {
+                    body.close();
+                } catch (Exception ignored) {
+                }
             });
             if (response.statusCode() != 200) throw new java.io.IOException("Image download failed");
             bytes = body.readNBytes(MAX_IMAGE + 1);
-            if (bytes.length == 0 || bytes.length > MAX_IMAGE) throw new java.io.IOException("Image size exceeds limit");
+            if (bytes.length == 0 || bytes.length > MAX_IMAGE)
+                throw new java.io.IOException("Image size exceeds limit");
         }
         Path path = ROOT.resolve(UUID.randomUUID() + ".image");
         synchronized (ImageCache.class) {

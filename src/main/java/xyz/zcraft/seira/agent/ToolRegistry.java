@@ -1,60 +1,43 @@
 package xyz.zcraft.seira.agent;
 
 import com.google.gson.*;
+import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.seira.bot.data.FileInfo;
+import xyz.zcraft.seira.bot.data.FileUploader;
+import xyz.zcraft.seira.bot.data.msg.Button;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
+import xyz.zcraft.seira.util.TokenManager;
 
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 public final class ToolRegistry implements AutoCloseable {
     private static final Logger requestLogger = LogManager.getLogger("AgentRequestsLogger");
     private static final Logger agentLogger = LogManager.getLogger("AgentLogger");
+    @Getter
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
     private final Predicate<String> administrator;
     private final Predicate<String> conversationAllowed;
     private final ConcurrentHashMap<String, Approval> approvals = new ConcurrentHashMap<>();
-    private final Map<String, String> categories = new ConcurrentHashMap<>();
-    private final Map<String, Set<String>> loadedCategories = new ConcurrentHashMap<>();
     private volatile Map<String, Tool> tools = Map.of();
     private Set<String> configuredNames = Set.of();
+    @Getter
+    private final TokenManager tokenManager;
+    @Getter
+    private final FileUploader fileUploader;
 
-    public ToolRegistry() {
-        this(ignored -> false, ignored -> true);
-    }
-
-    public ToolRegistry(Predicate<String> administrator, Predicate<String> conversationAllowed) {
+    public ToolRegistry(Predicate<String> administrator, Predicate<String> conversationAllowed,
+                        TokenManager tokenManager, FileUploader fileUploader) {
         this.administrator = administrator;
         this.conversationAllowed = conversationAllowed;
-        register(new Tool("list_tool_categories", "列出可按需加载的工具分类及可用数量。", ToolSchema.object().additionalProperties(false).toJson(),
-                Set.of(), Duration.ofSeconds(5), (args, context) -> {
-            JsonObject result = new JsonObject();
-            tools.forEach((name, tool) -> {
-                String category = categories.get(name);
-                if (category != null && permits(tool, context)) result.addProperty(category,
-                        result.has(category) ? result.get(category).getAsInt() + 1 : 1);
-            });
-            return result;
-        }));
-        register(new Tool("load_tool_category", "按分类加载完整工具定义，下一次模型请求即可调用。先用 list_tool_categories 获取分类。",
-                ToolSchema.object()
-                        .property("category", ToolSchema.string())
-                        .required("category")
-                        .additionalProperties(false).toJson(),
-                Set.of(), Duration.ofSeconds(5), (args, context) -> {
-            String category = args.get("category").getAsString();
-            JsonObject available = new JsonObject();
-            tools.forEach((name, tool) -> {
-                if (category.equals(categories.get(name)) && permits(tool, context))
-                    available.addProperty(name, tool.description());
-            });
-            if (available.isEmpty()) throw new IllegalArgumentException("Unknown or unavailable category");
-            loadedCategories.computeIfAbsent(context.conversationId(), ignored -> ConcurrentHashMap.newKeySet()).add(category);
-            return available;
-        }));
+        this.tokenManager = tokenManager;
+        this.fileUploader = fileUploader;
     }
 
     public static JsonArray definitions(Map<String, Tool> snapshot) {
@@ -88,19 +71,10 @@ public final class ToolRegistry implements AutoCloseable {
         return error;
     }
 
-    public synchronized void registerDeferred(String category, Tool tool) {
-        register(tool);
-        categories.put(tool.name(), category);
-    }
-
-    public void clearLoaded(String conversationId) {
-        loadedCategories.remove(conversationId);
-    }
-
-    private boolean permits(Tool tool, Context context) {
-        return conversationAllowed.test(context.conversationId())
-                && tool.permits(context)
-                && (!tool.adminOnly() || !context.participants().isEmpty() && context.participants().stream().allMatch(administrator));
+    private boolean permits(Tool tool, ToolContext toolContext) {
+        return conversationAllowed.test(toolContext.conversationId())
+                && tool.permits(toolContext)
+                && (!tool.adminOnly() || !toolContext.participants().isEmpty() && toolContext.participants().stream().allMatch(administrator));
     }
 
     public boolean decide(String token, String group, String user, boolean accept) {
@@ -111,17 +85,22 @@ public final class ToolRegistry implements AutoCloseable {
                 && approval.decision().complete(accept);
     }
 
-    private boolean confirm(Tool tool, JsonObject arguments, Context context) throws Exception {
+    private boolean confirm(Tool tool, JsonObject arguments, ToolContext toolContext) throws Exception {
         String token = UUID.randomUUID().toString();
-        Approval approval = new Approval(context.conversationId(), new CompletableFuture<>());
+        Approval approval = new Approval(toolContext.conversationId(), new CompletableFuture<>());
         approvals.put(token, approval);
 
         try {
             String preview = arguments.toString().replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
             if (preview.length() > 3000) throw new IllegalArgumentException("Confirmation preview too large");
 
-            context.notice().accept("工具 " + tool.name() + " 请求执行，参数：\n" + preview
-                    + "\n根据配置，此操作需要管理员批准喵。\n请管理员在两分钟内发送 /ai confirm " + token + " 或 /ai deny " + token);
+            final PendingMessage t = PendingMessage.ofMarkdownRaw("工具 " + tool.name() + " 请求执行，参数：\n```\n" + preview
+                            + "\n```\n根据配置，此操作需要管理员批准喵。\n请管理员在两分钟内进行授权",
+                    Button.keyboard(
+                            Button.command(1, "拒绝", "/ai deny " + token),
+                            Button.command(2, "批准", "/ai confirm " + token)
+                    ));
+            toolContext.notice().accept(t);
 
             return approval.decision().get(120, TimeUnit.SECONDS);
         } finally {
@@ -152,18 +131,17 @@ public final class ToolRegistry implements AutoCloseable {
         tools = Collections.unmodifiableMap(next);
     }
 
-    public Map<String, Tool> snapshot(Context context) {
+    public Map<String, Tool> snapshot(ToolContext toolContext) {
         var result = new LinkedHashMap<String, Tool>();
         tools.forEach((name, tool) -> {
-            if (permits(tool, context) && (!categories.containsKey(name)
-                    || loadedCategories.getOrDefault(context.conversationId(), Set.of()).contains(categories.get(name)))) {
+            if (permits(tool, toolContext)) {
                 result.put(name, tool);
             }
         });
         return Collections.unmodifiableMap(result);
     }
 
-    public JsonObject execute(JsonObject call, Map<String, Tool> snapshot, Context context, UUID sessionUuid) {
+    public JsonObject execute(JsonObject call, Map<String, Tool> snapshot, ToolContext toolContext, UUID sessionUuid) {
         var output = new JsonObject();
         output.addProperty("type", "function_call_output");
         output.addProperty("call_id", call.get("call_id").getAsString());
@@ -175,25 +153,25 @@ public final class ToolRegistry implements AutoCloseable {
         final UUID uuid = UUID.randomUUID();
 
         try {
-            requestLogger.debug("SESSION {} TOOL_CALL {} {}", sessionUuid, uuid, call);
+            requestLogger.debug("SESSION {} TOOL_CALL {} BODY {}", sessionUuid, uuid, call);
             agentLogger.debug("Session {} calling tool {}", sessionUuid, uuid);
 
             String name = call.get("name").getAsString();
             Tool tool = snapshot.getOrDefault(name, tools.get(name));
-            if (tool == null || !permits(tool, context))
+            if (tool == null || !permits(tool, toolContext))
                 throw new IllegalArgumentException("Tool not found or not permitted.");
 
             JsonObject arguments = JsonParser.parseString(call.get("arguments").getAsString()).getAsJsonObject();
             ToolArguments.validate(tool.parameters(), arguments);
 
-            if (tool.requiresConfirmation() && !confirm(tool, arguments, context)) {
+            if (tool.requiresConfirmation() && !confirm(tool, arguments, toolContext)) {
                 output.addProperty("output", error("CONFIRMATION_DENIED").toString());
                 return output;
             }
 
-            if (!permits(tool, context)) throw new IllegalArgumentException();
+            if (!permits(tool, toolContext)) throw new IllegalArgumentException();
 
-            task = executor.submit(() -> tool.handler().execute(arguments, context));
+            task = executor.submit(() -> tool.handler().execute(arguments, toolContext));
             result = task.get(tool.timeout().toMillis(), TimeUnit.MILLISECONDS);
             if (result == null) result = JsonNull.INSTANCE;
             // if (result.toString().length() > 100_000) result = error("OUTPUT_TOO_LARGE");
@@ -216,7 +194,7 @@ public final class ToolRegistry implements AutoCloseable {
         output.addProperty("output", result.toString());
         org.apache.logging.log4j.LogManager.getLogger(ToolRegistry.class).info(
                 "Agent tool={} conversation={} participants={} durationMs={} error={}",
-                call.get("name").getAsString(), context.conversationId(), context.participants().size(),
+                call.get("name").getAsString(), toolContext.conversationId(), toolContext.participants().size(),
                 TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started),
                 result.isJsonObject() && result.getAsJsonObject().has("error"));
         return output;
@@ -230,23 +208,20 @@ public final class ToolRegistry implements AutoCloseable {
 
     @FunctionalInterface
     public interface Handler {
-        JsonElement execute(JsonObject arguments, Context context) throws Exception;
+        JsonElement execute(JsonObject arguments, ToolContext toolContext) throws Exception;
     }
 
-    public record Context(
+    public record ToolContext(
             String conversationId,
             Set<String> participants,
             Map<String, String> aliases,
-            Consumer<String> notice
+            Map<String, String> names,
+            Consumer<PendingMessage> notice
     ) {
-        public Context(String conversationId, Set<String> participants) {
-            this(conversationId, participants, Map.of(), ignored -> {
-            });
-        }
-
-        public Context {
+        public ToolContext {
             participants = Set.copyOf(participants);
             aliases = Map.copyOf(aliases);
+            names = Map.copyOf(names);
         }
     }
 
@@ -286,8 +261,8 @@ public final class ToolRegistry implements AutoCloseable {
             return parameters.deepCopy();
         }
 
-        boolean permits(Context context) {
-            return groups.isEmpty() || groups.contains(context.conversationId());
+        boolean permits(ToolContext toolContext) {
+            return groups.isEmpty() || groups.contains(toolContext.conversationId());
         }
     }
 

@@ -6,11 +6,16 @@ import com.google.gson.JsonObject;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.bot.data.Attachment;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
+import xyz.zcraft.seira.config.AgentConfig;
 import xyz.zcraft.seira.db.UserDataStore;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutorService;
@@ -27,6 +32,7 @@ public final class AgentEngine implements AutoCloseable {
     private static final Logger requestLogger = LogManager.getLogger("AgentRequestsLogger");
     private static final Logger agentLogger = LogManager.getLogger("AgentLogger");
     private static final Gson GSON = new Gson();
+    private static final int MAX_HISTORY = 32;
     private final Map<String, Session> sessions = new HashMap<>();
     private final ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor();
     private final ResponsesClient client;
@@ -35,9 +41,10 @@ public final class AgentEngine implements AutoCloseable {
     private final ConversationStore store;
     private final Predicate<String> allowed;
     private boolean closed;
+    private final AgentConfig config;
 
     public AgentEngine(
-            ResponsesClient client, ToolRegistry tools,
+            AgentConfig config, ResponsesClient client, ToolRegistry tools,
             Supplier<String> instructions, ConversationStore store, Predicate<String> allowed
     ) {
         this.client = Objects.requireNonNull(client);
@@ -45,6 +52,7 @@ public final class AgentEngine implements AutoCloseable {
         this.instructions = Objects.requireNonNull(instructions);
         this.store = Objects.requireNonNull(store);
         this.allowed = Objects.requireNonNull(allowed);
+        this.config = Objects.requireNonNull(config);
     }
 
     static String renderMentions(String text, Map<String, String> participants, LongFunction<Optional<String>> findGroupMember) {
@@ -133,6 +141,11 @@ public final class AgentEngine implements AutoCloseable {
 
     private static JsonObject textHistory(JsonObject item) {
         var result = new JsonObject();
+        if (item.has("type") && item.get("type").isJsonPrimitive()
+                && "reasoning".equals(item.get("type").getAsString())) {
+            // Skipping reasoning.
+            return null;
+        }
         String role = item.has("role") ? item.get("role").getAsString() : "user";
         result.addProperty("role", role.equals("assistant") ? "assistant" : "user");
         StringBuilder text = new StringBuilder();
@@ -144,9 +157,13 @@ public final class AgentEngine implements AutoCloseable {
                     else if (content.has("image_url")) text.append("[历史图片已省略]\n");
                 }
             } else text.append(item.get("content").getAsString());
-        } else if (item.has("type") && item.get("type").getAsString().startsWith("function_call")) {
-            text.append("[工具执行记录，仅供上下文参考] ").append(item);
-        } else text.append("[非文本输出已省略]");
+//        } else if (item.has("type") && item.get("type").getAsString().startsWith("function_call")) {
+            // ignoring
+//            text.append("[工具执行记录，仅供上下文参考] ").append(item);
+//        } else {
+            // ignoring
+//            text.append("[非文本输出已省略]");
+        }
         result.addProperty("content", text.substring(0, Math.min(text.length(), 8192)));
         return result;
     }
@@ -173,12 +190,15 @@ public final class AgentEngine implements AutoCloseable {
                 loaded.previousId = saved.responseId();
                 loaded.participants.putAll(saved.participants());
                 saved.history().forEach(item -> loaded.history.add(item.getAsJsonObject()));
+
+                while (loaded.history.size() > MAX_HISTORY) {
+                    loaded.history.removeFirst();
+                }
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
             return loaded;
         });
-
     }
 
     public synchronized void rememberNames(String groupId, Map<String, String> names) {
@@ -198,7 +218,7 @@ public final class AgentEngine implements AutoCloseable {
         }
 
         if (message.id() != null) session.received.add(message.id());
-        if (session.received.size() > 1000) session.received.remove(session.received.iterator().next());
+        if (session.received.size() > 100) session.received.remove(session.received.iterator().next());
 
         session.inbox.add(message);
         session.lastUsed = now;
@@ -231,10 +251,21 @@ public final class AgentEngine implements AutoCloseable {
         return true;
     }
 
+    public synchronized boolean resetAll() {
+        try {
+            store.clearAll();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+
+        sessions.clear();
+        return true;
+    }
+
     private void run(String id, Session session) {
         LOG.info("Running session in conversation: {}", id);
         JsonArray input = new JsonArray();
-        Consumer<String> reply = ignored -> {
+        Consumer<PendingMessage> reply = ignored -> {
         };
         int rounds = 0;
         boolean recovered = false;
@@ -246,7 +277,7 @@ public final class AgentEngine implements AutoCloseable {
 
         final UUID sessionUuid = UUID.randomUUID();
         agentLogger.debug("Running session with id {} {}", id, sessionUuid);
-        requestLogger.debug("SESSION {} {}", sessionUuid, GSON.toJsonTree(session));
+        requestLogger.debug("SESSION {} BODY {}", sessionUuid, GSON.toJsonTree(session));
         try {
             while (!Thread.currentThread().isInterrupted()) {
                 synchronized (this) {
@@ -269,20 +300,20 @@ public final class AgentEngine implements AutoCloseable {
                 if (++rounds > 512) throw new IllegalStateException("Agent response limit reached");
                 if (!allowed.test(id)) throw new CancellationException("Conversation disabled");
 
-                var context = new ToolRegistry.Context(id, authors, session.participants, reply);
+                var context = new ToolRegistry.ToolContext(id, authors, session.participants, session.names, reply);
                 var snapshot = tools.snapshot(context);
-                Consumer<String> destination = reply;
+                Consumer<PendingMessage> destination = reply;
 
                 store.clear(id);
 
                 var delivered = new AtomicBoolean();
                 Consumer<String> listener = text -> {
                     delivered.set(true);
-                    destination.accept(renderMentions(text, session.participants, uid -> UserDataStore.findGroupOpenIdByUid(id, uid)));
+                    destination.accept(PendingMessage.ofMarkdownRaw(renderMentions(text, session.participants, uid -> UserDataStore.findGroupOpenIdByUid(id, uid))));
                 };
                 JsonObject response;
                 JsonArray requestInput = input;
-                String previousId = session.localContext ? null : session.previousId;
+                String previousId = (session.localContext || !config.usePreviousResponseId()) ? null : session.previousId;
                 if (session.localContext) {
                     requestInput = rebuildInput(baseHistory, transcript, input);
                 } else if (previousId == null && !session.history.isEmpty()) {
@@ -325,10 +356,17 @@ public final class AgentEngine implements AutoCloseable {
                             || (type.equals("reasoning") && item.has("encrypted_content") && !item.get("encrypted_content").isJsonNull()))
                         transcript.add(item.deepCopy());
                 }
-                for (var value : input) session.history.add(textHistory(value.getAsJsonObject()));
-                for (var value : response.getAsJsonArray("output"))
-                    session.history.add(textHistory(value.getAsJsonObject()));
-                while (session.history.size() > 100) session.history.removeFirst();
+                for (var value : input) {
+                    final JsonObject e = textHistory(value.getAsJsonObject());
+                    if (e == null) continue;
+                    session.history.add(e);
+                }
+                for (var value : response.getAsJsonArray("output")) {
+                    final JsonObject e = textHistory(value.getAsJsonObject());
+                    if (e == null) continue;
+                    session.history.add(e);
+                }
+                while (session.history.size() > MAX_HISTORY) session.history.removeFirst();
 
                 requestLogger.debug("SESSION {} RESPONSE {}", sessionUuid, response);
                 agentLogger.info("Session {} ended for {}", sessionUuid, id);
@@ -372,12 +410,11 @@ public final class AgentEngine implements AutoCloseable {
             LOG.warn("Agent conversation failed: {}", id, error);
 
             try {
-                reply.accept("本次对话出现错误未能完成，请重新发送请求喵。\n>" + error.getMessage());
+                reply.accept(PendingMessage.ofMarkdownRaw("本次对话出现错误未能完成，请重新发送请求喵。\n>" + error.getMessage()));
             } catch (RuntimeException ignored) {
             }
         } finally {
             synchronized (this) {
-                tools.clearLoaded(id);
                 session.running = false;
                 session.lastUsed = System.currentTimeMillis();
 
@@ -397,21 +434,27 @@ public final class AgentEngine implements AutoCloseable {
     }
 
     public record Message(
-            String id, String senderId, String senderName, String text,
-            List<Attachment> attachments, long timestamp, Consumer<String> reply) {
+            String id, String senderId, String senderName, String text, String ref,
+            List<Attachment> attachments, long timestamp, Consumer<PendingMessage> reply) {
         public Message {
             attachments = attachments == null ? List.of() : List.copyOf(attachments);
         }
 
         JsonObject toInput(String alias, Map<String, String> participants, Map<String, String> names) {
             var metadata = new JsonObject();
-            metadata.addProperty("message_id", id);
-            metadata.addProperty("sender_id", alias);
-            metadata.addProperty("sender_name", senderName);
-            metadata.addProperty("timestamp", timestamp);
+//            metadata.addProperty("message_id", id);
+            metadata.addProperty("id", alias);
+            metadata.addProperty("name", senderName);
+            String time = Instant.ofEpochMilli(System.currentTimeMillis())
+                    .atZone(ZoneId.systemDefault())
+                    .format(DateTimeFormatter.ofPattern("HH:mm"));
+            metadata.addProperty("time", time);
+            metadata.addProperty("quote", ref);
             metadata.addProperty("text", text);
-            metadata.addProperty("context_only", reply == null);
+//            metadata.addProperty("context_only", reply == null);
             if (participants != null) enrichUsers(metadata, this, participants, names);
+
+            metadata.add("attachments", GSON.toJsonTree(attachments));
 
             var item = new JsonObject();
             item.addProperty("role", "user");
@@ -433,7 +476,8 @@ public final class AgentEngine implements AutoCloseable {
                 if (type.startsWith("image/")) {
                     var image = new JsonObject();
                     image.addProperty("type", "input_image");
-                    String dataUrl = ImageCache.dataUrl(attachment);
+//                    String dataUrl = ImageCache.dataUrl(attachment);
+                    String dataUrl = attachment.url();
                     if (dataUrl == null) {
                         var missing = new JsonObject();
                         missing.addProperty("type", "input_text");
@@ -466,7 +510,13 @@ public final class AgentEngine implements AutoCloseable {
     private static final class Session {
         final ArrayDeque<JsonObject> history = new ArrayDeque<>();
         final ArrayDeque<Message> inbox = new ArrayDeque<>();
+        /**
+         * Map of participant's open id and alias.
+         */
         final Map<String, String> participants = new LinkedHashMap<>();
+        /**
+         * Map of participant's open id and username.
+         */
         final Map<String, String> names = new HashMap<>();
         final Set<String> received = new LinkedHashSet<>();
         boolean running;

@@ -62,6 +62,7 @@ public final class CommandParser {
         }
 
         String body = normalized.substring(PREFIX.length()).trim();
+        String bodyRaw = body;
         if (body.isEmpty()) {
             return ParseResult.emptyCommand();
         }
@@ -73,7 +74,7 @@ public final class CommandParser {
 
         String[] parts = splitArguments(body);
         String command = parts[0].toLowerCase(Locale.ROOT);
-        String query = body.substring(parts[0].length()).trim();
+        String query = bodyRaw.length() > command.length() ? bodyRaw.substring(command.length()).trim() : "";
         String[] args = Arrays.copyOfRange(parts, 1, parts.length);
 
         return ParseResult.parsed(new Context(senderNickname, senderUserId, groupId, messageId, command, args, rawContent, query, permissionLevel));

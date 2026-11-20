@@ -1,4 +1,4 @@
-package xyz.zcraft.seira.bot.data;
+package xyz.zcraft.seira.bot.data.msg;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.util.List;
+import java.util.Map;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -50,6 +51,7 @@ public class MDMessage extends PendingMessage {
         }
 
         content.add("rows", rows);
+        content.add("style", GSON.toJsonTree(Map.of("font_size", "small")));
         keyboard.add("content", content);
         return keyboard;
     }

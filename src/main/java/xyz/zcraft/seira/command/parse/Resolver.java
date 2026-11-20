@@ -16,7 +16,8 @@ public final class Resolver {
     private static final Map<List<String>, String> ALIASES = Map.of(
             List.of("+", "＋"), "+",
             List.of("~", "～"), "~",
-            List.of("=", "＝"), "="
+            List.of("=", "＝"), "=",
+            List.of("＃", "#"), "#"
     );
     // <faceType=1,faceId="86",ext="eyJ0ZXh0Ijoi5oCE54GrIn0=">
     // <faceType=1,faceId="497",ext="eyJ0ZXh0Ijoi5LyR5YGH5LqGIn0=">

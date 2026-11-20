@@ -1,12 +1,11 @@
 package xyz.zcraft.seira.command.handler;
 
-import xyz.zcraft.seira.bot.data.Button;
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.msg.Button;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.challenge.ChallengeMessages;
 import xyz.zcraft.seira.challenge.ChallengeService;
 import xyz.zcraft.seira.challenge.ChallengeSetupMessages;
 import xyz.zcraft.seira.command.Context;
-import xyz.zcraft.seira.command.TaskCoordinator;
 
 import java.util.Locale;
 import java.util.function.Function;
@@ -14,6 +13,7 @@ import java.util.function.Predicate;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
+@Deprecated
 public final class ChallengeCommandHandler {
     public static final String USAGE = """
             > 用法：/gch configure → 通过按钮设置 → /gch start
@@ -185,9 +185,6 @@ public final class ChallengeCommandHandler {
             }
         } catch (IllegalArgumentException e) {
             ctx.sendReply(at(ctx) + e.getMessage());
-        } catch (Exception e) {
-            org.apache.logging.log4j.LogManager.getLogger(ChallengeCommandHandler.class).error("Failed to handle challenge command", e);
-            ctx.sendReply(at(ctx) + TaskCoordinator.resolveErrorMessage(e));
         }
     }
 

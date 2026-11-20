@@ -1,5 +1,7 @@
 package xyz.zcraft.seira.config;
 
+import java.util.List;
+
 public record SeiraConfig(
         String sqlitePath,
         String directUrl,
@@ -7,7 +9,8 @@ public record SeiraConfig(
         Integer watchIntervalMinutes,
         Integer multiplayerWatchIntervalSeconds,
         boolean debugMode,
-        java.util.List<String> adminIds
+        List<String> adminIds,
+        List<String> exceptionReports
 ) {
     private static final int DEFAULT_WATCH_INTERVAL_MINUTES = 5;
     private static final int DEFAULT_MULTIPLAYER_WATCH_INTERVAL_SECONDS = 30;

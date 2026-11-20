@@ -9,7 +9,7 @@ import xyz.zcraft.seira.api.data.gacha.GachaCardOwn;
 import xyz.zcraft.seira.api.data.gacha.GachaPlayer;
 import xyz.zcraft.seira.api.data.gacha.OsuGacha;
 import xyz.zcraft.seira.bot.MessageSender;
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.TargetHistory;
 import xyz.zcraft.seira.command.TaskCoordinator;
@@ -18,8 +18,9 @@ import xyz.zcraft.seira.command.parse.TargetResolver;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.db.UserDataStore;
 
-import java.io.InputStream;
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
@@ -222,7 +223,7 @@ public class GachaCommandHandler {
             username = resolver.player(ctx.argument(0), null);
         }
 
-        try(var is = URI.create("https://osugacha.com/api/embed/image/badge/%s.png".formatted(username))
+        try (var is = URI.create("https://osugacha.com/api/embed/image/badge/%s.png".formatted(URLEncoder.encode(username, StandardCharsets.UTF_8)))
                 .toURL()
                 .openStream()) {
             final byte[] bytes = is.readAllBytes();

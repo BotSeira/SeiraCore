@@ -2,7 +2,7 @@ package xyz.zcraft.seira.rankguess;
 
 import com.google.gson.JsonObject;
 import org.jetbrains.annotations.NotNull;
-import xyz.zcraft.seira.bot.data.MessageReference;
+import xyz.zcraft.seira.bot.data.msg.MessageReference;
 import xyz.zcraft.seira.db.RankGuessRecordStore;
 import xyz.zcraft.seira.rankguess.data.*;
 

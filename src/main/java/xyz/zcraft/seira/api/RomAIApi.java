@@ -38,7 +38,7 @@ public class RomAIApi {
     public static List<RomAIMatch> getActiveMatches() {
         try {
             final HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create("https://rom-ai-site.vercel.app/api/active-matches"))
+                    .uri(URI.create("https://romai.dev/api/active-matches"))
                     .GET()
                     .build();
 

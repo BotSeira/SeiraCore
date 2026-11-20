@@ -9,8 +9,8 @@ import xyz.zcraft.osu.model.multiplayer.Room;
 import xyz.zcraft.seira.api.AsteroidApi;
 import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.*;
-import xyz.zcraft.seira.bot.data.Button;
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.msg.Button;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.InteractionHandler;
 import xyz.zcraft.seira.config.AppConfig;
@@ -285,7 +285,7 @@ public final class ReplyFactory {
 
     public PendingMessage beatmapMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                at(ctx) + "谱面" + m(response.getBeatmapId()) + "\n" +
+                at(ctx) + "谱面 " + m(response.getBeatmapId()) + "\n" +
                         "> 谱面集: " + ms(response.getBeatmapsetId()),
                 buttons().beatmapButtons(response.getBeatmapId())
         );
@@ -452,9 +452,9 @@ public final class ReplyFactory {
         return PendingMessage.ofMarkdownRaw(Contents.faqContent(ctx));
     }
 
-    public PendingMessage bgpMessage(Context context, Response<?> response) {
+    public PendingMessage mbgMessage(Context context, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                Contents.bgpContent(context, response),
+                Contents.mbgContent(context, response),
                 null
         );
     }
@@ -855,7 +855,7 @@ public final class ReplyFactory {
                     """.trim();
         }
 
-        public static String bgpContent(Context context, Response<?> response) {
+        public static String mbgContent(Context context, Response<?> response) {
             return at(context) + "\n> 背景预览(" + ms(response.getBeatmapsetId()) + " - " + m(response.getBeatmapId()) + ")";
         }
 
@@ -1173,7 +1173,7 @@ public final class ReplyFactory {
             return Button.keyboard(
                     Button.row(
                             // Button.command(1, "查询排行榜", "/lb " + beatmapId),
-                            Button.command(5, "预览", "/bpv " + beatmapId),
+                            Button.command(5, "预览", "/mv " + beatmapId),
                             Button.command(6, "分析", "/bma " + beatmapId),
                             Button.openUrl(2, "打开游戏", directUrl + "/b/" + beatmapId)
                     ),

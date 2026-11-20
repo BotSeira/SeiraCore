@@ -5,7 +5,7 @@ import xyz.zcraft.seira.api.data.Response;
 import xyz.zcraft.seira.api.data.SearchQuery;
 import xyz.zcraft.seira.api.data.SearchResultItem;
 import xyz.zcraft.seira.api.data.VideoRenderRecord;
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.TargetHistory;
 import xyz.zcraft.seira.command.TaskCoordinator;
@@ -55,7 +55,7 @@ public final class BeatmapCommandHandler {
         }
     }
 
-    public void handleM(Context ctx) {
+    public void handleBeatmap(Context ctx) {
         var target = ctx.argumentCount() == 0
                 ? TargetInput.memory() : TargetInput.read(ctx.args());
         var remembered = history.get(ctx);
@@ -105,13 +105,13 @@ public final class BeatmapCommandHandler {
         }
     }
 
-    public void handleBpv(Context ctx) {
+    public void handleBeatmapPreview(Context ctx) {
         var target = ctx.argumentCount() == 0 || ctx.argument(0).startsWith("+") || TimeDurationParser.isTimeRange(ctx.argument(0))
                 ? TargetInput.memory() : TargetInput.read(ctx.args());
         var remembered = history.get(ctx);
         if ((target.kind() == TargetInput.Kind.MEMORY && remembered == null)
                 || ctx.argumentCount() - target.consumedArgs() > 2) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.BPV));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.MV));
             return;
         }
 
@@ -129,7 +129,7 @@ public final class BeatmapCommandHandler {
             } else if (mods == null && !TimeDurationParser.isTimeRange(option)) {
                 mods = option;
             } else {
-                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.BPV));
+                ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.MV));
                 return;
             }
         }
@@ -147,23 +147,23 @@ public final class BeatmapCommandHandler {
         }
     }
 
-    public void handleBgp(Context ctx) {
+    public void handleBeatmapBg(Context ctx) {
         var target = ctx.argumentCount() == 0
                 ? TargetInput.memory() : TargetInput.read(ctx.args());
         var remembered = history.get(ctx);
         if (target.kind() == TargetInput.Kind.MEMORY && remembered == null) {
-            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.BGP));
+            ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + CommandUsage.MBG));
             return;
         }
         try (var _ = taskCoordinator.beginRequest(ctx, "Background Preview")) {
             var ids = targets.beatmap(ctx, target, remembered);
             var response = OstellaApi.getBeatmapBgResponse(ids.beatmapId());
             history.remember(ctx, ids);
-            ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.bgpMessage(ctx, response)));
+            ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.mbgMessage(ctx, response)));
         }
     }
 
-    public void handleDl(Context ctx) {
+    public void handleDownloadSet(Context ctx) {
         var target = ctx.argumentCount() == 0
                 ? TargetInput.memory() : TargetInput.read(ctx.args());
         var remembered = history.get(ctx);
@@ -180,7 +180,7 @@ public final class BeatmapCommandHandler {
         }
     }
 
-    public void handleMs(Context ctx) {
+    public void handleBeatmapset(Context ctx) {
         var target = ctx.argumentCount() == 0
                 ? TargetInput.memory() : TargetInput.read(ctx.args());
         var remembered = history.get(ctx);
@@ -197,7 +197,7 @@ public final class BeatmapCommandHandler {
         }
     }
 
-    public void handleSms(Context ctx) {
+    public void handleSearchSet(Context ctx) {
         final SearchQuery searchQuery = resolver.resolveSearchQuery(ctx.query());
         if (searchQuery == null) {
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + "用法：/sms [#页数] <搜索关键字>"));

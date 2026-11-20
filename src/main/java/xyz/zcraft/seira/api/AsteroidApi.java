@@ -377,6 +377,21 @@ public class AsteroidApi {
         }
     }
 
+    public static byte[] getBurningText(String text) {
+        try {
+            var request = requestBuilder("/burning-text?text=" + URLEncoder.encode(text, StandardCharsets.UTF_8))
+                    .GET()
+                    .build();
+
+            final HttpResponse<byte[]> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofByteArray());
+
+            return response.body();
+        } catch (Exception e) {
+            LOG.error("Failed to burning text gif", e);
+            throw new RuntimeException("获取燃烧文字GIF失败", e);
+        }
+    }
+
     public record ServerStatus(boolean online, String version) {
     }
 }

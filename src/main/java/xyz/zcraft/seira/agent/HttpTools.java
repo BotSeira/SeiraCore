@@ -21,6 +21,7 @@ import java.util.*;
 public final class HttpTools {
     private static final HttpClient HTTP = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(15)).followRedirects(HttpClient.Redirect.NEVER).build();
+    private static final Logger agentLogger = LogManager.getLogger("AgentLogger");
 
     private HttpTools() {
     }
@@ -39,8 +40,6 @@ public final class HttpTools {
 
         registry.replaceConfigured(tools);
     }
-
-    private static final Logger agentLogger = LogManager.getLogger("AgentLogger");
 
     static ToolRegistry.Tool create(JsonObject spec) {
         String pointer = spec.has("resultPointer") ? spec.get("resultPointer").getAsString() : "";

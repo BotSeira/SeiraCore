@@ -1,22 +1,26 @@
 package xyz.zcraft.seira.agent;
 
-import xyz.zcraft.seira.bot.data.Attachment;
-import xyz.zcraft.seira.bot.data.MsgElem;
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.*;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.config.AgentConfig;
+import xyz.zcraft.seira.config.AsteroidConfig;
+import xyz.zcraft.seira.config.OstellaConfig;
 import xyz.zcraft.seira.services.AiPermission;
+import xyz.zcraft.seira.util.ResourceUtil;
+import xyz.zcraft.seira.util.TokenManager;
 
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
+import static xyz.zcraft.seira.command.reply.ReplyFactory.ExternalUrls.CHANNEL;
+import static xyz.zcraft.seira.command.reply.ReplyFactory.ExternalUrls.PERMISSION;
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
 
 public final class AgentChatHandler implements AutoCloseable {
@@ -25,22 +29,28 @@ public final class AgentChatHandler implements AutoCloseable {
     private final AgentConfig settings;
     private final ToolRegistry tools;
     private final AgentEngine engine;
+    private final Function<String, GroupBotState> botStateGetter;
+    private final Set<String> consented = new HashSet<>();
     private volatile String prompt;
-    public AgentChatHandler(Predicate<String> administrator, AgentConfig conf,
-                            java.util.function.Function<String, String> osuToken,
-                            xyz.zcraft.seira.config.OstellaConfig ostella,
-                            xyz.zcraft.seira.config.AsteroidConfig asteroid) {
+
+    public AgentChatHandler(
+            Predicate<String> administrator, AgentConfig conf, Function<String, String> osuToken,
+            OstellaConfig ostella, AsteroidConfig asteroid, Function<String, GroupBotState> botStateGetter,
+            FileUploader groupFileUploader,
+            TokenManager tokenManager) {
         this.administrator = administrator;
-        tools = new ToolRegistry(administrator, this::enabled);
+        tools = new ToolRegistry(administrator, this::enabled, tokenManager, groupFileUploader);
+        this.botStateGetter = botStateGetter;
 
         try {
             settings = conf;
 
             if (settings.enabled()) {
-                JavaTools.register(tools);
+                JavaTools.register(tools, settings);
                 ServiceToolDefinitions.register(new ServiceTools(tools, ostella, asteroid, osuToken));
                 reload();
                 engine = new AgentEngine(
+                        settings,
                         new ResponsesClient(settings),
                         tools,
                         () -> prompt,
@@ -62,31 +72,7 @@ public final class AgentChatHandler implements AutoCloseable {
         return INSTANCE.get();
     }
 
-    private static void sendResponse(Context context, String message) {
-        var matcher = java.util.regex.Pattern.compile("%%\\[file:([^\\r\\n]+?)]%%").matcher(message);
-        var files = new java.util.LinkedHashSet<String>();
-        StringBuilder markdown = new StringBuilder();
-        while (matcher.find()) {
-            URI uri = URI.create(matcher.group(1).trim());
-            if (!("https".equals(uri.getScheme()) || "http".equals(uri.getScheme()))
-                    || uri.getHost() == null || uri.getUserInfo() != null)
-                throw new IllegalArgumentException("Invalid file URL");
-            files.add(uri.toString());
-            matcher.appendReplacement(markdown, "");
-        }
-        matcher.appendTail(markdown);
-        if (files.size() > 3) throw new IllegalArgumentException("Too many files in one message");
-
-        if (!markdown.toString().isBlank()
-                && !context.send(true, PendingMessage.ofMarkdownRaw(markdown.toString())).success())
-            throw new IllegalStateException("Agent message delivery failed");
-        for (String url : files) {
-            if (!context.send(true, PendingMessage.ofFileUrl(url)).success())
-                throw new IllegalStateException("Agent file delivery failed");
-        }
-    }
-
-    static List<Attachment> collectAttachments(List<Attachment> attachments, List<MsgElem> elements) {
+    public static List<Attachment> collectAttachments(List<Attachment> attachments, List<MsgElem> elements) {
         var candidates = new java.util.ArrayList<Attachment>();
         if (attachments != null) candidates.addAll(attachments);
         if (elements != null) {
@@ -95,19 +81,21 @@ public final class AgentChatHandler implements AutoCloseable {
             }
         }
 
-        var captured = new java.util.ArrayList<Attachment>();
-        var seen = new java.util.HashSet<String>();
-        for (Attachment attachment : candidates) {
-            if (attachment == null || !seen.add(attachment.url())) continue;
-            if (attachment.contentType() == null || !attachment.contentType().startsWith("image/")) continue;
-            try {
-                captured.add(ImageCache.capture(attachment));
-            } catch (Exception e) {
-                if (e instanceof InterruptedException) Thread.currentThread().interrupt();
-                captured.add(new Attachment("image/png", attachment.filename(), 0, "unavailable:"));
-            }
-        }
-        return captured;
+        return candidates;
+//
+//        var captured = new java.util.ArrayList<Attachment>();
+//        var seen = new java.util.HashSet<String>();
+//        for (Attachment attachment : candidates) {
+//            if (attachment == null || !seen.add(attachment.url())) continue;
+//            if (attachment.contentType() == null || !attachment.contentType().startsWith("image/")) continue;
+//            try {
+//                captured.add(ImageCache.capture(attachment));
+//            } catch (Exception e) {
+//                if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+//                captured.add(new Attachment("image/png", attachment.filename(), 0, "unavailable:"));
+//            }
+//        }
+//        return captured;
 
 //        var urls = new LinkedHashSet<String>();
 //        for (Attachment attachment : candidates) {
@@ -135,6 +123,15 @@ public final class AgentChatHandler implements AutoCloseable {
 //        }
 
 //        return List.copyOf(urls);
+    }
+
+    public static String getRefContent(List<MsgElem> elements) {
+        return elements.stream()
+                .filter(Objects::nonNull)
+                .filter(e -> e.content() != null && !e.content().isBlank())
+                .findFirst()
+                .map(MsgElem::content)
+                .orElse(null);
     }
 
     private static boolean isImageFilename(String name) {
@@ -166,11 +163,12 @@ public final class AgentChatHandler implements AutoCloseable {
                             ctx.senderUserId(),
                             ctx.senderNickname(),
                             text,
+                            getRefContent(elements),
                             collectAttachments(attachments, elements),
                             System.currentTimeMillis(),
                             message -> {
                                 if (!enabled(ctx.groupId())) return;
-                                sendResponse(ctx, message);
+                                ctx.send(true, message);
                             })
             );
         } catch (java.util.concurrent.RejectedExecutionException e) {
@@ -186,32 +184,38 @@ public final class AgentChatHandler implements AutoCloseable {
         if (text == null || text.isBlank()) return;
 
         engine.accept(groupId, new AgentEngine.Message(messageId, senderId, nickname,
-                text, List.of(), System.currentTimeMillis(), null));
+                text, getRefContent(elements), List.of(), System.currentTimeMillis(), null));
     }
 
     public void rememberNames(String groupId, java.util.Map<String, String> names) {
         if (enabled(groupId)) engine.rememberNames(groupId, names);
     }
 
-    public void handleAi(Context context) {
-        if (!context.inGroup()) {
-            context.sendReply(at(context) + "请在群聊中使用此命令喵。");
+    public void handleAi(Context ctx) {
+        if (!ctx.inGroup()) {
+            ctx.sendReply(at(ctx) + "请在群聊中使用此命令喵。");
             return;
         }
 
-        String action = context.argumentCount() == 0 ? "status" : context.argument(0);
+        String action = ctx.argumentCount() == 0 ? "status" : ctx.argument(0);
+
         if (action.equals("status")) {
-            context.sendReply(at(context) + (engine == null ? "AI 未配置或未启用喵。" : enabled(context.groupId()) ? "本群 Agent 已开启喵。" : "本群 Agent 已关闭喵。"));
+            final boolean b = AiPermission.permits(ctx.groupId());
+            final boolean c = AiPermission.isActivated(ctx.groupId());
+            ctx.sendReply(at(ctx) + "目前AI对话在本群状态\n" +
+                    "> 已授权：" + (b ? "√" : "×") + "\n" +
+                    "> 已启用：" + (c ? "√" : "×")
+            );
             return;
         }
 
-        if (!context.hasAdmin() && !administrator.test(context.senderUserId())) {
-            context.sendReply(at(context) + "此操作需要机器人管理员权限喵。");
+        if (!ctx.hasAdmin() && !administrator.test(ctx.senderUserId())) {
+            ctx.sendReply(at(ctx) + "此操作需要机器人管理员权限喵。");
             return;
         }
 
         if (engine == null) {
-            context.sendReply(at(context) + "AI 未配置或未启用喵。");
+            ctx.sendReply(at(ctx) + "AI 未配置或未启用喵。");
             return;
         }
 
@@ -219,46 +223,101 @@ public final class AgentChatHandler implements AutoCloseable {
             switch (action) {
                 case "confirm", "deny" -> {
                     boolean accepted = (
-                            context.argumentCount() == 2 && tools.decide(
-                                    context.argument(1),
-                                    context.groupId(),
-                                    context.senderUserId(),
+                            ctx.argumentCount() == 2 && tools.decide(
+                                    ctx.argument(1),
+                                    ctx.groupId(),
+                                    ctx.senderUserId(),
                                     action.equals("confirm")
                             )
                     );
-                    context.sendReply(at(context) + (accepted ? "决定已提交喵。" : "确认请求不存在、已处理或已过期喵。"));
+                    ctx.sendReply(at(ctx) + (accepted ? "决定已提交喵。" : "确认请求不存在、已处理或已过期喵。"));
+                    return;
                 }
                 case "grant", "revoke" -> {
-                    if (!administrator.test(context.senderUserId())) {
-                        context.sendReply(at(context) + "此操作需要机器人管理员权限喵。");
+                    if (!administrator.test(ctx.senderUserId())) {
+                        ctx.sendReply(at(ctx) + "此操作需要机器人管理员权限喵。");
                         return;
                     }
-                    if (action.equals("grant")) AiPermission.grant(context.groupId());
-                    else AiPermission.revoke(context.groupId());
-                    context.sendReply(at(context) + "AI 授权已更新喵。");
+                    if (action.equals("grant")) AiPermission.grant(ctx.groupId());
+                    else AiPermission.revoke(ctx.groupId());
+                    ctx.sendReply(at(ctx) + "AI 授权已更新喵。");
+                    return;
                 }
                 case "on", "off" -> {
-                    if (action.equals("on")) AiPermission.activate(context.groupId());
-                    else AiPermission.deactivate(context.groupId());
-
-                    context.sendReply(at(context) + (action.equals("on") ? "本群 AI 聊天已开启喵。" : "本群 AI 聊天已关闭。"));
-                }
-                case "reset" ->
-                        context.sendReply(at(context) + (engine.reset(context.groupId()) ? "已清除本群上下文喵" : "请等待本群当前任务结束后再清除喵。"));
-                case "reload" -> {
-                    if (!administrator.test(context.senderUserId())) {
-                        context.sendReply(at(context) + "此操作需要机器人管理员权限喵。");
+                    if (action.equals("on")) {
+                        final GroupBotState state = botStateGetter.apply(ctx.groupId());
+                        if (state.allowProactiveMsg() && state.receiveMsgSetting() == GroupBotState.ReceiveMsgSetting.ALL) {
+                            if (AiPermission.isActivated(ctx.groupId())) {
+                                ctx.sendReply(at(ctx) + "本群AI已为启用状态喵。");
+                            } else if (AiPermission.permits(ctx.groupId()) && !consented.contains(ctx.groupId())) {
+                                final String terms = ResourceUtil.loadString("/ai-chat-terms.md").orElse("文件加载失败了喵");
+                                ctx.sendReply("> 使用 AI 对话功能即表示群内成员同意并遵守以下条款：\n\n" + terms + "\n\n> 本消息仅展示一次，再次使用 `/ai on` 即可开启 AI 对话。");
+                                consented.add(ctx.groupId());
+                            } else if (AiPermission.permits(ctx.groupId())) {
+                                AiPermission.activate(ctx.groupId());
+                                ctx.sendReply(at(ctx) + "已启用本群AI对话喵。");
+                            } else {
+                                if (administrator.test(ctx.senderUserId())) {
+                                    AiPermission.permits(ctx.groupId());
+                                    AiPermission.activate(ctx.groupId());
+                                    ctx.sendReply(at(ctx) + "已授权并启用本群AI对话喵。");
+                                } else {
+                                    ctx.sendReply(at(ctx) + "本群无此功能权限，请 [联系 Bot 管理员](%s) 喵。".formatted(CHANNEL));
+                                }
+                            }
+                        } else {
+                            ctx.sendReply(PendingMessage.ofMarkdownRaw(
+                                    at(ctx) + "由于本群群主未配置权限或配置不完整，暂无法启用本群AI对话喵。" +
+                                            "权限配置**群主**见[这里](" + PERMISSION + ")~")
+                            );
+                        }
                     } else {
-                        reload();
-                        context.sendReply(at(context) + "AI 聊天已重新加载喵。");
+                        if (AiPermission.isActivated(ctx.groupId())) {
+                            AiPermission.deactivate(ctx.groupId());
+                            ctx.sendReply(at(ctx) + "已禁用本群AI对话喵。");
+                        } else {
+                            ctx.sendReply(at(ctx) + "本群AI对话未启用喵。");
+                        }
+                    }
+                    return;
+                }
+                case "reset" -> {
+                    if (ctx.argumentCount() == 2 && "all".equalsIgnoreCase(ctx.argument(1))) {
+                        if (administrator.test(ctx.senderUserId())) {
+                            ctx.sendReply(at(ctx) + (engine.resetAll() ? "已清除全部上下文喵" : "全部上下文清除失败喵。"));
+                        } else {
+                            ctx.sendReply(at(ctx) + "此操作需要机器人管理员权限喵。");
+                        }
+                        return;
+                    } else if (ctx.argumentCount() == 1) {
+                        ctx.sendReply(at(ctx) + (engine.reset(ctx.groupId()) ? "已清除本群上下文喵" : "请等待本群当前任务结束后再清除喵。"));
+                        return;
                     }
                 }
-                default ->
-                        context.sendReply(at(context) + "用法：/ai status|on|off|grant|revoke|reset|reload，或 /ai confirm|deny TOKEN");
+                case "reload" -> {
+                    if (!administrator.test(ctx.senderUserId())) {
+                        ctx.sendReply(at(ctx) + "此操作需要机器人管理员权限喵。");
+                    } else {
+                        reload();
+                        ctx.sendReply(at(ctx) + "AI 聊天已重新加载喵。");
+                    }
+                    return;
+                }
+                case "legacy" -> {
+                    if (!administrator.test(ctx.senderUserId())) {
+                        ctx.sendReply(at(ctx) + "此操作需要机器人管理员权限喵。");
+                        return;
+                    }
+                    AiPermission.setUseLegacy(!AiPermission.doUseLegacy());
+                    ctx.sendReply(at(ctx) + "已切换到" + (AiPermission.doUseLegacy() ? "旧版" : "新版") + "AI聊天模式喵。");
+                    return;
+                }
             }
+
+            ctx.sendReply(at(ctx) + "用法：/ai status|on|off|grant|revoke|reset|reload，或 /ai confirm|deny TOKEN");
         } catch (Exception e) {
             org.apache.logging.log4j.LogManager.getLogger(AgentChatHandler.class).error("Agent management failed", e);
-            context.sendReply(at(context) + "指令处理失败了喵。\n> " + e.getMessage());
+            ctx.sendReply(at(ctx) + "指令处理失败了喵。\n> " + e.getMessage());
         }
     }
 

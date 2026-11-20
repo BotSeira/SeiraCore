@@ -1,7 +1,7 @@
 package xyz.zcraft.seira.command;
 
 import xyz.zcraft.seira.bot.QQApi;
-import xyz.zcraft.seira.bot.data.Button;
+import xyz.zcraft.seira.bot.data.msg.Button;
 import xyz.zcraft.seira.interaction.InteractionListener;
 import xyz.zcraft.seira.interaction.ListenerRegistry;
 import xyz.zcraft.seira.interaction.data.InteractionEvent;

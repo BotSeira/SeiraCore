@@ -6,7 +6,7 @@ import xyz.zcraft.osu.model.Beatmapset;
 import xyz.zcraft.seira.api.AsteroidApi;
 import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.bot.MessageSender;
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.command.TargetHistory;
 import xyz.zcraft.seira.command.TaskCoordinator;
@@ -22,7 +22,10 @@ import xyz.zcraft.seira.util.dice.expr.DiceExpr;
 import xyz.zcraft.seira.util.dice.result.DiceResult;
 
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
@@ -55,7 +58,7 @@ public final class GeneralCommandHandler {
         this.adminAuthorizer = adminAuthorizer;
     }
 
-    public void handleU(Context context) {
+    public void handleUserInfo(Context context) {
         String player = resolver.player(context.argumentCount() == 0 ? null : context.argument(0), context.senderUserId());
 
         try (var _ = taskCoordinator.beginRequest(context, "User Info")) {
@@ -66,7 +69,7 @@ public final class GeneralCommandHandler {
         }
     }
 
-    public void handleO(Context ctx) {
+    public void handleUserAvatar(Context ctx) {
         final Set<Long> uids = new HashSet<>();
 
         if (ctx.argumentCount() == 0) {
@@ -100,6 +103,10 @@ public final class GeneralCommandHandler {
         }
     }
 
+    private static String roll(String... choices) {
+        return choices[new Random().nextInt(choices.length)];
+    }
+
     public void handleRoll(Context ctx) {
         DiceExpr diceExpr;
 
@@ -113,8 +120,8 @@ public final class GeneralCommandHandler {
         } else {
             try {
                 diceExpr = DiceExpr.parse(ctx.query());
-            } catch (Exception e) {
-                ctx.sendReply(at(ctx) + "无法解析骰子表达式喵。");
+            } catch (Exception _) {
+                tryParseRollSelection(ctx);
                 return;
             }
         }
@@ -127,6 +134,37 @@ public final class GeneralCommandHandler {
 
         final String message = at(ctx) + diceExpr + (Objects.equals(rollResultStr, totalStr) ? "" : " = " + rollResultStr) + " = __" + totalStr + "__";
         ctx.sendReply(message.replace("*", "\\*"));
+    }
+
+    private void tryParseRollSelection(Context ctx) {
+        final String input = ctx.query().trim();
+        final String result;
+
+        Matcher matcher = Pattern.compile("(.+?)不\\1").matcher(input);
+
+        if (matcher.find()) {
+            result = matcher.replaceFirst(roll("", "不") + "$1");
+        } else {
+            String body = input.startsWith("是") ? input.substring(1) : input;
+            String[] options = body.split("还是", -1);
+
+            if (options.length < 2 || Arrays.stream(options).anyMatch(String::isBlank)) {
+                ctx.sendReply(at(ctx) + "无法解析表达式喵。");
+                return;
+            }
+
+            result = options[ThreadLocalRandom.current().nextInt(options.length)].trim();
+        }
+
+        ctx.sendReply(
+                at(ctx) + roll(
+                        "小星觉得应该 %s !",
+                        "不如 %s ?",
+                        "要不然 %s ?",
+                        "当然 %s 啦!",
+                        "还是 %s 吧!"
+                ).formatted(result)
+        );
     }
 
     public void handleLuck(Context context) {
@@ -199,13 +237,25 @@ public final class GeneralCommandHandler {
         context.sendReply(PendingMessage.ofMarkdownRaw(sb.toString()));
     }
 
-    public void handleUx(Context ctx) {
+    public void handleUserStat(Context ctx) {
         String player = resolver.player(ctx.argumentCount() == 0 ? null : ctx.argument(0), ctx.senderUserId());
 
         try (var _ = taskCoordinator.beginRequest(ctx, "User Info Short")) {
             long uid = OstellaApi.resolveUid(player);
             var user = OstellaApi.getUserRaw(uid);
             ctx.sendReply(replyFactory.userInfoShortMessage(ctx, user));
+        }
+    }
+
+    public void handleBurningText(Context ctx) {
+        if (ctx.argumentCount() == 0) {
+            ctx.sendReply(at(ctx) + "用法：/burning <文字>");
+            return;
+        }
+
+        try (var _ = taskCoordinator.beginRequest(ctx, "Burning Text")) {
+            final byte[] burningText = AsteroidApi.getBurningText(Resolver.parseQqMeme(ctx.query()));
+            ctx.sendReply(PendingMessage.ofImageBase64(Base64.getEncoder().encodeToString(burningText)));
         }
     }
 }

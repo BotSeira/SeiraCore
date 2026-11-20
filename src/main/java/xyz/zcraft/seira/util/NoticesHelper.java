@@ -1,6 +1,6 @@
 package xyz.zcraft.seira.util;
 
-import xyz.zcraft.seira.bot.data.PendingMessage;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.data.Notice;
 import xyz.zcraft.seira.db.NoticeTrackerStore;

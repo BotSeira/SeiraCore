@@ -1,7 +1,7 @@
 package xyz.zcraft.seira.rankguess;
 
 import lombok.Getter;
-import xyz.zcraft.seira.bot.data.MessageReference;
+import xyz.zcraft.seira.bot.data.msg.MessageReference;
 import xyz.zcraft.seira.rankguess.data.Guess;
 import xyz.zcraft.seira.rankguess.data.Round;
 import xyz.zcraft.seira.rankguess.data.ScoreMultiplier;

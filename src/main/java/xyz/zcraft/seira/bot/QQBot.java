@@ -124,10 +124,19 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
 
         LOG.info("Initializing agents service");
         var agentAuth = new xyz.zcraft.seira.util.OsuAuthHelper(config.binding());
-        this.agentHandler = new AgentChatHandler(admins::isAdmin, config.agent(), openId -> {
-            var token = agentAuth.updateTokenAndGet(openId);
-            return token == null ? null : token.accessToken();
-        }, config.ostella(), config.asteroid());
+        this.agentHandler = new AgentChatHandler(
+                admins::isAdmin,
+                config.agent(),
+                openId -> {
+                    var token = agentAuth.updateTokenAndGet(openId);
+                    return token == null ? null : token.accessToken();
+                },
+                config.ostella(),
+                config.asteroid(),
+                group -> QQApi.getGroupBotState(tokenManager.getToken(), group),
+                (groupId, url, fileName) -> QQApi.uploadGroupFileByParts(tokenManager.getToken(), groupId, url, fileName),
+                tokenManager
+        );
 
         this.attachmentHandler = new AttachmentHandler(executors.attachmentDownloads());
 
@@ -157,7 +166,8 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                 agentHandler,
                 interactionHandler,
                 bindService,
-                mcMessageService
+                mcMessageService,
+                group -> QQApi.getGroupBotState(tokenManager.getToken(), group)
         );
     }
 

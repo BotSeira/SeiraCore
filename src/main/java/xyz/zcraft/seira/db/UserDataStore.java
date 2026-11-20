@@ -368,6 +368,22 @@ public final class UserDataStore {
         }
     }
 
+    public static void removeGroupMember(String groupId, String openId) {
+        SqliteDatabase.ensureInitialized();
+        String sql = """
+                DELETE FROM group_members
+                WHERE group_id = ? AND open_id = ?
+                """;
+        try (Connection connection = SqliteDatabase.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, groupId);
+            statement.setString(2, openId);
+            statement.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to remove group member", e);
+        }
+    }
+
     public static int clearGroupMember(String openId) {
         SqliteDatabase.ensureInitialized();
         String sql = "DELETE FROM group_members WHERE open_id = ?";

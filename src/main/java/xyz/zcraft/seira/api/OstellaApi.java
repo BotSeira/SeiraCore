@@ -290,6 +290,10 @@ public class OstellaApi {
         return getBase64BytesResponse("/beatmaps/" + beatmapId + (mod != null ? "?mod=" + mod : ""), "获取谱面失败", null);
     }
 
+    public static Response<Base64Bytes> getBeatmapUserScores(long beatmapId, long userId) {
+        return getBase64BytesResponse("/users/%d/scores/beatmaps/%d/all".formatted(userId, beatmapId), "获取谱面成绩失败", null);
+    }
+
     public static Response<Base64Bytes> getBeatmapAnalysisResponse(long beatmapId, String mod) {
         String query = "/beatmaps/" + beatmapId + "/analysis";
         if (mod != null && !mod.isBlank()) {
@@ -461,6 +465,29 @@ public class OstellaApi {
             data.forEach(item -> items.add(GSON.fromJson(item, BatchSearchResult.class)));
 
             return items;
+        } catch (IOException | InterruptedException e) {
+            throw requestFailure(e);
+        }
+    }
+
+    public static int enqueueMetaUpdate(List<BatchSearchQuery> queries) {
+        JsonObject payload = new JsonObject();
+        payload.add("queries", GSON.toJsonTree(queries));
+        try {
+            HttpRequest localRequest = requestBuilder()
+                    .uri(URI.create(ENDPOINT + "/beatmapsets/search/update"))
+                    .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
+                    .build();
+
+            final var send = CLIENT.send(localRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (send.statusCode() != 200) {
+                throw ApiUtil.parseHttpError(send.body(), send.statusCode(), "搜索谱面集失败");
+            }
+
+            final RawResponse rawResponse = GSON.fromJson(send.body(), RawResponse.class);
+            ApiUtil.ensureApiSuccess(rawResponse, "搜索谱面集失败");
+            return rawResponse.getData().getAsJsonObject().get("count").getAsInt();
         } catch (IOException | InterruptedException e) {
             throw requestFailure(e);
         }
@@ -1109,7 +1136,7 @@ public class OstellaApi {
             if (send.statusCode() == 404) {
                 final Integer errCode = ApiUtil.extractErrorCode(r);
                 if (errCode != null && errCode == ErrorCode.NO_SCORE_FOUND.getCode()) {
-                    throw new ApiRequestException(ErrorCode.NO_SCORE_FOUND.getCode(), "回放上传失败：无法获取对应的成绩");
+                    throw new ApiRequestException(ErrorCode.NO_SCORE_FOUND.getCode(), "回放上传失败：无法获取对应的成绩", "");
                 }
             }
 

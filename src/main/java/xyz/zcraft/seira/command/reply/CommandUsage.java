@@ -10,12 +10,12 @@ public final class CommandUsage {
     public static final String REBIND = "由于发生了一个技术问题，使用此功能需要重新绑定。请使用 `/unbind` 解除绑定，再使用 `/bind` 重新绑定~";
     public static final String RS = "用法：/rs <个数或范围> [玩家ID/用户名/@用户] [过滤条件 ...]";
     public static final String TB = "用法：/tb [#天数] [玩家ID/用户名/@用户]";
-    public static final String SCORE_FILTERS = "过滤示例：acc>=98 any=stream miss=1";
+    public static final String SCORE_FILTERS = "过滤示例：acc>=98 any=stream miss~1";
     public static final String M = "用法：/m <谱面ID 或 快捷查询> [Mod]";
     public static final String BMA = "用法：/bma <谱面ID 或 快捷查询> [Mod]";
     public static final String AP = "用法：/ap <谱面ID 或 快捷查询>";
-    public static final String BPV = "用法：/bpv [谱面ID 或 快捷查询] [Mod]";
-    public static final String BGP = "用法：/bgp <谱面ID 或 快捷查询>";
+    public static final String MV = "用法：/mv [谱面ID 或 快捷查询] [Mod]";
+    public static final String MBG = "用法：/mbg <谱面ID 或 快捷查询>";
     public static final String DL = "用法：/dl <谱面集ID 或 快捷查询>";
     public static final String S = "用法：/s [成绩ID、[@用户] m谱面ID 或 快捷查询] [用户] [+Mod]";
     public static final String SM = "用法：/sm [谱面ID 或 快捷查询] [@玩家] [+Mod]";
@@ -28,6 +28,7 @@ public final class CommandUsage {
     public static final String F = "用法：/f [@用户]";
     public static final String RCANCEL = "用法：/rcancel <渲染任务ID>";
     public static final String SUP = "用法：/sup [@用户]";
+    public static final String SS = "用法：/ss [谱面ID 或 快捷查询] [用户]";
 
     private CommandUsage() {
     }

@@ -14,6 +14,8 @@ seira:
   watchIntervalMinutes: 5
   # 多人房间结果监视的轮询间隔（秒）
   multiplayerWatchIntervalSeconds: 30
+  # 错误播报
+  exceptionReports: [ "GROUP:", "PRIVATE:" ]
 
 # === 用户绑定配置 ===
 binding:
@@ -89,16 +91,29 @@ mcForward:
 
 agent:
   enabled: false
-  endpoint: "https://api.openai.com/v1/responses"
+  endpoint: "https://api.openai.com/v1"
   apiKey: "${SEIRA_AGENT_API_KEY:-}"
-  model: "your-responses-model"
+  models:
+    chat:
+    vision:
+    image:
+    edit:
+    embedding:
   promptFile: "agent-prompt.md"
   toolsFile: "agent-tools.yml"
   timeoutSeconds: 120
+  usePreviousResponseId: true
   proxy:
     enabled: false
     host: "127.0.0.1"
     port: 7890
+  # 是否提供余额查询功能
+  usages:
+    enabled: true
+    endpoint: "/api/usage/token"
+    path: "data.user_quota.total_available"
+    rate: 500000
+    unit: "积分"
   settings:
     # 以下参数省略或设为 null 时不发送；修改后需重启，/ai reload 仅重载提示词和工具。
     # 参数支持情况取决于模型和供应商；不支持时保持 null。

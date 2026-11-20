@@ -14,6 +14,7 @@ import xyz.zcraft.seira.command.AttachmentHandler;
 import xyz.zcraft.seira.command.InteractionHandler;
 import xyz.zcraft.seira.command.route.Router;
 import xyz.zcraft.seira.config.AppConfig;
+import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.discord.DiscordBridgeService;
 import xyz.zcraft.seira.discord.QqIncomingMessage;
 import xyz.zcraft.seira.interaction.data.InteractionEvent;
@@ -31,7 +32,7 @@ import java.util.function.Supplier;
 
 public class WSClient extends WebSocketClient {
     private static final Logger LOG = LogManager.getLogger(WSClient.class);
-    private final Gson gson = new Gson();
+    private final Gson GSON = new Gson();
     @Getter
     private final AppConfig config;
     private final Supplier<AccessToken> tokenSupplier;
@@ -70,16 +71,6 @@ public class WSClient extends WebSocketClient {
         LOG.info("QQ Gateway WebSocket Client created");
     }
 
-    private static String firstText(JsonObject object, String... names) {
-        for (String name : names) {
-            if (object.has(name) && !object.get(name).isJsonNull()) {
-                String value = object.get(name).getAsString();
-                if (!value.isBlank()) return value;
-            }
-        }
-        return "QQ用户";
-    }
-
     @Override
     public void onOpen(ServerHandshake handshake) {
         LOG.info("Gateway connected");
@@ -97,7 +88,7 @@ public class WSClient extends WebSocketClient {
     }
 
     private void processMessage(String message) {
-        JsonObject payload = gson.fromJson(message, JsonObject.class);
+        JsonObject payload = GSON.fromJson(message, JsonObject.class);
         updateSequence(payload.get("s"));
 
         int op = payload.get("op").getAsInt();
@@ -147,12 +138,32 @@ public class WSClient extends WebSocketClient {
             onGroupMsg(payload);
         } else if ("INTERACTION_CREATE".equals(eventType)) {
             onInteraction(payload);
+        } else if ("GROUP_MEMBER_REMOVE".equals(eventType)) {
+            onGroupMemberRemove(payload);
+        } else if ("GROUP_MEMBER_ADD".equals(eventType)) {
+            onGroupMemberAdd(payload);
         }
+    }
+
+    private void onGroupMemberAdd(JsonObject payload) {
+        final JsonObject data = payload.get("d").getAsJsonObject();
+        final String groupOpenid = data.get("group_openid").getAsString();
+        final String memberOpenid = data.get("member_openid").getAsString();
+
+        UserDataStore.upsertGroupMember(groupOpenid, memberOpenid);
+    }
+
+    private void onGroupMemberRemove(JsonObject payload) {
+        final JsonObject data = payload.get("d").getAsJsonObject();
+        final String groupOpenid = data.get("group_openid").getAsString();
+        final String memberOpenid = data.get("member_openid").getAsString();
+
+        UserDataStore.upsertGroupMember(groupOpenid, memberOpenid);
     }
 
     private void onInteraction(JsonObject payload) {
         JsonObject data = payload.get("d").getAsJsonObject();
-        final var event = gson.fromJson(data, InteractionEvent.class);
+        final var event = GSON.fromJson(data, InteractionEvent.class);
         interactionHandler.onInteraction(event);
     }
 
@@ -169,7 +180,7 @@ public class WSClient extends WebSocketClient {
         if (attachments != null && !attachments.isJsonNull()) {
             for (JsonElement attachmentElem : attachments) {
                 JsonObject attachmentObj = attachmentElem.getAsJsonObject();
-                Attachment attachment = gson.fromJson(attachmentObj, Attachment.class);
+                Attachment attachment = GSON.fromJson(attachmentObj, Attachment.class);
                 attachmentList.add(attachment);
             }
         }
@@ -190,7 +201,7 @@ public class WSClient extends WebSocketClient {
 
         if (data.has("msg_elements")) {
             data.get("msg_elements").getAsJsonArray()
-                    .forEach(elem -> msgElemList.add(gson.fromJson(elem, MsgElem.class)));
+                    .forEach(elem -> msgElemList.add(GSON.fromJson(elem, MsgElem.class)));
         }
 
         router.onPrivateMessageReceived(openId, msgId, content, msgIdx, attachmentList, msgElemList);
@@ -204,7 +215,7 @@ public class WSClient extends WebSocketClient {
         List<Attachment> attachmentList = new ArrayList<>(attachments.size());
         for (JsonElement attachmentElem : attachments) {
             JsonObject attachmentObj = attachmentElem.getAsJsonObject();
-            Attachment attachment = gson.fromJson(attachmentObj, Attachment.class);
+            Attachment attachment = GSON.fromJson(attachmentObj, Attachment.class);
             attachmentList.add(attachment);
         }
 
@@ -242,17 +253,29 @@ public class WSClient extends WebSocketClient {
 
         if (data.has("msg_elements")) {
             data.get("msg_elements").getAsJsonArray()
-                    .forEach(elem -> msgElemList.add(gson.fromJson(elem, MsgElem.class)));
+                    .forEach(elem -> msgElemList.add(GSON.fromJson(elem, MsgElem.class)));
         }
 
         List<Attachment> attachments = parseAttachments(data);
         Map<String, String> mentions = parseMentions(data);
 
         if (!openId.equals(config.qq().selfId())) {
+            String resultName;
+            for (String name : List.of("nickname", "username", "member_name", "member_openid")) {
+                if (author.has(name) && !author.get(name).isJsonNull()) {
+                    String value = author.get(name).getAsString();
+                    if (!value.isBlank()) {
+                        resultName = value;
+                        break;
+                    }
+                }
+            }
+            resultName = "QQ用户";
+
             discordBridgeService.acceptQqMessage(new QqIncomingMessage(
                     groupId,
                     openId,
-                    firstText(author, "nickname", "username", "member_name", "member_openid"),
+                    resultName,
                     msgId,
                     stripSelfMention(content),
                     attachments,
@@ -295,7 +318,7 @@ public class WSClient extends WebSocketClient {
         JsonArray attachments = data.getAsJsonArray("attachments");
         List<Attachment> result = new ArrayList<>(attachments.size());
         for (JsonElement element : attachments) {
-            result.add(gson.fromJson(element, Attachment.class));
+            result.add(GSON.fromJson(element, Attachment.class));
         }
         return List.copyOf(result);
     }
@@ -325,7 +348,7 @@ public class WSClient extends WebSocketClient {
             AUDIO_ACTION (1 << 29)
             PUBLIC_GUILD_MESSAGES (1 << 30) // 消息事件，此为公域的消息事件
          */
-        data.addProperty("intents", 1 << 25 | 1 << 26 | 1 << 28 | 1 << 30);
+        data.addProperty("intents", 1 << 25 | 1 << 26 | 1 << 28 | 1 << 30 | 1 << 24);
 
         JsonObject payload = new JsonObject();
         payload.addProperty("op", 2);
@@ -350,7 +373,7 @@ public class WSClient extends WebSocketClient {
     private void sendHeartbeat() {
         JsonObject payload = new JsonObject();
         payload.addProperty("op", 1);
-        JsonElement seq = sequence.get() < 0 ? JsonNull.INSTANCE : gson.toJsonTree(sequence.get());
+        JsonElement seq = sequence.get() < 0 ? JsonNull.INSTANCE : GSON.toJsonTree(sequence.get());
         payload.add("d", seq);
         send(payload.toString());
     }

@@ -4,9 +4,9 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.zcraft.seira.api.data.QqUploadRequest;
 import xyz.zcraft.seira.bot.data.FileInfo;
-import xyz.zcraft.seira.bot.data.Message;
-import xyz.zcraft.seira.bot.data.PendingMessage;
-import xyz.zcraft.seira.bot.data.SentMessage;
+import xyz.zcraft.seira.bot.data.msg.Message;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
+import xyz.zcraft.seira.bot.data.msg.SentMessage;
 import xyz.zcraft.seira.data.UploadedImage;
 import xyz.zcraft.seira.services.CosService;
 import xyz.zcraft.seira.util.TokenManager;
@@ -63,7 +63,7 @@ public class MessageSender {
 
         if (uploadCos && fileType == PendingMessage.FILE_TYPE_VIDEO) {
             try {
-                return QQApi.uploadPrivateVideoByParts(tokenManager.getToken(), userId, url);
+                return QQApi.uploadPrivateFileByParts(tokenManager.getToken(), userId, url);
             } catch (RuntimeException e) {
                 LOG.error("Failed to upload private video directly to QQ {}", userId, e);
                 return null;
@@ -90,7 +90,7 @@ public class MessageSender {
 
         if (uploadCos && fileType == PendingMessage.FILE_TYPE_VIDEO) {
             try {
-                return QQApi.uploadGroupVideoByParts(tokenManager.getToken(), groupId, url);
+                return QQApi.uploadGroupFileByParts(tokenManager.getToken(), groupId, url);
             } catch (RuntimeException e) {
                 LOG.error("Failed to upload group video directly to QQ {}", groupId, e);
                 return null;
@@ -110,6 +110,28 @@ public class MessageSender {
                 2_000L,
                 "group media for " + groupId
         );
+    }
+
+    public FileInfo uploadGroupMediaByParts(String groupId, String url) {
+        LOG.info("Uploading group media by parts for group {}, url {}", groupId, url);
+
+        try {
+            return QQApi.uploadGroupFileByParts(tokenManager.getToken(), groupId, url);
+        } catch (RuntimeException e) {
+            LOG.error("Failed to upload group video directly to QQ {}", groupId, e);
+            return null;
+        }
+    }
+
+    public FileInfo uploadPrivateMediaByParts(String userId, String url) {
+        LOG.info("Uploading private media by parts for user {}, url {}", userId, url);
+
+        try {
+            return QQApi.uploadPrivateFileByParts(tokenManager.getToken(), userId, url);
+        } catch (RuntimeException e) {
+            LOG.error("Failed to upload private media directly to QQ {}", userId, e);
+            return null;
+        }
     }
 
     public FileInfo uploadPrivateMediaBase64(String userId, int fileType, String base64Str) {
