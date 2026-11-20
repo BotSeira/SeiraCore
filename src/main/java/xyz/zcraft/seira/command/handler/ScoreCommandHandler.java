@@ -320,7 +320,7 @@ public final class ScoreCommandHandler {
         String mod = option == null ? null : option.substring(1);
         List<String> filters = List.of();
         if (mod != null) {
-            var parsed = ScoreFilterArguments.parse(new String[]{"mod=" + mod}, 0);
+            var parsed = ScoreFilterArguments.parse(new String[]{"mod~" + mod}, 0);
             if (parsed.isError()) {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + parsed.errorMessage()));
                 return;
@@ -364,7 +364,7 @@ public final class ScoreCommandHandler {
         String mod = option == null ? null : option.substring(1);
         List<String> filters = List.of();
         if (mod != null) {
-            var parsed = ScoreFilterArguments.parse(new String[]{"mod=" + mod}, 0);
+            var parsed = ScoreFilterArguments.parse(new String[]{"mod~" + mod}, 0);
             if (parsed.isError()) {
                 ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) + parsed.errorMessage()));
                 return;

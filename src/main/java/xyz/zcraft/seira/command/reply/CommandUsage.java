@@ -10,7 +10,7 @@ public final class CommandUsage {
     public static final String REBIND = "由于发生了一个技术问题，使用此功能需要重新绑定。请使用 `/unbind` 解除绑定，再使用 `/bind` 重新绑定~";
     public static final String RS = "用法：/rs <个数或范围> [玩家ID/用户名/@用户] [过滤条件 ...]";
     public static final String TB = "用法：/tb [#天数] [玩家ID/用户名/@用户]";
-    public static final String SCORE_FILTERS = "过滤示例：acc>=98 any=stream miss=1";
+    public static final String SCORE_FILTERS = "过滤示例：acc>=98 any=stream miss~1";
     public static final String M = "用法：/m <谱面ID 或 快捷查询> [Mod]";
     public static final String BMA = "用法：/bma <谱面ID 或 快捷查询> [Mod]";
     public static final String AP = "用法：/ap <谱面ID 或 快捷查询>";

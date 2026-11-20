@@ -67,16 +67,16 @@ public final class ScoreFilterArguments {
             }
             validateMods(value);
         } else if (field.equals("rank")) {
-            if (!Set.of(">", ">=", "<", "<=", "=", "!=").contains(operator)) {
-                throw new IllegalArgumentException("rank 仅支持 >、>=、<、<=、=、!=");
+            if (!Set.of(">", ">=", "<", "<=", "=", "!=", "~", "!~").contains(operator)) {
+                throw new IllegalArgumentException("rank 仅支持 >、>=、<、<=、=、!=、~、!~");
             }
             value = value.toUpperCase(Locale.ROOT);
             if (!RANKS.contains(value)) {
                 throw new IllegalArgumentException("rank 必须是 SSH/SS/XH/X/SH/S/A/B/C/D/F");
             }
         } else if (field.equals("client")) {
-            if (!("=".equals(operator) || "!=".equals(operator))) {
-                throw new IllegalArgumentException("client 仅支持 =、!=");
+            if (!Set.of("=", "!=", "~", "!~").contains(operator)) {
+                throw new IllegalArgumentException("client 仅支持 =、!=、~、!~");
             }
             value = value.toUpperCase(Locale.ROOT);
             if (!("LAZER".equals(value) || "STABLE".equals(value))) {
@@ -85,9 +85,6 @@ public final class ScoreFilterArguments {
         } else if (Set.of("any", "title", "artist", "mapper", "genre", "language", "tag", "source", "type").contains(field)) {
             if (!Set.of("~", "!~", "=", "!=").contains(operator)) {
                 throw new IllegalArgumentException(field + " 仅支持 ~、!~、=、!=");
-            }
-            if (field.equals("any") && !Set.of("=", "!=").contains(operator)) {
-                throw new IllegalArgumentException("any 仅支持 =、!=");
             }
             if (value.isBlank()) {
                 throw new IllegalArgumentException(field + " 不能为空");
@@ -107,15 +104,15 @@ public final class ScoreFilterArguments {
                 }
             }
         } else if (Set.of("nsfw", "video", "storyboard", "fullcombo", "replay").contains(field)) {
-            if (!Set.of("=", "!=").contains(operator)) {
-                throw new IllegalArgumentException(field + " 仅支持 =、!=");
+            if (!Set.of("=", "!=", "~", "!~").contains(operator)) {
+                throw new IllegalArgumentException(field + " 仅支持 =、!=、~、!~");
             }
             value = value.toLowerCase(Locale.ROOT);
             if (!Set.of("true", "false").contains(value)) {
                 throw new IllegalArgumentException(field + " 必须是 true 或 false");
             }
         } else {
-            if (Set.of("~", "!~").contains(operator)) {
+            if (Set.of("=", "!=").contains(operator)) {
                 throw new IllegalArgumentException(field + " 不支持包含运算符");
             }
             double number = field.equals("time") ? parseDuration(value) : parseNumber(value);
@@ -180,7 +177,7 @@ public final class ScoreFilterArguments {
     private static String expandShorthand(String value) {
         Matcher missMatcher = MISS_SHORTHAND_PATTERN.matcher(value);
         if (missMatcher.matches()) {
-            return "miss" + (missMatcher.group(1).isEmpty() ? "=" : "!=") + missMatcher.group(2);
+            return "miss" + (missMatcher.group(1).isEmpty() ? "~" : "!~") + missMatcher.group(2);
         }
 
         String booleanFilter = switch (value.toLowerCase(Locale.ROOT)) {

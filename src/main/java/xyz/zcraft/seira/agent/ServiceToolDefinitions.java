@@ -188,7 +188,7 @@ final class ServiceToolDefinitions {
                         .property("u", ToolSchema.integer()
                                 .description("osu! 用户 ID"))
                         .property("filters", ToolSchema.string()
-                                .description("逗号分隔的成绩过滤器，例如 acc>=98,miss<=2,mod~HD。"))
+                                .description("逗号分隔的成绩过滤器，例如 acc>=98,miss<=2,mod=HD。"))
                         .property("mod", ToolSchema.string()
                                 .description("连续的 mod acronym，例如 HDHR 或 DT；空值表示 NM。"))
                         .required()
@@ -328,7 +328,7 @@ final class ServiceToolDefinitions {
                         .property("start", ToolSchema.integer()
                                 .description("成绩列表起始序号，默认 1，且不能大于 n。"))
                         .property("filters", ToolSchema.string()
-                                .description("逗号分隔的成绩过滤器，例如 acc>=98,miss<=2,mod~HD。"))
+                                .description("逗号分隔的成绩过滤器，例如 acc>=98,miss<=2,mod=HD。"))
                         .required("userId", "n")
                         .additionalProperties(false),
                 new String[]{"userId"}, new String[]{"n", "start", "filters"}, false, false, false);
@@ -360,7 +360,7 @@ final class ServiceToolDefinitions {
                         .property("fail", ToolSchema.bool()
                                 .description("是否包含失败的最近成绩，默认 false。"))
                         .property("filters", ToolSchema.string()
-                                .description("逗号分隔的成绩过滤器，例如 acc>=98,miss<=2,mod~HD。"))
+                                .description("逗号分隔的成绩过滤器，例如 acc>=98,miss<=2,mod=HD。"))
                         .required("userId", "n")
                         .additionalProperties(false),
                 new String[]{"userId"}, new String[]{"n", "start", "fail", "filters"}, false, false, false);
