@@ -22,7 +22,10 @@ import xyz.zcraft.seira.util.dice.expr.DiceExpr;
 import xyz.zcraft.seira.util.dice.result.DiceResult;
 
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static xyz.zcraft.seira.command.reply.ReplyFactory.at;
@@ -100,6 +103,10 @@ public final class GeneralCommandHandler {
         }
     }
 
+    private static String roll(String... choices) {
+        return choices[new Random().nextInt(choices.length)];
+    }
+
     public void handleRoll(Context ctx) {
         DiceExpr diceExpr;
 
@@ -113,8 +120,8 @@ public final class GeneralCommandHandler {
         } else {
             try {
                 diceExpr = DiceExpr.parse(ctx.query());
-            } catch (Exception e) {
-                ctx.sendReply(at(ctx) + "无法解析骰子表达式喵。");
+            } catch (Exception _) {
+                tryParseRollSelection(ctx);
                 return;
             }
         }
@@ -127,6 +134,37 @@ public final class GeneralCommandHandler {
 
         final String message = at(ctx) + diceExpr + (Objects.equals(rollResultStr, totalStr) ? "" : " = " + rollResultStr) + " = __" + totalStr + "__";
         ctx.sendReply(message.replace("*", "\\*"));
+    }
+
+    private void tryParseRollSelection(Context ctx) {
+        final String input = ctx.query().trim();
+        final String result;
+
+        Matcher matcher = Pattern.compile("(.+?)不\\1").matcher(input);
+
+        if (matcher.find()) {
+            result = matcher.replaceFirst(roll("", "不") + "$1");
+        } else {
+            String body = input.startsWith("是") ? input.substring(1) : input;
+            String[] options = body.split("还是", -1);
+
+            if (options.length < 2 || Arrays.stream(options).anyMatch(String::isBlank)) {
+                ctx.sendReply(at(ctx) + "无法解析表达式喵。");
+                return;
+            }
+
+            result = options[ThreadLocalRandom.current().nextInt(options.length)].trim();
+        }
+
+        ctx.sendReply(
+                at(ctx) + roll(
+                        "小星觉得应该 %s !",
+                        "不如 %s ?",
+                        "要不然 %s ?",
+                        "当然 %s 啦!",
+                        "还是 %s 吧!"
+                ).formatted(result)
+        );
     }
 
     public void handleLuck(Context context) {
