@@ -86,7 +86,7 @@ public final class ResponsesClient {
                 [
                   {
                     "type": "compaction",
-                    "compact_threshold": 800000
+                    "compact_threshold": 750000
                   }
                 ]
                 """));

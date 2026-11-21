@@ -265,6 +265,7 @@ public class Router {
                 .register(minecraftCommands::handleMc, "mc")
                 .register(minecraftCommands::handleMcBind, "mcbind")
                 .register(generalCommands::handleBurningText, "burning")
+                .register(generalCommands::handleRemoveMember, "rm")
                 .build();
     }
 

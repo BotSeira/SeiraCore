@@ -9,10 +9,12 @@ import xyz.zcraft.seira.config.OstellaConfig;
 import xyz.zcraft.seira.db.UserDataStore;
 
 import java.net.URI;
+import java.util.List;
 import java.util.function.Function;
 
 final class ServiceTools {
     private static final Logger agentLogger = LogManager.getLogger("AgentLogger");
+    private static final List<String> VERBOSITY_LEVELS = List.of("compact", "standard", "full");
     private final ToolRegistry registry;
     private final OstellaConfig ostella;
     private final AsteroidConfig asteroid;
@@ -35,16 +37,40 @@ final class ServiceTools {
     void declare(String service, String route, String name, String description, String method,
                  ToolSchema schema, String[] pathParameters, String[] queryParameters, boolean jsonBody,
                  boolean adminOnly, boolean requiresConfirmation) {
+        declare(service, route, name, description, method, schema, pathParameters, queryParameters,
+                jsonBody, adminOnly, requiresConfirmation, null);
+    }
+
+    void declareOstellaWithVerbosity(String route, String name, String description, ToolSchema schema,
+                                     String[] pathParameters, String[] queryParameters, String defaultVerbosity) {
+        String verbosity = ostella.toolVerbosity().getOrDefault(name, defaultVerbosity);
+        if (!VERBOSITY_LEVELS.contains(verbosity)) {
+            throw new IllegalArgumentException("Invalid ostella.toolVerbosity for " + name + ": " + verbosity);
+        }
+        declare("ostella", route, name, description, "GET", schema, pathParameters, queryParameters,
+                false, false, false, verbosity);
+    }
+
+    private void declare(String service, String route, String name, String description, String method,
+                         ToolSchema schema, String[] pathParameters, String[] queryParameters, boolean jsonBody,
+                         boolean adminOnly, boolean requiresConfirmation, String defaultVerbosity) {
         JsonObject spec = new JsonObject();
         spec.addProperty("name", name);
         spec.addProperty("description", description);
         spec.addProperty("method", method);
+        JsonObject query = argumentMapping(queryParameters);
+        if (defaultVerbosity != null) {
+            schema.property("verbosity", ToolSchema.string().enumValues(VERBOSITY_LEVELS.toArray())
+                    .description("谱面数据详情级别：compact 基础信息，standard 含难度属性，full 完整信息。默认 "
+                            + defaultVerbosity + "。"));
+            query.addProperty("verbosity", "$verbosity");
+        }
         spec.add("parameters", schema.toJson());
         spec.addProperty("timeoutSeconds", 60);
         spec.addProperty("adminOnly", adminOnly);
         spec.addProperty("requiresConfirmation", requiresConfirmation);
         spec.add("path", argumentMapping(pathParameters));
-        spec.add("query", argumentMapping(queryParameters));
+        spec.add("query", query);
         if (jsonBody) spec.addProperty("body", "$body");
 
         JsonObject headers = new JsonObject();
@@ -86,7 +112,12 @@ final class ServiceTools {
                 request = HttpTools.create(authorized);
             }
 
-            JsonElement result = request.handler().execute(arguments, context);
+            JsonObject requestArguments = arguments;
+            if (defaultVerbosity != null && !arguments.has("verbosity")) {
+                requestArguments = arguments.deepCopy();
+                requestArguments.addProperty("verbosity", defaultVerbosity);
+            }
+            JsonElement result = request.handler().execute(requestArguments, context);
             if (browser) browsers.record(route, arguments, context.conversationId(), result);
             return result;
         }, http.adminOnly(), http.requiresConfirmation()));

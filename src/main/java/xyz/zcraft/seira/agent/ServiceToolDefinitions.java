@@ -101,15 +101,15 @@ final class ServiceToolDefinitions {
                         .additionalProperties(false),
                 new String[]{}, new String[]{"q"}, false, false, false);
 
-        service.declare("ostella", "/beatmapsets/{beatmapsetId}",
+        service.declareOstellaWithVerbosity("/beatmapsets/{beatmapsetId}",
                 "ostella_get_beatmapsets_by_beatmapsetId",
-                "获取谱面集\n获取谱面集对象，谱面按星数升序排列。", "GET",
+                "获取谱面集\n获取谱面集对象，谱面按星数升序排列。",
                 ToolSchema.object()
                         .property("beatmapsetId", ToolSchema.integer()
                                 .description("osu! 谱面集 ID"))
                         .required("beatmapsetId")
                         .additionalProperties(false),
-                new String[]{"beatmapsetId"}, new String[]{}, false, false, false);
+                new String[]{"beatmapsetId"}, new String[]{}, "standard");
 
         service.declare("ostella", "/daily",
                 "ostella_get_daily",
@@ -317,9 +317,9 @@ final class ServiceToolDefinitions {
                         .additionalProperties(false),
                 new String[]{"userId"}, new String[]{}, false, false, false);
 
-        service.declare("ostella", "/users/{userId}/scores/bestof",
+        service.declareOstellaWithVerbosity("/users/{userId}/scores/bestof",
                 "ostella_get_users_by_userId_scores_bestof",
-                "获取玩家最佳成绩列表\n获取指定玩家的最佳成绩（BP）列表，支持范围选择以及过滤器。", "GET",
+                "获取玩家最佳成绩列表\n获取指定玩家的最佳成绩（BP）列表，支持范围选择以及过滤器。",
                 ToolSchema.object()
                         .property("userId", ToolSchema.integer()
                                 .description("osu! 用户 ID"))
@@ -331,11 +331,11 @@ final class ServiceToolDefinitions {
                                 .description("逗号分隔的成绩过滤器，例如 acc>=98,miss<=2,mod=HD。"))
                         .required("userId", "n")
                         .additionalProperties(false),
-                new String[]{"userId"}, new String[]{"n", "start", "filters"}, false, false, false);
+                new String[]{"userId"}, new String[]{"n", "start", "filters"}, "compact");
 
-        service.declare("ostella", "/users/{userId}/scores/deranked-best",
+        service.declareOstellaWithVerbosity("/users/{userId}/scores/deranked-best",
                 "ostella_get_users_by_userId_scores_deranked_best",
-                "获取指定玩家所有成绩的最佳成绩列表\n返回指定玩家的最佳成绩列表（包含已经记录的在Unranked谱面、或使用ScoreV2等不在官方BP计算范围之内的分数），以及使用这些成绩计算的排名、PP及其组成等数据。", "GET",
+                "获取指定玩家所有成绩的最佳成绩列表\n返回指定玩家的最佳成绩列表（包含已经记录的在Unranked谱面、或使用ScoreV2等不在官方BP计算范围之内的分数），以及使用这些成绩计算的排名、PP及其组成等数据。",
                 ToolSchema.object()
                         .property("userId", ToolSchema.integer()
                                 .description("目标用户ID"))
@@ -345,11 +345,11 @@ final class ServiceToolDefinitions {
                                 .description("查询数量"))
                         .required("userId", "n")
                         .additionalProperties(false),
-                new String[]{"userId"}, new String[]{"start", "n"}, false, false, false);
+                new String[]{"userId"}, new String[]{"start", "n"}, "compact");
 
-        service.declare("ostella", "/users/{userId}/scores/recent",
+        service.declareOstellaWithVerbosity("/users/{userId}/scores/recent",
                 "ostella_get_users_by_userId_scores_recent",
-                "获取玩家最近成绩列表\n获取指定玩家最近的成绩，支持指定数量、过滤和筛选通过的成绩。", "GET",
+                "获取玩家最近成绩列表\n获取指定玩家最近的成绩，支持指定数量、过滤和筛选通过的成绩。",
                 ToolSchema.object()
                         .property("userId", ToolSchema.integer()
                                 .description("osu! 用户 ID"))
@@ -363,21 +363,21 @@ final class ServiceToolDefinitions {
                                 .description("逗号分隔的成绩过滤器，例如 acc>=98,miss<=2,mod=HD。"))
                         .required("userId", "n")
                         .additionalProperties(false),
-                new String[]{"userId"}, new String[]{"n", "start", "fail", "filters"}, false, false, false);
+                new String[]{"userId"}, new String[]{"n", "start", "fail", "filters"}, "compact");
 
-        service.declare("ostella", "/users/{userId}/scores/beatmaps/{beatmapId}/all",
+        service.declareOstellaWithVerbosity("/users/{userId}/scores/beatmaps/{beatmapId}/all",
                 "ostella_get_users_beatmap_scores",
-                "获取玩家谱面成绩列表\n获取指定玩家在知指定谱面上的成绩", "GET",
+                "获取玩家谱面成绩列表\n获取指定玩家在知指定谱面上的成绩",
                 ToolSchema.object()
                         .property("userId", ToolSchema.integer().description("osu! 用户 ID"))
                         .property("beatmapId", ToolSchema.integer().description("谱面ID"))
                         .required("userId", "beatmapId")
                         .additionalProperties(false),
-                new String[]{"userId", "beatmapId"}, new String[]{}, false, false, false);
+                new String[]{"userId", "beatmapId"}, new String[]{}, "compact");
 
-        service.declare("ostella", "/users/{userId}/scores/today-best",
+        service.declareOstellaWithVerbosity("/users/{userId}/scores/today-best",
                 "ostella_get_users_by_userId_scores_today_best",
-                "获取最近若干天内达成的最佳成绩\n获取指定用户在一段时间范围内达成的最佳成绩（BP）。默认查询最近 1 天。", "GET",
+                "获取最近若干天内达成的最佳成绩\n获取指定用户在一段时间范围内达成的最佳成绩（BP）。默认查询最近 1 天。",
                 ToolSchema.object()
                         .property("userId", ToolSchema.integer()
                                 .description("osu! 用户 ID"))
@@ -385,7 +385,7 @@ final class ServiceToolDefinitions {
                                 .description("查询最近几天，默认 1。"))
                         .required("userId")
                         .additionalProperties(false),
-                new String[]{"userId"}, new String[]{"days"}, false, false, false);
+                new String[]{"userId"}, new String[]{"days"}, "compact");
 
         service.declare("ostella", "/whatif",
                 "ostella_get_whatif",

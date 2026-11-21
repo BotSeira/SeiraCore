@@ -15,6 +15,7 @@ import xyz.zcraft.seira.command.parse.TargetResolver;
 import xyz.zcraft.seira.command.reply.ReplyFactory;
 import xyz.zcraft.seira.data.Notice;
 import xyz.zcraft.seira.data.UploadedImage;
+import xyz.zcraft.seira.db.UserDataStore;
 import xyz.zcraft.seira.services.DailyLuck;
 import xyz.zcraft.seira.services.NoticeStore;
 import xyz.zcraft.seira.util.dice.Dice;
@@ -68,6 +69,31 @@ public final class GeneralCommandHandler {
 //            var completion = replyFactory.userInfoMessage(context, response);
 //            context.sendReply(taskCoordinator.imageMessage(response, completion));
         }
+    }
+
+    public void handleRemoveMember(Context ctx) {
+        if (!ctx.inGroup()) {
+            ctx.sendReply(at(ctx) + "本指令仅能在群组中使用喵。");
+            return;
+        }
+
+        if (ctx.permissionLevel() < Context.Permission.ADMIN && !adminAuthorizer.test(ctx.senderUserId())) {
+            ctx.sendReply(at(ctx) + "你没有权限使用此指令喵。");
+            return;
+        }
+
+        if (ctx.argumentCount() != 1) {
+            ctx.sendReply(at(ctx) + "用法：/rm <用户>");
+            return;
+        }
+
+        String player = resolver.player(ctx.argument(0), ctx.senderUserId());
+        long uid = OstellaApi.resolveUid(player);
+
+        UserDataStore.findGroupOpenIdByUid(ctx.groupId(), uid).ifPresentOrElse(s -> {
+            UserDataStore.removeGroupMember(ctx.groupId(), s);
+            ctx.sendReply(at(ctx) + "已移除玩家 `%s` 在本群中的记录喵。".formatted(player));
+        }, () -> ctx.sendReply(at(ctx) + "指定玩家在本群中无记录喵。"));
     }
 
     public void handleUserAvatar(Context ctx) {

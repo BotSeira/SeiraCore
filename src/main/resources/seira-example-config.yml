@@ -32,6 +32,8 @@ ostella:
   # oStella API 的地址，由 Seira 访问，默认为本地运行的 oStella 实例
   endpoint: "http://localhost:8721"
   token:
+  # 按工具名覆盖默认 JSON 详情级别，可用 compact、standard、full。
+  toolVerbosity: {}
 
 # === QQ机器人 配置 ===
 qq:
