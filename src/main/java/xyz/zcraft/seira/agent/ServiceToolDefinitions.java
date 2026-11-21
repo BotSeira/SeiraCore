@@ -270,13 +270,13 @@ final class ServiceToolDefinitions {
                 new String[]{}, new String[]{}, true, false, false);
 
         service.declare("ostella", "/users/lookup",
-                "ostella_post_users_lookup",
-                "按用户名查找玩家\n按用户名查找玩家信息。", "POST",
+                "ostella_lookup_users",
+                "按用户名查找玩家\n按用户名查找单个或多个玩家信息。", "POST",
                 ToolSchema.object()
                         .property("body", ToolSchema.object()
-                                .property("user_name", ToolSchema.string()
-                                        .description("要查找的用户名。空格用下划线代替。不区分大小写。"))
-                                .required("user_name"))
+                                .property("user_name", ToolSchema.string().description("要查找的用户名。空格用下划线代替。不区分大小写。"))
+                                .property("user_names", ToolSchema.string().description("要查找的多个用户名列表。空格用下划线代替。不区分大小写。"))
+                        )
                         .required("body")
                         .additionalProperties(false),
                 new String[]{}, new String[]{}, true, false, false);
@@ -366,8 +366,8 @@ final class ServiceToolDefinitions {
                 new String[]{"userId"}, new String[]{"n", "start", "fail", "filters"}, "compact");
 
         service.declareOstellaWithVerbosity("/users/{userId}/scores/beatmaps/{beatmapId}/all",
-                "ostella_get_users_beatmap_scores",
-                "获取玩家谱面成绩列表\n获取指定玩家在知指定谱面上的成绩",
+                "ostella_get_user_beatmap_scores",
+                "获取玩家谱面成绩列表\n获取指定玩家在指定谱面上的成绩",
                 ToolSchema.object()
                         .property("userId", ToolSchema.integer().description("osu! 用户 ID"))
                         .property("beatmapId", ToolSchema.integer().description("谱面ID"))
