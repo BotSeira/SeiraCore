@@ -164,7 +164,9 @@ public final class AgentEngine implements AutoCloseable {
             // ignoring
 //            text.append("[非文本输出已省略]");
         }
-        result.addProperty("content", text.substring(0, Math.min(text.length(), 8192)));
+        final String content = text.substring(0, Math.min(text.length(), 8192));
+        if (content == null || content.isBlank()) return null;
+        result.addProperty("content", content);
         return result;
     }
 
