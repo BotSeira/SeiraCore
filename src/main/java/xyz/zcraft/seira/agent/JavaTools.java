@@ -63,6 +63,35 @@ class JavaTools {
         );
     }
 
+    private static void registerImageReadTool(ToolRegistry registry) {
+        registry.register(new ToolRegistry.Tool(
+                "read_image",
+                "将指定 URL 的图片加入到对话上下文中供读取。",
+                ToolSchema.object()
+                        .property("url", ToolSchema.string().description("图片的URL"))
+                        .required("url")
+                        .additionalProperties(false)
+                        .toJson(),
+                Set.of(),
+                Duration.ofSeconds(5),
+                (args, context) -> {
+                    String groupId = context.conversationId();
+                    if (groupId == null || groupId.isBlank()) {
+                        throw new IllegalArgumentException("Group context is required");
+                    }
+
+                    final String title = args.get("title").getAsString();
+                    final String description = args.get("description").getAsString();
+                    final String url = args.get("url").getAsString();
+                    final String picUrl = args.get("picUrl").getAsString();
+
+                    context.notice().accept(CardMessage.ofCard(title, description, url, picUrl));
+
+                    return GSON.toJsonTree(Map.of("sent", true));
+                })
+        );
+    }
+
     private static void registerFileTools(ToolRegistry registry) {
         registry.register(new ToolRegistry.Tool(
                 "upload_attachment",

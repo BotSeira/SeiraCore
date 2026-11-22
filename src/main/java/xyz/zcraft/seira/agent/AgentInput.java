@@ -9,8 +9,7 @@ import xyz.zcraft.seira.bot.data.Attachment;
 import java.util.List;
 import java.util.Locale;
 
-sealed interface AgentInput permits AgentInput.History, AgentInput.UserMessage, AgentInput.ToolResult,
-        ResponsesClient.OutputItem {
+interface AgentInput {
     int MAX_HISTORY_TEXT_LENGTH = 8192;
     String OMITTED_HISTORY_IMAGE = "[历史图片已省略]";
 
@@ -19,6 +18,7 @@ sealed interface AgentInput permits AgentInput.History, AgentInput.UserMessage, 
             case Text(var role, var content) -> Codec.message(role, content);
             case UserHistory(var message) -> Codec.userHistory(message);
             case UserMessage message -> Codec.userMessage(message);
+            case UserImage image -> Codec.userImage(image);
             case ToolResult(var callId, var output) -> {
                 var item = new JsonObject();
                 item.addProperty("type", "function_call_output");
@@ -27,10 +27,11 @@ sealed interface AgentInput permits AgentInput.History, AgentInput.UserMessage, 
                 yield item;
             }
             case ResponsesClient.OutputItem item -> item.payload();
+            default -> throw new AssertionError();
         };
     }
 
-    sealed interface History extends AgentInput {
+    interface History extends AgentInput {
     }
 
     record Text(String role, String content) implements History {
@@ -47,6 +48,9 @@ sealed interface AgentInput permits AgentInput.History, AgentInput.UserMessage, 
                             .split(";", 2)[0].trim().toLowerCase(Locale.ROOT).startsWith("image/"))
                     .toList();
         }
+    }
+
+    record UserImage(String url) implements AgentInput {
     }
 
     record User(String id, String nickname, Long osuUid, String osuUsername) {
@@ -89,6 +93,14 @@ sealed interface AgentInput permits AgentInput.History, AgentInput.UserMessage, 
             }
             item.add("content", content);
             return item;
+        }
+
+        private static JsonObject userImage(UserImage userImage) {
+            var image = new JsonObject();
+            image.addProperty("type", "input_image");
+            image.addProperty("image_url", userImage.url());
+            image.addProperty("detail", "auto");
+            return image;
         }
 
         private static JsonObject userHistory(UserMessage message) {

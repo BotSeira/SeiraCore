@@ -210,7 +210,8 @@ public final class ToolRegistry implements AutoCloseable {
             Set<String> participants,
             Map<String, String> aliases,
             Map<String, String> names,
-            Consumer<PendingMessage> notice
+            Consumer<PendingMessage> notice,
+            Consumer<AgentInput> input
     ) {
         public ToolContext {
             participants = Set.copyOf(participants);

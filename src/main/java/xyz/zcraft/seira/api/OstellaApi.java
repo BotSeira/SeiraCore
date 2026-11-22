@@ -1074,7 +1074,7 @@ public class OstellaApi {
 
             final RawResponse response = GSON.fromJson(send.body(), RawResponse.class);
             ApiUtil.ensureApiSuccess(response, "查找玩家失败");
-            final JsonObject data = ApiUtil.requireDataObject(response, "查找玩家响应缺少用户数据");
+            final JsonObject data = ApiUtil.requireDataObject(response, "未找到玩家");
 
             return Response.<User>fromHeaders(send.headers())
                     .content(GSON.fromJson(data, User.class))

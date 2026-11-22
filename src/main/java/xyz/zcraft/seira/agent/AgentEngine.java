@@ -260,7 +260,7 @@ public final class AgentEngine implements AutoCloseable {
                 if (++rounds > 512) throw new IllegalStateException("Agent response limit reached");
                 if (!allowed.test(id)) throw new CancellationException("Conversation disabled");
 
-                var context = new ToolRegistry.ToolContext(id, authors, session.participants, session.names, reply);
+                var context = new ToolRegistry.ToolContext(id, authors, session.participants, session.names, reply, input::add);
                 var snapshot = tools.snapshot(context);
                 Consumer<PendingMessage> destination = reply;
 
