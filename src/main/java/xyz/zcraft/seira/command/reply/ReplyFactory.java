@@ -791,10 +791,7 @@ public final class ReplyFactory {
                     > /rg - 猜 Rank 游戏
                     > /whatif - 估算总 PP 与全球排名的对应关系
                     > /addpp - 估算新增成绩后的总 PP 与排名变化
-                    > /rep - 生成指定时刻周围的 GIF，范围最多 6 秒
-                    > /snap - 生成指定时间、物件或 Miss 的回放快照
                     > /watch - 监视群友的新成绩
-                    > /gch - 群挑战，自选难度，按水平调整成绩
                     > /mpw <MPLink> - 监视多人房间的逐图结果
                     > /f - 获取好友列表
                     
@@ -831,8 +828,6 @@ public final class ReplyFactory {
                     > /tb #7 @peppy -> 查看指定玩家近7天的新BP
                     > /@peppy -> 查看指定玩家的基本信息
                     > /rg group -> 开始群组猜 Rank 游戏
-                    > /gch start 12345 24 -> 开始24小时的自选难度群挑战
-                    > /gch join -> 加入本群挑战
                     > /m @peppy rp2 -> 查看指定玩家最近第2条成绩的谱面
                     > /dl mp -> 获取所在lazer多人房间当前谱面的镜像下载链接
                     > /m mp123456 -> 查询指定lazer多人房间的当前谱面
