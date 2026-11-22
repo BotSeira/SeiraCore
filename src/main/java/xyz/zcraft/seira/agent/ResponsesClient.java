@@ -1,6 +1,7 @@
 package xyz.zcraft.seira.agent;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.apache.logging.log4j.LogManager;
@@ -19,6 +20,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -47,16 +51,56 @@ public final class ResponsesClient {
         this.CLIENT = HttpClient.newBuilder().connectTimeout(timeout).proxy(proxySelector).build();
     }
 
-    public JsonObject create(
-            String previousId, String instructions, JsonArray input, JsonArray tools, Consumer<String> onMessage, UUID sessionUuid
+    private static Response decodeResponse(JsonObject response) {
+        var output = new ArrayList<OutputItem>();
+        for (var value : response.getAsJsonArray("output")) {
+            var item = value.getAsJsonObject();
+            String type = item.get("type").getAsString();
+            boolean reasoning = type.equals("reasoning");
+            boolean replayable = type.equals("message") || type.equals("function_call")
+                    || (reasoning && item.has("encrypted_content") && !item.get("encrypted_content").isJsonNull());
+            ToolCall call = null;
+            if (type.equals("function_call")) {
+                call = new ToolCall(item.get("call_id").getAsString(),
+                        item.get("name").getAsString(), item.get("arguments"));
+            }
+            output.add(new OutputItem(replayable ? item : null, reasoning ? null : textHistory(item), call));
+        }
+        return new Response(response.get("id").getAsString(), List.copyOf(output));
+    }
+
+    private static AgentInput.Text textHistory(JsonObject item) {
+        var text = new StringBuilder();
+        if (item.has("content")) {
+            if (item.get("content").isJsonArray()) {
+                for (var part : item.getAsJsonArray("content")) {
+                    var content = part.getAsJsonObject();
+                    if (content.has("text")) text.append(content.get("text").getAsString()).append('\n');
+                    else if (content.has("image_url")) text.append(AgentInput.OMITTED_HISTORY_IMAGE).append('\n');
+                }
+            } else {
+                text.append(item.get("content").getAsString());
+            }
+        }
+        String content = text.substring(0, Math.min(text.length(), AgentInput.MAX_HISTORY_TEXT_LENGTH));
+        if (content.isBlank()) return null;
+        String role = item.has("role") && "assistant".equals(item.get("role").getAsString()) ? "assistant" : "user";
+        return new AgentInput.Text(role, content);
+    }
+
+    Response create(
+            String previousId, String instructions, List<AgentInput> input, Map<String, ToolRegistry.Tool> tools,
+            Consumer<String> onMessage, UUID sessionUuid
     ) throws Exception {
         JsonObject body = new JsonObject();
         body.addProperty("model", models.chat());
         body.addProperty("instructions", instructions);
         body.addProperty("stream", true);
         body.addProperty("store", true);
-        body.add("input", input);
-        body.add("tools", tools);
+        var items = new JsonArray();
+        input.forEach(item -> items.add(AgentInput.toJson(item)));
+        body.add("input", items);
+        body.add("tools", ToolRegistry.definitions(tools));
         if (previousId != null) {
             body.addProperty("previous_response_id", previousId);
         }
@@ -178,7 +222,9 @@ public final class ResponsesClient {
                                     messages.append(event.get("delta").getAsString());
                             case "response.completed" -> {
                                 messages.finish();
-                                return event.getAsJsonObject("response");
+                                var result = event.getAsJsonObject("response");
+                                requestLogger.debug("SESSION {} RESPONSE {}", sessionUuid, result);
+                                return decodeResponse(result);
                             }
                             case "response.failed", "response.incomplete", "error" ->
                                     throw new ResponseException("Responses request did not complete: " + event, response.statusCode(), event);
@@ -191,6 +237,19 @@ public final class ResponsesClient {
                 finished.set(true);
             }
         }
+    }
+
+    record Response(String id, List<OutputItem> output) {
+    }
+
+    // Keep the original provider fields for replay after a response chain is lost.
+    record OutputItem(JsonObject payload, AgentInput.Text history, ToolCall call) implements AgentInput {
+        boolean replayable() {
+            return payload != null;
+        }
+    }
+
+    record ToolCall(String id, String name, JsonElement arguments) {
     }
 
     static final class ResponseException extends IOException {

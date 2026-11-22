@@ -4,7 +4,6 @@ import com.google.gson.*;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import xyz.zcraft.seira.bot.data.FileInfo;
 import xyz.zcraft.seira.bot.data.FileUploader;
 import xyz.zcraft.seira.bot.data.msg.Button;
 import xyz.zcraft.seira.bot.data.msg.PendingMessage;
@@ -13,7 +12,6 @@ import xyz.zcraft.seira.util.TokenManager;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -141,11 +139,9 @@ public final class ToolRegistry implements AutoCloseable {
         return Collections.unmodifiableMap(result);
     }
 
-    public JsonObject execute(JsonObject call, Map<String, Tool> snapshot, ToolContext toolContext, UUID sessionUuid) {
-        var output = new JsonObject();
-        output.addProperty("type", "function_call_output");
-        output.addProperty("call_id", call.get("call_id").getAsString());
-
+    AgentInput.ToolResult execute(ResponsesClient.OutputItem item, Map<String, Tool> snapshot,
+                                  ToolContext toolContext, UUID sessionUuid) {
+        var call = item.call();
         JsonElement result;
         long started = System.nanoTime();
         Future<JsonElement> task = null;
@@ -153,20 +149,19 @@ public final class ToolRegistry implements AutoCloseable {
         final UUID uuid = UUID.randomUUID();
 
         try {
-            requestLogger.debug("SESSION {} TOOL_CALL {} BODY {}", sessionUuid, uuid, call);
+            requestLogger.debug("SESSION {} TOOL_CALL {} BODY {}", sessionUuid, uuid, item.payload());
             agentLogger.debug("Session {} calling tool {}", sessionUuid, uuid);
 
-            String name = call.get("name").getAsString();
+            String name = call.name();
             Tool tool = snapshot.getOrDefault(name, tools.get(name));
             if (tool == null || !permits(tool, toolContext))
                 throw new IllegalArgumentException("Tool not found or not permitted.");
 
-            JsonObject arguments = JsonParser.parseString(call.get("arguments").getAsString()).getAsJsonObject();
+            JsonObject arguments = JsonParser.parseString(call.arguments().getAsString()).getAsJsonObject();
             ToolArguments.validate(tool.parameters(), arguments);
 
             if (tool.requiresConfirmation() && !confirm(tool, arguments, toolContext)) {
-                output.addProperty("output", error("CONFIRMATION_DENIED").toString());
-                return output;
+                return new AgentInput.ToolResult(call.id(), error("CONFIRMATION_DENIED"));
             }
 
             if (!permits(tool, toolContext)) throw new IllegalArgumentException();
@@ -191,13 +186,12 @@ public final class ToolRegistry implements AutoCloseable {
 
         requestLogger.debug("SESSION {} TOOL_CALL {} RESULT {}", sessionUuid, uuid, result);
 
-        output.addProperty("output", result.toString());
         org.apache.logging.log4j.LogManager.getLogger(ToolRegistry.class).info(
                 "Agent tool={} conversation={} participants={} durationMs={} error={}",
-                call.get("name").getAsString(), toolContext.conversationId(), toolContext.participants().size(),
+                call.name(), toolContext.conversationId(), toolContext.participants().size(),
                 TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started),
                 result.isJsonObject() && result.getAsJsonObject().has("error"));
-        return output;
+        return new AgentInput.ToolResult(call.id(), result);
     }
 
     @Override

@@ -1,6 +1,7 @@
 package xyz.zcraft.seira.agent;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -11,11 +12,10 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 public final class ConversationStore {
+    private static final Gson GSON = new Gson();
     private final Path directory;
 
     public ConversationStore(Path directory) {
@@ -28,7 +28,7 @@ public final class ConversationStore {
 
     public Saved load(String id) throws IOException {
         Path path = file(id);
-        if (!Files.exists(path)) return new Saved(null, Map.of(), new com.google.gson.JsonArray());
+        if (!Files.exists(path)) return new Saved(null, Map.of(), List.of());
 
         JsonObject root = JsonParser.parseString(Files.readString(path)).getAsJsonObject();
         if (!id.equals(root.get("conversationId").getAsString()))
@@ -39,24 +39,29 @@ public final class ConversationStore {
 
         Map<String, String> participants = new LinkedHashMap<>();
         root.getAsJsonObject("participants").entrySet().forEach(e -> participants.put(e.getKey(), e.getValue().getAsString()));
-        return new Saved(expired ? null : root.get("responseId").getAsString(), participants,
-                root.has("history") ? root.getAsJsonArray("history") : new com.google.gson.JsonArray());
+        var history = new ArrayList<AgentInput.Text>();
+        if (root.has("history")) {
+            root.getAsJsonArray("history").forEach(item -> history.add(GSON.fromJson(item, AgentInput.Text.class)));
+        }
+        return new Saved(expired ? null : root.get("responseId").getAsString(), participants, List.copyOf(history));
     }
 
     public void save(String id, String responseId, Map<String, String> participants) throws IOException {
-        save(id, responseId, participants, java.util.List.of());
+        save(id, responseId, participants, List.of());
     }
 
     public void save(String id, String responseId, Map<String, String> participants,
-                     java.util.Collection<JsonObject> history) throws IOException {
+                     Collection<AgentInput.History> history) throws IOException {
         Files.createDirectories(directory);
 
         JsonObject root = new JsonObject();
         root.addProperty("conversationId", id);
         root.addProperty("responseId", responseId);
         root.addProperty("updatedAt", System.currentTimeMillis());
-        root.add("participants", new Gson().toJsonTree(participants));
-        root.add("history", new Gson().toJsonTree(history));
+        root.add("participants", GSON.toJsonTree(participants));
+        var items = new JsonArray();
+        history.forEach(item -> items.add(AgentInput.toJson(item)));
+        root.add("history", items);
 
         Path destination = file(id);
         Path temporary = Files.createTempFile(directory, "conversation-", ".tmp");
@@ -92,6 +97,6 @@ public final class ConversationStore {
         }
     }
 
-    public record Saved(String responseId, Map<String, String> participants, com.google.gson.JsonArray history) {
+    public record Saved(String responseId, Map<String, String> participants, List<AgentInput.Text> history) {
     }
 }
