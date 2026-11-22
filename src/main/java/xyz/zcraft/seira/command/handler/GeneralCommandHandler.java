@@ -280,6 +280,11 @@ public final class GeneralCommandHandler {
             return;
         }
 
+        if (ctx.query().length() > 50) {
+            ctx.sendReply(at(ctx) + "文字太长了喵。");
+            return;
+        }
+
         try (var _ = taskCoordinator.beginRequest(ctx, "Burning Text")) {
             final byte[] burningText = AsteroidApi.getBurningText(Resolver.parseQqMeme(ctx.query()));
             ctx.sendReply(PendingMessage.ofImageBase64(Base64.getEncoder().encodeToString(burningText)));
