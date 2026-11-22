@@ -14,7 +14,9 @@ public class SanitizeTest {
             "bs 20 @abc",
             "rp 10 @abc",
             "bd20",
-            "p"
+            "p @abc",
+            "bp10-20",
+            "rp20-40 @abc"
     );
 
     @Test
