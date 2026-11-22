@@ -269,7 +269,7 @@ final class ServiceToolDefinitions {
                         .additionalProperties(false),
                 new String[]{}, new String[]{}, true, false, false);
 
-        service.declare("ostella", "/users/lookup",
+        service.declare("ostella", "/users/lookup/batch",
                 "ostella_lookup_users",
                 "按用户名查找玩家\n按用户名查找单个或多个玩家信息。", "POST",
                 ToolSchema.object()
