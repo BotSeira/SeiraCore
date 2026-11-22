@@ -1,6 +1,7 @@
 package xyz.zcraft.seira.command.handler;
 
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.seira.api.ApiRequestException;
 import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.MissData;
 import xyz.zcraft.seira.api.data.Response;
@@ -16,6 +17,7 @@ import xyz.zcraft.seira.command.reply.ReplyFactory;
 
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -331,12 +333,19 @@ public final class ScoreCommandHandler {
             }
             filters = parsed.filters();
         }
+
         try (var _ = taskCoordinator.beginRequest(ctx, "Score")) {
             var ids = targets.score(ctx, target, remembered, userOverride, filters, mod);
             var response = OstellaApi.getScoreResponse(ids.scoreId());
 //            collectChallengeScores(ctx, response);
             history.remember(ctx, ids);
             ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.scoreMessage(ctx, response)));
+        } catch (ApiRequestException ex) {
+            if (target.kind() == TargetInput.Kind.ID && target.id().length() < 10) {
+                ctx.sendReply(at(ctx) + "成绩查询失败，请稍后重试喵。\n> Tip: 若要查找指定谱面上的成绩，请使用 /sm");
+            } else {
+                throw ex;
+            }
         }
     }
 
