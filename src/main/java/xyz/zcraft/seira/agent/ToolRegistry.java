@@ -142,9 +142,9 @@ public final class ToolRegistry implements AutoCloseable {
     AgentInput.ToolResult execute(ResponsesClient.OutputItem item, Map<String, Tool> snapshot,
                                   ToolContext toolContext, UUID sessionUuid) {
         var call = item.call();
-        JsonElement result;
+        AgentInput.ToolResult result;
         long started = System.nanoTime();
-        Future<JsonElement> task = null;
+        Future<AgentInput.ToolResult> task = null;
 
         final UUID uuid = UUID.randomUUID();
 
@@ -166,32 +166,37 @@ public final class ToolRegistry implements AutoCloseable {
 
             if (!permits(tool, toolContext)) throw new IllegalArgumentException();
 
-            task = executor.submit(() -> tool.handler().execute(arguments, toolContext));
+            task = executor.submit(() -> {
+                var images = new ArrayList<String>();
+                var context = new ToolContext(toolContext.conversationId(), toolContext.participants(),
+                        toolContext.aliases(), toolContext.names(), toolContext.notice(), images::add);
+                JsonElement output = tool.handler().execute(arguments, context);
+                return new AgentInput.ToolResult(call.id(), output == null ? JsonNull.INSTANCE : output, List.copyOf(images));
+            });
             result = task.get(tool.timeout().toMillis(), TimeUnit.MILLISECONDS);
-            if (result == null) result = JsonNull.INSTANCE;
-            // if (result.toString().length() > 100_000) result = error("OUTPUT_TOO_LARGE");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            result = error("CANCELLED");
+            result = new AgentInput.ToolResult(call.id(), error("CANCELLED"));
             agentLogger.error("Tool call cancelled", e);
         } catch (TimeoutException e) {
-            result = error("TIMEOUT");
+            result = new AgentInput.ToolResult(call.id(), error("TIMEOUT"));
             agentLogger.error("Tool call timed out", e);
         } catch (Exception e) {
-            result = error("TOOL_FAILED", e.getMessage());
+            result = new AgentInput.ToolResult(call.id(), error("TOOL_FAILED", e.getMessage()));
             agentLogger.error("Tool call failed", e);
         } finally {
             if (task != null && !task.isDone()) task.cancel(true);
         }
 
-        requestLogger.debug("SESSION {} TOOL_CALL {} RESULT {}", sessionUuid, uuid, result);
+        JsonElement output = result.output();
+        requestLogger.debug("SESSION {} TOOL_CALL {} RESULT {}", sessionUuid, uuid, output);
 
         org.apache.logging.log4j.LogManager.getLogger(ToolRegistry.class).info(
                 "Agent tool={} conversation={} participants={} durationMs={} error={}",
                 call.name(), toolContext.conversationId(), toolContext.participants().size(),
                 TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started),
-                result.isJsonObject() && result.getAsJsonObject().has("error"));
-        return new AgentInput.ToolResult(call.id(), result);
+                output.isJsonObject() && output.getAsJsonObject().has("error"));
+        return result;
     }
 
     @Override
@@ -211,8 +216,13 @@ public final class ToolRegistry implements AutoCloseable {
             Map<String, String> aliases,
             Map<String, String> names,
             Consumer<PendingMessage> notice,
-            Consumer<AgentInput> input
+            Consumer<String> imageOutput
     ) {
+        ToolContext(String conversationId, Set<String> participants, Map<String, String> aliases,
+                    Map<String, String> names, Consumer<PendingMessage> notice) {
+            this(conversationId, participants, aliases, names, notice, ignored -> {});
+        }
+
         public ToolContext {
             participants = Set.copyOf(participants);
             aliases = Map.copyOf(aliases);

@@ -18,12 +18,18 @@ interface AgentInput {
             case Text(var role, var content) -> Codec.message(role, content);
             case UserHistory(var message) -> Codec.userHistory(message);
             case UserMessage message -> Codec.userMessage(message);
-            case UserImage image -> Codec.userImage(image);
-            case ToolResult(var callId, var output) -> {
+            case ToolResult(var callId, var output, var images) -> {
                 var item = new JsonObject();
                 item.addProperty("type", "function_call_output");
                 item.addProperty("call_id", callId);
-                item.addProperty("output", output.toString());
+                if (images.isEmpty()) {
+                    item.addProperty("output", output.toString());
+                } else {
+                    var content = new JsonArray();
+                    if (!output.isJsonNull()) content.add(Codec.inputText(output.toString()));
+                    images.forEach(url -> content.add(Codec.inputImage(url)));
+                    item.add("output", content);
+                }
                 yield item;
             }
             case ResponsesClient.OutputItem item -> item.payload();
@@ -50,13 +56,13 @@ interface AgentInput {
         }
     }
 
-    record UserImage(String url) implements AgentInput {
-    }
-
     record User(String id, String nickname, Long osuUid, String osuUsername) {
     }
 
-    record ToolResult(String callId, JsonElement output) implements AgentInput {
+    record ToolResult(String callId, JsonElement output, List<String> images) implements AgentInput {
+        ToolResult(String callId, JsonElement output) {
+            this(callId, output, List.of());
+        }
     }
 
     final class Codec {
@@ -84,21 +90,17 @@ interface AgentInput {
                 if (attachment.url() == null) {
                     content.add(inputText(MISSING_IMAGE));
                 } else {
-                    var image = new JsonObject();
-                    image.addProperty("type", "input_image");
-                    image.addProperty("image_url", attachment.url());
-                    image.addProperty("detail", "auto");
-                    content.add(image);
+                    content.add(inputImage(attachment.url()));
                 }
             }
             item.add("content", content);
             return item;
         }
 
-        private static JsonObject userImage(UserImage userImage) {
+        private static JsonObject inputImage(String url) {
             var image = new JsonObject();
             image.addProperty("type", "input_image");
-            image.addProperty("image_url", userImage.url());
+            image.addProperty("image_url", url);
             image.addProperty("detail", "auto");
             return image;
         }

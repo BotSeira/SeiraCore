@@ -29,6 +29,7 @@ class JavaTools {
         registerFileTools(registry);
         registerMessageCardTool(registry);
         registerBalanceTool(registry, config);
+        registerImageReadTool(registry);
     }
 
     private static void registerMessageCardTool(ToolRegistry registry) {
@@ -68,7 +69,7 @@ class JavaTools {
                 "read_image",
                 "将指定 URL 的图片加入到对话上下文中供读取。",
                 ToolSchema.object()
-                        .property("url", ToolSchema.string().description("图片的URL"))
+                        .property("url", ToolSchema.string().description("可访问的图片 HTTP(S) URL"))
                         .required("url")
                         .additionalProperties(false)
                         .toJson(),
@@ -80,14 +81,13 @@ class JavaTools {
                         throw new IllegalArgumentException("Group context is required");
                     }
 
-                    final String title = args.get("title").getAsString();
-                    final String description = args.get("description").getAsString();
-                    final String url = args.get("url").getAsString();
-                    final String picUrl = args.get("picUrl").getAsString();
-
-                    context.notice().accept(CardMessage.ofCard(title, description, url, picUrl));
-
-                    return GSON.toJsonTree(Map.of("sent", true));
+                    var uri = URI.create(args.get("url").getAsString());
+                    if (uri.getHost() == null || uri.getUserInfo() != null
+                            || !("https".equalsIgnoreCase(uri.getScheme()) || "http".equalsIgnoreCase(uri.getScheme()))) {
+                        throw new IllegalArgumentException("An HTTP(S) image URL is required");
+                    }
+                    context.imageOutput().accept(uri.toString());
+                    return JsonNull.INSTANCE;
                 })
         );
     }
