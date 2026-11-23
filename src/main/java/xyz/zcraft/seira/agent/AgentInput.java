@@ -1,9 +1,6 @@
 package xyz.zcraft.seira.agent;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
+import com.google.gson.*;
 import xyz.zcraft.seira.bot.data.Attachment;
 
 import java.util.List;
@@ -13,23 +10,36 @@ interface AgentInput {
     int MAX_HISTORY_TEXT_LENGTH = 8192;
     String OMITTED_HISTORY_IMAGE = "[历史图片已省略]";
 
+    static JsonArray requestItems(List<AgentInput> input) {
+        var items = new JsonArray();
+        var images = new JsonArray();
+        for (AgentInput item : input) {
+            if (!(item instanceof ToolResult) && !images.isEmpty()) {
+                items.add(Codec.imageMessage(images));
+                images = new JsonArray();
+            }
+            items.add(toJson(item));
+            if (item instanceof ToolResult result && !result.images().isEmpty()) {
+                images.add(Codec.inputText("工具调用 " + result.callId() + " 返回的图片："));
+                for (String url : result.images()) {
+                    images.add(Codec.inputImage(url));
+                }
+            }
+        }
+        if (!images.isEmpty()) items.add(Codec.imageMessage(images));
+        return items;
+    }
+
     static JsonObject toJson(AgentInput input) {
         return switch (input) {
             case Text(var role, var content) -> Codec.message(role, content);
             case UserHistory(var message) -> Codec.userHistory(message);
             case UserMessage message -> Codec.userMessage(message);
-            case ToolResult(var callId, var output, var images) -> {
+            case ToolResult(var callId, var output, _) -> {
                 var item = new JsonObject();
                 item.addProperty("type", "function_call_output");
                 item.addProperty("call_id", callId);
-                if (images.isEmpty()) {
-                    item.addProperty("output", output.toString());
-                } else {
-                    var content = new JsonArray();
-                    if (!output.isJsonNull()) content.add(Codec.inputText(output.toString()));
-                    images.forEach(url -> content.add(Codec.inputImage(url)));
-                    item.add("output", content);
-                }
+                item.addProperty("output", output.toString());
                 yield item;
             }
             case ResponsesClient.OutputItem item -> item.payload();
@@ -63,6 +73,10 @@ interface AgentInput {
         ToolResult(String callId, JsonElement output) {
             this(callId, output, List.of());
         }
+
+        ToolResult imageTimedOut() {
+            return new ToolResult(callId, new JsonPrimitive("图片加载超时，无法读取。"));
+        }
     }
 
     final class Codec {
@@ -93,6 +107,13 @@ interface AgentInput {
                     content.add(inputImage(attachment.url()));
                 }
             }
+            item.add("content", content);
+            return item;
+        }
+
+        private static JsonObject imageMessage(JsonArray content) {
+            var item = new JsonObject();
+            item.addProperty("role", "user");
             item.add("content", content);
             return item;
         }

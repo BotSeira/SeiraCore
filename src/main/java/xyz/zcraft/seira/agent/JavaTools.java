@@ -87,7 +87,7 @@ class JavaTools {
                         throw new IllegalArgumentException("An HTTP(S) image URL is required");
                     }
                     context.imageOutput().accept(uri.toString());
-                    return JsonNull.INSTANCE;
+                    return GSON.toJsonTree(Map.of("status", "image_attached_in_following_message"));
                 })
         );
     }

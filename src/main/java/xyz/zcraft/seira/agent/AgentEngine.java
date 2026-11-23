@@ -10,6 +10,7 @@ import xyz.zcraft.seira.db.UserDataStore;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.http.HttpTimeoutException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -19,10 +20,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
-import java.util.function.LongFunction;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
+import java.util.function.*;
 
 public final class AgentEngine implements AutoCloseable {
     private static final Logger LOG = LogManager.getLogger(AgentEngine.class);
@@ -281,32 +279,48 @@ public final class AgentEngine implements AutoCloseable {
                     requestInput.addAll(transcript);
                     requestInput.addAll(input);
                 }
-                try {
-                    response = client.create(
-                            previousId,
-                            instructions.get(),
-                            requestInput,
-                            snapshot,
-                            listener,
-                            sessionUuid
-                    );
-                } catch (IOException error) {
-                    agentLogger.error("Session {} error creating response", sessionUuid, error);
-                    String detail = error.getMessage();
-                    boolean missing = error instanceof ResponsesClient.ResponseException failure
-                            && failure.previousResponseMissing();
-                    if (missing) session.localContext = true;
-                    boolean expiredImage = detail != null && detail.contains("422")
-                            && detail.contains("Failed to fetch media from URL") && detail.contains("image_url");
-                    if (recovered || delivered.get() || session.previousId == null || (!missing && !expiredImage))
-                        throw error;
-                    if (!allowed.test(id) || Thread.currentThread().isInterrupted()) throw error;
-                    recovered = true;
-                    session.previousId = null;
-                    var rebuilt = rebuildInput(baseHistory, transcript, input);
-                    agentLogger.warn("Session {} rebuilding missing or expired response chain for {}", sessionUuid, id);
-                    response = client.create(null, instructions.get(), rebuilt,
-                            snapshot, listener, sessionUuid);
+                boolean retriedWithoutImages = false;
+                while (true) {
+                    try {
+                        response = client.create(previousId, instructions.get(), requestInput, snapshot, listener, sessionUuid);
+                        break;
+                    } catch (IOException error) {
+                        agentLogger.error("Session {} error creating response", sessionUuid, error);
+                        boolean missing = error instanceof ResponsesClient.ResponseException failure
+                                && failure.previousResponseMissing();
+                        if (missing) session.localContext = true;
+                        if (delivered.get() || !allowed.test(id) || Thread.currentThread().isInterrupted()) throw error;
+
+                        if (error instanceof HttpTimeoutException && !retriedWithoutImages) {
+                            var unavailable = new HashMap<String, AgentInput.ToolResult>();
+                            for (AgentInput item : requestInput) {
+                                if (item instanceof AgentInput.ToolResult result && !result.images().isEmpty()) {
+                                    unavailable.put(result.callId(), result.imageTimedOut());
+                                }
+                            }
+                            if (!unavailable.isEmpty()) {
+                                UnaryOperator<AgentInput> omitImages = item -> item instanceof AgentInput.ToolResult result
+                                        ? unavailable.getOrDefault(result.callId(), result) : item;
+                                input.replaceAll(omitImages);
+                                transcript.replaceAll(omitImages);
+                                if (requestInput != input) requestInput.replaceAll(omitImages);
+                                executed.putAll(unavailable);
+                                retriedWithoutImages = true;
+                                agentLogger.warn("Session {} retrying without timed-out tool images for {}", sessionUuid, id);
+                                continue;
+                            }
+                        }
+
+                        String detail = error.getMessage();
+                        boolean expiredImage = detail != null && detail.contains("422")
+                                && detail.contains("Failed to fetch media from URL") && detail.contains("image_url");
+                        if (recovered || session.previousId == null || (!missing && !expiredImage)) throw error;
+                        recovered = true;
+                        session.previousId = null;
+                        previousId = null;
+                        requestInput = rebuildInput(baseHistory, transcript, input);
+                        agentLogger.warn("Session {} rebuilding missing or expired response chain for {}", sessionUuid, id);
+                    }
                 }
                 transcript.addAll(input);
                 for (var item : input) {

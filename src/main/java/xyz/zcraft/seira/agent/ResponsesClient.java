@@ -1,6 +1,5 @@
 package xyz.zcraft.seira.agent;
 
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -18,6 +17,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -25,7 +25,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
@@ -97,9 +99,7 @@ public final class ResponsesClient {
         body.addProperty("instructions", instructions);
         body.addProperty("stream", true);
         body.addProperty("store", true);
-        var items = new JsonArray();
-        input.forEach(item -> items.add(AgentInput.toJson(item)));
-        body.add("input", items);
+        body.add("input", AgentInput.requestItems(input));
         body.add("tools", ToolRegistry.definitions(tools));
         if (previousId != null) {
             body.addProperty("previous_response_id", previousId);
@@ -157,6 +157,12 @@ public final class ResponsesClient {
             response = pending.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
         } catch (Exception e) {
             pending.cancel(true);
+            if (e instanceof TimeoutException
+                    || (e instanceof ExecutionException failure && failure.getCause() instanceof HttpTimeoutException)) {
+                var error = new HttpTimeoutException("Responses gateway did not send HTTP headers within " + timeout.toSeconds() + "s");
+                error.initCause(e);
+                throw error;
+            }
             throw e;
         }
 
