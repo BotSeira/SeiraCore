@@ -280,7 +280,7 @@ public final class GeneralCommandHandler {
             return;
         }
 
-        var text = Resolver.parseQqMeme(ctx.query());
+        var text = Resolver.parseQqMeme(ctx.query()).trim();
         if (text.length() > 50) {
             ctx.sendReply(at(ctx) + "文字太长了喵。");
             return;
