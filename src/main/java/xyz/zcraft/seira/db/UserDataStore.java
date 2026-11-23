@@ -9,6 +9,7 @@ import xyz.zcraft.seira.util.OsuAuthHelper;
 import xyz.zcraft.seira.watch.SpecificScoreWatchState;
 
 import java.sql.*;
+import java.time.Instant;
 import java.util.*;
 
 public final class UserDataStore {
@@ -564,7 +565,7 @@ public final class UserDataStore {
                  PreparedStatement userStatement = connection.prepareStatement(insertUser);
                  PreparedStatement beatmapStatement = connection.prepareStatement(insertBeatmap)) {
                 watchStatement.setString(1, state.groupId());
-                watchStatement.setLong(2, System.currentTimeMillis());
+                watchStatement.setLong(2, state.startedAt().toEpochMilli());
                 watchStatement.executeUpdate();
 
                 deleteUsersStatement.setString(1, state.groupId());
@@ -653,7 +654,8 @@ public final class UserDataStore {
         Map<String, Set<Long>> usersByGroup = new LinkedHashMap<>();
         Map<String, Set<Long>> beatmapsByGroup = new LinkedHashMap<>();
         Map<String, Map<Long, Long>> cursorsByGroup = new LinkedHashMap<>();
-        String groupsSql = "SELECT group_id FROM specific_score_watches ORDER BY group_id";
+        Map<String, Instant> startedAtByGroup = new LinkedHashMap<>();
+        String groupsSql = "SELECT group_id, updated_at FROM specific_score_watches ORDER BY group_id";
         String usersSql = """
                 SELECT group_id, user_id, last_score_id
                 FROM specific_score_watch_users
@@ -669,6 +671,7 @@ public final class UserDataStore {
                  ResultSet resultSet = statement.executeQuery(groupsSql)) {
                 while (resultSet.next()) {
                     String groupId = resultSet.getString("group_id");
+                    startedAtByGroup.put(groupId, Instant.ofEpochMilli(resultSet.getLong("updated_at")));
                     usersByGroup.put(groupId, new LinkedHashSet<>());
                     beatmapsByGroup.put(groupId, new LinkedHashSet<>());
                     cursorsByGroup.put(groupId, new LinkedHashMap<>());
@@ -700,11 +703,12 @@ public final class UserDataStore {
         }
 
         List<SpecificScoreWatchState> states = new ArrayList<>();
-        usersByGroup.forEach((groupId, userIds) -> {
+        startedAtByGroup.forEach((groupId, startedAt) -> {
+            Set<Long> userIds = usersByGroup.getOrDefault(groupId, Set.of());
             Set<Long> beatmapIds = beatmapsByGroup.getOrDefault(groupId, Set.of());
             if (!userIds.isEmpty() && !beatmapIds.isEmpty()) {
                 states.add(new SpecificScoreWatchState(
-                        groupId, userIds, beatmapIds, cursorsByGroup.getOrDefault(groupId, Map.of())
+                        groupId, userIds, beatmapIds, cursorsByGroup.getOrDefault(groupId, Map.of()), startedAt
                 ));
             } else {
                 LOG.warn("Ignoring incomplete persisted /wx watch for group {}", groupId);

@@ -85,7 +85,7 @@ public final class SpecificScoreWatchCommandHandler {
             SpecificScoreWatchState state = watchService.startSpecific(ctx.groupId(), userIds, beatmapIds);
             ctx.sendReply(PendingMessage.ofMarkdownRaw(at(ctx) +
                     "指定谱面成绩监视已启动，目标为" + state.userIds().size() + " 名玩家，"
-                    + state.beatmapIds().size() + " 张谱面。"
+                    + state.beatmapIds().size() + " 张谱面，有效期 " + SpecificScoreWatchState.LIFETIME.toDays() + " 天。"
             ));
         }
     }
