@@ -163,8 +163,17 @@ public final class Resolver {
             rawContent = command + " " + target + " " + remaining;
         }
 
+        for (String s : TO_ADD_SPACE) {
+            if (rawContent.startsWith(s)) {
+                rawContent = rawContent.replaceFirst(s, s + " ");
+                break;
+            }
+        }
+
         return rawContent;
     }
+
+    private static final List<String> TO_ADD_SPACE = List.of("🔥");
 
     public SearchQuery resolveSearchQuery(String arg) {
         final Optional<MatchResult> first = Patterns.SEARCH_PATTERN.matcher(arg.trim()).results().findFirst();

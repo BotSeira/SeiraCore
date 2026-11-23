@@ -219,7 +219,7 @@ public class Router {
                 .register(ncmHandler::handleNcmUpdate, "ncmu")
                 .register(beatmapCommands::handleBeatmapPreview, "bpv", "mv")
                 .register(beatmapCommands::handleBeatmapBg, "bgp", "mbg")
-                .register(ctx -> socialCommands.handleF(ctx, !ctx.inGroup()), "f")
+                .register(ctx -> socialCommands.handleF(ctx, !ctx.inGroup()), "f", "fuck")
                 .register(socialCommands::handleFriendStatus, "mu")
                 .register(ctx -> socialCommands.handleF(ctx, true), "fall")
                 .register(socialCommands::handleSupporterStatus, "sup")
@@ -264,7 +264,7 @@ public class Router {
                 .register(aiChatHandler::handleAi, "ai")
                 .register(minecraftCommands::handleMc, "mc")
                 .register(minecraftCommands::handleMcBind, "mcbind")
-                .register(generalCommands::handleBurningText, "burning")
+                .register(generalCommands::handleBurningText, "burning", "burn", "🔥")
                 .register(generalCommands::handleRemoveMember, "rm")
                 .build();
     }
