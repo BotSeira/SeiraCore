@@ -7,6 +7,7 @@ public record SeiraConfig(
         String directUrl,
         boolean queueMessageInGroup,
         Integer watchIntervalMinutes,
+        Integer specificWatchIntervalMinutes,
         Integer multiplayerWatchIntervalSeconds,
         boolean debugMode,
         List<String> adminIds,
@@ -14,11 +15,18 @@ public record SeiraConfig(
 ) {
     private static final int DEFAULT_WATCH_INTERVAL_MINUTES = 5;
     private static final int DEFAULT_MULTIPLAYER_WATCH_INTERVAL_SECONDS = 30;
+    private static final int DEFAULT_SPECIFIC_WATCH_INTERVAL_MINUTES = 10;
 
     public int effectiveWatchIntervalMinutes() {
         return watchIntervalMinutes == null || watchIntervalMinutes <= 0
                 ? DEFAULT_WATCH_INTERVAL_MINUTES
                 : watchIntervalMinutes;
+    }
+
+    public int effectiveSpecificWatchIntervalMinutes() {
+        return specificWatchIntervalMinutes == null || specificWatchIntervalMinutes <= 0
+                ? DEFAULT_SPECIFIC_WATCH_INTERVAL_MINUTES
+                : specificWatchIntervalMinutes;
     }
 
     public int effectiveMultiplayerWatchIntervalSeconds() {

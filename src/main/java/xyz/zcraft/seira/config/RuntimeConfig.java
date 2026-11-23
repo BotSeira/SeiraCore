@@ -43,6 +43,7 @@ public final class RuntimeConfig {
                 newSeira.directUrl(),
                 newSeira.queueMessageInGroup(),
                 oldSeira.watchIntervalMinutes(),
+                oldSeira.specificWatchIntervalMinutes(),
                 oldSeira.multiplayerWatchIntervalSeconds(),
                 newSeira.debugMode(),
                 newSeira.adminIds() == null ? List.of() : List.copyOf(newSeira.adminIds()),

@@ -10,8 +10,10 @@ seira:
   debugMode: false
   # 管理员用户ID列表，逗号分隔
   adminIds: [ ]
-  # 新成绩监视与群挑战成绩收集共用的批量轮询间隔（分钟）
+  # 新成绩监视批量轮询间隔（分钟）
   watchIntervalMinutes: 5
+  # 批量监视的轮询间隔（分钟）
+  specificWatchIntervalMinutes: 10
   # 多人房间结果监视的轮询间隔（秒）
   multiplayerWatchIntervalSeconds: 30
   # 错误播报

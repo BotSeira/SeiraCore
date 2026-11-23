@@ -102,7 +102,7 @@ public class QQBot implements AutoCloseable, ConsoleRuntimeControl {
                 new WatchScoreNotifier(sender),
                 new SpecificScoreNotifier(sender),
                 new SqliteSpecificScoreWatchStore(),
-                Duration.ofMinutes(config.seira().effectiveWatchIntervalMinutes())
+                Duration.ofMinutes(config.seira().effectiveSpecificWatchIntervalMinutes())
         );
         this.challengeService = new ChallengeService(
                 new OstellaChallengeApi(config.ostella().endpoint(), config.ostella().token()),
