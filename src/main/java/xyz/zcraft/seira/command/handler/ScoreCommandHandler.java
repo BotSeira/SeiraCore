@@ -1,6 +1,7 @@
 package xyz.zcraft.seira.command.handler;
 
 import org.apache.logging.log4j.Logger;
+import xyz.zcraft.osu.model.UserExtended;
 import xyz.zcraft.seira.api.ApiRequestException;
 import xyz.zcraft.seira.api.OstellaApi;
 import xyz.zcraft.seira.api.data.MissData;
@@ -17,7 +18,7 @@ import xyz.zcraft.seira.command.reply.ReplyFactory;
 
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -27,6 +28,7 @@ public final class ScoreCommandHandler {
     private static final int MAX_SCORE_LIST_COUNT = 200;
     private static final Pattern SCORE_LIST_RANGE_PATTERN = Pattern.compile("^(\\d+)(?:-(\\d+))?$");
     private static final Logger LOG = org.apache.logging.log4j.LogManager.getLogger(ScoreCommandHandler.class);
+    final AtomicInteger reworkBestWaiting = new AtomicInteger(0);
     private final Resolver resolver;
     private final TargetResolver targets;
     private final TargetHistory history;
@@ -183,6 +185,23 @@ public final class ScoreCommandHandler {
 
             ctx.sendReply(PendingMessage.ofImageBase64(response.getContent().toBase64()));
 //            ctx.sendReply(taskCoordinator.imageMessage(response, replyFactory.bpMessage(ctx, response)));
+        }
+    }
+
+    public void handleReworkedBests(Context ctx) {
+        String player = resolver.player(ctx.argumentCount() == 0 ? null : ctx.argument(0), ctx.senderUserId());
+        try (var _ = taskCoordinator.beginRequest(ctx, "Deranked Best")) {
+            long uid = OstellaApi.resolveUid(player);
+            final UserExtended userRaw = OstellaApi.getUserRaw(uid);
+            final int i = reworkBestWaiting.incrementAndGet();
+            final String ver = "pp-dev";
+            ctx.sendReply(at(ctx) + "正在计算玩家 `%s` 在 `%s` 下的 BP，请稍作等待喵。\n> 目前你在计算队列的第 `%d` 位~"
+                    .formatted(userRaw.getUsername(), ver, i));
+            var response = OstellaApi.getReworkedBestResponse(uid, ver);
+
+            ctx.sendReply(PendingMessage.ofImageBase64(response.getContent().toBase64()));
+        } finally {
+            reworkBestWaiting.decrementAndGet();
         }
     }
 

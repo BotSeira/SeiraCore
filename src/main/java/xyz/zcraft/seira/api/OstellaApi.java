@@ -125,6 +125,14 @@ public class OstellaApi {
         );
     }
 
+    public static Response<Base64Bytes> getReworkedBestResponse(long uid, String version) {
+        return getBase64BytesResponse(
+                "/users/" + uid + "/scores/bestof/recalculate?version=" + version,
+                "获取Rework最好成绩失败",
+                null
+        );
+    }
+
     public static Response<Base64Bytes> getUserInfoResponse(long uid) {
         return getBase64BytesResponse(
                 "/users/" + uid,

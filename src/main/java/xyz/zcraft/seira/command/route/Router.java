@@ -206,6 +206,7 @@ public class Router {
                 .register(scoreCommands::handleRandomBest, "rbp")
                 .register(scoreCommands::handleBests, "bp", "bs")
                 .register(scoreCommands::handleDerankedBests, "bd", "debp")
+                .register(scoreCommands::handleReworkedBests, "rework")
                 .register(beatmapCommands::handleDaily, "daily")
                 .register(socialCommands::handleMultiplayer, "mp")
                 .register(ctx -> scoreCommands.handleRecentScores(ctx, true), "rs")
