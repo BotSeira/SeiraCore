@@ -131,7 +131,7 @@ public final class ConsoleCommandProcessor {
                     (left, right) -> left + " | " + right
             ).orElse(""));
         }
-        output.append("\nReturned ").append(result.rows().size()).append(" row(s)");
+        output.append("\n----------\nReturned ").append(result.rows().size()).append(" row(s)");
         if (result.truncated()) {
             output.append(" (result truncated)");
         }

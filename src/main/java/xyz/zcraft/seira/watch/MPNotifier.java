@@ -1,8 +1,11 @@
 package xyz.zcraft.seira.watch;
 
 import xyz.zcraft.seira.bot.MessageSender;
-import xyz.zcraft.seira.data.UploadedImage;
+import xyz.zcraft.seira.bot.data.FileInfo;
+import xyz.zcraft.seira.bot.data.msg.Message;
+import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 
+import java.util.Base64;
 import java.util.Objects;
 
 public final class MPNotifier {
@@ -13,18 +16,23 @@ public final class MPNotifier {
     }
 
     public boolean sendResult(MPWatchService.WatchEntry watch, String groupId, byte[] imageBytes) {
-        final UploadedImage uploadedImage = messageSender.uploadImageToCos(imageBytes);
-
-        if (uploadedImage == null) return false;
-
-        return messageSender.sendGroupMarkdown(
-                groupId,
-                """
-                        %s
-                        > __%s__
-                        > %s mp - %s
-                        """.formatted(uploadedImage.toMarkdown(), watch.roomName(), watch.version().value(), watch.roomId()).trim()
-        ) != null;
+        final FileInfo fileInfo = messageSender.uploadGroupMediaBase64(groupId, PendingMessage.FILE_TYPE_IMAGE, Base64.getEncoder().encodeToString(imageBytes));
+        Message message = new Message();
+        message.setMsgType(PendingMessage.MSG_TYPE_MEDIA);
+        message.setMedia(fileInfo);
+        return messageSender.sendGroupMessage(groupId, message) != null;
+//        final UploadedImage uploadedImage = messageSender.uploadImageToCos(imageBytes);
+//
+//        if (uploadedImage == null) return false;
+//
+//        return messageSender.sendGroupMarkdown(
+//                groupId,
+//                """
+//                        %s
+//                        > __%s__
+//                        > %s mp - %s
+//                        """.formatted(uploadedImage.toMarkdown(), watch.roomName(), watch.version().value(), watch.roomId()).trim()
+//        ) != null;
     }
 
     public boolean sendRoomEnded(String groupId, RoomWatchSnapshot snapshot) {
