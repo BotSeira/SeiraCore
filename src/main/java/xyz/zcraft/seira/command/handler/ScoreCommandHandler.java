@@ -189,12 +189,12 @@ public final class ScoreCommandHandler {
     }
 
     public void handleReworkedBests(Context ctx) {
+        final String ver = "pp-dev";
         String player = resolver.player(ctx.argumentCount() == 0 ? null : ctx.argument(0), ctx.senderUserId());
         try (var _ = taskCoordinator.beginRequest(ctx, "Deranked Best")) {
             final int i = reworkBestWaiting.incrementAndGet();
             long uid = OstellaApi.resolveUid(player);
             final UserExtended userRaw = OstellaApi.getUserRaw(uid);
-            final String ver = "pp-dev";
             ctx.sendReply(at(ctx) + "正在计算玩家 `%s` 在 `%s` 下的 BP，请稍作等待喵。\n> 目前你在计算队列的第 `%d` 位~"
                     .formatted(userRaw.getUsername(), ver, i));
             var response = OstellaApi.getReworkedBestResponse(uid, ver);
