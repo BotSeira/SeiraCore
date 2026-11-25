@@ -418,7 +418,7 @@ public final class RankGuessCommandHandler {
         try {
             final String s = OstellaApi.lookupPlayerScore(boundUid, bpType, index, List.of(), null);
             scoreId = Long.parseLong(
-                   s.startsWith("loc") ? "-" +s.substring(3) : s
+                    s.startsWith("loc") ? "-" + s.substring(3) : s
             );
         } catch (Exception e) {
             LOG.error("Failed to lookup score id", e);

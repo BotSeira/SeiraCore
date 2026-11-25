@@ -35,7 +35,7 @@ ostella:
   endpoint: "http://localhost:8721"
   token:
   # 按工具名覆盖默认 JSON 详情级别，可用 compact、standard、full。
-  toolVerbosity: {}
+  toolVerbosity: { }
 
 # === QQ机器人 配置 ===
 qq:

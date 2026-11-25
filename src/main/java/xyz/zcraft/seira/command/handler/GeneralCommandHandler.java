@@ -59,6 +59,10 @@ public final class GeneralCommandHandler {
         this.adminAuthorizer = adminAuthorizer;
     }
 
+    private static String roll(String... choices) {
+        return choices[new Random().nextInt(choices.length)];
+    }
+
     public void handleUserInfo(Context ctx) {
         String player = resolver.player(ctx.argumentCount() == 0 ? null : ctx.argument(0), ctx.senderUserId());
 
@@ -128,10 +132,6 @@ public final class GeneralCommandHandler {
                 ctx.sendReply(msg);
             }
         }
-    }
-
-    private static String roll(String... choices) {
-        return choices[new Random().nextInt(choices.length)];
     }
 
     public void handleRoll(Context ctx) {
@@ -281,7 +281,10 @@ public final class GeneralCommandHandler {
         }
 
         var text = Resolver.parseQqMeme(ctx.query()).trim();
-        if (text.length() > 50) {
+        final String[] lines = text.split("\n");
+        if (text.length() > 100
+                || lines.length > 8
+                || Arrays.stream(lines).mapToInt(String::length).max().orElse(0) > 30) {
             ctx.sendReply(at(ctx) + "文字太长了喵。");
             return;
         }

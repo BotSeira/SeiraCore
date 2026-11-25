@@ -86,7 +86,7 @@ final class ServiceTools {
         boolean browser = service.equals("asteroid") && route.startsWith("/browsers/");
         boolean oauth = service.equals("ostella") && (route.equals("/beatmaps/lookup") || route.equals("/beatmapsets/lookup"));
 
-        registry.register( new ToolRegistry.Tool(http.name(), http.description(), http.parameters(),
+        registry.register(new ToolRegistry.Tool(http.name(), http.description(), http.parameters(),
                 http.groups(), http.timeout(), (arguments, context) -> {
             agentLogger.debug("Executing tool {} with args {}", http.name(), arguments);
             if (browser) {

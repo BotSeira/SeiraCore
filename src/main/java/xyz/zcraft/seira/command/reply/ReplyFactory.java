@@ -301,7 +301,7 @@ public final class ReplyFactory {
 
     public PendingMessage scoreAnalyzeMessage(Context ctx, Response<?> response) {
         return PendingMessage.ofMarkdownRaw(
-                at(ctx) + "成绩分析(" + s(response.getScoreId()) +  ")",
+                at(ctx) + "成绩分析(" + s(response.getScoreId()) + ")",
                 buttons().saButtons(response.getBeatmapId(), response.getScoreId())
         );
     }

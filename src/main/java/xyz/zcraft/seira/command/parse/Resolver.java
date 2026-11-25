@@ -32,6 +32,7 @@ public final class Resolver {
     private static final Pattern QQ_MEME_ALT = Pattern.compile(
             "<faceType=4,faceId=\"\",ext=\"([^\"]+)\">", Pattern.CASE_INSENSITIVE
     );
+    private static final List<String> TO_ADD_SPACE = List.of("🔥");
     private final java.util.function.Function<String, Long> boundUid;
 
     public Resolver() {
@@ -172,8 +173,6 @@ public final class Resolver {
 
         return rawContent;
     }
-
-    private static final List<String> TO_ADD_SPACE = List.of("🔥");
 
     public SearchQuery resolveSearchQuery(String arg) {
         final Optional<MatchResult> first = Patterns.SEARCH_PATTERN.matcher(arg.trim()).results().findFirst();

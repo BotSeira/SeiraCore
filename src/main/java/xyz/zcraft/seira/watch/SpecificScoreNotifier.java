@@ -15,6 +15,10 @@ public final class SpecificScoreNotifier {
         this.messageSender = Objects.requireNonNull(messageSender);
     }
 
+    private static String joinIds(Set<Long> ids) {
+        return ids.stream().sorted().map(String::valueOf).collect(Collectors.joining(","));
+    }
+
     public boolean sendScoreId(String groupId, long scoreId) {
         return messageSender.sendGroupMarkdown(groupId, "捕获到成绩 ID：" + cmd("/s " + scoreId, String.valueOf(scoreId))) != null;
     }
@@ -23,9 +27,5 @@ public final class SpecificScoreNotifier {
         String command = "/wx start " + joinIds(userIds) + " " + joinIds(beatmapIds);
         return messageSender.sendGroupMarkdown(groupId,
                 "本群的指定谱面成绩监视已到期，点击" + cmd(command, "这里") + "再次启动喵。") != null;
-    }
-
-    private static String joinIds(Set<Long> ids) {
-        return ids.stream().sorted().map(String::valueOf).collect(Collectors.joining(","));
     }
 }

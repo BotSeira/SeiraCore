@@ -1,6 +1,9 @@
 package xyz.zcraft.seira.agent;
 
-import xyz.zcraft.seira.bot.data.*;
+import xyz.zcraft.seira.bot.data.Attachment;
+import xyz.zcraft.seira.bot.data.FileUploader;
+import xyz.zcraft.seira.bot.data.GroupBotState;
+import xyz.zcraft.seira.bot.data.MsgElem;
 import xyz.zcraft.seira.bot.data.msg.PendingMessage;
 import xyz.zcraft.seira.command.Context;
 import xyz.zcraft.seira.config.AgentConfig;
@@ -15,7 +18,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
 

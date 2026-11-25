@@ -13,13 +13,14 @@ public record AgentConfig(
         LLMSettings settings,
         Usages usages
 ) {
-    public record Models (
+    public record Models(
             String chat,
             String vision,
             String image,
             String edit,
             String embedding
-    ){}
+    ) {
+    }
 
     public record Usages(
             boolean enabled,

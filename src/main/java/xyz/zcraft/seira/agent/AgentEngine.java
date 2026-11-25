@@ -34,8 +34,8 @@ public final class AgentEngine implements AutoCloseable {
     private final Supplier<String> instructions;
     private final ConversationStore store;
     private final Predicate<String> allowed;
-    private boolean closed;
     private final AgentConfig config;
+    private boolean closed;
 
     public AgentEngine(
             AgentConfig config, ResponsesClient client, ToolRegistry tools,

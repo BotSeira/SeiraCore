@@ -282,18 +282,18 @@ public class Router {
                     detail = "\n详细信息：\n```json\n" + apiEx.getBodyRaw() + "\n```";
                 }
                 String message = """
-                    处理指令时发生错误：
-                    目标：`%s`
-                    指令：
-                    ```text
-                    %s
-                    ```
-                    错误：
-                    ```text
-                    %s
-                    ```
-                    %s
-                    """.formatted(ctx.senderUserId() + "@" + ctx.groupId(), ctx.rawContent(), stackTrace, detail).trim();
+                        处理指令时发生错误：
+                        目标：`%s`
+                        指令：
+                        ```text
+                        %s
+                        ```
+                        错误：
+                        ```text
+                        %s
+                        ```
+                        %s
+                        """.formatted(ctx.senderUserId() + "@" + ctx.groupId(), ctx.rawContent(), stackTrace, detail).trim();
                 if (s.startsWith("GROUP:")) {
                     messageSender.sendGroupMarkdown(s.substring("GROUP:".length()), message);
                 } else if (s.startsWith("PRIVATE:")) {

@@ -23,12 +23,12 @@ public final class ToolRegistry implements AutoCloseable {
     private final Predicate<String> administrator;
     private final Predicate<String> conversationAllowed;
     private final ConcurrentHashMap<String, Approval> approvals = new ConcurrentHashMap<>();
-    private volatile Map<String, Tool> tools = Map.of();
-    private Set<String> configuredNames = Set.of();
     @Getter
     private final TokenManager tokenManager;
     @Getter
     private final FileUploader fileUploader;
+    private volatile Map<String, Tool> tools = Map.of();
+    private Set<String> configuredNames = Set.of();
 
     public ToolRegistry(Predicate<String> administrator, Predicate<String> conversationAllowed,
                         TokenManager tokenManager, FileUploader fileUploader) {
@@ -220,7 +220,8 @@ public final class ToolRegistry implements AutoCloseable {
     ) {
         ToolContext(String conversationId, Set<String> participants, Map<String, String> aliases,
                     Map<String, String> names, Consumer<PendingMessage> notice) {
-            this(conversationId, participants, aliases, names, notice, ignored -> {});
+            this(conversationId, participants, aliases, names, notice, ignored -> {
+            });
         }
 
         public ToolContext {
