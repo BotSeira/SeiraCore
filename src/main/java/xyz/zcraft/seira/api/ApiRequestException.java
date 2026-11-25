@@ -50,6 +50,7 @@ public class ApiRequestException extends RuntimeException {
             case RENDER_QUEUE_FULL -> "回放渲染队列已满，请稍后再试喵";
             case RENDERER_UNAVAILABLE -> "回放渲染服务暂不可用，请稍后再试喵";
             case PERFORMANCE_PLUS_UNAVAILABLE -> "Performance+服务暂不可用，请稍后再试喵";
+            case TEMPLATE_RENDER_ERROR -> "图片渲染失败了喵。";
             case IMAGE_RENDER_TIMEOUT -> "超时了喵。";
         };
     }

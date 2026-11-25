@@ -61,9 +61,8 @@ public final class TaskCoordinator {
                 }
                 case ApiRequestException e -> {
                     final String s = ApiRequestException.getDefaultMessage(e.getErrorCode()) + "\n> " + e.getMessage();
-                    if (e.getErrorCode() != null
-                            && e.getErrorCode() / 1000 != 1
-                            && e.getErrorCode() != ErrorCode.REPLAY_UNAVAILABLE.getCode()) {
+                    if (e.getErrorCode() == null ||
+                            (e.getErrorCode() / 1000 != 1 && e.getErrorCode() != ErrorCode.REPLAY_UNAVAILABLE.getCode())) {
                         reporter.accept(ctx, exception);
                     }
                     return s;
